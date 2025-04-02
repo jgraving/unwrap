@@ -15,6 +15,14 @@ def softplus(eta):
     return pm.math.log1pexp(eta)
 
 
+def reciprocal_softplus(eta):
+    return pt.exp(-pt.log(softplus(eta)))
+
+
+def inverse_reciprocal_softplus(mu):
+    return inverse_softplus(pt.exp(-pt.log(mu)))
+
+
 def modulo(eta):
     return eta % (2 * PI)
 
@@ -35,6 +43,12 @@ LINKS = {
     "softplus": LinksContainer(inverse_softplus, softplus),
     "logexpm1": LinksContainer(inverse_softplus, softplus),  # Alias for softplus
     "log1pexp": LinksContainer(inverse_softplus, softplus),  # Alias for softplus
+    "reciprocal_softplus": LinksContainer(
+        inverse_reciprocal_softplus, reciprocal_softplus
+    ),
+    "inv_softplus": LinksContainer(
+        inverse_reciprocal_softplus, reciprocal_softplus
+    ),  # Short alias
     "modulo": LinksContainer(modulo, modulo),
     "mod": LinksContainer(modulo, modulo),  # Alias for modulo
     "shifted_modulo": LinksContainer(shifted_modulo, shifted_modulo),
