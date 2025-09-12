@@ -74,8 +74,8 @@ transformed parameters {
   lprior += normal_lpdf(b_fmu | 0,pi()/2);
   lprior += unwrap_von_mises_vect_lpdf(b_zmu | 0, log1p_exp(kappamu));
   lprior += normal_lpdf(Intercept_kappa | 3,2);
-  lprior += student_t_lpdf(sd_1 | 3, 0, 2.5)
-    - 1 * student_t_lccdf(0 | 3, 0, 2.5);
+  lprior += student_t_lpdf(sd_1 | 3, 0, 0.5)
+    - 1 * student_t_lccdf(0 | 3, 0, 0.5);
 }
 model {
   // likelihood including constants
