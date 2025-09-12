@@ -593,6 +593,7 @@ VertHist = function(data, # numerical data vector
                     main = '',
                     col = 'gray',
                     border = NA,
+                    axes = TRUE,
                     ...)
 {
   hst = hist(x = data, # calculate the histogram but don't plot it
@@ -605,7 +606,8 @@ VertHist = function(data, # numerical data vector
               ylim = if(is.null(ylim)){range(mids)}else{ylim},
               xlab = xlab,
               ylab = ylab,
-              main = main)
+              main = main,
+              axes = axes)
          #plot each bar
          for(i in 1:length(mids))
          {
@@ -1062,7 +1064,7 @@ prior_highcorr =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'fmu') +
                         nlpar  = 'zmu',  class = 'b') +
                   set_prior("target += normal_lpdf(kappamu | 3, 3)", #expect high concentration (low variation) 
                             check = FALSE) +
-                  prior('normal(3,2)', class = 'Intercept', dpar = 'kappa') #+
+                  prior('normal(3,2)', class = 'Intercept', dpar = 'kappa') +
                   prior('student_t(3, 0, 0.5)', class = 'sd', dpar = 'kappa')
 
 #set up required Stan functions
@@ -1150,6 +1152,7 @@ bmod_highcorr = brm(
           )
 
 sm_highcorr = summary(bmod_highcorr)
+sm_highcorr$fixed
 sm_highcorr$spec_pars
 
 plot(bmod_highcorr,
@@ -1217,7 +1220,7 @@ DescriptCplot(k = kappa_mu1,
               denscol = NA,
               pcol = NA,
               cicol = NA,
-              mvcol = col_sd
+              mvcol = col_rho
 )
 points.circular(dt1,
                 bins = 360/5-1,
@@ -1229,9 +1232,9 @@ points.circular(dt1,
 
 with(draws_highcorr,
      points(x = sin(b_fmu_Intercept)*
-              A1(softplus(Intercept_kappa)),
+              A1(softplus(kappa_mu)),
             y = cos(b_fmu_Intercept)*
-              A1(softplus(Intercept_kappa)),
+              A1(softplus(kappa_mu)),
             col = adjustcolor(col = col_sd,
                               alpha.f = 1/255),
             pch = 19)
@@ -1259,3 +1262,245 @@ with(draws_highcorr,
 abline(h = kappa_mu1,
        col = col_rho,
        lwd = 7)
+
+
+# Low interindiv correlation ---------------------------------------
+set.seed(0120810506)#ISBN Batschelet, 1981
+kappa_mu = 0.1
+kappa_id = 5.0
+
+ndata = 10 # moderate sample size
+
+dt2 = rvonmises(n = 10,
+                mu = c0,
+                kappa = kappa_mu)
+print(round(dt2))
+
+par(pty = 's')
+par(mar = c(0,0,0,0))
+par(mfrow = c(3,4))
+dt_id2 = lapply(X = dt2, #rev(kd), # should this be largest to smallest?
+                FUN = DescriptCplot,
+                save_sample = TRUE,
+                k = kappa_id,
+                ndata = 20,
+                refline = 0,
+                sdcol = NA,
+                denscol = NA)
+#Add the population of biases
+DescriptCplot(k = kappa_mu,
+              ndata = 10,
+              refline = 0,
+              sdcol = NA,
+              denscol = NA,
+              pcol = NA,
+              cicol = col_sd,
+              mvcol = col_sd
+)
+points.circular(dt2,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+
+dt_comb2 = do.call(what = c,
+                   args = dt_id2)
+PCfun(angles = dt_comb2,
+      col = 'gray25',
+      shrink = 3.0)
+mle_comb2 = mle.vonmises(x = dt_comb2,bias = TRUE)
+ci_comb2 = with(mle_comb2,
+                CI_vM(angles = dt_comb2,
+                      m1 = mu,
+                      k1 = kappa,
+                      alternative = 'two.sided')
+)
+with(mle_comb2,
+     {
+       arrows.circular(x = circular(mu,
+                                    units = 'degrees',
+                                    rotation = 'clock',
+                                    zero = pi/2),
+                       y = A1(kappa),
+                       lwd = 3,
+                       col = col_pdf,
+                       length = 0.1
+       )
+     }
+)
+PlotCI_vM(ci_vec = ci_comb2,
+          col = col_pdf)
+mtext(text = paste0('(',paste(signif(ci_comb2[-2], 2), collapse = ' '), ')'),
+      side = 1,
+      line = -1)
+rayleigh.test(dt_comb2)
+rayleigh.test(dt_comb2[1+0:9 * 20])
+
+
+## Model version ---------------------------------------------------------
+prior_lowcorr =  prior('normal(0,pi())', class = 'b', nlpar = 'fmu') +
+  prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
+        nlpar  = 'zmu',  class = 'b') +
+  set_prior("target += normal_lpdf(kappamu | 0, 5)", #expect any concentration (low variation) 
+            check = FALSE) +
+  prior('normal(3,2)', class = 'Intercept', dpar = 'kappa') +
+prior('student_t(3, 0, 0.5)', class = 'sd', dpar = 'kappa')
+
+
+bmod_lowcorr = brm(
+  formula = form_highcorr,
+  data = data.frame(y = rad(unlist(dt_id2)),
+                    ID = factor(x = sort(rep(1:length(dt_id2),
+                                             times = length(dt_id2[[1]]))),
+                                ordered = FALSE)
+  ),
+  family = unwrap_von_mises,
+  stanvars = stan_unwrap_fun + mod_circular_fun + stan_kappamu + stan_modmu,
+  prior = prior_lowcorr,
+  cores = 4,
+  backend = 'cmdstan'
+)
+
+sm_lowcorr = summary(bmod_lowcorr)
+sm_lowcorr$fixed
+sm_lowcorr$spec_pars
+
+plot(bmod_lowcorr,
+     var = '^b_zmu',
+     regex = TRUE,
+     transform = unwrap_circular_deg)
+
+
+
+
+
+plot(bmod_lowcorr,
+     var = 'kappamu')
+
+
+
+draws_lowcorr = as_draws_df(bmod_lowcorr)
+
+par(pty = 's')
+par(mar = c(0,0,0,0),
+    mfrow = c(3,4))
+for(i in 1:length(dt_id2) )
+{
+  mu_name = paste0('b_zmu_ID',i)
+  kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
+  PCfun(dt_id2[[i]],
+        col = col_obs,
+        sep = 0.05,
+        shrink = 1.25,
+        plot_rho = FALSE)
+  arrows.circular(x = dt2[i],
+                  y = A1(kappa_id),
+                  col = col_rho,
+                  lwd = 5,
+                  length = 0.1/1.25
+  )
+  with(draws_lowcorr,
+       points(x = sin(b_fmu_Intercept + get(mu_name))*
+                A1(softplus(Intercept_kappa+get(kappa_name))),
+              y = cos(b_fmu_Intercept + get(mu_name))*
+                A1(softplus(Intercept_kappa+get(kappa_name))),
+              col = adjustcolor(col = col_sd,
+                                alpha.f = 1/255),
+              pch = 19)
+  )
+  with(draws_lowcorr,
+       arrows.circular(x = median.circular(
+         circular(x = 
+                    mod_circular(b_fmu_Intercept + get(mu_name)),
+                  units = 'radians',
+                  rotation = 'clock',
+                  zero = pi/2)
+       )[1],
+       y = A1(softplus(median(Intercept_kappa+get(kappa_name)))),
+       lwd = 2,
+       length = 0.1/1.25,
+       col = adjustcolor(col_sd, alpha.f = 200/255))
+  )
+}
+
+#Add the population of biases
+DescriptCplot(k = kappa_mu,
+              ndata = 10,
+              refline = 0,
+              sdcol = NA,
+              denscol = NA,
+              pcol = NA,
+              cicol = NA,
+              mvcol = col_rho
+)
+points.circular(dt2,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+
+with(draws_lowcorr,
+     points(x = sin(b_fmu_Intercept)*
+              A1(softplus(kappa_mu)),
+            y = cos(b_fmu_Intercept)*
+              A1(softplus(kappa_mu)),
+            col = adjustcolor(col = col_sd,
+                              alpha.f = 1/255),
+            pch = 19)
+)
+
+with(draws_lowcorr,
+     arrows.circular(x = mean.circular(circular(b_fmu_Intercept,
+                                                units = 'radians',
+                                                rotation = 'clock',
+                                                zero = pi/2)
+     )[1],
+     y = A1(softplus(median(kappa_mu))),
+     lwd = 2,
+     length = 0.1/1.25,
+     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+# 
+# with(draws_lowcorr,
+#      VertHist(data = softplus(kappa_mu),
+#               main = 'kappa_mu',
+#               ylim = c(0, 5),
+#               col = adjustcolor(col_kappa, alpha.f = 100/255),
+#               cex.axis = 0.7))
+# abline(h = kappa_mu,
+#        col = col_rho,
+#        lwd = 7)
+# 
+# with(draws_lowcorr,
+#      VertHist(data = softplus(Intercept_kappa),
+#               main = 'kappa',
+#               ylim = c(0, 15),
+#               col = adjustcolor(col_kappa, alpha.f = 100/255),
+#               cex.axis = 0.7))
+# abline(h = kappa_id,
+#        col = col_rho,
+#        lwd = 7)
+
+
+with(draws_lowcorr,
+     VertHist(data = unwrap_circular_deg(b_fmu_Intercept),
+              main = 'mean angle',
+              ylim = c(-180, 180),
+              col = adjustcolor(col_sd, alpha.f = 100/255),
+              cex.axis = 0.7,
+              axes = FALSE))
+abline(h = 0,
+       col = 'gray',
+       lwd = 7)
+axis(side = 1)
+axis(side = 2,
+     at = -6:6*(180/6) )
+
+with(draws_lowcorr,
+     quantile(unwrap_circular_deg(b_fmu_Intercept),
+              probs = c(0,0.5,1)+c(1,0,-1)*(1-0.95)*0.5)
+)
