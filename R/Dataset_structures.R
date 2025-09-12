@@ -39,6 +39,7 @@ graphics.off()
 # 
 #TODO   ---------------------------------------------
 #TODO   
+#- Contour plots
 #- Separate functions
 #- Rmarkdown version
 
@@ -101,6 +102,33 @@ Mod360.180 = function(x)
     )
   )
 }
+
+#the radian equivalent
+mod_circular = function(x)
+{
+  atan2(y = sin(x),
+        x = cos(x))
+}
+
+#the unwrapped (no discontinuities)
+unwrap_circular = function(x)
+{
+  mux = mean.circular(x = circular(x = x, template = 'none'))
+  centx = atan2(y = sin(x - mux),
+                x = cos(x  - mux))
+  unwrx = centx + mux
+}
+
+#degree version
+unwrap_circular_deg = function(x)
+{
+  mux = mean.circular(x = circular(x = x, template = 'none'))
+  centx = atan2(y = sin(x - mux),
+                x = cos(x  - mux))
+  unwrx = centx + mux
+  return(deg(unwrx))
+}
+
 
 
 #generic mean angle simulator
@@ -773,7 +801,7 @@ mtext(text = paste0('(',paste(signif(ci_divergence[-2], 2), collapse = ' '), ')'
       line = -1)
 
 
-## model version --------------------------------------------------------
+## Model version --------------------------------------------------------
 
 #fit a generic unwrap model
 ci_uw = CI_unwrap(data = data.frame(y = rad(cd_divergence)), 
@@ -933,10 +961,10 @@ with(ci_kappa,
                      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
 with(draws_kappa,
-     VertHist(data = b_kappa_x, 
+     VertHist(data = softplus(Intercept_kappa+b_kappa_x) - softplus(Intercept_kappa), 
               main = 'change in kappa',
               ylim = c(-10, 1),
-              col = adjustcolor(col_sd, alpha.f = 100/255),
+              col = adjustcolor(col_kappa, alpha.f = 100/255),
               cex.axis = 0.7))
 abline(h = 0,
        col = 'gray',
@@ -945,3 +973,289 @@ abline(h = 0,
 with(draws_kappa, mean(b_kappa_x < 0)*100 ) #nearly all estimates suggest a reduction in kappa
 
 watson.two.test(cd_3, cd_0.5)#no difference detected
+
+
+
+# High interindiv correlation ---------------------------------------
+set.seed(0120810506)#ISBN Batschelet, 1981
+kappa_mu1 = 2.0
+kappa_id1 = 5.0
+
+ndata = 10 # moderate sample size
+
+dt1 = rvonmises(n = 10,
+                mu = c0,
+                kappa = kappa_mu1)
+print(round(dt1))
+
+par(pty = 's')
+par(mar = c(0,0,0,0))
+par(mfrow = c(3,4))
+dt_id1 = lapply(X = dt1, #rev(kd), # should this be largest to smallest?
+                FUN = DescriptCplot,
+                save_sample = TRUE,
+                k = kappa_id1,
+                ndata = 20,
+                refline = 0,
+                sdcol = NA,
+                denscol = NA)
+#Add the population of biases
+DescriptCplot(k = kappa_mu1,
+              ndata = 10,
+              refline = 0,
+              sdcol = NA,
+              denscol = NA,
+              pcol = NA,
+              cicol = col_sd,
+              mvcol = col_sd
+)
+points.circular(dt1,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+
+dt_comb1 = do.call(what = c,
+                   args = dt_id1)
+PCfun(angles = dt_comb1,
+      col = 'gray25',
+      shrink = 3.0)
+mle_comb1 = mle.vonmises(x = dt_comb1,bias = TRUE)
+ci_comb1 = with(mle_comb1,
+                CI_vM(angles = dt_comb1,
+                      m1 = mu,
+                      k1 = kappa,
+                      alternative = 'two.sided')
+)
+with(mle_comb1,
+     {
+       arrows.circular(x = circular(mu,
+                                    units = 'degrees',
+                                    rotation = 'clock',
+                                    zero = pi/2),
+                       y = A1(kappa),
+                       lwd = 3,
+                       col = col_pdf,
+                       length = 0.1
+       )
+     }
+)
+PlotCI_vM(ci_vec = ci_comb1,
+          col = col_pdf)
+rayleigh.test(dt_comb1)
+rayleigh.test(dt_comb1[1+0:9 * 20])
+
+## Model version --------------------------------------------------------
+
+#fit a mixed effects unwrap model
+#can normal random effects sufficiently capture that structure?
+form_highcorr = bf(y ~ fmu + zmu,
+                  fmu ~ 1,
+                  zmu ~ 0 + ID,
+                  kappa ~ 1 + (1|ID),
+                  nl = TRUE)
+
+prior_highcorr =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'fmu') +
+                  prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
+                        nlpar  = 'zmu',  class = 'b') +
+                  set_prior("target += normal_lpdf(kappamu | 3, 3)", #expect high concentration (low variation) 
+                            check = FALSE) +
+                  prior('normal(3,2)', class = 'Intercept', dpar = 'kappa') #+
+                  prior('student_t(3, 0, 0.5)', class = 'sd', dpar = 'kappa')
+
+#set up required Stan functions
+mod_circular_fun = stanvar(scode = "
+    real mod_circular(real y) {
+      return fmod(y + pi(), 2*pi()) - pi();
+    }
+  ",
+                           block = 'functions')
+unwrap_von_mises = custom_family(
+  "unwrap_von_mises", dpars = c("mu", "kappa"),
+  links = c('identity',#brms cannot accept custom link functions, do via nl instead
+            "softplus"), 
+  lb = c(-pi, 0), ub = c(pi, NA),
+  type = "real",
+)
+
+stan_unwrap_fun = stanvar(scode = "
+    real unwrap_von_mises_lpdf(real y, real mu, real kappa) {
+      return von_mises_lpdf(y | mod_circular(mu), kappa);
+    }
+    real unwrap_von_mises_rng(real mu, real kappa) {
+      return von_mises_rng( mod_circular(mu) , kappa);
+    }
+    real unwrap_von_mises_vect_lpdf(vector y, real mu, real kappa) {
+    real tmp = 0;
+    for(i in 1:size(y))
+    {
+    tmp = tmp + unwrap_von_mises_lpdf(y[i] | mu, kappa);
+    }
+      return tmp;
+    }
+  ",
+                          block = 'functions') 
+
+stan_kappamu = stanvar(scode = "
+real kappamu;
+                           ",
+                           block = "parameters") + 
+  stanvar(scode = "
+real kappa_mu = log1p_exp(kappamu);
+          ", 
+          block = 'genquant')
+
+stan_modmu =   stanvar(scode = "
+  vector [K_fmu] mod_mu;
+  for(i in 1:size(mod_mu))
+  {
+    mod_mu[i] = mod_circular(b_fmu[i]);
+  }
+  vector [K_zmu] mod_zmu;
+  for(i in 1:size(mod_zmu))
+  {
+    mod_zmu[i] = mod_circular(b_zmu[i]);
+  }
+          ", 
+                       block = 'genquant')
+
+
+sc = make_stancode(formula = form_highcorr,
+                   data = data.frame(y = rad(unlist(dt_id1)),
+                                     ID = as.factor(sort(rep(1:length(dt_id1), times = ndata)))),
+                   family = unwrap_von_mises,
+                   stanvars = stan_unwrap_fun + mod_circular_fun + stan_kappamu + stan_modmu,
+                   prior = prior_highcorr,)
+write.table(x = sc,
+            file = file.path(getwd(),
+                             'Mod__highcorr.stan'),
+            quote = FALSE,
+            col.names = FALSE,
+            row.names = FALSE)
+
+bmod_highcorr = brm(
+          formula = form_highcorr,
+           data = data.frame(y = rad(unlist(dt_id1)),
+                             ID = factor(x = sort(rep(1:length(dt_id1),
+                                                      times = length(dt_id1[[1]]))),
+                                         ordered = FALSE)
+                             ),
+           family = unwrap_von_mises,
+           stanvars = stan_unwrap_fun + mod_circular_fun + stan_kappamu + stan_modmu,
+           prior = prior_highcorr,
+           cores = 4,
+           backend = 'cmdstan'
+          )
+
+sm_highcorr = summary(bmod_highcorr)
+sm_highcorr$spec_pars
+
+plot(bmod_highcorr,
+     var = '^b_zmu',
+     regex = TRUE,
+     transform = unwrap_circular_deg)
+
+
+
+
+plot(bmod_highcorr,
+     var = 'kappamu')
+
+
+
+draws_highcorr = as_draws_df(bmod_highcorr)
+
+par(pty = 's')
+par(mar = c(0,0,0,0),
+    mfrow = c(3,4))
+for(i in 1:length(dt_id1) )
+{
+  mu_name = paste0('b_zmu_ID',i)
+  kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
+  PCfun(dt_id1[[i]],
+        col = col_obs,
+        sep = 0.05,
+        shrink = 1.25,
+        plot_rho = FALSE)
+  arrows.circular(x = dt1[i],
+                  y = A1(kappa_id1),
+                  col = col_rho,
+                  lwd = 5,
+                  length = 0.1/1.25
+  )
+  with(draws_highcorr,
+       points(x = sin(b_fmu_Intercept + get(mu_name))*
+                    A1(softplus(Intercept_kappa+get(kappa_name))),
+              y = cos(b_fmu_Intercept + get(mu_name))*
+                    A1(softplus(Intercept_kappa+get(kappa_name))),
+              col = adjustcolor(col = col_sd,
+                                alpha.f = 1/255),
+              pch = 19)
+  )
+  with(draws_highcorr,
+       arrows.circular(x = median.circular(
+                             circular(x = 
+                             mod_circular(b_fmu_Intercept + get(mu_name)),
+                                                    units = 'radians',
+                                                    rotation = 'clock',
+                                                    zero = pi/2)
+                                           )[1],
+                       y = A1(softplus(median(Intercept_kappa+get(kappa_name)))),
+                       lwd = 2,
+                       length = 0.1/1.25,
+                       col = adjustcolor(col_sd, alpha.f = 200/255))
+  )
+}
+
+#Add the population of biases
+DescriptCplot(k = kappa_mu1,
+              ndata = 10,
+              refline = 0,
+              sdcol = NA,
+              denscol = NA,
+              pcol = NA,
+              cicol = NA,
+              mvcol = col_sd
+)
+points.circular(dt1,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+
+with(draws_highcorr,
+     points(x = sin(b_fmu_Intercept)*
+              A1(softplus(Intercept_kappa)),
+            y = cos(b_fmu_Intercept)*
+              A1(softplus(Intercept_kappa)),
+            col = adjustcolor(col = col_sd,
+                              alpha.f = 1/255),
+            pch = 19)
+     )
+
+with(draws_highcorr,
+     arrows.circular(x = mean.circular(circular(b_fmu_Intercept,
+                                                  units = 'radians',
+                                                  rotation = 'clock',
+                                                  zero = pi/2)
+     )[1],
+     y = A1(softplus(median(kappa_mu))),
+     lwd = 2,
+     length = 0.1/1.25,
+     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+
+
+with(draws_highcorr,
+     VertHist(data = softplus(kappa_mu), 
+              main = 'kappa_mu',
+              ylim = c(0, 5),
+              col = adjustcolor(col_kappa, alpha.f = 100/255),
+              cex.axis = 0.7))
+abline(h = kappa_mu1,
+       col = col_rho,
+       lwd = 7)
