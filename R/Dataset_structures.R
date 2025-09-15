@@ -1810,6 +1810,7 @@ print(rt_lst_print)
 
 
 ## Model version ---------------------------------------------------------
+#TODO find appropriate priors
 prior_var =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
   prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
         nlpar  = 'zmu',  class = 'b') +
