@@ -625,6 +625,36 @@ VertHist = function(data, # numerical data vector
 }
 
 
+#add contours
+Draws2Cont = function(draws,
+                      palette = 'Heat 2',
+                      nlevels = 20,
+                      x_string = 'sin(Intercept)*A1(softplus(kappa))',
+                      y_string = 'cos(Intercept)*A1(softplus(kappa))',
+                      alpha = 200/255
+)
+{
+  with(draws,
+       {
+         with(MASS::kde2d(x = eval(str2lang(x_string)),
+                          y = eval(str2lang(y_string)) ),
+              {
+                .filled.contour(x = x,
+                                y = y,
+                                z = z,
+                                levels = (1:nlevels)*max(z/nlevels),
+                                col = hcl.colors(n = nlevels,
+                                                 palette = palette,
+                                                 rev = TRUE,
+                                                 alpha = alpha)
+                )
+              }
+         )
+       }
+  )
+}
+
+
 #invert the softplus link
 #https://en.wikipedia.org/wiki/Softplus
 #we are using this as our _inverse_ link function for kappa,
@@ -773,8 +803,6 @@ CI_unwrap = function(data,
 
 
 # Divergence from home direction -------------------------------------------
-set.seed(0120810506)#ISBN Batschelet, 1981
-
 par(pty = 's')
 par(mar = c(0,0,0,0))
 
@@ -833,13 +861,17 @@ arrows.circular(x = circular(-15,
                 lwd = 5,
                 length = 0.1/1.25
 )
-with(draws_divergence,
-     points(x = sin(Intercept)*A1(softplus(kappa)),
-            y = cos(Intercept)*A1(softplus(kappa)),
-            col = adjustcolor(col = col_sd,
-                              alpha.f = 1/255),
-            pch = 19)
-            )
+
+
+Draws2Cont(draws_divergence)
+
+# with(draws_divergence,
+#      points(x = sin(Intercept)*A1(softplus(kappa)),
+#             y = cos(Intercept)*A1(softplus(kappa)),
+#             col = adjustcolor(col = col_sd,
+#                               alpha.f = 1/255),
+#             pch = 19)
+#             )
 with(ci_uw,
      arrows.circular(x = circular(mu[2],
                                   rotation = 'clock',
@@ -859,9 +891,9 @@ abline(h = 0,
        col = 'gray',
        lwd = 7)
 
-# Reduced concentration -------------------
-set.seed(0120810506)#ISBN Batschelet, 1981
+with(draws_divergence, paste0(mean(Intercept < 0)*100, '%') ) #nearly all estimates suggest a rightwards turn
 
+# Reduced concentration -------------------
 par(pty = 's')
 par(mar = c(0,0,0,0))
 par(mfrow = c(1,2))
@@ -916,13 +948,17 @@ arrows.circular(x = circular(0,
                 lwd = 5,
                 length = 0.1/1.25
 )
-with(draws_kappa,
-     points(x = sin(Intercept)*A1(softplus(Intercept_kappa)),
-            y = cos(Intercept)*A1(softplus(Intercept_kappa)),
-            col = adjustcolor(col = col_sd,
-                              alpha.f = 1/255),
-            pch = 19)
-)
+Draws2Cont(draws_kappa,
+           x_string = 'sin(Intercept)*A1(softplus(Intercept_kappa))',
+           y_string = 'cos(Intercept)*A1(softplus(Intercept_kappa))',
+           )
+# with(draws_kappa,
+#      points(x = sin(Intercept)*A1(softplus(Intercept_kappa)),
+#             y = cos(Intercept)*A1(softplus(Intercept_kappa)),
+#             col = adjustcolor(col = col_sd,
+#                               alpha.f = 1/255),
+#             pch = 19)
+# )
 with(ci_kappa,
      arrows.circular(x = circular(mu[2],
                                   rotation = 'clock',
@@ -946,13 +982,17 @@ arrows.circular(x = circular(0,
                 lwd = 5,
                 length = 0.1/1.25
 )
-with(draws_kappa,
-     points(x = sin(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x)),
-            y = cos(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x)),
-            col = adjustcolor(col = col_sd,
-                              alpha.f = 1/255),
-            pch = 19)
+Draws2Cont(draws_kappa,
+           x_string = 'sin(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x))',
+           y_string = 'cos(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x))',
 )
+# with(draws_kappa,
+#      points(x = sin(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x)),
+#             y = cos(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x)),
+#             col = adjustcolor(col = col_sd,
+#                               alpha.f = 1/255),
+#             pch = 19)
+# )
 with(ci_kappa,
      arrows.circular(x = circular(mu_x[2],
                                   rotation = 'clock',
@@ -972,19 +1012,148 @@ abline(h = 0,
        col = 'gray',
        lwd = 7)
 
-with(draws_kappa, mean(b_kappa_x < 0)*100 ) #nearly all estimates suggest a reduction in kappa
+with(draws_kappa, paste0(mean(b_kappa_x < 0)*100, '%') ) #nearly all estimates suggest a reduction in kappa
 
 watson.two.test(cd_3, cd_0.5)#no difference detected
+
+# Change in direction -------------------
+# After Papi & Pardi, 1963
+
+par(pty = 's')
+par(mar = c(0,0,0,0))
+par(mfrow = c(1,2))
+
+cd_control = DescriptCplot(m = 180,
+                     k = 3,
+                     ndata = 20,
+                     sdcol = NA,
+                     denscol = NA,
+                     refline = c0,
+                     save_sample = TRUE,
+                     seed = 1539571)#DOI Papi & Pardi
+
+cd_treatment = DescriptCplot(m = 210,
+                       k = 3,
+                       ndata = 20,
+                       sdcol = NA,
+                       denscol = NA,
+                       refline = c0,
+                       save_sample = TRUE,
+                     seed = 0120810506) #ISBN Batschelet 1981
+
+## Model version ---------------------------------------------------------
+
+
+ci_delta = CI_unwrap(data = data.frame(y = rad(c(cd_control, cd_treatment)),
+                                       x = c(rep(0, length(cd_control)),
+                                             rep(1, length(cd_treatment)))
+                                      ),
+                    formula = bf(y~x,
+                                 kappa~x),
+                    est_kappa = TRUE,
+                    return_model = TRUE,
+                    backend = 'cmdstan'#faster and more reliable
+                    )
+
+draws_delta = with(ci_delta, as_draws_df(model))
+
+
+par(pty = 's')
+par(mar = c(0,0,0,0),
+    mfrow = c(1,3))
+PCfun(cd_control,
+      col = col_obs,
+      sep = 0.05,
+      shrink = 1.25,
+      plot_rho = FALSE)
+arrows.circular(x = circular(180,
+                             units = 'degrees',
+                             rotation = 'clock',
+                             zero = pi/2),
+                y = A1(3),
+                col = col_rho,
+                lwd = 5,
+                length = 0.1/1.25
+)
+Draws2Cont(draws_delta,
+           x_string = 'sin(Intercept)*A1(softplus(Intercept_kappa))',
+           y_string = 'cos(Intercept)*A1(softplus(Intercept_kappa))',
+)
+# with(draws_delta,
+#      points(x = sin(Intercept)*A1(softplus(Intercept_kappa)),
+#             y = cos(Intercept)*A1(softplus(Intercept_kappa)),
+#             col = adjustcolor(col = col_sd,
+#                               alpha.f = 1/255),
+#             pch = 19)
+# )
+with(ci_delta,
+     arrows.circular(x = circular(mu[2],
+                                  rotation = 'clock',
+                                  zero = pi/2),
+                     y = A1(kappa[2]),
+                     lwd = 2,
+                     length = 0.1/1.25,
+                     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+PCfun(cd_treatment,
+      col = col_obs,
+      sep = 0.05,
+      shrink = 1.25,
+      plot_rho = FALSE)
+arrows.circular(x = circular(205,
+                             units = 'degrees',
+                             rotation = 'clock',
+                             zero = pi/2),
+                y = A1(3),
+                col = col_rho,
+                lwd = 5,
+                length = 0.1/1.25
+)
+Draws2Cont(draws_delta,
+           x_string = 'sin(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x))',
+           y_string = 'cos(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x))',
+)
+# with(draws_delta,
+#      points(x = sin(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x)),
+#             y = cos(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x)),
+#             col = adjustcolor(col = col_sd,
+#                               alpha.f = 1/255),
+#             pch = 19)
+# )
+with(ci_delta,
+     arrows.circular(x = circular(mu_x[2],
+                                  rotation = 'clock',
+                                  zero = pi/2),
+                     y = A1(kappa_x[2]),
+                     lwd = 2,
+                     length = 0.1/1.25,
+                     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+with(draws_delta,
+     VertHist(data = Mod360.180(deg(b_x)), 
+              main = 'change in mean angle',
+              ylim = c(-60, 60),
+              col = adjustcolor(col_sd, alpha.f = 100/255),
+              axes = F,
+              cex.axis = 0.7))
+abline(h = 0,
+       col = 'gray',
+       lwd = 7)
+axis(1)
+axis(2, at = -4:4*15)
+
+with(draws_delta, paste0(mean(b_x > 0)*100, '%') ) #nearly all estimates suggest a rightwards turn
+
+watson.two.test(cd_control, cd_treatment)#no difference detected
 
 
 
 # High interindiv correlation ---------------------------------------
-set.seed(0120810506)#ISBN Batschelet, 1981
 kappa_mu1 = 2.0
 kappa_id1 = 5.0
 
 ndata = 10 # moderate sample size
-
+set.seed(0120810506)#ISBN Batschelet, 1981
 dt1 = rvonmises(n = 10,
                 mu = c0,
                 kappa = kappa_mu1)
@@ -993,14 +1162,17 @@ print(round(dt1))
 par(pty = 's')
 par(mar = c(0,0,0,0))
 par(mfrow = c(3,4))
-dt_id1 = lapply(X = dt1, #rev(kd), # should this be largest to smallest?
-                FUN = DescriptCplot,
+dt_id1 = mapply(FUN = DescriptCplot,
+                m = dt1, 
+                seed = 1000*1:length(dt1), #different seed for each
                 save_sample = TRUE,
                 k = kappa_id1,
                 ndata = 20,
                 refline = 0,
                 sdcol = NA,
-                denscol = NA)
+                denscol = NA,
+                SIMPLIFY = FALSE
+                )
 #Add the population of biases
 DescriptCplot(k = kappa_mu1,
               ndata = 10,
@@ -1188,15 +1360,21 @@ for(i in 1:length(dt_id1) )
                   lwd = 5,
                   length = 0.1/1.25
   )
-  with(draws_highcorr,
-       points(x = sin(b_fmu_Intercept + get(mu_name))*
-                    A1(softplus(Intercept_kappa+get(kappa_name))),
-              y = cos(b_fmu_Intercept + get(mu_name))*
-                    A1(softplus(Intercept_kappa+get(kappa_name))),
-              col = adjustcolor(col = col_sd,
-                                alpha.f = 1/255),
-              pch = 19)
-  )
+  Draws2Cont(draws_highcorr,
+             x_string = 'sin(b_fmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+             y_string = 'cos(b_fmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))'
+             )
+  # with(draws_highcorr,
+  #      points(x = sin(b_fmu_Intercept + get(mu_name))*
+  #                   A1(softplus(Intercept_kappa+get(kappa_name))),
+  #             y = cos(b_fmu_Intercept + get(mu_name))*
+  #                   A1(softplus(Intercept_kappa+get(kappa_name))),
+  #             col = adjustcolor(col = col_sd,
+  #                               alpha.f = 1/255),
+  #             pch = 19)
+  # )
   with(draws_highcorr,
        arrows.circular(x = median.circular(
                              circular(x = 
@@ -1229,16 +1407,21 @@ points.circular(dt1,
                 shrink = 1.25,
                 col = col_rho
 )
-
-with(draws_highcorr,
-     points(x = sin(b_fmu_Intercept)*
-              A1(softplus(kappa_mu)),
-            y = cos(b_fmu_Intercept)*
-              A1(softplus(kappa_mu)),
-            col = adjustcolor(col = col_sd,
-                              alpha.f = 1/255),
-            pch = 19)
-     )
+Draws2Cont(draws = draws_highcorr,
+           x_string = 'sin(b_fmu_Intercept)*
+             A1(softplus(kappa_mu))',
+           y_string = 'cos(b_fmu_Intercept)*
+             A1(softplus(kappa_mu))'
+           )
+# with(draws_highcorr,
+#      points(x = sin(b_fmu_Intercept)*
+#               A1(softplus(kappa_mu)),
+#             y = cos(b_fmu_Intercept)*
+#               A1(softplus(kappa_mu)),
+#             col = adjustcolor(col = col_sd,
+#                               alpha.f = 1/255),
+#             pch = 19)
+#      )
 
 with(draws_highcorr,
      arrows.circular(x = mean.circular(circular(b_fmu_Intercept,
@@ -1262,15 +1445,16 @@ with(draws_highcorr,
 abline(h = kappa_mu1,
        col = col_rho,
        lwd = 7)
+with(draws_highcorr, paste0(mean(softplus(kappa_mu) < kappa_mu1)*100, '%') ) #most estimates are close to correct
 
 
 # Low interindiv correlation ---------------------------------------
-set.seed(0120810506)#ISBN Batschelet, 1981
 kappa_mu = 0.1
 kappa_id = 5.0
 
 ndata = 10 # moderate sample size
-
+# set.seed(20635088)#pubmed ID Baird et al., 2010 Bearing selection in ball-rolling dung beetles: is it constant?
+set.seed(0120810506)#ISBN Batschelet, 1981
 dt2 = rvonmises(n = 10,
                 mu = c0,
                 kappa = kappa_mu)
@@ -1279,14 +1463,16 @@ print(round(dt2))
 par(pty = 's')
 par(mar = c(0,0,0,0))
 par(mfrow = c(3,4))
-dt_id2 = lapply(X = dt2, #rev(kd), # should this be largest to smallest?
-                FUN = DescriptCplot,
+dt_id2 = mapply(FUN = DescriptCplot,
+                m = dt2, #
+                seed = 1000*1:length(dt2), # different seed for each
                 save_sample = TRUE,
                 k = kappa_id,
                 ndata = 20,
                 refline = 0,
                 sdcol = NA,
-                denscol = NA)
+                denscol = NA,
+                SIMPLIFY = FALSE)
 #Add the population of biases
 DescriptCplot(k = kappa_mu,
               ndata = 10,
@@ -1371,9 +1557,9 @@ plot(bmod_lowcorr,
      var = '^b_zmu',
      regex = TRUE,
      transform = unwrap_circular_deg)
+#
 
-
-
+#
 
 
 plot(bmod_lowcorr,
@@ -1401,15 +1587,21 @@ for(i in 1:length(dt_id2) )
                   lwd = 5,
                   length = 0.1/1.25
   )
-  with(draws_lowcorr,
-       points(x = sin(b_fmu_Intercept + get(mu_name))*
-                A1(softplus(Intercept_kappa+get(kappa_name))),
-              y = cos(b_fmu_Intercept + get(mu_name))*
-                A1(softplus(Intercept_kappa+get(kappa_name))),
-              col = adjustcolor(col = col_sd,
-                                alpha.f = 1/255),
-              pch = 19)
+  Draws2Cont(draws_lowcorr,
+             x_string = 'sin(b_fmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+             y_string = 'cos(b_fmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))'
   )
+  # with(draws_lowcorr,
+  #      points(x = sin(b_fmu_Intercept + get(mu_name))*
+  #               A1(softplus(Intercept_kappa+get(kappa_name))),
+  #             y = cos(b_fmu_Intercept + get(mu_name))*
+  #               A1(softplus(Intercept_kappa+get(kappa_name))),
+  #             col = adjustcolor(col = col_sd,
+  #                               alpha.f = 1/255),
+  #             pch = 19)
+  # )
   with(draws_lowcorr,
        arrows.circular(x = median.circular(
          circular(x = 
@@ -1443,15 +1635,21 @@ points.circular(dt2,
                 col = col_rho
 )
 
-with(draws_lowcorr,
-     points(x = sin(b_fmu_Intercept)*
-              A1(softplus(kappa_mu)),
-            y = cos(b_fmu_Intercept)*
-              A1(softplus(kappa_mu)),
-            col = adjustcolor(col = col_sd,
-                              alpha.f = 1/255),
-            pch = 19)
+Draws2Cont(draws = draws_lowcorr,
+           x_string = 'sin(b_fmu_Intercept)*
+             A1(kappa_mu)',
+           y_string = 'cos(b_fmu_Intercept)*
+             A1(kappa_mu)'
 )
+# with(draws_lowcorr,
+#      points(x = sin(b_fmu_Intercept)*
+#               A1(softplus(kappa_mu)),
+#             y = cos(b_fmu_Intercept)*
+#               A1(softplus(kappa_mu)),
+#             col = adjustcolor(col = col_sd,
+#                               alpha.f = 1/255),
+#             pch = 19)
+# )
 
 with(draws_lowcorr,
      arrows.circular(x = mean.circular(circular(b_fmu_Intercept,
@@ -1459,7 +1657,7 @@ with(draws_lowcorr,
                                                 rotation = 'clock',
                                                 zero = pi/2)
      )[1],
-     y = A1(softplus(median(kappa_mu))),
+     y = A1(median(kappa_mu)),
      lwd = 2,
      length = 0.1/1.25,
      col = adjustcolor(col_sd, alpha.f = 200/255))
@@ -1486,21 +1684,318 @@ with(draws_lowcorr,
 #        lwd = 7)
 
 
+# with(draws_lowcorr,
+#      VertHist(data = unwrap_circular_deg(b_fmu_Intercept),
+#               main = 'mean angle',
+#               ylim = c(-180, 180),
+#               col = adjustcolor(col_sd, alpha.f = 100/255),
+#               cex.axis = 0.7,
+#               axes = FALSE))
+# axis(side = 1)
+# axis(side = 2,
+#      at = -6:6*(180/6) )
 with(draws_lowcorr,
-     VertHist(data = unwrap_circular_deg(b_fmu_Intercept),
-              main = 'mean angle',
-              ylim = c(-180, 180),
-              col = adjustcolor(col_sd, alpha.f = 100/255),
+     {
+     VertHist(data = softplus(Intercept_kappa),
+              main = 'pop. kappa',
+              ylim = c(0, 7),
+              col = adjustcolor(col_kappa, alpha.f = 100/255),
               cex.axis = 0.7,
-              axes = FALSE))
-abline(h = 0,
-       col = 'gray',
+              axes = TRUE)
+      abline(h = 0,
+             col = 1,
+             lwd = 1)
+       })
+abline(h = kappa_id,
+       col = col_rho,
        lwd = 7)
-axis(side = 1)
-axis(side = 2,
-     at = -6:6*(180/6) )
-
 with(draws_lowcorr,
-     quantile(unwrap_circular_deg(b_fmu_Intercept),
-              probs = c(0,0.5,1)+c(1,0,-1)*(1-0.95)*0.5)
+  paste0(mean(Intercept_kappa > kappa_id)*100, '%') #estimate almost perfectly centred on true pop kappa
 )
+# with(draws_lowcorr,
+#      quantile(unwrap_circular_deg(b_fmu_Intercept),
+#               probs = c(0,0.5,1)+c(1,0,-1)*(1-0.95)*0.5)
+# )
+# 
+# with(draws_lowcorr, 
+#      paste0(mean(unwrap_circular_deg(b_fmu_Intercept) > 0)*100, '%') ) #notable probability density for rightwards bias, inspite of leftwards trend
+
+# Variable individual parameters ---------------------------------------
+kappa_mu_var = 1.0
+kappa_var_mean = 1.5
+kappa_var_sd = 2.0
+set.seed(0120810506)#ISBN Batschelet, 1981
+kappa_id_var = rnorm(n = ndata,
+                     mean = kappa_var_mean,
+                     sd = kappa_var_sd)
+#rectified
+kappa_id_var[kappa_id_var<0] = 0
+
+set.seed(0120810506)#ISBN Batschelet, 1981
+# list of circular datasets
+dt_var = rvonmises(n = ndata,
+                   mu = c0,
+                   kappa = kappa_mu_var)
+
+par(pty = 's')
+par(mar = c(0,0,0,0))
+par(mfrow = c(3,4))
+dt_id_var = mapply(m = dt_var, 
+                   k = round(kappa_id_var,2), 
+                   seed = 1000*1:length(dt_var), # different seed for each
+                   FUN = DescriptCplot,
+                   save_sample = TRUE,
+                   ndata = 20,
+                   refline = 0,
+                   sdcol = NA,
+                   denscol = NA,
+                   SIMPLIFY = FALSE)
+#Add the population of biases
+DescriptCplot(k = kappa_mu_var,
+              ndata = ndata,
+              refline = 0,
+              sdcol = NA,
+              denscol = NA,
+              pcol = NA,
+              cicol = col_sd,
+              mvcol = col_sd
+)
+points.circular(dt_var,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+mean_kappa_id_var = softplus(mean(inv_softplus(kappa_id_var)))
+#Add decription of the average individual
+DescriptCplot(k = kappa_var_mean,
+              ndata = ndata,
+              refline = 0,
+              sdcol = NA,
+              denscol = NA,
+              pcol = NA,
+              cicol = col_rho,
+              mvcol = col_rho
+)
+kappa_id_var_ci = kappa_var_mean + 
+  kappa_var_sd * 
+  qnorm(c(0,1) + c(1,-1)*0.05/2)
+#rectify
+kappa_id_var_ci[kappa_id_var_ci<0] = 0
+
+
+arrows(x0 = sin(c0),
+       x1 = sin(c0),
+       y0 = A1(kappa_id_var_ci[1]),
+       y1 = A1(kappa_id_var_ci[2]),
+       lwd = 7,
+       col = adjustcolor(col = col_sd2,
+                         alpha.f = 100/255),
+       length = 0.05,
+       angle = 90,
+       code = 3,
+       lend = 'butt'
+)
+mtext(text = paste0('(',paste(signif(kappa_id_var_ci, 2), collapse = ' '), ')'),
+      side = 1,
+      line = -1)
+#v-test is not significant (or Rayleigh test)
+rayleigh.test(dt_var, mu = c0)
+rt_lst = lapply(X = lapply(dt_id_var, circular, units = 'degrees'),
+                FUN = rayleigh.test)
+rt_lst_print = do.call(what = rbind, 
+                       args = rt_lst)
+print(rt_lst_print)
+
+
+## Model version ---------------------------------------------------------
+prior_var =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
+  prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
+        nlpar  = 'zmu',  class = 'b') +
+  set_prior("target += normal_lpdf(kappamu | 3, 3)", #prior to larger values helps convergence 
+            check = FALSE) +
+  prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') + #narrower prior aids convergence
+  prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa')#now expect substantial variation
+
+
+bmod_var = brm(
+  formula = form_highcorr,
+  data = data.frame(y = rad(unlist(dt_var)),
+                    ID = factor(x = sort(rep(1:length(dt_var),
+                                             times = length(dt_var[[1]]))),
+                                ordered = FALSE)
+  ),
+  family = unwrap_von_mises,
+  stanvars = stan_unwrap_fun + mod_circular_fun + stan_kappamu + stan_modmu,
+  prior = prior_var,
+  cores = 4,
+  backend = 'cmdstan'
+)
+
+sm_var = summary(bmod_var)
+sm_var$fixed
+sm_var$spec_pars
+plot(bmod_var,
+     var = '^sd',
+     regex = TRUE)
+plot(bmod_var,
+     var = 'b_kappa_Intercept')
+plot(bmod_var,
+     var = '^b_zmu',
+     regex = TRUE,
+     transform = unwrap_circular_deg)
+#
+
+#
+
+
+plot(bmod_var,
+     var = 'kappamu')
+
+
+
+draws_var = as_draws_df(bmod_var)
+
+par(pty = 's')
+par(mar = c(0,0,0,0),
+    mfrow = c(3,4))
+for(i in 1:length(dt_var) )
+{
+  mu_name = paste0('b_zmu_ID',i)
+  kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
+  PCfun(dt_id_var[[i]],
+        col = col_obs,
+        sep = 0.05,
+        shrink = 1.25,
+        plot_rho = FALSE)
+  arrows.circular(x = dt_var[i],
+                  y = A1(kappa_id),
+                  col = col_rho,
+                  lwd = 5,
+                  length = 0.1/1.25
+  )
+  Draws2Cont(draws_var,
+             x_string = 'sin(b_fmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+             y_string = 'cos(b_fmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))'
+  )
+  # with(draws_lowcorr,
+  #      points(x = sin(b_fmu_Intercept + get(mu_name))*
+  #               A1(softplus(Intercept_kappa+get(kappa_name))),
+  #             y = cos(b_fmu_Intercept + get(mu_name))*
+  #               A1(softplus(Intercept_kappa+get(kappa_name))),
+  #             col = adjustcolor(col = col_sd,
+  #                               alpha.f = 1/255),
+  #             pch = 19)
+  # )
+  with(draws_lowcorr,
+       arrows.circular(x = median.circular(
+         circular(x = 
+                    mod_circular(b_fmu_Intercept + get(mu_name)),
+                  units = 'radians',
+                  rotation = 'clock',
+                  zero = pi/2)
+       )[1],
+       y = A1(softplus(median(Intercept_kappa+get(kappa_name)))),
+       lwd = 2,
+       length = 0.1/1.25,
+       col = adjustcolor(col_sd, alpha.f = 200/255))
+  )
+}
+
+#Add the population of biases
+DescriptCplot(k = kappa_mu_var,
+              ndata = 10,
+              refline = 0,
+              sdcol = NA,
+              denscol = NA,
+              pcol = NA,
+              cicol = NA,
+              mvcol = col_rho
+)
+points.circular(dt_var,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+
+Draws2Cont(draws = draws_var,
+           x_string = 'sin(b_fmu_Intercept)*
+             A1(kappa_mu)',
+           y_string = 'cos(b_fmu_Intercept)*
+             A1(kappa_mu)'
+)
+# with(draws_lowcorr,
+#      points(x = sin(b_fmu_Intercept)*
+#               A1(softplus(kappa_mu)),
+#             y = cos(b_fmu_Intercept)*
+#               A1(softplus(kappa_mu)),
+#             col = adjustcolor(col = col_sd,
+#                               alpha.f = 1/255),
+#             pch = 19)
+# )
+
+with(draws_var,
+     arrows.circular(x = mean.circular(circular(b_fmu_Intercept,
+                                                units = 'radians',
+                                                rotation = 'clock',
+                                                zero = pi/2)
+     )[1],
+     y = A1(median(kappa_mu)),
+     lwd = 2,
+     length = 0.1/1.25,
+     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+# 
+# with(draws_lowcorr,
+#      VertHist(data = softplus(kappa_mu),
+#               main = 'kappa_mu',
+#               ylim = c(0, 5),
+#               col = adjustcolor(col_kappa, alpha.f = 100/255),
+#               cex.axis = 0.7))
+# abline(h = kappa_mu,
+#        col = col_rho,
+#        lwd = 7)
+# 
+# with(draws_lowcorr,
+#      VertHist(data = softplus(Intercept_kappa),
+#               main = 'kappa',
+#               ylim = c(0, 15),
+#               col = adjustcolor(col_kappa, alpha.f = 100/255),
+#               cex.axis = 0.7))
+# abline(h = kappa_id,
+#        col = col_rho,
+#        lwd = 7)
+
+
+# with(draws_lowcorr,
+#      VertHist(data = unwrap_circular_deg(b_fmu_Intercept),
+#               main = 'mean angle',
+#               ylim = c(-180, 180),
+#               col = adjustcolor(col_sd, alpha.f = 100/255),
+#               cex.axis = 0.7,
+#               axes = FALSE))
+# axis(side = 1)
+# axis(side = 2,
+#      at = -6:6*(180/6) )
+with(draws_lowcorr,
+     {
+       VertHist(data = kappa_mu,
+                main = 'kappa mu',
+                ylim = c(0, 3),
+                col = adjustcolor(col_kappa, alpha.f = 100/255),
+                cex.axis = 0.7,
+                axes = TRUE)
+       abline(h = median(kappa_mu),
+              col = col_kappa,
+              lwd = 2)
+     })
+abline(h = kappa_mu,
+       col = col_rho,
+       lwd = 7)
+paste0(mean(draws_lowcorr$kappa_mu > kappa_mu)*100, '%') #notable probability density for true kappa_mu
+
