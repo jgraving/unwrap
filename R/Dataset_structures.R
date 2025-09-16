@@ -39,7 +39,9 @@ graphics.off()
 # 
 #TODO   ---------------------------------------------
 #TODO   
-#- Contour plots
+#- Contour plots  +
+#- Appropriate priors for high variation
+#- Explicit models for each step
 #- Separate functions
 #- Rmarkdown version
 
@@ -1810,15 +1812,27 @@ print(rt_lst_print)
 
 
 ## Model version ---------------------------------------------------------
-#TODO find appropriate priors
-prior_var =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
+#TODO find prior to recover pop. kappa
+#The large inter-individual variability and small number of individuals
+#Make these parameters harder to estimate
+#We want to recover population kappa, which depends on both sd_kappa and kappa_mu
+  # mc_var = mean.circular(unlist(dt_var))
+  # prior_var = prior_st(paste0('normal(',rad(mc_var),', pi()/15)'),#"empirical" prior around the dataset mean
+prior_var = prior('normal(0, pi()/3)',class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
   prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
         nlpar  = 'zmu',  class = 'b') +
-  set_prior("target += normal_lpdf(kappamu | 3, 3)", #prior to larger values helps convergence 
+  prior('student_t(3, 0, 2.5)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
+  set_prior("target += normal_lpdf(kappamu | 2.0, 1.5)", #good convergence
             check = FALSE) +
-  prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') + #narrower prior aids convergence
-  prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa')#now expect substantial variation
-
+  prior('normal(5.0,1.5)', class = 'Intercept', dpar = 'kappa') + #good convergence
+#attempt to improve parameter recovery
+  # prior_var = prior('normal(0, pi()/3)',class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
+  #   prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
+  #         nlpar  = 'zmu',  class = 'b') +
+  #   set_prior("target += normal_lpdf(kappamu | 0, 1.5)", #prior to lower values to account for large individual differences
+  #             check = FALSE) +
+  #   prior('normal(2.0,1.5)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  #   prior('student_t(3, 0, 2.5)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
 
 bmod_var = brm(
   formula = form_highcorr,
@@ -1831,28 +1845,61 @@ bmod_var = brm(
   stanvars = stan_unwrap_fun + mod_circular_fun + stan_kappamu + stan_modmu,
   prior = prior_var,
   cores = 4,
-  backend = 'cmdstan'
+  backend = 'cmdstan',
+  control = list(adapt_delta = 0.95,#slower, but more robust sampling
+                 max_treedepth  = 10)#longer searches at each step
+)
+
+#the more concentrated data is around the population mean
+#the lower individual concentration must be
+bayesplot::mcmc_scatter(
+  as.array(bmod_var),
+  pars = c("kappamu", "b_kappa_Intercept"),
+  np = nuts_params(bmod_var),
+  size = 1
+)
+#higher average concentration could be explained by 
+#higher variance in concentration (to account for low conc. individuals)
+bayesplot::mcmc_scatter(
+  as.array(bmod_var),
+  pars = c("b_kappa_Intercept", "sd_ID__kappa_Intercept"),
+  np = nuts_params(bmod_var),
+  size = 1
+)
+#higher concentration of means requires
+#higher variance in concentration (to account for individuals oriented away from mean)
+bayesplot::mcmc_scatter(
+  as.array(bmod_var),
+  pars = c("kappamu", "sd_ID__kappa_Intercept"),
+  np = nuts_params(bmod_var),
+  size = 1
 )
 
 sm_var = summary(bmod_var)
-sm_var$fixed
-sm_var$spec_pars
+print(sm_var, digits = 2)
+# print(sm_var$fixed, digits = 3)
+# print(sm_var$spec_pars, digits = 3)
+plot(bmod_var,
+     var = 'b_kappa_Intercept',
+     transform = softplus)
+plot(bmod_var,
+     var = 'kappamu')
 plot(bmod_var,
      var = '^sd',
      regex = TRUE)
 plot(bmod_var,
-     var = 'b_kappa_Intercept')
+     var = '^b_fmu',
+     regex = TRUE,
+     transform = unwrap_circular_deg)
 plot(bmod_var,
      var = '^b_zmu',
      regex = TRUE,
+     nvariables  = 10,
      transform = unwrap_circular_deg)
 #
 
 #
 
-
-plot(bmod_var,
-     var = 'kappamu')
 
 
 
@@ -1860,7 +1907,7 @@ draws_var = as_draws_df(bmod_var)
 
 par(pty = 's')
 par(mar = c(0,0,0,0),
-    mfrow = c(3,4))
+    mfrow = c(4,4))
 for(i in 1:length(dt_var) )
 {
   mu_name = paste0('b_zmu_ID',i)
@@ -1871,7 +1918,7 @@ for(i in 1:length(dt_var) )
         shrink = 1.25,
         plot_rho = FALSE)
   arrows.circular(x = dt_var[i],
-                  y = A1(kappa_id),
+                  y = A1(kappa_id_var[i]),
                   col = col_rho,
                   lwd = 5,
                   length = 0.1/1.25
@@ -1891,7 +1938,7 @@ for(i in 1:length(dt_var) )
   #                               alpha.f = 1/255),
   #             pch = 19)
   # )
-  with(draws_lowcorr,
+  with(draws_var,
        arrows.circular(x = median.circular(
          circular(x = 
                     mod_circular(b_fmu_Intercept + get(mu_name)),
@@ -1930,15 +1977,6 @@ Draws2Cont(draws = draws_var,
            y_string = 'cos(b_fmu_Intercept)*
              A1(kappa_mu)'
 )
-# with(draws_lowcorr,
-#      points(x = sin(b_fmu_Intercept)*
-#               A1(softplus(kappa_mu)),
-#             y = cos(b_fmu_Intercept)*
-#               A1(softplus(kappa_mu)),
-#             col = adjustcolor(col = col_sd,
-#                               alpha.f = 1/255),
-#             pch = 19)
-# )
 
 with(draws_var,
      arrows.circular(x = mean.circular(circular(b_fmu_Intercept,
@@ -1951,52 +1989,59 @@ with(draws_var,
      length = 0.1/1.25,
      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
-# 
-# with(draws_lowcorr,
-#      VertHist(data = softplus(kappa_mu),
-#               main = 'kappa_mu',
-#               ylim = c(0, 5),
-#               col = adjustcolor(col_kappa, alpha.f = 100/255),
-#               cex.axis = 0.7))
-# abline(h = kappa_mu,
-#        col = col_rho,
-#        lwd = 7)
-# 
-# with(draws_lowcorr,
-#      VertHist(data = softplus(Intercept_kappa),
-#               main = 'kappa',
-#               ylim = c(0, 15),
-#               col = adjustcolor(col_kappa, alpha.f = 100/255),
-#               cex.axis = 0.7))
-# abline(h = kappa_id,
-#        col = col_rho,
-#        lwd = 7)
 
 
-# with(draws_lowcorr,
-#      VertHist(data = unwrap_circular_deg(b_fmu_Intercept),
-#               main = 'mean angle',
-#               ylim = c(-180, 180),
-#               col = adjustcolor(col_sd, alpha.f = 100/255),
-#               cex.axis = 0.7,
-#               axes = FALSE))
-# axis(side = 1)
-# axis(side = 2,
-#      at = -6:6*(180/6) )
-with(draws_lowcorr,
+with(draws_var,
+     VertHist(data = softplus(Intercept_kappa),
+              main = 'kappa',
+              ylim = c(0, 15),
+              col = adjustcolor(col_kappa, alpha.f = 100/255),
+              cex.axis = 0.7))
+abline(h = kappa_var_mean,
+       col = col_rho,
+       lwd = 7)
+
+
+with(draws_var,
+     VertHist(data = unwrap_circular_deg(b_fmu_Intercept),
+              main = 'mean angle',
+              ylim = c(-180, 180),
+              col = adjustcolor(col_sd, alpha.f = 100/255),
+              cex.axis = 0.7,
+              axes = FALSE))
+axis(side = 1)
+axis(side = 2,
+     at = -6:6*(180/6) )
+abline(h = 0,
+       col = col_rho,
+       lwd = 7)
+
+
+with(draws_var,
+     VertHist(data = softplus(kappa_mu),
+              main = 'kappa_mu',
+              ylim = c(0, 5),
+              col = adjustcolor(col_kappa, alpha.f = 100/255),
+              cex.axis = 0.7))
+abline(h = kappa_mu_var,
+       col = col_rho,
+       lwd = 7)
+
+with(draws_var,
      {
-       VertHist(data = kappa_mu,
-                main = 'kappa mu',
-                ylim = c(0, 3),
+       VertHist(data = sd_ID__kappa_Intercept,
+                main = 'pop. kappa sd',
+                ylim = c(0, 15),
                 col = adjustcolor(col_kappa, alpha.f = 100/255),
                 cex.axis = 0.7,
                 axes = TRUE)
-       abline(h = median(kappa_mu),
-              col = col_kappa,
-              lwd = 2)
+       abline(h = 0,
+              col = 1,
+              lwd = 1)
      })
-abline(h = kappa_mu,
+abline(h = kappa_var_sd,
        col = col_rho,
        lwd = 7)
-paste0(mean(draws_lowcorr$kappa_mu > kappa_mu)*100, '%') #notable probability density for true kappa_mu
-
+with(draws_var,
+     paste0(mean(sd_ID__kappa_Intercept < kappa_var_sd)*100, '%') #estimate almost perfectly centred on true pop kappa
+)
