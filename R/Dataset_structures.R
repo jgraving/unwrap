@@ -2018,7 +2018,7 @@ abline(h = 0,
 
 
 with(draws_var,
-     VertHist(data = softplus(kappa_mu),
+     VertHist(data = kappa_mu,
               main = 'kappa_mu',
               ylim = c(0, 5),
               col = adjustcolor(col_kappa, alpha.f = 100/255),
