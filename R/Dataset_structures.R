@@ -1829,10 +1829,10 @@ print(rt_lst_print)
 prior_var = prior('normal(0, pi()/3)',class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
   prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
         nlpar  = 'zmu',  class = 'b') +
-  set_prior("target += normal_lpdf(kappamu | log(exp(2.0)-1), 1.5)", #prior to lower values to account for large individual differences
+  set_prior("target += normal_lpdf(kappamu | log(exp(1.0)-1), 0.5)", #prior to lower values to account for large individual differences
             check = FALSE) +
-  prior('normal( log(exp(3.0)-1), 1.5)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
-  prior('student_t(3, 0, 2.5)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
+  prior('normal( log(exp(2.0)-1), 1.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
 
 bmod_var = brm(
   formula = form_highcorr,
