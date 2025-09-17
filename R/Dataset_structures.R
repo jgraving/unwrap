@@ -1725,7 +1725,7 @@ with(draws_lowcorr,
 # Variable individual parameters ---------------------------------------
 kappa_mu_var = 1.0
 kappa_var_mean = 1.5
-kappa_var_sd = 2.0
+kappa_var_sd = 0.5
 set.seed(0120810506)#ISBN Batschelet, 1981
 kappa_id_var = rnorm(n = ndata,
                      mean = kappa_var_mean,
@@ -1747,7 +1747,7 @@ dt_id_var = mapply(m = dt_var,
                    seed = 1000*1:length(dt_var), # different seed for each
                    FUN = DescriptCplot,
                    save_sample = TRUE,
-                   ndata = 20,
+                   ndata = 40,
                    refline = 0,
                    sdcol = NA,
                    denscol = NA,
@@ -1818,21 +1818,21 @@ print(rt_lst_print)
 #We want to recover population kappa, which depends on both sd_kappa and kappa_mu
   # mc_var = mean.circular(unlist(dt_var))
   # prior_var = prior_st(paste0('normal(',rad(mc_var),', pi()/15)'),#"empirical" prior around the dataset mean
-prior_var = prior('normal(0, pi()/3)',class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
-  prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
-        nlpar  = 'zmu',  class = 'b') +
-  set_prior("target += normal_lpdf(kappamu | 2.0, 1.5)", #good convergence
-            check = FALSE) +
-  prior('normal(5.0,1.5)', class = 'Intercept', dpar = 'kappa') + #good convergence
-  prior('student_t(3, 0, 1.5)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
-#attempt to improve parameter recovery
   # prior_var = prior('normal(0, pi()/3)',class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
   #   prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
   #         nlpar  = 'zmu',  class = 'b') +
-  #   set_prior("target += normal_lpdf(kappamu | 0, 1.5)", #prior to lower values to account for large individual differences
-  #             check = FALSE) +
-  #   prior('normal(2.0,1.5)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
-  #   prior('student_t(3, 0, 2.5)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
+  # set_prior("target += normal_lpdf(kappamu | 2.0, 1.5)", #good convergence
+  #           check = FALSE) +
+  # prior('normal(5.0,1.5)', class = 'Intercept', dpar = 'kappa') + #good convergence
+  # prior('student_t(3, 0, 1.5)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
+#attempt to improve parameter recovery
+prior_var = prior('normal(0, pi()/3)',class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
+  prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
+        nlpar  = 'zmu',  class = 'b') +
+  set_prior("target += normal_lpdf(kappamu | log(exp(2.0)-1), 1.5)", #prior to lower values to account for large individual differences
+            check = FALSE) +
+  prior('normal( log(exp(3.0)-1), 1.5)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('student_t(3, 0, 2.5)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
 
 bmod_var = brm(
   formula = form_highcorr,
@@ -1880,8 +1880,10 @@ print(sm_var, digits = 2)
 # print(sm_var$fixed, digits = 3)
 # print(sm_var$spec_pars, digits = 3)
 plot(bmod_var,
-     var = 'b_kappa_Intercept',
-     transform = softplus)
+     var = 'b_kappa_Intercept')
+# plot(bmod_var,
+#      var = 'b_kappa_Intercept',
+#      transform = softplus)
 plot(bmod_var,
      var = 'kappamu')
 plot(bmod_var,
