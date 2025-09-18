@@ -1826,13 +1826,14 @@ print(rt_lst_print)
   # prior('normal(5.0,1.5)', class = 'Intercept', dpar = 'kappa') + #good convergence
   # prior('student_t(3, 0, 1.5)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
 #attempt to improve parameter recovery
-prior_var = prior('normal(0, pi()/3)',class = 'b', nlpar = 'fmu') + #narrower prior helps convergence without introducing much bias
-  prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
-        nlpar  = 'zmu',  class = 'b') +
-  set_prior("target += normal_lpdf(kappamu | log(exp(1.0)-1), 0.5)", #prior to lower values to account for large individual differences
+prior_var = prior('normal(0, pi())',class = 'b', nlpar = 'fmu') + #wider prior helps avoid bias
+  prior_string(paste('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
+              '+ normal_lpdf(b_zmu | 0, 2*pi())'), # additional prior to keep estimates from walking around the circle
+                nlpar  = 'zmu',  class = 'b') +
+  set_prior("target += normal_lpdf(kappamu | 1.0, 1.0)", #prior to lower values to account for large individual differences
             check = FALSE) +
-  prior('normal( log(exp(2.0)-1), 1.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
-  prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
+  prior('normal( 2.0, 2.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('student_t(3, 0, 2.0)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
 
 bmod_var = brm(
   formula = form_highcorr,
@@ -1852,28 +1853,28 @@ bmod_var = brm(
 
 #the more concentrated data is around the population mean
 #the lower individual concentration must be
-bayesplot::mcmc_scatter(
-  as.array(bmod_var),
-  pars = c("kappamu", "b_kappa_Intercept"),
-  np = nuts_params(bmod_var),
-  size = 1
-)
-#higher average concentration could be explained by 
-#higher variance in concentration (to account for low conc. individuals)
-bayesplot::mcmc_scatter(
-  as.array(bmod_var),
-  pars = c("b_kappa_Intercept", "sd_ID__kappa_Intercept"),
-  np = nuts_params(bmod_var),
-  size = 1
-)
-#higher concentration of means requires
-#higher variance in concentration (to account for individuals oriented away from mean)
-bayesplot::mcmc_scatter(
-  as.array(bmod_var),
-  pars = c("kappamu", "sd_ID__kappa_Intercept"),
-  np = nuts_params(bmod_var),
-  size = 1
-)
+# bayesplot::mcmc_scatter(
+#   as.array(bmod_var),
+#   pars = c("kappamu", "b_kappa_Intercept"),
+#   np = nuts_params(bmod_var),
+#   size = 1
+# )
+# #higher average concentration could be explained by 
+# #higher variance in concentration (to account for low conc. individuals)
+# bayesplot::mcmc_scatter(
+#   as.array(bmod_var),
+#   pars = c("b_kappa_Intercept", "sd_ID__kappa_Intercept"),
+#   np = nuts_params(bmod_var),
+#   size = 1
+# )
+# #higher concentration of means requires
+# #higher variance in concentration (to account for individuals oriented away from mean)
+# bayesplot::mcmc_scatter(
+#   as.array(bmod_var),
+#   pars = c("kappamu", "sd_ID__kappa_Intercept"),
+#   np = nuts_params(bmod_var),
+#   size = 1
+# )
 
 sm_var = summary(bmod_var)
 print(sm_var, digits = 2)
@@ -1893,11 +1894,11 @@ plot(bmod_var,
      var = '^b_fmu',
      regex = TRUE,
      transform = unwrap_circular_deg)
-plot(bmod_var,
-     var = '^b_zmu',
-     regex = TRUE,
-     nvariables  = 10,
-     transform = unwrap_circular_deg)
+# plot(bmod_var,
+#      var = '^b_zmu',
+#      regex = TRUE,
+#      nvariables  = 10,
+#      transform = unwrap_circular_deg)
 #
 
 #
@@ -2045,5 +2046,5 @@ abline(h = kappa_var_sd,
        col = col_rho,
        lwd = 7)
 with(draws_var,
-     paste0(mean(sd_ID__kappa_Intercept < kappa_var_sd)*100, '%') #estimate almost perfectly centred on true pop kappa
+     paste0(mean(softplus(Intercept_kappa) > kappa_var_mean)*100, '%') #estimate almost perfectly centred on true pop kappa
 )
