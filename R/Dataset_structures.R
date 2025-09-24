@@ -2836,3 +2836,170 @@ with(data.frame(lc_hd),
      pnorm(q = elpd_diff[2], sd = se_diff[2])
 )
 
+
+# Prior example -----------------------------------------------------------
+
+## mu ---------------------------------------------------------------------
+
+
+xc = seq(from = -pi,
+         to = pi, 
+        by = 0.01)
+set.seed(123)
+kp = 0.7
+rvm = rvonmises(n = 20,
+                mu = circular(pi,
+                              zero = pi/2,
+                              rotation = 'clock'),
+                kappa = kp)
+
+dvm_true = dvonmises(x = xc,
+                     mu = pi,
+                     kappa = kp)
+
+mle_est = mle.vonmises(x = rvm)
+lk_sample = sapply(X = lapply(X = xc,
+                   FUN = dvonmises,
+                   x = as.numeric(rvm),
+                   kappa = mle_est$kappa),
+                   FUN = prod)
+
+
+dnorm_prior = dnorm(x = xc,
+                    mean = 0,
+                    sd = pi)
+
+lk_post = dnorm_prior*lk_sample
+
+est_mean = xc[which.max(lk_post)]
+
+mle_kappa = mle.vonmises(x = rvm,
+                         mu = circular(est_mean,
+                                       zero = pi/2,
+                                       rotation = 'clock'))
+
+par(mfrow = c(4,2))
+par(pty = 's')
+hist(deg( as.numeric(rvm) %% (2*pi)),
+     breaks = 100,
+     col = 'darkblue',
+     xlab = 'angle',
+     ylab = 'relative probability',
+     main = paste0('true distribution:\n',
+                   'von-Mises(mu = 180°, kappa = ', round(kp, 2), ')'),
+     xlim = c(0,360),
+     ylim = c(0,length(rvm)/2)
+)
+points(x = deg(xc %% (2*pi)),
+      y = dvm_true*length(rvm),
+      col = 'orange',
+      pch = 19)
+PCfun(angles = deg(rvm),
+      col = 'darkblue')
+lines(x = sin(xc)*(dvm_true+1),
+      y = cos(xc)*(dvm_true+1),
+      col = 'orange',
+      lwd = 3)
+
+hist(deg( as.numeric(rvm) %% (2*pi)),
+     breaks = 100,
+     col = 'darkblue',
+     xlab = 'angle',
+     ylab = 'relative likelihood',
+     main = with(mle_est,
+                 paste0('likelihood distribution:\n',
+                   'von-Mises(mu = ',
+                   round(deg(mu)),'°, kappa = ', round(kappa,2), ')')
+                 ),
+     xlim = c(0,360),
+     ylim = c(0,length(rvm)/2)
+)
+points(x = deg(xc %% (2*pi)),
+       y = 0.5*lk_sample/max(lk_sample),
+       col = 'purple',
+       pch = 19)
+
+PCfun(angles = deg(rvm),
+      col = 'darkblue')
+lines(x = sin(xc)*(0.5*lk_sample/max(lk_sample)+1),
+      y = cos(xc)*(0.5*lk_sample/max(lk_sample)+1),
+      col = 'purple',
+      lwd = 3)
+with(mle_est,
+     {
+arrows(x0 = 0,
+       y0 = 0,
+       x1 = sin(mu)*A1(kappa),
+       y1 = cos(mu)*A1(kappa),
+       col = adjustcolor(col = 'purple',
+                         alpha.f = 200/255),
+       lwd = 3,
+       length = 0.1
+)
+     }
+)
+
+
+hist(deg( as.numeric(rvm) %% (2*pi)),
+     breaks = 100,
+     col = 'darkblue',
+     xlab = 'angle',
+     ylab = 'relative prior likelihood',
+     main = 'prior distribution:\nnormal(mean = 0°, sd = 180°)',
+     xlim = c(0,360),
+     ylim = c(0,length(rvm)/2)
+)
+points(x = deg(xc %% (2*pi)),
+       y = dnorm_prior*length(rvm),
+       col = 'darkgreen',
+       pch = 19)
+PCfun(angles = deg(rvm),
+      col = 'darkblue')
+lines(x = sin(xc)*(dnorm_prior+1),
+      y = cos(xc)*(dnorm_prior+1),
+      col = 'darkgreen',
+      lwd = 3)
+
+hist(deg( as.numeric(rvm) %% (2*pi)),
+     breaks = 100,
+     col = 'darkblue',
+     xlab = 'angle',
+     ylab = 'relative posterior likelihood',
+     main = with(mle_kappa,
+                 paste0('posterior distribution:\n',
+                        'von-Mises(mu = ',
+                        round(deg(est_mean)),'°, kappa = ', round(kappa,2), ')')
+     ),
+     xlim = c(0,360),
+     ylim = c(0,length(rvm)/2)
+)
+points(x = deg(xc %% (2*pi)),
+       y = 
+         0.5*lk_post/max(lk_post),
+       col = 'darkred',
+       pch = 19)
+PCfun(angles = deg(rvm),
+      col = 'darkblue')
+lines(x = sin(xc)*(
+                     0.5*lk_post/max(lk_post)+1),
+      y = cos(xc)*(
+                     0.5*lk_post/max(lk_post)+1),
+      col = 'darkred',
+      lwd = 3)
+
+arrows(x0 = 0,
+       y0 = 0,
+       x1 = sin(est_mean)*A1(mle_kappa$kappa),
+       y1 = cos(est_mean)*A1(mle_kappa$kappa),
+       col = adjustcolor(col = 'darkred',
+                         alpha.f = 200/255),
+       lwd = 3,
+       length = 0.1
+       )
+
+
+## kappa -----------------------------------------------------------------
+
+
+
+
