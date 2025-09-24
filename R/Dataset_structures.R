@@ -2999,7 +2999,129 @@ arrows(x0 = 0,
 
 
 ## kappa -----------------------------------------------------------------
+xk = seq(from = 0.01, to  = 10, by  = 0.05)
 
 
+mle_est_kappa = mle.vonmises.bootstrap.ci(x = rvm,
+                                          mu = circular(est_mean,
+                                                        zero = pi/2,
+                                                        rotation = 'clock'))
+lk_kappa = sapply(X = lapply(X = xk,
+                              FUN = dvonmises,
+                              x = as.numeric(rvm),
+                              mu = as.numeric(mle_est$mu)),
+                   FUN = prod)
+
+
+dnorm_prior_kappa = dnorm(x = inv_softplus(xk),
+                    mean = 3,
+                    sd = 3)
+
+lk_post_kappa = dnorm_prior_kappa*lk_kappa
+
+est_kappa= xk[which.max(lk_post_kappa)]
+
+par(mfrow = c(4,2))
+
+plot(x = NULL,
+     xlim = range(xk),
+     ylim = c(0,1),
+     xlab = 'kappa',
+     ylab = 'probability density',
+     main = paste0('true distribution\n',
+                   'kappa = ', kp))
+abline(v = kp,
+       col = 'orange')
+PCfun(angles = deg(rvm),
+      col = 'darkblue')
+arrows(x0 = 0,
+       y0 = 0,
+       x1 = sin(pi)*A1(kp),
+       y1 = cos(pi)*A1(kp),
+       col = adjustcolor(col = 'orange',
+                         alpha.f = 200/255),
+       lwd = 3,
+       length = 0.1
+)
+
+plot(x = xk,
+     y = lk_kappa/max(lk_kappa),
+     xlim = range(xk),
+     ylim = c(0,1),
+     xlab = 'kappa',
+     ylab = 'relative likelihood',
+     main = paste0('likelihood distribution\n',
+                   'kappa = ', round(median(mle_est_kappa$kappa),2)),
+     col = 'purple',
+     type = 'l',
+     lwd = 3
+)
+abline(v = median(mle_est_kappa$kappa),
+       col = 'purple')
+
+PCfun(angles = deg(rvm),
+      col = 'darkblue')
+arrows(x0 = 0,
+       y0 = 0,
+       x1 = sin(pi)*A1(median(mle_est_kappa$kappa)),
+       y1 = cos(pi)*A1(median(mle_est_kappa$kappa)),
+       col = adjustcolor(col = 'purple',
+                         alpha.f = 200/255),
+       lwd = 3,
+       length = 0.1
+)
+
+
+plot(x = xk,
+     y = dnorm_prior_kappa,
+     xlim = range(xk),
+     ylim = c(0,1),
+     xlab = 'kappa',
+     ylab = 'prior likelihood',
+     main = paste0('prior distribution\n',
+                   'normal(mean = 3, sd = 3)'),
+     col = 'darkgreen',
+     type = 'l',
+     lwd = 3
+)
+
+PCfun(angles = deg(rvm),
+      col = 'darkblue')
+arrows(x0 = 0,
+       y0 = 0,
+       x1 = sin(pi)*A1(softplus(3)),
+       y1 = cos(pi)*A1(softplus(3)),
+       col = adjustcolor(col = 'darkgreen',
+                         alpha.f = 200/255),
+       lwd = 3,
+       length = 0.1
+)
+
+plot(x = xk,
+     y = lk_post_kappa/max(lk_post_kappa),
+     xlim = range(xk),
+     ylim = c(0,1),
+     xlab = 'kappa',
+     ylab = 'relative posterior likelihood',
+     main = paste0('posterior estimate\n',
+                   'kappa = ', round(est_kappa,2)),
+     col = 'darkred',
+     type = 'l',
+     lwd = 3
+)
+abline(v = est_kappa,
+       col = 'darkred')
+
+PCfun(angles = deg(rvm),
+      col = 'darkblue')
+arrows(x0 = 0,
+       y0 = 0,
+       x1 = sin(pi)*A1(softplus(est_kappa)),
+       y1 = cos(pi)*A1(softplus(est_kappa)),
+       col = adjustcolor(col = 'darkred',
+                         alpha.f = 200/255),
+       lwd = 3,
+       length = 0.1
+)
 
 
