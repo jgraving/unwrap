@@ -109,8 +109,10 @@ transformed parameters {
   lprior += normal_lpdf(b_fmu[2] | 0, pi()/2);
   lprior += normal_lpdf(b_kappa[1] |  0.0, 3.0);
   lprior += normal_lpdf(Intercept_kappa |  3.0, 3.0);
-  lprior += student_t_lpdf(sd_1 | 3, 0, 3.0)
-    - 2 * student_t_lccdf(0 | 3, 0, 3.0);
+  lprior += student_t_lpdf(sd_1[1] | 3, 0, 3.0)
+    - 1 * student_t_lccdf(0 | 3, 0, 3.0);
+  lprior += student_t_lpdf(sd_1[2] | 3, 0, 3.0)
+    - 1 * student_t_lccdf(0 | 3, 0, 3.0);
   lprior += lkj_corr_cholesky_lpdf(L_1 | 1);
 }
 model {
