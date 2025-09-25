@@ -2460,7 +2460,7 @@ prior_hd = prior('normal(0, pi()/1)',class = 'b', nlpar = 'fmu') + #wider prior 
   prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
   prior('normal( 0.0, 3.0)', class = 'b', dpar = 'kappa', coef = 'treat') + #turns should not affect population accuracy
   prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa') +  #now expect substantial variation, but too much makes sampling unstable
-  prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa', coef = 'treat') #now expect substantial variation, but too much makes sampling unstable
+  prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa', coef = 'treat', group = 'ID') #now expect substantial variation, but too much makes sampling unstable
 
 sc_hd = make_stancode(formula = form_hd,
                    data = data.frame(y = rad( c(dt_comb_hd, dt_comb_delta) ),
@@ -2548,7 +2548,7 @@ for(i in 1:length(dt_hd) )
         plot_rho = FALSE)
   arrows.circular(x = dt_hd[i],
                   y = A1(kappa_id_hd[i]),
-                  col = col_rho,
+                  col = col_obs,
                   lwd = 5,
                   length = 0.1/1.25
   )
@@ -2588,7 +2588,7 @@ for(i in 1:length(dt_delta) )
         plot_rho = FALSE)
   arrows.circular(x = dt_delta[i],
                   y = A1(kappa_id_hd[i]),
-                  col = col_rho,
+                  col = 'darkgreen',
                   lwd = 5,
                   length = 0.1/1.25
   )
@@ -2621,7 +2621,7 @@ DescriptCplot(k = kappa_mu_hd,
               denscol = NA,
               pcol = NA,
               cicol = NA,
-              mvcol = col_rho
+              mvcol = col_obs
 )
 points.circular(dt_hd,
                 bins = 360/5-1,
@@ -2659,7 +2659,7 @@ DescriptCplot(m = delta_mu,
               denscol = NA,
               pcol = NA,
               cicol = NA,
-              mvcol = col_rho
+              mvcol = 'darkgreen'
 )
 points.circular(dt_delta,
                 bins = 360/5-1,
@@ -2687,7 +2687,7 @@ with(draws_hd,
      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
 
-#Add decription of the average individual
+#Add description of the average individual
 DescriptCplot(k = kappa_hd_mean,
               ndata = ndata/2,
               refline = 0,
@@ -2695,7 +2695,7 @@ DescriptCplot(k = kappa_hd_mean,
               denscol = NA,
               pcol = NA,
               cicol = NA,
-              mvcol = col_rho
+              mvcol = col_obs
 )
 Draws2Cont(draws = draws_hd,
            x_string = 'sin(b_fmu_Intercept)*
@@ -2831,10 +2831,43 @@ loo_hd = loo(bmod_hd)
 loo_no_hd = loo(bmod_no_hd)
 #the treatment helps prediction a lot
 lc_hd = loo_compare(loo_hd, loo_no_hd)
+print(lc_hd)
 #"p<0.01" we might say
 with(data.frame(lc_hd),
      pnorm(q = elpd_diff[2], sd = se_diff[2])
 )
+
+# stripchart(x = data.frame(no_turn = round(loo_no_hd$pointwise[,'elpd_loo'],1),
+#                      turn = round(loo_hd$pointwise[,'elpd_loo'],1) ),
+#            col = sapply(c(col_obs, col_sd), FUN = adjustcolor,
+#                         alpha.f = 100/255),
+#            ylab = 'pointwise log predictive power',
+#            pch = 19,
+#            vertical = TRUE,
+#            method = 'stack'
+#            )
+
+elpd_diff_hd = loo_hd$pointwise[,'elpd_loo'] - 
+            loo_no_hd$pointwise[,'elpd_loo']
+
+par(mfrow = c(1,1),
+    mar = c(0,4,0,0))
+
+VertHist(data = elpd_diff_hd,
+        main = 'LOO comparison\nmodels for turn or no turn',
+        col = adjustcolor(col_sd, alpha.f = 100/255),
+        ylab = 'ELPD difference',
+        xlab = '',
+        cex.axis = 0.7)
+abline(h = 0,
+       col = 'gray',
+       lwd = 7)
+legend(x = 'bottomright',
+       legend = paste( c('ELPD difference =','\nSE of difference ='),
+                      round(lc_hd[2,c('elpd_diff','se_diff')],2) )
+)
+
+paste0(mean(elpd_diff_hd > 0)*100, '%') #estimate somewhat favours a turn
 
 
 # Prior example -----------------------------------------------------------
