@@ -632,23 +632,44 @@ VertHist = function(data, # numerical data vector
 
 
 #add contours
+#TODO investigate tiling approach to avoid overflows
 Draws2Cont = function(draws,
                       palette = 'Heat 2',
                       nlevels = 20,
                       x_string = 'sin(Intercept)*A1(softplus(kappa))',
                       y_string = 'cos(Intercept)*A1(softplus(kappa))',
-                      alpha = 200/255
-)
+                      alpha = 200/255,
+                      ngrid = 25, # defaults to a 25x25 grid
+                      cropc = FALSE, #crop region outside circle
+                      denstype = 'relative' # 'normalised' or 'relative' (normalised fails to plot low densities)
+                      )
 {
-  with(draws,
+  kdc = with(draws,
        {
-         with(MASS::kde2d(x = eval(str2lang(x_string)),
-                          y = eval(str2lang(y_string)) ),
+        MASS::kde2d(x = eval(str2lang(x_string)),
+                    y = eval(str2lang(y_string)),
+                    n = ngrid)
+      }
+  )
+  if(cropc)
+  {
+    xy = with(kdc, expand.grid(x = x,y= y))#find coordinates of z variable
+    idc = with(xy, x^2+y^2 < 1.0)
+    #crop edge of circle
+    kdc = within(kdc,
+                   {z[!idc] = 0})
+  }
+  with(kdc,
               {
                 .filled.contour(x = x,
                                 y = y,
                                 z = z,
-                                levels = (1:nlevels)*max(z/nlevels),
+                                levels = (1:nlevels)*
+                                            switch(EXPR = denstype,
+                                                    relative = max(z/nlevels),
+                                                    normalised = sum(z/nlevels),#warning, fails to plot low densities
+                                                    max(z/nlevels)
+                                                   ),
                                 col = hcl.colors(n = nlevels,
                                                  palette = palette,
                                                  rev = TRUE,
@@ -656,9 +677,51 @@ Draws2Cont = function(draws,
                 )
               }
          )
-       }
-  )
 }
+
+# Draws2CircCont = function(draws,
+#                           palette = 'Heat 2',
+#                           nlevels = 20,
+#                           x_string = 'Intercept',
+#                           y_string = 'A1(softplus(kappa))',
+#                           alpha = 200/255,
+#                           denstype = 'relative' # 'normalised' or 'relative'
+# )
+# {
+#   with(draws,
+#        {
+#          xx = eval(str2lang(x_string))
+#          yy = eval(str2lang(y_string))
+#          xtile = c(xx - 2*pi, xx, xx + 2*pi)
+#          ytile = c(yy, yy, yy)
+#          kdc = MASS::kde2d(x = xtile,
+#                            y = ytile, 
+#                            n = 30)
+#          ln = length(kdc$x)/3
+#          midspan = ln + 1:ln #indices of the middle span
+#          midspanx = with(kdc,order(sin(x[midspan])*y[midspan]) )#indices of the middle span
+#          midspany = with(kdc, order(cos(x[midspan])*y[midspan]) ) #indices of the middle span
+#          with(kdc,
+#               {
+#                 .filled.contour(x = sin(x[midspanx])*y[midspanx],
+#                                 y = cos(x[midspany])*y[midspany],
+#                                 z = z[midspanx, midspany],
+#                                 levels = (1:nlevels)*
+#                                             switch(EXPR = denstype,
+#                                                     relative = max(z[midspanx, midspany]/nlevels),
+#                                                     normalised = sum(z[midspanx, midspany])/nlevels,
+#                                                     relative = max(z[midspanx, midspany]/nlevels)
+#                                                    ),
+#                                 col = hcl.colors(n = nlevels,
+#                                                  palette = palette,
+#                                                  rev = TRUE,
+#                                                  alpha = alpha)
+#                 )
+#               }
+#          )
+#        }
+#   )
+# }
 
 
 #invert the softplus link
@@ -962,6 +1025,8 @@ PCfun(cd_divergence,
       sep = 0.05,
       shrink = 1.25,
       plot_rho = FALSE)
+# Draws2Cont(draws_divergence)
+Draws2CircCont(draws_divergence)
 arrows.circular(x = circular(-15,
                              units = 'degrees',
                              rotation = 'clock',
@@ -973,7 +1038,6 @@ arrows.circular(x = circular(-15,
 )
 
 
-Draws2Cont(draws_divergence)
 
 # with(draws_divergence,
 #      points(x = sin(Intercept)*A1(softplus(kappa)),
@@ -2546,17 +2610,19 @@ for(i in 1:length(dt_hd) )
         sep = 0.05,
         shrink = 1.25,
         plot_rho = FALSE)
+  Draws2Cont(draws_hd,
+             x_string = 'sin(b_fmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+             y_string = 'cos(b_fmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+             ngrid = 100, # needs higher resolution to avoid spillover
+             cropc = TRUE
+  )
   arrows.circular(x = dt_hd[i],
                   y = A1(kappa_id_hd[i]),
                   col = col_obs,
                   lwd = 5,
                   length = 0.1/1.25
-  )
-  Draws2Cont(draws_hd,
-             x_string = 'sin(b_fmu_Intercept + get(mu_name))*
-                         A1(softplus(Intercept_kappa+get(kappa_name)))',
-             y_string = 'cos(b_fmu_Intercept + get(mu_name))*
-                         A1(softplus(Intercept_kappa+get(kappa_name)))'
   )
   with(draws_hd,
        arrows.circular(x = median.circular(
@@ -2586,18 +2652,20 @@ for(i in 1:length(dt_delta) )
         sep = 0.05,
         shrink = 1.25,
         plot_rho = FALSE)
+  Draws2Cont(draws_hd,
+             x_string = 'sin(b_fmu_Intercept + b_fmu_treat + get(mu_name) + get(mu_delta_name))*
+                         A1(softplus(Intercept_kappa+b_kappa_treat+get(kappa_name)+get(kappa_delta_name)))',
+             y_string = 'cos(b_fmu_Intercept + b_fmu_treat + get(mu_name) + get(mu_delta_name))*
+                         A1(softplus(Intercept_kappa+b_kappa_treat+get(kappa_name)+get(kappa_delta_name)))',
+             ngrid = 100, # needs higher resolution to avoid spillover
+             cropc = TRUE
+            )
   arrows.circular(x = dt_delta[i],
                   y = A1(kappa_id_hd[i]),
                   col = 'darkgreen',
                   lwd = 5,
                   length = 0.1/1.25
   )
-  Draws2Cont(draws_hd,
-             x_string = 'sin(b_fmu_Intercept + b_fmu_treat + get(mu_name) + get(mu_delta_name))*
-                         A1(softplus(Intercept_kappa+b_kappa_treat+get(kappa_name)+get(kappa_delta_name)))',
-             y_string = 'cos(b_fmu_Intercept + b_fmu_treat + get(mu_name) + get(mu_delta_name))*
-                         A1(softplus(Intercept_kappa+b_kappa_treat+get(kappa_name)+get(kappa_delta_name)))'
-            )
   with(draws_hd,
        arrows.circular(x = median.circular(
          circular(x = 
@@ -2635,7 +2703,9 @@ Draws2Cont(draws = draws_hd,
            x_string = 'sin(b_fmu_Intercept)*
              A1(kappa_mu)',
            y_string = 'cos(b_fmu_Intercept)*
-             A1(kappa_mu)'
+             A1(kappa_mu)',
+           ngrid = 100, # needs higher resolution to avoid spillover
+           cropc = TRUE
 )
 
 with(draws_hd,
@@ -2673,7 +2743,9 @@ Draws2Cont(draws = draws_hd,
            x_string = 'sin(b_fmu_treat)*
              A1(kappa_mu_delta)',
            y_string = 'cos(b_fmu_treat)*
-             A1(kappa_mu_delta)'
+             A1(kappa_mu_delta)',
+           ngrid = 100, # needs higher resolution to avoid spillover
+           cropc = TRUE
 )
 with(draws_hd,
      arrows.circular(x = mean.circular(circular(b_fmu_treat,
@@ -2701,7 +2773,9 @@ Draws2Cont(draws = draws_hd,
            x_string = 'sin(b_fmu_Intercept)*
              A1(softplus(Intercept_kappa))',
            y_string = 'cos(b_fmu_Intercept)*
-             A1(softplus(Intercept_kappa))'
+             A1(softplus(Intercept_kappa))',
+           ngrid = 100, # needs higher resolution to avoid spillover
+           cropc = TRUE
 )
 with(draws_hd,
      arrows.circular(x = mean.circular(circular(b_fmu_Intercept,
