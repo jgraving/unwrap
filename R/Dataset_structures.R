@@ -1066,6 +1066,206 @@ abline(h = 0,
 
 with(draws_divergence, paste0(mean(Intercept < 0)*100, '%') ) #nearly all estimates suggest a rightwards turn
 
+
+## Comparison ------------------------------------------------------------
+#set up required Stan functions
+mod_circular_fun = stanvar(scode = "
+    real mod_circular(real y) {
+      return fmod(y + pi(), 2*pi()) - pi();
+    }
+  ",
+                           block = 'functions')
+unwrap_von_mises = custom_family(
+  "unwrap_von_mises", dpars = c("mu", "kappa"),
+  links = c('identity',#brms cannot accept custom link functions, do via nl instead
+            "softplus"), 
+  lb = c(-pi, 0), ub = c(pi, NA),
+  type = "real"
+)
+
+stan_unwrap_fun = stanvar(scode = "
+    real unwrap_von_mises_lpdf(real y, real mu, real kappa) {
+      return von_mises_lpdf(y | mod_circular(mu), kappa);
+    }
+    real unwrap_von_mises_rng(real mu, real kappa) {
+      return von_mises_rng( mod_circular(mu) , kappa);
+    }
+    real unwrap_von_mises_vect_lpdf(vector y, real mu, real kappa) {
+    real tmp = 0;
+    for(i in 1:size(y))
+    {
+    tmp = tmp + unwrap_von_mises_lpdf(y[i] | mu, kappa);
+    }
+      return tmp;
+    }
+  ",
+                          block = 'functions') 
+
+fixed_von_mises = custom_family(
+  "fixed_von_mises", dpars = c("mu", "kappa"),
+  links = c('identity',#brms cannot accept custom link functions, do via nl instead
+            "softplus"), 
+  lb = c(-pi, 0), ub = c(pi, NA),
+  type = "real"
+)
+
+
+log_lik_fixed_von_mises <- function(i, prep) {
+  #remove circular formatting?
+  prep$data$Y = as.numeric(prep$data$Y)
+  
+  args <- list(
+    kappa = get_dpar(prep, "kappa", i = i)
+  )
+  args$mu = rep(0, length(args$kappa))
+  
+  # ----------- log_lik helper-functions -----------
+  # compute (possibly censored) log_lik values
+  # @param dist name of a distribution for which the functions
+  #   d<dist> (pdf) and p<dist> (cdf) are available
+  # @param args additional arguments passed to pdf and cdf
+  # @param prep a brmsprep object
+  # @return vector of log_lik values
+  log_lik_censor <- function(dist, args, i, prep) {
+    pdf <- get(paste0("d", dist), mode = "function")
+    cdf <- get(paste0("p", dist), mode = "function")
+    y <- prep$data$Y[i]
+    cens <- prep$data$cens[i]
+    if (is.null(cens) || cens == 0) {
+      x <- do_call(pdf, c(y, args, log = TRUE))
+    } else if (cens == 1) {
+      x <- do_call(cdf, c(y, args, lower.tail = FALSE, log.p = TRUE))
+    } else if (cens == -1) {
+      x <- do_call(cdf, c(y, args, log.p = TRUE))
+    } else if (cens == 2) {
+      rcens <- prep$data$rcens[i]
+      x <- log(do_call(cdf, c(rcens, args)) - do_call(cdf, c(y, args)))
+    }
+    x
+  }
+  
+  # adjust log_lik in truncated models
+  # @param x vector of log_lik values
+  # @param cdf a cumulative distribution function
+  # @param args arguments passed to cdf
+  # @param i observation number
+  # @param prep a brmsprep object
+  # @return vector of log_lik values
+  log_lik_truncate <- function(x, cdf, args, i, prep) {
+    lb <- prep$data[["lb"]][i]
+    ub <- prep$data[["ub"]][i]
+    if (is.null(lb) && is.null(ub)) {
+      return(x)
+    }
+    if (!is.null(lb)) {
+      log_cdf_lb <- do_call(cdf, c(lb, args, log.p = TRUE))
+    } else {
+      log_cdf_lb <- rep(-Inf, length(x))
+    }
+    if (!is.null(ub)) {
+      log_cdf_ub <- do_call(cdf, c(ub, args, log.p = TRUE))
+    } else {
+      log_cdf_ub <- rep(0, length(x))
+    }
+    x - log_diff_exp(log_cdf_ub, log_cdf_lb)
+  }
+  
+  # weight log_lik values according to defined weights
+  # @param x vector of log_lik values
+  # @param i observation number
+  # @param prep a brmsprep object
+  # @return vector of log_lik values
+  log_lik_weight <- function(x, i, prep) {
+    weight <- prep$data$weights[i]
+    if (!is.null(weight)) {
+      x <- x * weight
+    }
+    x
+  }
+  
+  
+  out <- log_lik_censor(
+    dist = "von_mises", args = args, i = i, prep = prep
+  )
+  out <- log_lik_truncate(
+    out, cdf = pvon_mises, args = args, i = i, prep = prep
+  )
+  log_lik_weight(out, i = i, prep = prep)
+}
+
+
+#fit a model with mean at 0
+mod_expect = brm(formula = bf(y~0,
+                              kappa~1),
+                data = data.frame(y = rad(cd_divergence)),
+                # family = von_mises(link = 'identity', link_kappa = 'softplus'),
+                family = fixed_von_mises,
+                stanvars = stanvar(scode = "
+    real fixed_von_mises_lpdf(real y, real mu, real kappa) {
+      return von_mises_lpdf(y | mu, kappa);
+    }
+  ",
+                                   block = 'functions'),
+                backend = 'cmdstan'
+                )
+
+
+
+
+
+loo_divergence = loo(ci_uw$model)
+loo_expected = loo(mod_expect)
+lc_divergence = loo_compare(loo_divergence, loo_expected)
+print(lc_divergence)
+#it appears that the treatment has no detectable effect
+with(data.frame(lc_delta),
+     pnorm(q = elpd_diff[2], sd = se_diff[2])
+)
+
+#N.B. If the expected angle were not 0°,
+# we can adjust the data to align the expected angle with
+# a 0 intercept
+
+
+#we now place our expected angle at -15°, the true mean
+mod_true = brm(formula = bf(y ~ 0,
+                            kappa~1),
+               data = data.frame(y = rad(cd_divergence) - 
+                                       rad(-15)), #subtract the true mean
+               family = fixed_von_mises,
+               stanvars = stanvar(scode = "
+    real fixed_von_mises_lpdf(real y, real mu, real kappa) {
+      return von_mises_lpdf(y | mu, kappa);
+    }
+  ",
+                                  block = 'functions'),
+               backend = 'cmdstan'
+)
+
+#this model should be compared with another fitted to the
+#_same data_
+mod_false = brm(formula = bf(y ~ 1,#free intercept
+                             kappa~1),
+                data = data.frame(y = rad(cd_divergence) - 
+                                    rad(-15)), #subtract the true mean
+                family = fixed_von_mises,
+                stanvars = stanvar(scode = "
+    real fixed_von_mises_lpdf(real y, real mu, real kappa) {
+      return von_mises_lpdf(y | mu, kappa);
+    }
+  ",
+                                   block = 'functions'),
+                backend = 'cmdstan'
+)
+
+loo_true = loo(mod_true)
+loo_false = loo(mod_false)
+loo_compare(loo_true, loo_false)
+#           elpd_diff se_diff
+# mod_true   0.0       0.0   
+# mod_false  0.0       0.0   
+#no difference between expected and observed angle
+
 # Reduced concentration -------------------
 par(pty = 's')
 par(mar = c(0,0,0,0))
