@@ -1025,8 +1025,7 @@ PCfun(cd_divergence,
       sep = 0.05,
       shrink = 1.25,
       plot_rho = FALSE)
-# Draws2Cont(draws_divergence)
-Draws2CircCont(draws_divergence)
+Draws2Cont(draws_divergence)
 arrows.circular(x = circular(-15,
                              units = 'degrees',
                              rotation = 'clock',
@@ -2858,7 +2857,8 @@ with(draws_hd,
 
 ## Comparison ------------------------------------------------------------
 
-#fit a model with no turn
+### no treatment model  ---------------------------------------------
+
 #same priors, but no turn
 prior_no_hd = prior('normal(0, pi()/1)',class = 'b', nlpar = 'fmu') + #wider prior helps avoid biasp
   set_prior(paste("target +=", 
@@ -2899,17 +2899,146 @@ apply(X = as_draws_df(bmod_no_hd,
            MARGIN = 2,
            FUN = Rhat_unwrap)
 
+### no turn model with treatment kappa ---------------------------------------------
+
+#can normal random effects sufficiently capture that structure?
+form_kappa_hd = bf(y ~ fmu + zmu,
+             fmu ~ 1,
+             zmu ~ 0 + ID,
+             kappa ~ 1 + treat + (1 + treat|ID),
+             nl = TRUE)
+
+
+#same priors, but no turn
+prior_kappa_hd = prior('normal(0, pi()/1)',class = 'b', nlpar = 'fmu') + #wider prior helps avoid biasp
+  set_prior(paste("target +=", 
+                  'unwrap_von_mises_vect_lpdf(b_zmu[1:5] | 0, log1p_exp(kappamu))',
+                  '+ normal_lpdf(b_zmu[1:5] | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
+  ),
+  check = FALSE) +
+  set_prior("target += normal_lpdf(kappamu | 3.0, 3.0)", #prior to higher values, indiv differences should be small
+            check = FALSE) +
+  prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('normal( 0.0, 3.0)', class = 'b', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa')   #now expect substantial variation, but too much makes sampling unstable
+
+#fit in the same way, but ignore the treatment
+bmod_kappa_hd = brm(
+  formula = form_kappa_hd,
+  data = data.frame(y = rad( c(dt_comb_hd, dt_comb_delta) ),
+                    ID = factor(
+                      c(sort(rep(1:(ndata/2), 20)),
+                        sort(rep(1:(ndata/2), 20))),
+                      ordered = FALSE),
+                    treat = sort(rep(1:2 - 1, 20*ndata/2))
+  ),
+  family = unwrap_von_mises,
+  stanvars = stan_unwrap_fun + mod_circular_fun + stan_kappamu + stan_modmu,
+  prior = prior_kappa_hd,
+  cores = 4,
+  backend = 'cmdstan',
+  control = list(adapt_delta = 0.97)#slower, but more robust sampling
+)
+
+summary(bmod_kappa_hd)#still converges well
+
+UnwrapRhats(bmod_kappa_hd)#including random effects
+
+apply(X = as_draws_df(bmod_kappa_hd,
+                           variable = '^b_fmu', 
+                           regex = TRUE),
+           MARGIN = 2,
+           FUN = Rhat_unwrap)
+
 
 
 loo_hd = loo(bmod_hd)
+loo_kappa_hd = loo(bmod_kappa_hd)
 loo_no_hd = loo(bmod_no_hd)
 #the treatment helps prediction a lot
-lc_hd = loo_compare(loo_hd, loo_no_hd)
+lc_hd = loo_compare(loo_hd, loo_kappa_hd, loo_no_hd)
 print(lc_hd)
+#               elpd_diff se_diff
+# bmod_hd         0.0       0.0  
+# bmod_kappa_hd -61.2       8.3  
+# bmod_no_hd    -82.7      11.0  
 #"p<0.01" we might say
 with(data.frame(lc_hd),
      pnorm(q = elpd_diff[2], sd = se_diff[2])
 )
+
+lc_plot = data.frame(elpd = c(loo_no_hd$estimates['elpd_loo','Estimate'],
+                              loo_kappa_hd$estimates['elpd_loo','Estimate'],
+                              loo_hd$estimates['elpd_loo','Estimate'],
+                              loo_kappa_hd$estimates['elpd_loo','Estimate'] - lc_hd[2,'elpd_diff']),
+                     se = c(loo_no_hd$estimates['elpd_loo','SE'],
+                            loo_kappa_hd$estimates['elpd_loo','SE'],
+                            loo_hd$estimates['elpd_loo','SE'],
+                            lc_hd[2,'se_diff'])
+                     )
+
+par(mar = c(0,4,0,4),
+    mfrow = c(1,1))
+plot(x = 1:dim(lc_plot)[1],
+     y = lc_plot$elpd,
+     xlab = '',
+     ylab = 'expected log predictive density',
+     xlim = c(1,dim(lc_plot)[1]) + c(-1,1)*0.5,
+     ylim = with(lc_plot, {range(elpd+se%*% t(c(-2,2)))}), #within 2sigma of all estimates
+     pch = 19,
+     col = c(col_obs, col_kappa, col_sd, col_rho),
+     cex = 2,
+     axes = FALSE)
+with(lc_plot,
+     {
+arrows(x0 = 1:dim(lc_plot)[1],
+       x1 = 1:dim(lc_plot)[1],
+       y0 = elpd - se,
+       y1 = elpd + se,
+       code = 3,
+       angle = 90,
+       length = 0.1,
+       lwd = 3,
+       col =  c(col_obs, col_kappa, col_sd, col_rho)
+       )
+     }
+)
+axis(2,
+     at = pretty(c(0,
+                   with(lc_plot, {range(elpd+se%*% t(c(-2,2)))}))
+                 )
+     )
+axis(4,
+     at = with(lc_plot,
+               {
+               # pretty(c(elpd[2], c(elpd[dim(lc_plot)[1]] + se[dim(lc_plot)[1]]%*% t(c(-2,0,2)) ) ) )
+               seq(from = elpd[2], to = elpd[dim(lc_plot)[1]] + se[dim(lc_plot)[1]]*4, by = 20)
+               }
+               ),
+     labels = with(lc_plot,
+                          {
+                            seq(from = 0, to =  elpd[dim(lc_plot)[1]] + se[dim(lc_plot)[1]]*4 - elpd[2],  by = 20)
+                            # round(
+                            # pretty(c(elpd[2], c(elpd[dim(lc_plot)[1]] + se[dim(lc_plot)[1]]%*% t(c(-2,0,2)) ) ) ) - elpd[1]
+                            # )
+                          }
+     )
+)
+abline(h = lc_plot$elpd[2],
+       col = 'gray')
+mtext(text = 'ELPD difference',
+      side = 4,
+      line = 3
+      )
+mtext(side = 1,
+      line = -1,
+      at = 1:dim(lc_plot)[1],
+     text = c('null\nmodel',
+              'kappa\nmodel',
+              'mu & kappa\nmodel',
+              'difference'),
+     col = c(col_obs, col_kappa, col_sd, col_rho)
+     )
 
 # stripchart(x = data.frame(no_turn = round(loo_no_hd$pointwise[,'elpd_loo'],1),
 #                      turn = round(loo_hd$pointwise[,'elpd_loo'],1) ),
@@ -2918,30 +3047,31 @@ with(data.frame(lc_hd),
 #            ylab = 'pointwise log predictive power',
 #            pch = 19,
 #            vertical = TRUE,
-#            method = 'stack'
+#            method = 'stack',
+#            add = FALSE
 #            )
 
-elpd_diff_hd = loo_hd$pointwise[,'elpd_loo'] - 
-            loo_no_hd$pointwise[,'elpd_loo']
-
-par(mfrow = c(1,1),
-    mar = c(0,4,0,0))
-
-VertHist(data = elpd_diff_hd,
-        main = 'LOO comparison\nmodels for turn or no turn',
-        col = adjustcolor(col_sd, alpha.f = 100/255),
-        ylab = 'ELPD difference',
-        xlab = '',
-        cex.axis = 0.7)
-abline(h = 0,
-       col = 'gray',
-       lwd = 7)
-legend(x = 'bottomright',
-       legend = paste( c('ELPD difference =','\nSE of difference ='),
-                      round(lc_hd[2,c('elpd_diff','se_diff')],2) )
-)
-
-paste0(mean(elpd_diff_hd > 0)*100, '%') #estimate somewhat favours a turn
+# elpd_diff_hd = loo_hd$pointwise[,'elpd_loo'] - 
+#             loo_no_hd$pointwise[,'elpd_loo']
+# 
+# par(mfrow = c(1,1),
+#     mar = c(0,4,0,0))
+# 
+# VertHist(data = elpd_diff_hd,
+#         main = 'LOO comparison\nmodels for turn or no turn',
+#         col = adjustcolor(col_sd, alpha.f = 100/255),
+#         ylab = 'ELPD difference',
+#         xlab = '',
+#         cex.axis = 0.7)
+# abline(h = 0,
+#        col = 'gray',
+#        lwd = 7)
+# legend(x = 'bottomright',
+#        legend = paste( c('ELPD difference =','\nSE of difference ='),
+#                       round(lc_hd[2,c('elpd_diff','se_diff')],2) )
+# )
+# 
+# paste0(mean(elpd_diff_hd > 0)*100, '%') #estimate somewhat favours a turn
 
 
 # Prior example -----------------------------------------------------------
