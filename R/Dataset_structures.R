@@ -1218,11 +1218,8 @@ loo_divergence = loo(ci_uw$model)
 loo_expected = loo(mod_expect)
 lc_divergence = loo_compare(loo_divergence, loo_expected)
 print(lc_divergence)
-#             elpd_diff se_diff
-# ci_uw$model  0.0       0.0   
-# mod_expect  -4.3       1.7 
-#it appears that the treatment has no detectable effect
-with(data.frame(lc_delta),
+#it appears that the diverence model fits better
+with(data.frame(lc_divergence),
      pnorm(q = elpd_diff[2], sd = se_diff[2])
 )
 
@@ -1258,6 +1255,7 @@ mod_false = CI_unwrap(data = data.frame(y = rad(cd_divergence) -
 )
 
 loo_true = loo(mod_true)
+loo_false = loo(mod_false$model)
 loo_false = loo(mod_false$model)
 loo_compare(loo_true, loo_false)
 #               elpd_diff se_diff
