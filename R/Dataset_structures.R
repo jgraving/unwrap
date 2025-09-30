@@ -1200,6 +1200,7 @@ mod_expect = brm(formula = bf(y~0,
                 data = data.frame(y = rad(cd_divergence)),
                 # family = von_mises(link = 'identity', link_kappa = 'softplus'),
                 family = fixed_von_mises,
+                prior = prior('normal(3,3)', class = 'Intercept', dpar = 'kappa'),
                 stanvars = stanvar(scode = "
     real fixed_von_mises_lpdf(real y, real mu, real kappa) {
       return von_mises_lpdf(y | mu, kappa);
@@ -1217,6 +1218,9 @@ loo_divergence = loo(ci_uw$model)
 loo_expected = loo(mod_expect)
 lc_divergence = loo_compare(loo_divergence, loo_expected)
 print(lc_divergence)
+#             elpd_diff se_diff
+# ci_uw$model  0.0       0.0   
+# mod_expect  -4.3       1.7 
 #it appears that the treatment has no detectable effect
 with(data.frame(lc_delta),
      pnorm(q = elpd_diff[2], sd = se_diff[2])
@@ -1233,6 +1237,7 @@ mod_true = brm(formula = bf(y ~ 0,
                data = data.frame(y = rad(cd_divergence) - 
                                        rad(-15)), #subtract the true mean
                family = fixed_von_mises,
+               prior = prior('normal(3,3)', class = 'Intercept', dpar = 'kappa'),
                stanvars = stanvar(scode = "
     real fixed_von_mises_lpdf(real y, real mu, real kappa) {
       return von_mises_lpdf(y | mu, kappa);
@@ -1244,27 +1249,21 @@ mod_true = brm(formula = bf(y ~ 0,
 
 #this model should be compared with another fitted to the
 #_same data_
-mod_false = brm(formula = bf(y ~ 1,#free intercept
-                             kappa~1),
-                data = data.frame(y = rad(cd_divergence) - 
-                                    rad(-15)), #subtract the true mean
-                family = fixed_von_mises,
-                stanvars = stanvar(scode = "
-    real fixed_von_mises_lpdf(real y, real mu, real kappa) {
-      return von_mises_lpdf(y | mu, kappa);
-    }
-  ",
-                                   block = 'functions'),
-                backend = 'cmdstan'
+mod_false = CI_unwrap(data = data.frame(y = rad(cd_divergence) - 
+                                          rad(-15)),
+                      est_kappa = TRUE,
+                      return_model = TRUE,
+                      predictors = FALSE,
+                      backend = 'cmdstan'#faster and more reliable
 )
 
 loo_true = loo(mod_true)
-loo_false = loo(mod_false)
+loo_false = loo(mod_false$model)
 loo_compare(loo_true, loo_false)
-#           elpd_diff se_diff
-# mod_true   0.0       0.0   
-# mod_false  0.0       0.0   
-#no difference between expected and observed angle
+#               elpd_diff se_diff
+# mod_true         0.0       0.0   
+# mod_false$model -0.8       0.3 
+#expected angle model has higher predictive power
 
 # Reduced concentration -------------------
 par(pty = 's')
