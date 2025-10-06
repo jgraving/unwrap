@@ -2,6 +2,11 @@
 title: "Circular Dataset Structures"
 output: html_document
 date: "`r Sys.Date()`"
+author: "James Foster"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
 editor_options: 
   markdown: 
     wrap: sentence
@@ -246,7 +251,7 @@ with(draws_divergence,
 with(draws_divergence,
      {
       VertHist(data = deg(Intercept), 
-               main = 'mean angle',
+               main = '\nmean angle',
                ylim = c(-30, 15),
                col = adjustcolor(col_sd, alpha.f = 100/255),
                cex.axis = 0.7)
@@ -263,8 +268,10 @@ with(draws_divergence,
       }
      ) #nearly all estimates suggest a rightwards turn
 ```
-
-```{r Model comparison observed vs expected mean angle}
+## Test the expected angle hypothesis
+To test the hypothesis that the true mean direction falls in the expected direction, we can fit another model where this is explicitly stated. To inform BRMS that we do not want to estimate the mean direction, we use the notation `y~0`, which removes the intercept. We can now estimate $\kappa$, _assuming_ that the mean direction is 0°, using the same prior for kappa as before.
+The model for a divergent mean direction has higher expected log predictive density (ELPD) than the model for the expected direction. This ELPD difference is $>2\times$ larger than its standard error, so we can state with some confidence that the hypothesis of a divergence from the expected direction is more likely than the hypothesis of alignment with the expected direction.
+```{r Model comparison observed vs expected mean direction}
 
 
 #fit a model with mean at 0
@@ -283,6 +290,7 @@ loo_divergence = loo(mod_divergence)
 loo_expected = loo(mod_expect)
 loo_compare(loo_divergence, loo_expected)
 ```
+
 In this case, the expected angle model is straightforward to fit because the expected angle is 0°, which is also the default intercept for a `y~0` (no-intercept) model.
 If the expected angle were not 0°, we would need to adjust the data to align the expected angle with the `0` intercept.
 Here is an example with the expected angle at -15°.
@@ -320,8 +328,12 @@ mod_false =  brm(formula = bf(y ~ 1,
 )
 
 #both models converge well with rhats [1.000, 1.002]
+sm_truefalse = lapply(list(true = mod_true, false = mod_false), summary)
 #their mu estimates are very close, differing by only 2°, with overlapping CI.
-round( deg(summary(mod_false)$fixed[1, 1:4]) )
+round( deg(
+  sm_truefalse$false$fixed['Intercept',
+                                    1:4]
+  ) )
 
 #add Leave-One-Out Cross-Validation
 loo_true = loo(mod_true)
