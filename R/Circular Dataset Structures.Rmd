@@ -31,7 +31,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 > **REFERENCES**
 >
-> *data types*
+> **data types**
 >
 > Duelli P. & Wehner R.
 > (1973) The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor ( Formicidae , Hymenoptera ) *Journal of Comparative Physiology* 53(3) 37-53
@@ -42,7 +42,7 @@ knitr::opts_chunk$set(echo = TRUE)
 > “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
 > *J. Comp. Physiol.* 134, 151–157.
 >
-> *modelling methods*
+> **modelling methods**
 >
 > Sayin S, Couzin-Fuchs E, Petelski I, Günzel Y, Salahshour M, Lee CY, Graving JM, Li L, Deussen O, Sword GA, et al. (2025) The behavioral mechanisms governing collective motion in swarming locusts.
 > Science.
@@ -67,16 +67,266 @@ knitr::opts_chunk$set(echo = TRUE)
 > -   move necessary functions to unwrap_functions.R
 > -   make functions for result extraction from BRMS
 
-```{r cars}
-summary(cars)
+## Set up workspace
+
+```{r Load functions and packages}
+source('unwrap_functions.R')
 ```
 
-## Including Plots
+Set up some colours for plotting.
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r Set up plot colours}
+col_kappa = '#1E78B5'#colour for kappa parameter
+col_rho = '#F08024' #colour for mean vector length
+col_sd = '#E74A29' #colour for SD and mean angle
+col_sd2 = '#E57461' #colour for other SD heuristics
+col_pdf = adjustcolor(col = '#21A885', # colour for probability density
+                      alpha.f = 0.7)
+col_obs = '#3E1F51' #colour for control observations
+col_treat = '#006400' # colour for treatment observations
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Divergence from home direction
+
+In navigation experiments return directions are often compared with the expected home direction to determine if homeward navigation is perturbed.
+Here, we simulate example data (𝑛 = 20) generated from a distribution with a mean differs that from the expected direction (0°) by only 15°.
+
+```{r Generate diverging data, echo  = FALSE}
+ndata = 20 #sample size
+
+# circular zero expected angle
+c0 = circular(x = 0,
+              units = 'degrees',
+              rotation = 'clock',
+              zero = pi/2)
+#true mean angle
+c15 = circular(x = -15,
+              units = 'degrees',
+              rotation = 'clock',
+              zero = pi/2)
+
+par(pty = 's') # square axes
+par(mar = c(0,0,0,0)) # no margins
+
+cd_divergence = DescriptCplot(m = -15, # population mean
+                              k = 10, # high concentration
+                              refline = 0, # expected direction
+                              ndata = ndata,
+                              mvcol = col_obs, #distr. mean same colour as observations
+                              sdcol = NA, # don't plot SD
+                              denscol = NA, # don't plot prob. density
+                              save_sample = TRUE)
+```
+
+A common shortcut to assess orientation in an expected direction is to use the v-test modification of the Rayleigh test for uniformity.
+This tests the hypothesis of uniformity against the alternative of clustering in some direction near the expected direction.
+The data are very far from uniform ($\kappa = 10$), and the mean angle is very close to the expected angle (cosine similarity of `cos(rad(-1)) = 97%`), so the test is significant.
+Even so, the data show a trend away from the expected angle, 75% of points falling to the left of 0°.
+
+```{r v-test for uniformity}
+#v-test finds significant orientation in 0°, but we know the true direction is different
+rayleigh.test(cd_divergence, mu = c0)
+
+```
+
+## Fit the model
+
+In order to fit a circular model using the shifted modulo and softplus links, we need to define a custom family.
+This family
+
+```{r Set up the circular model custom family}
+#set up required Stan functions
+#shifted modulo in Stan code
+mod_circular_fun = stanvar(scode = "
+  real mod_circular(real y) {
+    return fmod(y + pi(), 2*pi()) - pi();
+  }
+",
+                           block = 'functions')
+
+#custom likelihood function using the shifted modulo link
+stan_unwrap_fun = stanvar(scode = "
+  real unwrap_von_mises_lpdf(real y, real mu, real kappa) {
+    return von_mises_lpdf(y | mod_circular(mu), kappa);
+  }
+  real unwrap_von_mises_rng(real mu, real kappa) {
+    return von_mises_rng( mod_circular(mu) , kappa);
+  }
+",
+                          block = 'functions') 
+#define the custom family
+unwrap_von_mises = custom_family(
+  name = "unwrap_von_mises",
+  dpars = c("mu",
+            "kappa"),
+  links = c('identity',#N.B. the link function is defined via the LPD function
+            "softplus"), 
+  lb = c(-pi,#lower bound of mu should be -pi
+         0),
+  ub = c(pi,#upper bound of mu should be pi
+         NA),
+  type = "real",#takes continuous response data
+  # vars = stan_unwrap_fun + mod_circular_fun
+)
+
+```
+
+To fit out model, we need to convert our data from degrees to radians.
+It is also recommended to remove additional formatting by converting from class "circular" to class "numeric".
+Our formula indicates that each of mu and kappa require a single parameter estimate (\~1).
+In this data, we expect a mean direction anywhere on the circle (within $\pi$ of the mean) and high concentration ($\kappa>1$), so highest prior density is set in that range.
+Since the mean direction is far from the wrap-point ($-\pi$ or $\pi$), the `Rhat` convergence heuristic for the mu `Intercept` can be interpreted on the linear scale.
+
+```{r Fit a model to the divergence data}
+#reformat data for BRMS
+dt_divergence = data.frame(y = as.numeric(#remove circular formatting
+                                rad(cd_divergence)#convert to radians
+                                )
+                           )#make a data frame
+
+#formula for a circular model with no predictors
+form_divergence = bf(y~1,
+                     kappa~1,
+                     family = unwrap_von_mises)
+#unbiased priors
+prior_divergence =  prior('normal(0,2*pi())', class = 'Intercept', dpar = 'mu') +
+                     prior('normal(3,3)', class = 'Intercept', dpar = 'kappa')
+
+#fit a generic unwrap model
+mod_divergence = brm(formula = form_divergence,
+             data = dt_divergence,
+             family = unwrap_von_mises,
+             stanvars = stan_unwrap_fun + mod_circular_fun,
+             prior = prior_divergence,
+             silent = 2,
+             backend = 'cmdstan'#faster and more reliable
+  )
+
+summary(mod_divergence)
+```
+
+A model fitted to the example data correctly indicates that the mean direction is to the left of the expected direction in \>99% of 𝜇 estimates.
+
+```{r Plot the model fitted for divergence data}
+draws_divergence = as_draws_df(mod_divergence)
+
+
+par(pty = 's')
+par(mar = c(0,0,0,0),
+    mfrow = c(1,2))
+PCfun(cd_divergence,
+      col = col_obs,
+      sep = 0.05,
+      shrink = 1.25,
+      plot_rho = FALSE)
+Draws2Cont(draws_divergence,
+           x_string = )
+arrows.circular(x = circular(-15,
+                             units = 'degrees',
+                             rotation = 'clock',
+                             zero = pi/2),
+                y = A1(10),
+                col = col_obs,
+                lwd = 5,
+                length = 0.1/1.25
+)
+
+
+with(draws_divergence,
+     arrows.circular(x = median.circular(x =
+                                           circular(Intercept,
+                                  rotation = 'clock',
+                                  zero = pi/2)
+                                  ),
+                     y = A1(softplus(x = median(x = Intercept_kappa))),
+                     lwd = 2,
+                     length = 0.1/1.25,
+                     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+with(draws_divergence,
+     {
+      VertHist(data = deg(Intercept), 
+               main = 'mean angle',
+               ylim = c(-30, 15),
+               col = adjustcolor(col_sd, alpha.f = 100/255),
+               cex.axis = 0.7)
+     }
+)
+abline(h = 0,
+       col = 'gray',
+       lwd = 7)
+
+with(draws_divergence,
+     {
+       paste0('mu left of expected angle: ',
+              mean(Intercept < 0)*100, '%')
+      }
+     ) #nearly all estimates suggest a rightwards turn
+```
+
+```{r Model comparison observed vs expected mean angle}
+
+
+#fit a model with mean at 0
+mod_expect = brm(formula = bf(y~0,
+                              kappa~1),
+                data = dt_divergence,
+                family = unwrap_von_mises,
+                prior = prior('normal(3,3)', class = 'Intercept', dpar = 'kappa'),
+                stanvars = stan_unwrap_fun + mod_circular_fun,
+                silent = 2,
+                backend = 'cmdstan'
+                )
+#add Leave-One-Out Cross-Validation
+
+loo_divergence = loo(mod_divergence)
+loo_expected = loo(mod_expect)
+loo_compare(loo_divergence, loo_expected)
+```
+In this case, the expected angle model is straightforward to fit because the expected angle is 0°, which is also the default intercept for a `y~0` (no-intercept) model.
+If the expected angle were not 0°, we would need to adjust the data to align the expected angle with the `0` intercept.
+Here is an example with the expected angle at -15°.
+
+```{r Model comparison for expected angle not at 0}
+#align the data relative to the expected angle
+dt_aligned = within(dt_divergence,
+                    {
+                    y = y - rad(-15)  #subtract the expected angle
+                    }
+                    )
+
+
+#we now place our expected angle at -15°, the true mean
+mod_true = brm(formula = bf(y ~ 0,
+                            kappa~1),
+               data = dt_aligned, 
+               family = unwrap_von_mises,
+               prior = prior_divergence[2,], # just the kappa prior
+               stanvars = stan_unwrap_fun + mod_circular_fun,
+               silent = 2,
+               backend = 'cmdstan'
+)
+
+#this model should be compared with another fitted to the
+#_same data_
+mod_false =  brm(formula = bf(y ~ 1,
+                            kappa~1),
+               data = dt_aligned, 
+               family = unwrap_von_mises,
+               prior = prior_divergence, # the kappa and mu priors
+               stanvars = stan_unwrap_fun + mod_circular_fun,
+               silent = 2,
+               backend = 'cmdstan'
+)
+
+#both models converge well with rhats [1.000, 1.002]
+#their mu estimates are very close, differing by only 2°, with overlapping CI.
+round( deg(summary(mod_false)$fixed[1, 1:4]) )
+
+#add Leave-One-Out Cross-Validation
+loo_true = loo(mod_true)
+loo_false = loo(mod_false)
+loo_compare(loo_true, loo_false)
+#expected angle model has higher predictive power
+```
+Now the expected angle has somewhat higher predictive power, even though both find a similar mean direction (95% CI -7°–10° for `mod_false`).
