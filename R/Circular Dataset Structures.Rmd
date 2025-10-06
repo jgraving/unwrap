@@ -279,8 +279,6 @@ The fitted model indicates that the mean direction is to the left of the expecte
 To test the hypothesis that the true mean direction falls in the expected direction, we can fit another model where this is explicitly stated.
 To inform BRMS that we do not want to estimate the mean direction, we use the notation `y~0`, which removes the intercept parameter.
 We can now estimate $\kappa$, *assuming* that the mean direction is 0°, using the same prior for kappa as before.
-The model for a divergent mean direction has higher expected log predictive density (ELPD) than the model for the expected direction.
-This ELPD difference is $>2\times$ larger than its standard error, so we can state with some confidence that the hypothesis of a divergence from the expected direction is more likely than the hypothesis of alignment with the expected direction.
 
 ```{r Model comparison observed vs expected mean direction}
 
@@ -301,9 +299,11 @@ loo_divergence = loo(mod_divergence)
 loo_expected = loo(mod_expect)
 loo_compare(loo_divergence, loo_expected)
 ```
+The model for a divergent mean direction has higher expected log predictive density (ELPD) than the model for the expected direction.
+This ELPD difference is $>2\times$ larger than its standard error, so we can state with some confidence that the hypothesis of a divergence from the expected direction is more likely than the hypothesis of alignment with the expected direction.
 
 In this case, the expected angle model is straightforward to fit because the expected angle is 0°, which is also the default intercept for a `y~0` (no-intercept) model.
-If the expected angle were not 0°, we would need to adjust the data to align the expected angle with the `0` intercept.
+If the expected direction were not 0°, we would need to adjust the data to align the expected angle with the `0` intercept, then fit both models (expected direction and divergent direction) to the adjusted data.
 Here is an example with the expected angle at -15°.
 
 ```{r Model comparison for expected angle not at 0}
@@ -350,10 +350,9 @@ round( deg(
 loo_true = loo(mod_true)
 loo_false = loo(mod_false)
 loo_compare(loo_true, loo_false)
-#expected angle model has higher predictive power
 ```
 
-Now the expected angle has somewhat higher predictive power, even though both find a similar mean direction (95% CI -7°–10° for `mod_false`).
+Now the expected direction model has higher predictive power, even though both find a similar mean direction. If the divergence model had higher predictive power, but within one standard error of the expected direction model, we could not rule out that the expected direction is the true direction, though evidence would be weaker.
 
 #Change in direction
 If the expected direction is not known, it can be estimated from control data and compared with treatment data. In this example, the two distributions have different random number seeds, to avoid producing two identical distributions of angles with a fixed shift.
