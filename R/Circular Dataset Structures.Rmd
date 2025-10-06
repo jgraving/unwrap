@@ -1,6 +1,5 @@
 ---
 title: "Circular Dataset Structures"
-output: html_document
 date: "`r Sys.Date()`"
 author: "James Foster"
 output:
@@ -125,11 +124,11 @@ cd_divergence = DescriptCplot(m = -15, # population mean
 
 A common shortcut to assess orientation in an expected direction is to use the v-test modification of the Rayleigh test for uniformity.
 This tests the hypothesis of uniformity against the alternative of clustering in some direction near the expected direction.
-The data are very far from uniform ($\kappa = 10$), and the mean angle is very close to the expected angle (cosine similarity of `cos(rad(-1)) = 97%`), so the test is significant.
+The data are very far from uniform ($\kappa = 10$), and the mean angle is very close to the expected angle (cosine similarity of `cos(rad(-15)) = 97%`), so the test is significant.
 Even so, the data show a trend away from the expected angle, 75% of points falling to the left of 0°.
 
 ```{r v-test for uniformity}
-#v-test finds significant orientation in 0°, but we know the true direction is different
+mean(cd_divergence < 0)
 rayleigh.test(cd_divergence, mu = c0)
 
 ```
@@ -178,9 +177,8 @@ unwrap_von_mises = custom_family(
 
 To fit out model, we need to convert our data from degrees to radians.
 It is also recommended to remove additional formatting by converting from class "circular" to class "numeric".
-Our formula indicates that each of mu and kappa require a single parameter estimate (\~1).
+Our formula indicates that each of mu and kappa require a single parameter estimate (`~1`).
 In this data, we expect a mean direction anywhere on the circle (within $\pi$ of the mean) and high concentration ($\kappa>1$), so highest prior density is set in that range.
-Since the mean direction is far from the wrap-point ($-\pi$ or $\pi$), the `Rhat` convergence heuristic for the mu `Intercept` can be interpreted on the linear scale.
 
 ```{r Fit a model to the divergence data}
 #reformat data for BRMS
@@ -210,7 +208,12 @@ mod_divergence = brm(formula = form_divergence,
 summary(mod_divergence)
 ```
 
-A model fitted to the example data correctly indicates that the mean direction is to the left of the expected direction in \>99% of 𝜇 estimates.
+Since the mean direction is far from the wrap-point ($-\pi$ or $\pi$), the `Rhat` convergence heuristic for the mu `Intercept` can be interpreted on the linear scale.
+`Rhat` values for both parameters are $<1.01$ and effective sample size (ESS) indicates most of the 4000 draws explored the posterior distribution efficiently, so we can assume that this model has converged.
+
+To inspect the model's predictions, we can extract the post-warmup draws from the model and plot the posterior distribution of estimates alongside the original data.
+$\mu$ `Intercept` can be plotted as an angle in radians on its original scale.
+For $\kappa$, we need to convert estimates to the correct scale using the `softplus` transform ($\log( \exp(x) + 1)$) and then convert it to mean-vector-length scale using the `A1` function. There are `4000` posterior estimates, so rather than plotting all of them we'll summarise them as the medians of $\mu$ and $\kappa$ estimates and the normalised 2D kernel density of their mean-vector equivalent.
 
 ```{r Plot the model fitted for divergence data}
 draws_divergence = as_draws_df(mod_divergence)
@@ -268,9 +271,17 @@ with(draws_divergence,
       }
      ) #nearly all estimates suggest a rightwards turn
 ```
+
+The fitted model indicates that the mean direction is to the left of the expected direction in $>99\%$ of 𝜇 estimates.
+
 ## Test the expected angle hypothesis
-To test the hypothesis that the true mean direction falls in the expected direction, we can fit another model where this is explicitly stated. To inform BRMS that we do not want to estimate the mean direction, we use the notation `y~0`, which removes the intercept. We can now estimate $\kappa$, _assuming_ that the mean direction is 0°, using the same prior for kappa as before.
-The model for a divergent mean direction has higher expected log predictive density (ELPD) than the model for the expected direction. This ELPD difference is $>2\times$ larger than its standard error, so we can state with some confidence that the hypothesis of a divergence from the expected direction is more likely than the hypothesis of alignment with the expected direction.
+
+To test the hypothesis that the true mean direction falls in the expected direction, we can fit another model where this is explicitly stated.
+To inform BRMS that we do not want to estimate the mean direction, we use the notation `y~0`, which removes the intercept parameter.
+We can now estimate $\kappa$, *assuming* that the mean direction is 0°, using the same prior for kappa as before.
+The model for a divergent mean direction has higher expected log predictive density (ELPD) than the model for the expected direction.
+This ELPD difference is $>2\times$ larger than its standard error, so we can state with some confidence that the hypothesis of a divergence from the expected direction is more likely than the hypothesis of alignment with the expected direction.
+
 ```{r Model comparison observed vs expected mean direction}
 
 
@@ -341,4 +352,61 @@ loo_false = loo(mod_false)
 loo_compare(loo_true, loo_false)
 #expected angle model has higher predictive power
 ```
+
 Now the expected angle has somewhat higher predictive power, even though both find a similar mean direction (95% CI -7°–10° for `mod_false`).
+
+#Change in direction
+If the expected direction is not known, it can be estimated from control data and compared with treatment data. In this example, the two distributions have different random number seeds, to avoid producing two identical distributions of angles with a fixed shift.
+```{r Simulate a change in direction}
+par(pty = 's')
+par(mar = c(0,0,0,0))
+par(mfrow = c(1,2))
+
+cd_control = DescriptCplot(m = 180,
+                     k = 3,
+                     ndata = ndata,
+                     mvcol = col_obs,
+                     sdcol = NA,
+                     denscol = NA,
+                     refline = c0,
+                     save_sample = TRUE,
+                     seed = 1539571)#DOI Papi & Pardi
+
+cd_treatment = DescriptCplot(m = 210,
+                       k = 3,
+                       ndata = ndata,
+                       mvcol = col_obs,
+                       sdcol = NA,
+                       denscol = NA,
+                       refline = c0,
+                       save_sample = TRUE,
+                     seed = 0120810506) #ISBN Batschelet 1981
+
+
+```
+
+#Change in concentration 
+An experimental treatment may also affect concentration independently of mean direction.
+```{r Simulate a decrease in concentration}
+par(pty = 's')
+par(mar = c(0,0,0,0))
+par(mfrow = c(1,2))
+
+cd_3 = DescriptCplot(m = 0,
+                     k = 3,
+                     ndata = ndata,
+                     mvcol = col_obs,
+                     sdcol = NA,
+                     denscol = NA,
+                     refline = c0,
+                     save_sample = TRUE)
+
+cd_0.5 = DescriptCplot(m = 0,
+                       k = 0.5,
+                       ndata = 20,
+                       mvcol = col_obs,
+                       sdcol = NA,
+                       denscol = NA,
+                       refline = c0,
+                       save_sample = TRUE)
+```
