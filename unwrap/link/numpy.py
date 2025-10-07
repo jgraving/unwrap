@@ -25,7 +25,7 @@ def modulo(eta):
     return eta % (2 * PI)
 
 
-def shifted_modulo(eta):
+def rotated_modulo(eta):
     return ((eta + PI) % (2 * PI)) - PI
 
 
@@ -45,8 +45,10 @@ LINKS = {
     "inv_softplus": LinksContainer(inverse_reciprocal_softplus, reciprocal_softplus),  # Alias for reciprocal_softplus
     "modulo": LinksContainer(modulo, modulo),
     "mod": LinksContainer(modulo, modulo),  # Alias for modulo
-    "shifted_modulo": LinksContainer(shifted_modulo, shifted_modulo),
-    "shift_mod": LinksContainer(shifted_modulo, shifted_modulo),  # Alias for shifted_modulo
+    "shifted_modulo": LinksContainer(rotated_modulo, rotated_modulo),
+    "shift_mod": LinksContainer(rotated_modulo, rotated_modulo),  # Alias for rotated_modulo
+    "rotated_modulo": LinksContainer(rotated_modulo, rotated_modulo),
+    "rot_mod": LinksContainer(rotated_modulo, rotated_modulo),  # Alias for rotated_modulo
     "rectifier": LinksContainer(rectifier, rectifier),
     "relu": LinksContainer(rectifier, rectifier),  # Alias for rectifier
     "atan2": LinksContainer(atan2, atan2),
