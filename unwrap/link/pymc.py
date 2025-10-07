@@ -30,6 +30,7 @@ def modulo(eta):
 def rotated_modulo(eta):
     return ((eta + PI) % (2 * PI)) - PI
 
+shifted_modulo = rotated_modulo
 
 def rectifier(eta):
     return pt.maximum(EPS, eta)
