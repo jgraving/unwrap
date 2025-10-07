@@ -372,6 +372,7 @@ DescriptCplot = function(k,
                          refline = NA,
                          save_sample = FALSE,
                          seed = 20250815,
+                         titleline = -5,
                          ...#passed to points.circular
 )
 {
@@ -491,7 +492,7 @@ DescriptCplot = function(k,
   #add a title
   mtext(text = paste0('κ = ', k),
         side = 1,
-        line = -3)
+        line = titleline)
   if(save_sample)
   {return(cd)}
 }

@@ -369,6 +369,7 @@ cd_control = DescriptCplot(m = 180,
                      denscol = NA,
                      refline = c0,
                      save_sample = TRUE,
+                     titleline = -1,#needs to be lower when data are South
                      seed = 1539571)#DOI Papi & Pardi
 
 cd_treatment = DescriptCplot(m = 210,
@@ -379,6 +380,7 @@ cd_treatment = DescriptCplot(m = 210,
                        denscol = NA,
                        refline = c0,
                        save_sample = TRUE,
+                       titleline = -1,#needs to be lower when data are South
                      seed = 0120810506) #ISBN Batschelet 1981
 
 
