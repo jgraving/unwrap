@@ -8,6 +8,7 @@ from .numpy import (
     inverse_reciprocal_softplus,
     modulo,
     shifted_modulo,
+    rotated_modulo,
     rectifier,
     atan2,
     LINKS as NUMPY_LINKS,
@@ -25,6 +26,7 @@ __all__ = [
     "inverse_reciprocal_softplus",
     "modulo",
     "shifted_modulo",
+    "rotated_modulo",
     "rectifier",
     "atan2",
     # Backend-specific LINKS dicts
