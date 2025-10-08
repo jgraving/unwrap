@@ -9,6 +9,7 @@ from .numpy import (
     modulo,
     shifted_modulo,
     rotated_modulo,
+    circular_modulo,
     rectifier,
     atan2,
     LINKS as NUMPY_LINKS,
@@ -27,6 +28,7 @@ __all__ = [
     "modulo",
     "shifted_modulo",
     "rotated_modulo",
+    "circular_modulo",
     "rectifier",
     "atan2",
     # Backend-specific LINKS dicts
