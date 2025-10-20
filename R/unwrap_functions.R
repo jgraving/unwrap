@@ -627,50 +627,6 @@ Draws2Cont = function(draws,
   )
 }
 
-# Draws2CircCont = function(draws,
-#                           palette = 'Heat 2',
-#                           nlevels = 20,
-#                           x_string = 'Intercept',
-#                           y_string = 'A1(softplus(kappa))',
-#                           alpha = 200/255,
-#                           denstype = 'relative' # 'normalised' or 'relative'
-# )
-# {
-#   with(draws,
-#        {
-#          xx = eval(str2lang(x_string))
-#          yy = eval(str2lang(y_string))
-#          xtile = c(xx - 2*pi, xx, xx + 2*pi)
-#          ytile = c(yy, yy, yy)
-#          kdc = MASS::kde2d(x = xtile,
-#                            y = ytile, 
-#                            n = 30)
-#          ln = length(kdc$x)/3
-#          midspan = ln + 1:ln #indices of the middle span
-#          midspanx = with(kdc,order(sin(x[midspan])*y[midspan]) )#indices of the middle span
-#          midspany = with(kdc, order(cos(x[midspan])*y[midspan]) ) #indices of the middle span
-#          with(kdc,
-#               {
-#                 .filled.contour(x = sin(x[midspanx])*y[midspanx],
-#                                 y = cos(x[midspany])*y[midspany],
-#                                 z = z[midspanx, midspany],
-#                                 levels = (1:nlevels)*
-#                                             switch(EXPR = denstype,
-#                                                     relative = max(z[midspanx, midspany]/nlevels),
-#                                                     normalised = sum(z[midspanx, midspany])/nlevels,
-#                                                     relative = max(z[midspanx, midspany]/nlevels)
-#                                                    ),
-#                                 col = hcl.colors(n = nlevels,
-#                                                  palette = palette,
-#                                                  rev = TRUE,
-#                                                  alpha = alpha)
-#                 )
-#               }
-#          )
-#        }
-#   )
-# }
-
 
 #invert the softplus link
 #https://en.wikipedia.org/wiki/Softplus

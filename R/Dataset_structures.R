@@ -755,7 +755,7 @@ CI_unwrap = function(data,
     {
       prior =  prior('normal(0,pi())', class = 'Intercept', dpar = 'mu') +
         prior('normal(0,pi()/3)', class = 'b', dpar = 'mu') +
-        prior('normal(3,3)', class = 'Intercept', dpar = 'kappa')
+        prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') +
       prior('normal(0,3)', class = 'b', dpar = 'kappa')
     }else{
       prior =  prior('normal(0,pi())', class = 'Intercept', dpar = 'mu') +
