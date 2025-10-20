@@ -1,5 +1,7 @@
 import pymc as pm
 import numpy as np
+import pytensor.tensor as pt
+from pymc.distributions.dist_math import check_parameters
 
 # Define a very small concentration value (effectively uniform on the circle)
 EPS = np.finfo(float).eps
@@ -96,3 +98,108 @@ class BimodalVonMises:
         w = pt.stack([p, 1 - p], axis=-1)
 
         return VonMisesMixture.dist(w, mu, kappa, **kwargs)
+
+
+def vmss_logp(theta, mu, kappa, R, n):
+    r"""
+    Elementwise log-likelihood for the **sufficient-statistics von Mises** model
+    with **observed** per-unit mean angles ``theta`` and known summaries ``R`` and ``n``.
+
+    Data (observed / known)
+    -----------------------
+    theta : tensor-like, shape (N,)
+        Per-unit circular **mean direction** (radians) in (-π, π] — this is the
+        observed value passed to the likelihood (i.e., `observed=theta`).
+    R : tensor-like, shape (N,)
+        Per-unit **mean resultant length** in [0, 1].
+    n : tensor-like, shape (N,)
+        Per-unit sample sizes (≥ 1).
+
+    Parameters (to be estimated)
+    ----------------------------
+    mu : tensor-like, shape (N,)
+        Per-unit mean direction (radians), typically a single linear predictor, e.g. `mu = X @ beta`.
+        No modulo needed; periodicity is handled by `cos(mu - theta)`.
+    kappa : tensor-like, shape (N,)
+        Per-unit concentration (> 0), usually via a positive link such as `softplus(X @ eta)`.
+
+    Model & exact joint log-likelihood
+    ----------------------------------
+    If step angles θ_ij are iid VM(μ_i, κ_i), then the joint log-likelihood condensed by
+    sufficient statistics equals:
+
+        log L_i = κ_i * (n_i * R_i) * cos(μ_i - θ_i)  -  n_i * log(2π)  -  n_i * log I0(κ_i),
+
+    where R_i is the **mean** resultant length and θ_i is the circular mean.
+
+    Returns
+    -------
+    logp : tensor, shape (N,)
+        Elementwise log-likelihood; PyMC will sum across the observed axis.
+    """
+    # match PyMC VonMises style: res → support mask → check_parameters
+    res = kappa * n * R * pt.cos(mu - theta) - n * (
+        pt.log(2.0 * np.pi) + pt.log(pt.i0(kappa))
+    )
+
+    # support: theta ∈ [-π, π]
+    res = pt.switch(
+        pt.bitwise_and(pt.ge(theta, -np.pi), pt.le(theta, np.pi)),
+        res,
+        -np.inf,
+    )
+
+    # parameter & data checks
+    return check_parameters(
+        res,
+        (kappa > 0) & (R >= 0) & (R <= 1) & (n >= 1),
+        msg="kappa > 0, 0 <= R <= 1, n >= 1",
+    )
+
+
+def VonMisesSS(name, mu, kappa, R, n, **kwargs):
+    r"""
+    Sufficient Statistics von Mises with observed per-unit mean angles, scaled by sample size `n`
+    and mean resultant vector length `R`.
+
+    Call with `observed=theta`, and pass `R` (mean resultant length) and `n` as known arrays.
+
+    Parameters
+    ----------
+    name : str
+        Random variable name.
+    mu : tensor-like, shape (N,)
+        Per-unit mean direction.
+    kappa : tensor-like, shape (N,)
+        Per-unit concentration (> 0).
+    R : tensor-like, shape (N,)
+        Per-unit **mean** resultant length in [0, 1].
+    n : tensor-like, shape (N,)
+        Per-unit step counts (≥ 1).
+    **kwargs :
+        Forwarded to `pm.CustomDist` (`observed=theta`).
+
+    Example
+    -------
+    >>> beta  = pm.Normal("beta", 0.0, 1.5, shape=P)
+    >>> eta   = pm.Normal("eta",  0.0, 5.0, shape=P)
+    >>> mu    = X @ beta
+    >>> kappa = pm.math.softplus(X @ eta)
+    >>> vm = VonMisesSS(
+    ...     "vm_ss",
+    ...     mu=mu, kappa=kappa,
+    ...     R=R, n=n,
+    ...     observed=theta,
+    ...     shape=n.shape,
+    ... )
+    """
+    # Note: vmss_logp signature must match (value, *params)
+    return pm.CustomDist(
+        name,
+        mu,
+        kappa,
+        R,
+        n,
+        logp=vmss_logp,
+        **kwargs,
+    )
