@@ -217,7 +217,7 @@ cd_long = with(cd,
 ## Specify condition types by rotation angle
 cd_long = within(cd_long,
                  {
-                  lDoLP = log10(DoLP)
+                  lDoLP = log10(DoLP)#intention: 0.99 -> -0.01; 0.02 -> -0.98
                   signed_angle = Mod360.180(bearing)  # bearing between -180 and 180
                   angle = as.numeric(rad(signed_angle)) # circular format suppresses later warnings
                   pol_bearing = sapply(X = condition,
@@ -323,6 +323,7 @@ pr_mu_mix =
 #priors for kappa
 pr_kappa_uni = 
   prior(normal(3.0,3.0), class = b, nlpar = 'k1', coef = 'Intercept') + # bias to oriented
+  prior(normal(0.0,3.0), class = b, nlpar = 'k1', coef = 'LD') + # bias to oriented
   prior(student_t(3, 0, 3.0), class = sd, nlpar = 'k1')  # weak bias no differences
 pr_kappa_mix = pr_kappa_uni  #identical
 #priors for theta (mixture weight)
@@ -379,6 +380,18 @@ print(sm_uni$fixed[c('fmu1_Intercept',
 
 UnwrapRhats(np_uni, variable = 'fmu')
 summary(UnwrapRhats(np_uni), variable = 'zmu')
+
+plot(x = sort(unique(mod_dt$DoLP)),
+     y = A1(
+         softplus( 
+           sort(unique(mod_dt$LD))*
+           sm_uni$fixed['k1_LD','Estimate']+
+           sm_uni$fixed['k1_Intercept','Estimate']
+         )
+       ),
+     xlab = 'degree of polarization',
+     ylab = 'predicted kappa')
+abline(h = c(0,1), v = c(0,1))
 
 
 ### Bimodal -------------------------------------------------------------
@@ -545,9 +558,9 @@ if(all_plots)
   plot(np_mix,
        variable = '^kappamu1',
        regex = TRUE)
-  plot(np_mix,
-       variable = '^kappamu2',
-       regex = TRUE)
+  # plot(np_mix,
+  #      variable = '^kappamu2',
+  #      regex = TRUE)
   
   #Many random effects of mu
   plot(np_mix,
@@ -555,11 +568,11 @@ if(all_plots)
        regex = TRUE,
        ask = FALSE,
        transform = unwrap_circular_deg)
-  plot(np_mix,
-       variable = '^b_zmu2',
-       regex = TRUE,
-       ask = FALSE,
-       transform = unwrap_circular_deg)
+  # plot(np_mix,
+  #      variable = '^b_zmu2',
+  #      regex = TRUE,
+  #      ask = FALSE,
+  #      transform = unwrap_circular_deg)
 }
 
 # Plot conditional effects ----
@@ -573,6 +586,6 @@ posterior_epred_unwrap_von_mises =   function(draws,component="all") {
         kappa = softplus(kappa)
 
   }
-cond_mix = conditional_effects(np_mix)
+cond_mix = conditional_effects(np_mix, dpar = 'kappa1')
 # conditional_effects(np_mix)
 
