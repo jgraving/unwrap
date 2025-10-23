@@ -423,7 +423,7 @@ summary(model_delta)
 ```
 Because the mean direction for the control now falls precisely at the boundary of $(-\pi, \pi)$, estimates for the `Intercept` parameter with equal likelihood appear in both positive and negative directions. The same is also possible for the coefficient `b_x` (treatment change in angle). If we unwrap these estimates, we can see that they actually converged towards the same angle, but in different directions.
 ```{r Unwrap the intercept estimates}
-plot(model_delta)
+plot(model_delta, ask = FALSE)
 #unwrap estimates and convert to degrees
 plot(x = model_delta,
      variable = c('Intercept','b_x'),
@@ -679,7 +679,7 @@ with(mle_comb1,
 )
 ```
 
-```{r Rayleigh tests on each individual and all together}
+```{r Rayleigh tests on combined data and 1st trials}
 rayleigh.test(dt_comb1)
 rayleigh.test(dt_comb1[1+0:9 * 20])
 
