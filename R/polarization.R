@@ -4,7 +4,7 @@
 #   
 # AUTHOR: James Foster 2025 10 23
 # 
-# MODIFIED: James Foster 2025 10 23
+# MODIFIED: James Foster 2025 10 24
 # 
 # DESCRIPTION: Fit a hierarchical maximum-likelihood von Mises to dung beetle exit angles under a rotatable polarized light stimulus.
 # Modified from [beetles.ipynb](https://github.com/jgraving/unwrap/notebooks/)
@@ -15,7 +15,7 @@
 # OUTPUTS:  Plots and test statistics
 # 
 # CHANGES: 
-#   - 
+#   - very tight priors
 # 
 # REFERENCES:
 #   - Foster, J.J., $et~al$.  (2019). 
@@ -33,7 +33,9 @@
 # 
 # ---
 #   # TODO
-#   -
+#   - plot predictions
+#   - neaten up
+#   - comment
 
 # Set up workspace --------------------------------------------------------
 angle_unit = 'degrees'
@@ -82,7 +84,7 @@ tryCatch(expr = #try to load functions from the folder containing this file
          }
 )
 
-path_file = file.path(here_path, "Notebooks/DLdata201611.csv")
+path_file = file.path(here_path, "DLdata201611.csv")
 if(file.exists(path_file))
 {
   print(path_file)
@@ -250,6 +252,10 @@ mod_dt = within(cd_long,
                           ) # set to 1 for East, 0 for North
             }
 )
+#subset for testing?
+mod_dt_subs = subset(mod_dt, 
+                    subset = ID %in% u_id[1+0:33 *10]
+                    )
 
 
 
@@ -273,7 +279,7 @@ formula_mix = bf(#modulus may not be necessary, included in lpd function
   nlf(mu2 ~ fmu1 + fmu2 + zmu1), #assume it is the same, but with some small increment
   fmu1 ~ 1 + CD, # all conditions
   zmu1 ~ 0 + ID, # mean angle combines fixed and random effects
-  # fmu2 ~ 1, #just UV-dim
+  fmu2 ~ 1, #just UV-dim
   # zmu2 ~ 0 + ID, # mean angle combines fixed and random effects
   nlf(kappa1 ~ k1),
   nlf(kappa2 ~ k1), #for 2nd mean, this is specific to individual and condition combination
@@ -288,29 +294,35 @@ formula_mix = bf(#modulus may not be necessary, included in lpd function
 ## Priors ----------------------------------------------------------------
 
 #STRATEGY
-#bias mu1 to near 0° to help find any population mean
+  #bias mu1 to near 0° to help find any population mean
 #force theta to near 0
-#could bias effect of condition to 90° (strong expectation)
+#could bias effect of condition to 90° (strong expectation), made this tighter now
+#force k1 to >-1 (otherwise no positive control)
+#force k1 to high values (otherwise no positive control)
+#force kappamu1 to low values (otherwise no variation found)
+#force k1 intercept and slope to cancel
+#narrower prior on zmu1
 
 #priors for mu
 pr_mu_uni = 
-  prior(normal(0,pi()/2), class = b,  nlpar = 'fmu1', coef = 'Intercept') + # closer to 0°
-  prior(normal(pi()/2,pi()/2), class = b,  nlpar = 'fmu1', coef = 'CD') + # closer to 90°
+  # prior(normal(0,pi()/2), class = b,  nlpar = 'fmu1', coef = 'Intercept') + # closer to 0°
+  prior(normal(0,1*pi()), class = b,  nlpar = 'fmu1', coef = 'Intercept') + # closer to 0°
+  prior(normal(pi()/2,pi()/6), class = b,  nlpar = 'fmu1', coef = 'CD') + # closer to 90°
   set_prior(paste("target +=", 
                   'unwrap_von_mises_vect_lpdf(b_zmu1 | 0, log1p_exp(kappamu1))',
                   '+ normal_lpdf(b_zmu1 | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
   ),
   check = FALSE) +
-  set_prior("target += normal_lpdf(kappamu1 | 3.0, 3.0)", #prior to higher values, indiv differences should be small
+  set_prior("target += normal_lpdf(kappamu1 | -1, 0.1)", #strong prior to lower values, indiv differences could be large
             check = FALSE) 
 pr_mu_mix = 
   pr_mu_uni + #same as unimodal, plus priors for 2nd mean
   prior(normal(-pi(),pi()/3), class = b, nlpar = 'fmu2', coef = 'Intercept') + # closer to 180°
   set_prior(paste("target +=", 
                   'unwrap_von_mises_vect_lpdf(b_zmu1 | 0, log1p_exp(kappamu1))',
-                  '+ normal_lpdf(b_zmu1 | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
+                  '+ normal_lpdf(b_zmu1 | 0, 1*pi())'# additional prior to keep estimates from walking around the circle
   ),
-  check = FALSE) #+
+  check = FALSE) +
   # set_prior("target += normal_lpdf(kappamu1 | 3.0, 3.0)", #prior to lower values, indiv differences could be large
   #           check = FALSE) + 
   # set_prior(paste("target +=", 
@@ -318,18 +330,22 @@ pr_mu_mix =
   #                 '+ normal_lpdf(b_zmu2 | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
   # ),
   # check = FALSE) +
-  # set_prior("target += normal_lpdf(kappamu2 | 0.0, 1.0)", #prior to higher values, indiv differences should be small
-  #           check = FALSE)
+  set_prior("target += normal_lpdf(kappamu2 | 0.0, 1.0)", #prior to higher values, indiv differences should be small
+            check = FALSE)#not estimated
 #priors for kappa
 pr_kappa_uni = 
-  prior(normal(3.0,3.0), class = b, nlpar = 'k1', coef = 'Intercept') + # bias to oriented
-  prior(normal(0.0,3.0), class = b, nlpar = 'k1', coef = 'LD') + # bias to oriented
-  prior(student_t(3, 0, 3.0), class = sd, nlpar = 'k1')  # weak bias no differences
+  prior(normal(3.0,1.0), class = b, nlpar = 'k1', coef = 'Intercept') + # bias to oriented
+  prior(normal(1.0,3.0), class = b, nlpar = 'k1', coef = 'LD') + # bias to positive
+  set_prior(paste("target +=", 
+                  '+ normal_lpdf(b_k1[1] - 2*b_k1[2] | -2.0, 1.0)'# additional prior for disorientation at DoLP close to 0
+  ),
+  check = FALSE) +
+  prior(student_t(3, 0, 1.0), class = sd, nlpar = 'k1')  # weak bias no differences, narrower
 pr_kappa_mix = pr_kappa_uni  #identical
 #priors for theta (mixture weight)
 pr_theta_mix = 
   # prior(normal(1.0,0.25), class = Intercept, dpar = 'theta1') + # force to mu1 as primary #20251007 approx 30% of data are at mu2, so setting to 1.0
-  prior(normal(0.0,0.5), class = Intercept, dpar = 'theta1') + # force to mu1 as primary #20251007 approx 30% of data are at mu2, so setting to 1.0
+  prior(normal(0.0,0.3), class = Intercept, dpar = 'theta1') + # force to mu1 as primary #20251007 approx 30% of data are at mu2, so setting to 1.0
   prior(student_t(3, 0, 0.5), class = sd, dpar = 'theta1') #should this be so small?
 # prior(student_t(3, 0, 3.0), class = sd, dpar = 'theta1') #should this be so small?
 
@@ -341,8 +357,8 @@ pr_mix = pr_mu_mix + pr_kappa_mix + pr_theta_mix
 
 
 ## Run model -------------------------------------------------------------
-wup = 500
-sam = 200
+wup = 1000
+sam = 1000
 
 
 ### Unimodal -------------------------------------------------------------
@@ -370,6 +386,10 @@ save(np_uni,
      file = file.path(dirname(path_file),
                       'polarization_uni.RData')
 )
+load(
+  file.path(dirname(path_file),
+            'polarization_uni.RData')
+)
 
 sm_uni = summary(np_uni, robust = TRUE)
 print(sm_uni$fixed[c('fmu1_Intercept',
@@ -389,8 +409,31 @@ plot(x = sort(unique(mod_dt$DoLP)),
            sm_uni$fixed['k1_Intercept','Estimate']
          )
        ),
+     type = 'b',
      xlab = 'degree of polarization',
-     ylab = 'predicted kappa')
+     ylab = 'predicted mean vector length',
+     xlim = c(0,1),
+     ylim = c(0,1)
+     )
+# l-95% CI u-95% CI
+lines(x = sort(unique(mod_dt$DoLP)),
+      y = A1(
+        softplus( 
+          sort(unique(mod_dt$LD))* # rough calculation, expect 
+            sm_uni$fixed['k1_LD','l-95% CI']+ # lowest intercept
+            sm_uni$fixed['k1_Intercept','u-95% CI'] # _largest_ slope to give lowest estimate
+        )
+      )
+      )
+lines(x = sort(unique(mod_dt$DoLP)),
+      y = A1(
+        softplus( 
+          sort(unique(mod_dt$LD))* # rough calculation, expect 
+            sm_uni$fixed['k1_LD','u-95% CI']+ # lowest intercept
+            sm_uni$fixed['k1_Intercept','l-95% CI'] # _largest_ slope to give lowest estimate
+        )
+      )
+      )
 abline(h = c(0,1), v = c(0,1))
 
 
@@ -423,7 +466,9 @@ save(np_mix,
 sm_mix = summary(np_mix, robust = TRUE)
 print(sm_mix$fixed[c('fmu1_Intercept',
                      'fmu1_CD',
+                     'fmu2_Intercept',
                      'k1_Intercept',
+                     'theta1_Intercept',
                      'k1_LD'),],
       digits = 3)
 
@@ -431,14 +476,47 @@ UnwrapRhats(np_mix, variable = 'fmu')
 summary(UnwrapRhats(np_mix), variable = 'zmu')
 
 
-#  Plot model coefficients ------------------------------------------------
-plot(np_mix)
+plot(x = sort(unique(mod_dt$DoLP)),
+     y = A1(
+       softplus( 
+         sort(unique(mod_dt$LD))*
+           sm_mix$fixed['k1_LD','Estimate']+
+           sm_mix$fixed['k1_Intercept','Estimate']
+       )
+     ),
+     type = 'b',
+     xlab = 'degree of polarization',
+     ylab = 'predicted mean vector length',
+     xlim = c(0,1),
+     ylim = c(0,1)
+)
+# l-95% CI u-95% CI
+lines(x = sort(unique(mod_dt$DoLP)),
+      y = A1(
+        softplus( 
+          sort(unique(mod_dt$LD))* # rough calculation, expect 
+            sm_mix$fixed['k1_LD','l-95% CI']+ # lowest intercept
+            sm_mix$fixed['k1_Intercept','u-95% CI'] # _largest_ slope to give lowest estimate
+        )
+      )
+)
+lines(x = sort(unique(mod_dt$DoLP)),
+      y = A1(
+        softplus( 
+          sort(unique(mod_dt$LD))* # rough calculation, expect 
+            sm_mix$fixed['k1_LD','u-95% CI']+ # lowest intercept
+            sm_mix$fixed['k1_Intercept','l-95% CI'] # _largest_ slope to give lowest estimate
+        )
+      )
+)
+abline(h = c(0,1), v = c(0,1))
 
 
 ## Model comparison ------------------------------------------------------
 #better predictions should justify fitting a mixture model 
-loo_uni = loo(np_uni)
-loo_mix = loo(np_mix)
+mm = FALSE
+loo_uni = loo(np_uni, moment_match = mm)
+loo_mix = loo(np_mix, moment_match = mm)
 lc_unimix = loo_compare(loo_uni, loo_mix)
 print(lc_unimix)
 #the mixture model has higher predictive power
@@ -530,9 +608,9 @@ if(all_plots)
   plot(np_mix,
        variable = 'Intercept_theta1',
        transform = plogis)
-  plot(np_mix,
-       variable = '^b_theta1',
-       regex = TRUE) 
+  # plot(np_mix,
+  #      variable = '^b_theta1',
+  #      regex = TRUE) 
   #primary mu
   plot(np_mix,
        variable = '^b_fmu1', # all effects have similar names
@@ -589,3 +667,126 @@ posterior_epred_unwrap_von_mises =   function(draws,component="all") {
 cond_mix = conditional_effects(np_mix, dpar = 'kappa1')
 # conditional_effects(np_mix)
 
+
+## plot circular random effects ------------------------------------------
+draws_mix = as_draws_df(np_mix)
+
+dt_dim = dim(mod_dt_subs)
+u_id = with(mod_dt_subs, unique(ID))
+n_indiv = length(u_id)
+csq = ceiling(sqrt(n_indiv))
+
+dop_cols = with(mod_dt, RColorBrewer::brewer.pal(n = length(u_LD),
+                                                 name = 'RdBu' ) )
+u_LD =  with(mod_dt, unique(LD) )
+
+par(pty = 's')#sometimes gets skipped? Needs to come first
+par(mar =rep(0,4),
+    mfrow = c(csq,
+              csq) )
+# id = u_id[1]
+# par(mar =rep(0,4),
+#     mfrow = c(1,
+#               1) )
+for(id in u_id)
+{
+  
+  mu1_name = paste0('b_zmu1_ID',id)
+  # mu2_name = paste0('b_zmu2_ID',id)
+  kappa_name = paste0('r_ID__k1[',id,',Intercept]')
+  theta_name = paste0('r_ID__theta1[',id,',Intercept]')
+  
+  with(subset(x = mod_dt_subs,
+              subset = ID %in% id),
+       {
+         plot.circular(x = circular(x = deg(angle),
+                                    type = 'angles',
+                                    unit = angle_unit,
+                                    modulo = '2pi',
+                                    zero = pi/2,
+                                    rotation = angle_rot
+         ),
+         sep = 2/dt_dim[1],
+         stack = TRUE,
+         bins = 360/5,
+         pch = 21, 
+         col = 1,
+         cex = 2,
+         bg = dop_cols[which(u_LD %in% LD[1])]
+         ) 
+       }
+  )
+  
+  #mu 1 original
+  Draws2Cont(draws_mix,
+             alpha = with(draws_mix,
+                          plogis( median(b_theta1_Intercept+get(theta_name)) ) ),
+             # ngrid = 100,
+             x_string = paste0('sin(',
+                               'b_fmu1_Intercept+',
+                               'get(mu1_name)', ')*',
+                               'A1(softplus(',
+                               'b_k1_Intercept+',
+                               'get(kappa_name)',
+                               '))'),
+             y_string = paste0('cos(',
+                               'b_fmu1_Intercept+',
+                               'get(mu1_name)', ')*',
+                               'A1(softplus(',
+                               'b_k1_Intercept+',
+                               'get(kappa_name)',
+                               '))')
+  )
+  
+  with(draws_mix,
+       arrows.circular(x = median.circular(
+         circular(x = 
+                    mod_circular(b_fmu1_Intercept + get(mu1_name)),
+                  units = 'radians',
+                  rotation = 'clock',
+                  zero = pi/2)
+       )[1] * c(1,1),
+       y = A1(softplus( median(b_k1_Intercept+get(kappa_name))) ) *c(-1,1),
+       lwd = 5*plogis( median(b_theta1_Intercept+get(theta_name)) ),
+       length = 0.1/1.25,
+       col = adjustcolor('darkred', alpha.f = 200/255))
+  )
+  
+  #mu 2 turned
+  Draws2Cont(draws_mix,
+             palette = 'Blues',
+             alpha = with(draws_mix,
+                          plogis( -median(b_theta1_Intercept+get(theta_name)) ) ),
+             # ngrid = 100,
+             x_string = paste0('sin(',
+                               'b_fmu1_Intercept+',
+                               'get(mu1_name)+',
+                               'b_fmu2_Intercept', ')*',
+                               'A1(softplus(',
+                               'b_k1_Intercept+',
+                               'get(kappa_name)',
+                               '))'),
+             y_string = paste0('cos(',
+                               'b_fmu1_Intercept+',
+                               'get(mu1_name)+',
+                               'b_fmu2_Intercept', ')*',
+                               'A1(softplus(',
+                               'b_k1_Intercept+',
+                               'get(kappa_name)',
+                               '))')
+  )
+  with(draws_mix,
+       arrows.circular(x = median.circular(
+         circular(x = 
+                    mod_circular(b_fmu1_Intercept + get(mu1_name) +
+                                   b_fmu2_Intercept +  b_fmu1_CD),
+                  units = 'radians',
+                  rotation = 'clock',
+                  zero = pi/2)
+       )[1]*c(1,1),
+       y = A1(softplus(median(b_k1_Intercept+get(kappa_name))))*c(-1,1),
+       lwd = 5*plogis( -median(b_theta1_Intercept+get(theta_name)) ),
+       length = 0.1/1.25,
+       col = adjustcolor('darkblue', alpha.f = 200/255))
+  )
+}
