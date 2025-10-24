@@ -301,7 +301,7 @@ formula_mix = bf(#modulus may not be necessary, included in lpd function
 #force k1 to high values (otherwise no positive control)
 #force kappamu1 to low values (otherwise no variation found)
 #force k1 intercept and slope to cancel
-#narrower prior on zmu1
+#narrower prior on zmu1, keep on one half of the circle
 
 #priors for mu
 pr_mu_uni = 
@@ -320,7 +320,7 @@ pr_mu_mix =
   prior(normal(-pi(),pi()/3), class = b, nlpar = 'fmu2', coef = 'Intercept') + # closer to 180°
   set_prior(paste("target +=", 
                   'unwrap_von_mises_vect_lpdf(b_zmu1 | 0, log1p_exp(kappamu1))',
-                  '+ normal_lpdf(b_zmu1 | 0, 1*pi())'# additional prior to keep estimates from walking around the circle
+                  '+ normal_lpdf(b_zmu1 | 0, 1*pi()/2)'# additional prior to keep estimates from walking around the circle
   ),
   check = FALSE) +
   # set_prior("target += normal_lpdf(kappamu1 | 3.0, 3.0)", #prior to lower values, indiv differences could be large
