@@ -498,7 +498,7 @@ DescriptCplot = function(k,
 }
 
 PCfun = function(angles,
-                 col,
+                 col = 'darkblue',
                  shrink = 1.5,
                  title = '',
                  plot_rho = TRUE,
