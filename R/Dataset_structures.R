@@ -1696,7 +1696,7 @@ sc = make_stancode(formula = form_highcorr,
                                      ID = as.factor(sort(rep(1:length(dt_id1), times = ndata)))),
                    family = unwrap_von_mises,
                    stanvars = stan_unwrap_fun + mod_circular_fun + stan_kappamu + stan_modmu,
-                   prior = prior_highcorr,)
+                   prior = prior_highcorr)
 write.table(x = sc,
             file = file.path(getwd(),
                              'Mod__highcorr.stan'),
