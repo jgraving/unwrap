@@ -724,7 +724,7 @@ form_null = bf(y ~ mu, #observed angle is predicted by mean angle
 
 #priors chosen for parameter recovery
 prior_treat = prior('normal(0, 2*pi())',class = 'b', nlpar = 'pmu') + #wider prior helps avoid bias
-  prior('unwrap_von_mises(0, 0.1)',class = 'b', nlpar = 'pmu', coef = 'treatment') + #expectation of moderate sized turns
+  prior('unwrap_von_mises(0, 0.3)',class = 'b', nlpar = 'pmu', coef = 'treatment') + #expectation of moderate sized turns
   set_prior(paste("target +=", 
                   'unwrap_von_mises_vect_lpdf(b_imu[1:N_1] | 0, log1p_exp(kappamu))',
                      '+ normal_lpdf(b_imu[1:N_1] | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
