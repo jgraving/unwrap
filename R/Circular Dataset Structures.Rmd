@@ -400,6 +400,8 @@ cd_treatment = DescriptCplot(m = 210,
 
 ```
 
+## Fit the model
+
 To model the change in direction, we need to account for potential differences in both direction and concentration between the control and treatment.
 We can combine our two sets of angles together into one vector $y$, that is aligned with the vector $x$, which specifies whether the treatment was applied in Boolean logic (yes: $1$, no: $0$).
 *N.B.* For stability, a slightly narrower prior on `Intercept`, $N(0,3\pi/2)$, is used.
@@ -642,6 +644,8 @@ cd_0.5 = DescriptCplot(m = 0,
                        save_sample = TRUE)
 ```
 
+## Fit the model
+
 By default, the assumptions for this model would be the same as for the change in angle: we want to be able to account for any potential effects of the treatment on both $\mu$ and $\kappa$, even if we suspect that the treatment only affects one parameter.
 We can therefore use the same model as for the change in angle.
 
@@ -810,6 +814,14 @@ As we might have also expected, the effect of treatment on $\mu$, present in our
 
 # High inter-individual correlation
 
+In datasets that include repeated measurements across individuals, it is necessary to account for individual differences before attempting to identify any population level trends.
+In the simplest case, the orientation behaviour of different individuals is very similar.
+One example would be where all individuals share a common goal direction $\beta_0$, but differ in alignment with that direction by their individual offsets from that direction $\beta_i$.
+In this case $\mu$ and $\kappa$ depend on the specific values of $\beta_0$ and $\beta_i$, and the distribution across $\beta_i$ is determined by the hyperparameter $\kappa_\mu$.
+
+In this example, each individual's headings are highly concentrated around their particular directional bias with the distribution $\mu_i = \beta_0 + \beta_i$, $\kappa = 5.0$.
+The distribution of individual biases is moderately concentrated, $\kappa_\mu = 2.0$, so that individuals heading biases are quite close together.
+
 ```{r Simulate high interindividual correlation}
 kappa_mu1 = 2.0
 kappa_id1 = 5.0
@@ -824,11 +836,12 @@ print(round(dt1))
 par(pty = 's')
 par(mar = c(0,0,0,0))
 par(mfrow = c(3,4))
+#Loop through individuals generating a random sample for each individual
 dt_id1 = mapply(FUN = DescriptCplot,
                 m = dt1, 
                 seed = 1000*1:length(dt1), #different seed for each
                 save_sample = TRUE,
-                k = kappa_id1,
+                k = kappa_id1,#all the same concentration
                 ndata = 20,
                 refline = 0,
                 sdcol = NA,
@@ -852,12 +865,13 @@ points.circular(dt1,
                 shrink = 1.25,
                 col = col_rho
 )
-
+#Show the pooled data across all individuals
 dt_comb1 = do.call(what = c,
                    args = dt_id1)
 PCfun(angles = dt_comb1,
       col = 'gray25',
       shrink = 3.0)
+#Fit the maximum likelihood distribution for the pooled data
 mle_comb1 = mle.vonmises(x = dt_comb1,bias = TRUE)
 ci_comb1 = with(mle_comb1,
                 CI_vM(angles = dt_comb1,
@@ -865,6 +879,7 @@ ci_comb1 = with(mle_comb1,
                       k1 = kappa,
                       alternative = 'two.sided')
 )
+#Plot the estimated mean vector across pooled data
 with(mle_comb1,
      {
        arrows.circular(x = circular(mu,
@@ -880,50 +895,62 @@ with(mle_comb1,
 )
 ```
 
-```{r Rayleigh tests on combined data and 1st trials}
-rayleigh.test(dt_comb1)
-rayleigh.test(dt_comb1[1+0:9 * 20])
+The high correlation is apparent, since 8/10 individual heading biases are within 45° of the population mean.
+Each individual's sample is also tightly clustered around its individual mean.
+Here individuals are sufficiently correlated that we can recover the population mean direction from the mean of pooled data across individuals.
 
-```
+We can use a hierarchical model, accounting for differences and similarities between individuals, to measure concentration for the average individual ($\alpha_0$) or across individual heading biases ($\kappa_\mu$), as well as to confirm expectations about the population mean direction ($\beta_0$).
+
+## Fit the model
+
+To model this in `BRMS` we can construct a 'nonlinear' formula for predicting the vector of angle $y$ that is comprised of the sum estimates of $\beta_0$ and $\beta_i$.
+$\beta_0$ is estimated as an `Intercept` (single estimate across individuals), and $\beta_i$ lacks an intercept (`~0`) but includes a different offset for each individual.
+We can also estimate the concentration across $\beta_i$, by defining the hyperparameter `softkappamu` in `Stan` code, which is the inverse-softplus of estimates of the $\kappa_\mu$ parameter.
+This is linked to estimates of $\beta_i$ because its softplus transform (`log1p_exp(softkappamu)`) acts as a prior on the von Mises distribution of $\beta_i$: $\beta_i \sim \mathcal{M}(0, \kappa_\mu)$.
+Since we would like our estimates to balance similarity between individuals against any clearly identifiable differences (partial pooling) we should set a prior distribution for $\kappa_\mu$ with high prior density towards strong correlation ($10 < \kappa_\mu < 20$) but some density towards weak correlation ($\kappa_\mu<1$).
+A log-normal distribution $\log \kappa_\mu \sim \mathcal{N}(\log(15), 0.6)$ balances these two objectives.
+
+To include individual differences in $\kappa$ in the model, we can rely on the automatic methods for linear modelling in `BRMS`.
+That means that to the formula for population level $\kappa$ (`kappa_Intercept`: `kappa~1`) we add the individual-effects term `+(1|ID)`.
+As for $\beta_i$, this implies a set of offsets from the population for each individual ($\alpha_i$) that follow a normal distribution (on the inverse-softplus scale) defined by $\sigma_\kappa$.
+As for $\kappa_\mu$ we require a prior that balances correlation and potentially large differences, with high prior density for $\sigma_\kappa \approx 0$ but some density at much larger values.
+This can be achieved with a student-T distribution with 3 degrees of freedom, a mean at 0, and a standard deviation of 0.5: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,0.5)$.
 
 ```{r Model individuals (high correlation)}
 #fit a mixed effects unwrap model
-#can normal random effects sufficiently capture that structure?
-form_highcorr = bf(y ~ fmu + zmu,
-                  fmu ~ 1,
-                  zmu ~ 0 + ID,
-                  kappa ~ 1 + (1|ID),
+form_highcorr = bf(y ~ mu,
+                  nlf(mu ~ beta0 + betai),#a nonlinear formula
+                  beta0 ~ 1,
+                  betai ~ 0 + ID,
+                  kappa ~ 1 + (1|ID),#a linear formula
                   nl = TRUE)
 
-prior_highcorr =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'fmu') +
-                  prior('unwrap_von_mises_vect(0, log1p_exp(kappamu))',
-                        nlpar  = 'zmu',  class = 'b') +
-                  set_prior("target += normal_lpdf(kappamu | 3, 3)", #expect high concentration (low variation) 
+prior_highcorr =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'beta0') +
+                  prior('unwrap_von_mises_vect(0, log1p_exp(softkappamu))',
+                        nlpar  = 'betai',  class = 'b') +
+                  # set_prior("target += normal_lpdf(softkappamu | 3, 3)"
+                  set_prior("target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)", #expect high concentration (low variation) 
                             check = FALSE) +
                   prior('normal(3,2)', class = 'Intercept', dpar = 'kappa') +
                   prior('student_t(3, 0, 0.5)', class = 'sd', dpar = 'kappa')
 
-#set up required Stan functions
-mod_circular_fun = stanvar(scode = "
-    real mod_circular(real y) {
-      return fmod(y + pi(), 2*pi()) - pi();
-    }
-  ",
-                           block = 'functions')
-unwrap_von_mises = custom_family(
-  "unwrap_von_mises", dpars = c("mu", "kappa"),
-  links = c('identity',#brms cannot accept custom link functions, do via nl instead
-            "softplus"), 
-  lb = c(-pi, 0), ub = c(pi, NA),
-  type = "real",
-)
+#Introduce stan variable for kappamu
+stan_softkappamu = stanvar(scode = "
+real softkappamu;
+                           ",
+                           block = "parameters") + 
+  stanvar(scode = "
+real kappa_mu = log1p_exp(softkappamu);
+          ", 
+          block = 'genquant')
 
+#update the unwrap function to account for vectors
 stan_unwrap_fun = stanvar(scode = "
     real unwrap_von_mises_lpdf(real y, real mu, real kappa) {
-      return von_mises_lpdf(y | mod_circular(mu), kappa);
+      return von_mises_lpdf(y | modulo_circular(mu), kappa);
     }
     real unwrap_von_mises_rng(real mu, real kappa) {
-      return von_mises_rng( mod_circular(mu) , kappa);
+      return von_mises_rng( modulo_circular(mu) , kappa);
     }
     real unwrap_von_mises_vect_lpdf(vector y, real mu, real kappa) {
     real tmp = 0;
@@ -934,68 +961,49 @@ stan_unwrap_fun = stanvar(scode = "
       return tmp;
     }
   ",
-                          block = 'functions') 
+                          block = 'functions')
 
-stan_kappamu = stanvar(scode = "
-real kappamu;
-                           ",
-                           block = "parameters") + 
-  stanvar(scode = "
-real kappa_mu = log1p_exp(kappamu);
-          ", 
-          block = 'genquant')
-
-stan_modmu =   stanvar(scode = "
-  vector [K_fmu] mod_mu;
-  for(i in 1:size(mod_mu))
-  {
-    mod_mu[i] = mod_circular(b_fmu[i]);
-  }
-  vector [K_zmu] mod_zmu;
-  for(i in 1:size(mod_zmu))
-  {
-    mod_zmu[i] = mod_circular(b_zmu[i]);
-  }
-          ", 
-                       block = 'genquant')
-
-dt_highcorr = data.frame(y = rad(unlist(dt_id1)),
-                             ID = factor(x = sort(rep(1:length(dt_id1),
-                                                      times = length(dt_id1[[1]]))),
-                                         ordered = FALSE)
+#collect data
+dt_highcorr = data.frame(y = as.numeric( rad(unlist(dt_id1)) ),#angles as a numeric vector in radians
+                         ID = factor(x = #individual labels as a unordered categorical (factor)
+                                       sort(
+                                         rep(1:length(dt_id1),
+                                             times = length(dt_id1[[1]]))
+                                         ),
+                                     ordered = FALSE)
                              )
-
-bmod_highcorr = brm(
+#run the model
+model_highcorr = brm(
           formula = form_highcorr,
            data = dt_highcorr,
            family = unwrap_von_mises,
-           stanvars = stan_unwrap_fun + mod_circular_fun + stan_kappamu + stan_modmu,
+           stanvars = stan_unwrap_fun + 
+                      modulo_circular_fun + 
+                      stan_softkappamu,
            prior = prior_highcorr,
-           cores = 4,
-           backend = 'cmdstan'
-          )
-
+           silent = 2,
+          backend = 'cmdstan') 
 ```
 
 ```{r Inspect the high correlation individuals model}
 
-sm_highcorr = summary(bmod_highcorr)
+sm_highcorr = summary(model_highcorr)
 print(sm_highcorr, digits = 2)
-#random effects zmu looks bad, but good after unwrapping
-UnwrapRhats(bmod_highcorr,
-            variable = '^b_zmu')
+#random effects betai looks bad, but good after unwrapping
+UnwrapRhats(model_highcorr,
+            variable = '^b_betai')
 ```
 
 ```{r Plot the high correlation individuals model}
 
-draws_highcorr = as_draws_df(bmod_highcorr)
+draws_highcorr = as_draws_df(model_highcorr)
 
 par(pty = 's')
 par(mar = c(0,0,0,0),
     mfrow = c(3,4))
 for(i in 1:length(dt_id1) )
 {
-  mu_name = paste0('b_zmu_ID',i)
+  mu_name = paste0('b_betai_ID',i)
   kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
   PCfun(dt_id1[[i]],
         col = col_obs,
@@ -1009,24 +1017,15 @@ for(i in 1:length(dt_id1) )
                   length = 0.1/1.25
   )
   Draws2Cont(draws_highcorr,
-             x_string = 'sin(b_fmu_Intercept + get(mu_name))*
+             x_string = 'sin(b_beta0_Intercept + get(mu_name))*
                          A1(softplus(Intercept_kappa+get(kappa_name)))',
-             y_string = 'cos(b_fmu_Intercept + get(mu_name))*
+             y_string = 'cos(b_beta0_Intercept + get(mu_name))*
                          A1(softplus(Intercept_kappa+get(kappa_name)))'
              )
-  # with(draws_highcorr,
-  #      points(x = sin(b_fmu_Intercept + get(mu_name))*
-  #                   A1(softplus(Intercept_kappa+get(kappa_name))),
-  #             y = cos(b_fmu_Intercept + get(mu_name))*
-  #                   A1(softplus(Intercept_kappa+get(kappa_name))),
-  #             col = adjustcolor(col = col_sd,
-  #                               alpha.f = 1/255),
-  #             pch = 19)
-  # )
   with(draws_highcorr,
        arrows.circular(x = median.circular(
                              circular(x = 
-                             mod_circular(b_fmu_Intercept + get(mu_name)),
+                             mod_circular(b_beta0_Intercept + get(mu_name)),
                                                     units = 'radians',
                                                     rotation = 'clock',
                                                     zero = pi/2)
@@ -1056,23 +1055,14 @@ points.circular(dt1,
                 col = col_rho
 )
 Draws2Cont(draws = draws_highcorr,
-           x_string = 'sin(b_fmu_Intercept)*
+           x_string = 'sin(b_beta0_Intercept)*
              A1(softplus(kappa_mu))',
-           y_string = 'cos(b_fmu_Intercept)*
+           y_string = 'cos(b_beta0_Intercept)*
              A1(softplus(kappa_mu))'
            )
-# with(draws_highcorr,
-#      points(x = sin(b_fmu_Intercept)*
-#               A1(softplus(kappa_mu)),
-#             y = cos(b_fmu_Intercept)*
-#               A1(softplus(kappa_mu)),
-#             col = adjustcolor(col = col_sd,
-#                               alpha.f = 1/255),
-#             pch = 19)
-#      )
 
 with(draws_highcorr,
-     arrows.circular(x = mean.circular(circular(b_fmu_Intercept,
+     arrows.circular(x = mean.circular(circular(b_beta0_Intercept,
                                                   units = 'radians',
                                                   rotation = 'clock',
                                                   zero = pi/2)
@@ -1084,14 +1074,24 @@ with(draws_highcorr,
 )
 
 
+# with(draws_highcorr,
+#      VertHist(data = softplus(kappa_mu), 
+#               main = '\nkappa_mu',
+#               ylim = c(0, 5),
+#               col = adjustcolor(col_kappa, alpha.f = 100/255),
+#               cex.axis = 0.7))
+# abline(h = kappa_mu1,
+#        col = col_rho,
+#        lwd = 7)
+# with(draws_highcorr, paste0(mean(softplus(kappa_mu) > kappa_mu1)*100, '%') ) #overestimates through partial pooling
 with(draws_highcorr,
-     VertHist(data = softplus(kappa_mu), 
-              main = 'kappa_mu',
-              ylim = c(0, 5),
+     VertHist(data = softplus(Intercept_kappa), 
+              main = '\npopulation kappa',
+              ylim = c(0, 10),
               col = adjustcolor(col_kappa, alpha.f = 100/255),
               cex.axis = 0.7))
-abline(h = kappa_mu1,
+abline(h = kappa_id1,
        col = col_rho,
        lwd = 7)
-with(draws_highcorr, paste0(mean(softplus(kappa_mu) < kappa_mu1)*100, '%') ) #most estimates are close to correct
+with(draws_highcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id1)*100, '%') ) #partial pooling allows accurate estimate
 ```
