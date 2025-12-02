@@ -613,7 +613,7 @@ Although the model with a change in direction indicates the change to be very co
 Since the median estimate is close to the true value of 30°, the model's estimates appear to be robust, if not conclusive.
 Conversely, we can conclude that there was no effect of treatment on concentration, since `model_kappadelta` is a much worse fit than the null model (`model_nodelta`).
 
-# Change in concentration 
+# Change in concentration
 
 An experimental treatment may also affect concentration independently of mean direction.
 In this example the simulated data the treatment has exactly the same $\mu$ (0°) as the control, but $\kappa$ decreases by $>80\%$ for the treatment.
@@ -779,7 +779,7 @@ model_conc_kappa =  brm(formula = bf(y~1,
                              backend = 'cmdstan' ) #model with no effects of treatment 
 model_conc_nokappa =  brm(formula = bf(y~1,
                                        kappa~1),
-                          data = dt_delta,
+                          data = dt_conc,
                           family = unwrap_von_mises,
                           prior = prior_conc[c(1,3),], # intercept kappa & mu priors                
                           stanvars = stan_unwrap_fun + modulo_circular_fun,                
@@ -792,9 +792,9 @@ print(   list(`treat. kappa` =      summary(model_conc_kappa),
                             variable = c('Intercept'),
                             regex = FALSE
                                   ),
-              `no treat.` =      summary(model_conc_nodelta),
+              `no treat.` =      summary(model_conc_nokappa),
               `unwrapped rhat no treat.` =
-                UnwrapRhats(model_nodelta,
+                UnwrapRhats(model_conc_nokappa,
                             variable = c('Intercept'),
                             regex = FALSE
                             )     
@@ -806,7 +806,7 @@ print(loo_compare(loo_conc, loo_conc_kappa, loo_conc_nokappa))
 ```
 
 In this case the hypothesis tests are clear, the effect of change in kappa (present in both our original model and the kappa only model) improves model predictive density.
-As we might have also expected, the effect of treatment on $\mu$, present in our original model but not the $\kappa$-only model, does not improve predictive density, so there is no evidence that the treatment affects $\mu$.
+As we might have also expected, the effect of treatment on $\mu$, present in our original model but not the $\kappa$-only model, does not improve predictive density, so there is little evidence that the treatment affects $\mu$.
 
 # High inter-individual correlation
 
