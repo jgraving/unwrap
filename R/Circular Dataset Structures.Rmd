@@ -1595,7 +1595,7 @@ watson.two.test(dt_comb_hd, dt_comb_delta)
 ## Fit the model
 ```{r Formula for individual heading change}
 #collect data
-dt_hd = data.frame(y = as.numeric( rad(c(dt_comb_hd, dt_comb_delta)) ),#angles as a numeric vector in radians
+dt_headchange = data.frame(y = as.numeric( rad(c(dt_comb_hd, dt_comb_delta)) ),#angles as a numeric vector in radians
                    x = c(rep(0, times = length(dt_comb_hd)),
                          rep(1, times = length(dt_comb_delta)) ),
                    ID = factor(x = #individual labels as an unordered categorical (factor)
@@ -1638,7 +1638,7 @@ set_prior(prior = 'target += normal_lpdf(softkappamux | 0, 1.0)', check = FALSE)
 #run the model
 model_hd = brm(
            formula = form_hd,
-           data = dt_hd,
+           data = dt_headchange,
            family = unwrap_von_mises,
            stanvars = stan_unwrap_fun + 
                       modulo_circular_fun + 
@@ -1697,9 +1697,9 @@ set_prior(prior = 'target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.
 
 
 #refit and save all parameters for model comparison
-mod_hd_treatment = brm(
+model_hd_treatment = brm(
   formula = form_hd,
-  data = dt_hd,
+  data = dt_headchange,
   family = unwrap_von_mises,
   stanvars = stan_unwrap_fun + 
                       modulo_circular_fun + 
@@ -1713,9 +1713,9 @@ mod_hd_treatment = brm(
   control = list(adapt_delta = 0.97)#slower, but more robust sampling
 )
 
-mod_hd_kappa = brm(
+model_hd_kappa = brm(
   formula = form_hd_kappa,
-  data = dt_hd,
+  data = dt_headchange,
   family = unwrap_von_mises,
   stanvars = stan_unwrap_fun + 
                       modulo_circular_fun + 
@@ -1728,9 +1728,9 @@ mod_hd_kappa = brm(
   control = list(adapt_delta = 0.97)#slower, but more robust sampling
 )
 
-mod_hd_null = brm(
+model_hd_null = brm(
   formula = form_hd_null,
-  data = dt_hd,
+  data = dt_headchange,
   family = unwrap_von_mises,
   stanvars = stan_unwrap_fun + 
                       modulo_circular_fun + 
@@ -1744,28 +1744,28 @@ mod_hd_null = brm(
 )
 ```
 ```{r Check convergence for individual heading hypotheses}
-rhat(mod_hd_treatment)
-rhat(mod_hd_kappa)
-rhat(mod_hd_null)
-UnwrapRhats(mod_hd_treatment,
+summary(model_hd_treatment)
+UnwrapRhats(model_hd_treatment,
             variable = '^b_beta')
-UnwrapRhats(mod_hd_kappa,
+summary(model_hd_kappa)
+UnwrapRhats(model_hd_kappa,
             variable = '^b_beta')
-UnwrapRhats(mod_hd_null,
+summary(model_hd_null)
+UnwrapRhats(model_hd_null,
             variable = '^b_beta')
 ```
 
 
-# Test hypothesis of treatment effect
+## Test hypothesis of treatment effect
 
 To compare the predictive power of the models, we can use leave-one-out cross-validation (LOO-CV) to calculate the estimated log predictive density (ELPD) and its standard error for each model.
 A good model increases ELPD.
 
 ```{r LOO-CV for model comparison}
 #better predictions should justify fitting a treatment model 
-loo_null = loo(mod_hd_null, moment_match = TRUE)
-loo_kappa = loo(glmm_kappa, moment_match = TRUE)
-loo_treat = loo(glmm_treatment, moment_match = TRUE)
+loo_null = loo(model_hd_null, moment_match = TRUE)
+loo_kappa = loo(model_hd_kappa, moment_match = TRUE)
+loo_treat = loo(model_hd_treatment, moment_match = TRUE)
 lc_nulltreat = loo_compare(loo_null, loo_kappa, loo_treat)
 print(lc_nulltreat)
 ```
@@ -1854,31 +1854,31 @@ Since we simulated the data, we can compare the model estimates (red and yellow 
 ```{r Model predictions}
 
 
-draws_treat = as_draws_df(glmm_treatment)
+draws_treat = as_draws_df(model_hd_treatment)
 
 par(pty = 's')
 par(mar = c(0,0,0,0),
-    mfrow = c(2*2,ceiling(nindiv/2)))
+    mfrow = c(2,length(dt_hd)))
 #control
-for(i in 1:length(dt_treat) )
+for(i in 1:length(dt_hd) )
 {
-  mu_name = paste0('b_imu_ID',i)
+  mu_name = paste0('b_betai_ID',i)
   kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
-  PCfun(dt_id_treat[[i]],
+  PCfun(dt_id_hd[[i]],
         col = col_obs,
         sep = 0.05,
         shrink = 1.25,
         plot_rho = FALSE)
   Draws2Cont(draws_treat,
-             x_string = 'sin(b_pmu_Intercept + get(mu_name))*
+             x_string = 'sin(b_beta0_Intercept + get(mu_name))*
                          A1(softplus(Intercept_kappa+get(kappa_name)))',
-             y_string = 'cos(b_pmu_Intercept + get(mu_name))*
+             y_string = 'cos(b_beta0_Intercept + get(mu_name))*
                          A1(softplus(Intercept_kappa+get(kappa_name)))',
              ngrid = 100, # needs higher resolution to avoid spillover
              cropc = TRUE
   )
-  arrows.circular(x = dt_treat[i],
-                  y = A1(kappa_id_treat[i]),
+  arrows.circular(x = dt_hd[i],
+                  y = A1(kappa_id_hd[i]),
                   col = col_obs,
                   lwd = 5,
                   length = 0.1/1.25
@@ -1886,7 +1886,7 @@ for(i in 1:length(dt_treat) )
   with(draws_treat,
        arrows.circular(x = median.circular(
          circular(x = 
-                    mod_circular(b_pmu_Intercept + get(mu_name)),
+                    mod_circular(b_beta0_Intercept + get(mu_name)),
                   units = 'radians',
                   rotation = 'clock',
                   zero = pi/2)
@@ -1900,40 +1900,38 @@ for(i in 1:length(dt_treat) )
 #treatment
 for(i in 1:length(dt_delta) )
 {
-  mu_name = paste0('b_imu_ID',i)
-  mu_delta_name = if(i>1)
-                  {paste0('b_imu_ID',i , ':treatment')}else
-                  {paste0('b_imu_', 'treatment')}
+  mu_name = paste0('b_betai_ID',i)
+  mu_delta_name = paste0('b_betai_ID',i , ':x')
   kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
-  kappa_delta_name = paste0('r_ID__kappa[',i,',treatment]')
+  kappa_delta_name = paste0('r_ID__kappa[',i,',x]')
   PCfun(dt_id_delta[[i]],
-        col = 'darkgreen',
+        col = col_treat,
         sep = 0.05,
         shrink = 1.25,
         plot_rho = FALSE)
   Draws2Cont(draws_treat,
-             x_string = 'sin(b_pmu_Intercept + b_pmu_treatment + get(mu_name) + get(mu_delta_name))*
-                         A1(softplus(Intercept_kappa+b_kappa_treatment+get(kappa_name)+get(kappa_delta_name)))',
-             y_string = 'cos(b_pmu_Intercept + b_pmu_treatment + get(mu_name) + get(mu_delta_name))*
-                         A1(softplus(Intercept_kappa+b_kappa_treatment+get(kappa_name)+get(kappa_delta_name)))',
+             x_string = 'sin(b_beta0_Intercept + b_beta0_x + get(mu_name) + get(mu_delta_name))*
+                         A1(softplus(Intercept_kappa+b_kappa_x+get(kappa_name)+get(kappa_delta_name)))',
+             y_string = 'cos(b_beta0_Intercept + b_beta0_x + get(mu_name) + get(mu_delta_name))*
+                         A1(softplus(Intercept_kappa+b_kappa_x+get(kappa_name)+get(kappa_delta_name)))',
              ngrid = 100, # needs higher resolution to avoid spillover
              cropc = TRUE
             )
   arrows.circular(x = dt_delta[i],
-                  y = A1(kappa_id_treat[i]),
-                  col = 'darkgreen',
+                  y = A1(kappa_id_hd[i]),
+                  col = col_treat,
                   lwd = 5,
                   length = 0.1/1.25
   )
   with(draws_treat,
        arrows.circular(x = median.circular(
          circular(x = 
-                    mod_circular(b_pmu_Intercept+ b_pmu_treatment + get(mu_name)  + get(mu_delta_name)),
+                    mod_circular(b_beta0_Intercept+ b_beta0_x + get(mu_name)  + get(mu_delta_name)),
                   units = 'radians',
                   rotation = 'clock',
                   zero = pi/2)
        )[1],
-       y = A1(softplus(median(Intercept_kappa + b_kappa_treatment + get(kappa_name) + get(kappa_delta_name)))),
+       y = A1(softplus(median(Intercept_kappa + b_kappa_x + get(kappa_name) + get(kappa_delta_name)))),
        lwd = 2,
        length = 0.1/1.25,
        col = adjustcolor(col_sd, alpha.f = 200/255))
@@ -1948,14 +1946,15 @@ This is influenced by the wide spread of individual mean angles and turn angles,
 ```{r Plot population parameters}
 par(mfrow = c(1,4))
 #Add the population of biases
-DescriptCplot(k = kappa_mu_treat,
-              ndata = nindiv,
+DescriptCplot(k = kappa_mu_hd,
+              ndata = length(dt_hd),
               refline = 0,
               denscol = NA,
               pcol = NA,
+              sdcol = NA,
               mvcol = col_obs
 )
-points.circular(dt_treat,
+points.circular(dt_hd,
                 bins = 360/5-1,
                 stack = TRUE,
                 sep = 0.05,
@@ -1964,16 +1963,16 @@ points.circular(dt_treat,
 )
 
 Draws2Cont(draws = draws_treat,
-           x_string = 'sin(b_pmu_Intercept)*
+           x_string = 'sin(b_beta0_Intercept)*
              A1(kappa_mu)',
-           y_string = 'cos(b_pmu_Intercept)*
+           y_string = 'cos(b_beta0_Intercept)*
              A1(kappa_mu)',
            ngrid = 100, # needs higher resolution to avoid spillover
            cropc = TRUE
 )
 
 with(draws_treat,
-     arrows.circular(x = mean.circular(circular(b_pmu_Intercept,
+     arrows.circular(x = mean.circular(circular(b_beta0_Intercept,
                                                 units = 'radians',
                                                 rotation = 'clock',
                                                 zero = pi/2)
@@ -1986,12 +1985,13 @@ with(draws_treat,
 
 #Add the population of turns
 DescriptCplot(m = delta_mu,
-              k = kappa_mu_treat,
-              ndata = nindiv,
+              k = kappa_mu_hd,
+              ndata = length(dt_hd),
               refline = 0,
               denscol = NA,
               pcol = NA,
-              mvcol = 'darkgreen'
+              sdcol = NA,
+              mvcol = col_treat
 )
 points.circular(dt_delta,
                 bins = 360/5-1,
@@ -2002,43 +2002,44 @@ points.circular(dt_delta,
 )
 
 Draws2Cont(draws = draws_treat,
-           x_string = 'sin(b_pmu_treatment)*
-             A1(kappa_mu_delta)',
-           y_string = 'cos(b_pmu_treatment)*
-             A1(kappa_mu_delta)',
+           x_string = 'sin(b_beta0_x)*
+             A1(kappa_mu_x)',
+           y_string = 'cos(b_beta0_x)*
+             A1(kappa_mu_x)',
            ngrid = 100, # needs higher resolution to avoid spillover
            cropc = TRUE
 )
 with(draws_treat,
-     arrows.circular(x = mean.circular(circular(b_pmu_treatment,
+     arrows.circular(x = mean.circular(circular(b_beta0_x,
                                                 units = 'radians',
                                                 rotation = 'clock',
                                                 zero = pi/2)
      )[1],
-     y = A1(median(kappa_mu_delta)),
+     y = A1(median(kappa_mu_x)),
      lwd = 2,
      length = 0.1/1.25,
      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
 
 #Add description of the average individual
-DescriptCplot(k = kappa_treat_mean,
+DescriptCplot(k = kappa_hd_mean,
               ndata = ndata/2,
               refline = 0,
               denscol = NA,
               pcol = NA,
+              sdcol = NA,
               mvcol = col_obs
 )
 Draws2Cont(draws = draws_treat,
-           x_string = 'sin(b_pmu_Intercept)*
+           x_string = 'sin(b_beta0_Intercept)*
              A1(softplus(Intercept_kappa))',
-           y_string = 'cos(b_pmu_Intercept)*
+           y_string = 'cos(b_beta0_Intercept)*
              A1(softplus(Intercept_kappa))',
            ngrid = 100, # needs higher resolution to avoid spillover
            cropc = TRUE
 )
 with(draws_treat,
-     arrows.circular(x = mean.circular(circular(b_pmu_Intercept,
+     arrows.circular(x = mean.circular(circular(b_beta0_Intercept,
                                                 units = 'radians',
                                                 rotation = 'clock',
                                                 zero = pi/2)
@@ -2052,7 +2053,7 @@ with(draws_treat,
 
 
 with(draws_treat,
-     VertHist(data = unwrap_circular_deg(b_pmu_treatment),
+     VertHist(data = unwrap_circular_deg(b_beta0_x),
               main = 'change in mean angle',
               ylim = c(-180, 180),
               col = adjustcolor(col_sd, alpha.f = 100/255),
@@ -2067,7 +2068,7 @@ abline(h = 0,
 
 #estimate somewhat favours a turn
 with(draws_treat,
-     paste0(mean(b_pmu_treatment > 0)*100, '%') 
+     paste0(mean(b_beta0_x > 0)*100, '%') 
 )
 
 ```
