@@ -865,6 +865,8 @@ dt_id1 = mapply(FUN = DescriptCplot,
                 refline = 0,
                 sdcol = NA,
                 denscol = NA,
+                mvcol = col_obs,
+                lwd = 5,
                 SIMPLIFY = FALSE
                 )
 #Add the population of biases
@@ -1058,7 +1060,7 @@ for(i in 1:length(dt_id1) )
         plot_rho = FALSE)
   arrows.circular(x = dt1[i],
                   y = A1(kappa_id1),
-                  col = col_rho,
+                  col = col_obs,
                   lwd = 5,
                   length = 0.1/1.25
   )
@@ -1163,7 +1165,9 @@ dt_id_var = mapply(m = dt_var,
                    ndata = 40, 
                    refline = 0, 
                    sdcol = NA, 
-                   denscol = NA, 
+                   denscol = NA,
+                   mvcol = col_obs,
+                   lwd = 5,
                    SIMPLIFY = FALSE) 
 #Add the population of biases 
 DescriptCplot(k = kappa_mu_var, 
@@ -1311,7 +1315,7 @@ for(i in 1:length(dt_id_var) ) {
         plot_rho = FALSE) 
   arrows.circular(x = dt_var[i], 
                   y = A1(kappa_id_var[i]), 
-                  col = col_rho, 
+                  col = col_obs, 
                   lwd = 5, 
                   length = 0.1/1.25 ) 
   Draws2Cont(draws_lowcorr, 
