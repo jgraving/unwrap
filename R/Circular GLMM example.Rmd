@@ -777,7 +777,7 @@ prior_kappa = prior('normal(0, 2*pi())',class = 'b', nlpar = 'pmu') + #wider pri
             check = FALSE) +
   # set_prior("target += normal_lpdf(deltakappamu | 0.0, 1.0)", #turns should follow individual distribution
   #           check = FALSE) +
-  set_prior("target += lognormal_lpdf(log1p_exp(kappamu + deltakappamu) | log(30), 0.6)", #prior to higher values, indiv differences should be small
+  set_prior("target += lognormal_lpdf(log1p_exp(kappamu + deltakappamu) | log(15), 0.6)", #prior to higher values, indiv differences should be small
             check = FALSE) +
   prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
   prior('normal( 0.0, 3.0)', class = 'b', dpar = 'kappa', coef = 'treatment') + #turns should not affect population accuracy
