@@ -17,10 +17,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Details
 
-> **AUTHOR**
->
-> James Foster
-
 > **DESCRIPTION**
 >
 > Examination of different dataset structures that may arise in the study of animal navigation.
@@ -40,11 +36,25 @@ knitr::opts_chunk$set(echo = TRUE)
 > Duelli P. & Wehner R.
 > (1973) The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor ( Formicidae , Hymenoptera ) *Journal of Comparative Physiology* 53(3) 37-53
 >
+> Papi, F., and Pardi, L.
+> (1963).
+> On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
+> Biol.
+> Bull.
+> *124*, 97–105.
+> <https://doi.org/10.2307/1539571>.
+>
 > Edrich, W., Neumeyer, C.
 > and von Helversen, O.
 > (1979).
 > “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
 > *J. Comp. Physiol.* 134, 151–157.
+>
+> Dreyer, D., Frost, B., Mouritsen, H., Günther, A., Green, K., Whitehouse, M., Johnsen, S., Heinze, S., and Warrant, E.
+> (2018).
+> The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
+> Current Biology *28*, 2160-2166.e5.
+> <https://doi.org/10.1016/j.cub.2018.05.030>.
 >
 > **modelling methods**
 >
@@ -403,7 +413,7 @@ cd_treatment = DescriptCplot(m = 210,
 ## Fit the model
 
 To model the change in direction, we need to account for potential differences in both direction and concentration between the control and treatment.
-We can combine our two sets of angles together into one vector $y$, that is aligned with the vector $x$, which specifies whether the treatment was applied in Boolean logic (yes: $1$, no: $0$).
+We can combine our two sets of angles together into one vector $y$, that is aligned with the vector $x$, which specifies in Boolean logic (yes: $1$, no: $0$) whether the treatment was applied .
 *N.B.* For stability, a slightly narrower prior on `Intercept`, $N(0,3\pi/2)$, is used.
 This reduces the region of $50\%$ prior density from [-240°, 240°] to [-180°, 180°].
 
@@ -458,7 +468,7 @@ UnwrapRhats(model_delta,
 
 Now that we have established that the model has converged, we can inspect the model predictions.
 To do this we need to apply the model formula to the estimates.
-That means that in the control condition we use estimates of `Intercept` ($\mu$) and `Intercept_kappa`, but for the treatment we need `Intercept` plus `b_x` (effect of treatment on $\mu$) and `Intercept_kappa` plus `b_kappa_x` (effect of treatment on $\kappa$).
+That means that in the control condition we use estimates of `Intercept` ($\mu$) and `Intercept_kappa`, but for the treatment we need `Intercept` + `b_x` (effect of treatment on $\mu$) and `Intercept_kappa` + `b_kappa_x` (effect of treatment on $\kappa$).
 
 ```{r Inspect predictions for change in direction}
 draws_delta = as_draws_df(model_delta)
@@ -556,11 +566,11 @@ watson.two.test(cd_control, cd_treatment)#no difference detected
 ```
 
 Uncertainty in the example data results in a wide range of posterior estimates for the treatment direction.
-Nonetheless, $\>95\%$ of estimates for change in 𝜇 are to the right of 0°, suggesting a change in direction.
+Nonetheless, $\>95\%$ of estimates for change in 𝜇 are to the right of 0°, suggesting a rightwards change in direction.
 
 ## Test the direction change hypothesis
 
-We can investigate this further with model comparison by fitting models with no effects of treatment, and effects on only kappa.
+We can investigate this further using model comparison, by fitting models with only treatment effects on $\kappa$, and no effects of treatment on $\mu$ or $\kappa$.
 We do this by setting the formula for $\mu$ and $\kappa$ to `~1` (estimate intercept only).
 
 ```{r LOO-CV direction change}
@@ -618,7 +628,7 @@ Conversely, we can conclude that there was no effect of treatment on concentrati
 # Change in concentration
 
 An experimental treatment may also affect concentration independently of mean direction.
-In this example the simulated data the treatment has exactly the same $\mu$ (0°) as the control, but $\kappa$ decreases by $>80\%$ for the treatment.
+In this example the simulated data for the treatment has exactly the same $\mu$ (0°) as the control, but $\kappa$ decreases by $>80\%$.
 
 ```{r Simulate a decrease in concentration}
 par(pty = 's')
@@ -672,7 +682,7 @@ model_conc = brm(formula = form_conc,
 summary(model_conc)
 ```
 
-The model successfully recovers a large change in $\kappa$ caused by the treatment, alongside only a neglible potential change in $\mu$ (approximately equal posterior density either to the left and right of 0°).
+The model successfully recovers a large change in $\kappa$ caused by the treatment, alongside only a negligible potential change in $\mu$ (approximately equal posterior density either to the left and right of 0°).
 Since the model formula is identical to the change in direction example, we can extract the predictions in the same way.
 
 ```{r Inspect predictions for change in kappa}
@@ -746,7 +756,7 @@ with(draws_conc,
 with(draws_conc,
      VertHist(data = softplus(Intercept_kappa+b_kappa_x) - softplus(Intercept_kappa), 
               main = 'change in kappa',
-              ylim = c(-10, 1),
+              ylim = c(-5, 1),
               col = adjustcolor(col_kappa, alpha.f = 100/255),
               cex.axis = 0.7))
 abline(h = 0,
@@ -755,16 +765,25 @@ abline(h = 0,
 
 with(draws_conc, paste0(mean(b_kappa_x < 0)*100, '%') ) #nearly all estimates suggest a reduction in kappa
 
-watson.two.test(cd_3, cd_0.5)#no difference detected
-
 ```
 
 Although there is some uncertainty in the particular size of the change in $\kappa$, $99\%$ of posterior estimates support a treatment effect that decreases $\kappa$.
 *N.B.* Since $\kappa$ is estimated on the inverse-softplus scale, the estimates for the control and treatment need to be calculated and then softplus transformed before a difference in $\kappa$ can be calculated on its true scale.
 
-A compare two sets of data that may differ in $\mu$, $\kappa$, or both is to apply the Watson two-sample test for homogeneity.
-For this sample size and combination of sample $\kappa$ values, the test fails to detect difference (although the p-value is relatively small).
-Given that all parts of this hypothesis can be modelled, we can instead test the hypothesis of a change in $\kappa$ by model comparison, as we did for the change in direction.
+```{r Test for concentration difference}
+#test for any difference
+watson.wheeler.test(y ~ x, data = dt_conc)
+#test for only concentration difference
+eqt = with(dt_conc, equal.kappa.test(y, group = x))
+print(eqt)
+#compare kappa estimates
+print(cbind(kappa_test = eqt$kappa, true = c(3, 0.5)), digits = 3)
+```
+
+A common method to compare two sets of data that may differ in $\mu$, $\kappa$, or both is to apply the Mardia-Watson-Wheeler test for homogeneity.
+For this sample size and combination of sample $\kappa$ values, the test fails to detect a difference (although the p-value is relatively small).
+The `equal.kappa.test` is better suited for this purpose (although the biased estimates of $\kappa$ it produces may fail to detect smaller differences).
+Given that all parts of these hypothesis tests can be modelled, we can instead test the hypothesis of a change in $\kappa$ by model comparison, as we did for the change in direction.
 
 ## Test the direction change hypothesis
 
@@ -780,7 +799,7 @@ model_conc_kappa =  brm(formula = bf(y~1,
                              prior = prior_conc[c(1,3:4),], # the all kappa & 1st mu prior                
                              stanvars = stan_unwrap_fun + modulo_circular_fun,    
                              silent = 2,                
-                             backend = 'cmdstan' ) #model with no effects of treatment 
+                             backend = 'cmdstan') #model with no effects of treatment 
 model_conc_nokappa =  brm(formula = bf(y~1,
                                        kappa~1),
                           data = dt_conc,
@@ -906,32 +925,43 @@ We can use a hierarchical model, accounting for differences and similarities bet
 To model this in `BRMS` we can construct a 'nonlinear' formula for predicting the vector of angle $y$ that is comprised of the sum estimates of $\beta_0$ and $\beta_i$.
 $\beta_0$ is estimated as an `Intercept` (single estimate across individuals), and $\beta_i$ lacks an intercept (`~0`) but includes a different offset for each individual.
 We can also estimate the concentration across $\beta_i$, by defining the hyperparameter `softkappamu` in `Stan` code, which is the inverse-softplus of estimates of the $\kappa_\mu$ parameter.
-This is linked to estimates of $\beta_i$ because its softplus transform (`log1p_exp(softkappamu)`) acts as a prior on the von Mises distribution of $\beta_i$: $\beta_i \sim \mathcal{M}(0, \kappa_\mu)$.
+This is linked to estimates of $\beta_i$ because its softplus transform (`log1p_exp(softkappamu)`) acts as a prior on the von Mises distribution of $\beta_i$: $\beta_i \sim \mathcal{M}(0,\kappa_\mu)$.
 Since we would like our estimates to balance similarity between individuals against any clearly identifiable differences (partial pooling) we should set a prior distribution for $\kappa_\mu$ with high prior density towards strong correlation ($10 < \kappa_\mu < 20$) but some density towards weak correlation ($\kappa_\mu<1$).
-A log-normal distribution $\log \kappa_\mu \sim \mathcal{N}(\log(15), 0.6)$ balances these two objectives.
+A log-normal distribution $\log \kappa_\mu \sim \mathcal{N}(\log(15),0.6)$ balances these two objectives.
 
-To include individual differences in $\kappa$ in the model, we can rely on the automatic methods for linear modelling in `BRMS`.
-That means that to the formula for population level $\kappa$ (`kappa_Intercept`: `kappa~1`) we add the individual-effects term `+(1|ID)`.
-As for $\beta_i$, this implies a set of offsets from the population for each individual ($\alpha_i$) that follow a normal distribution (on the inverse-softplus scale) defined by $\sigma_\kappa$.
-As for $\kappa_\mu$ we require a prior that balances correlation and potentially large differences, with high prior density for $\sigma_\kappa \approx 0$ but some density at much larger values.
-This can be achieved with a student-T distribution with 3 degrees of freedom, a mean at 0, and a standard deviation of 0.5: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,0.5)$.
-
-```{r Model individuals (high correlation)}
-#fit a mixed effects unwrap model
+```{r Formula for an individual effects model}
+#collect data
+dt_highcorr = data.frame(y = as.numeric( rad(unlist(dt_id1)) ),#angles as a numeric vector in radians
+                         ID = factor(x = #individual labels as a unordered categorical (factor)
+                                       sort(
+                                         rep(1:length(dt_id1),
+                                             times = length(dt_id1[[1]]))
+                                         ),
+                                     ordered = FALSE)
+                             )
+#set up formula with both 'nonlinear' and linear predictors
 form_highcorr = bf(y ~ mu,
                   nlf(mu ~ beta0 + betai),#a nonlinear formula
                   beta0 ~ 1,
                   betai ~ 0 + ID,
                   kappa ~ 1 + (1|ID),#a linear formula
-                  nl = TRUE)
+                  family = unwrap_von_mises)
+```
+
+To include individual differences in $\kappa$ in the model, we can rely on the automatic methods for linear modelling in `BRMS`.
+That means that to the formula for population level $\kappa$ (`kappa_Intercept`: `kappa~1`) we add the individual-effects term `+(1|ID)`.
+As for $\beta_i$, this implies a set of offsets from the population for each individual ($\alpha_i$) that follow a normal distribution (on the inverse-softplus scale) defined by $\sigma_\kappa$.
+As for $\kappa_\mu$ we require a prior that balances correlation and potentially large differences, with high prior density for $\sigma_\kappa \approx 0$ but some density at much larger values.
+This can be achieved with a the positive half of a student-T distribution with 3 degrees of freedom, a mean at 0, and a standard deviation of 0.5: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,0.5)$.
+
+```{r Model individuals (high correlation)}
 
 prior_highcorr =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'beta0') +
                   prior('unwrap_von_mises_vect(0, log1p_exp(softkappamu))',
                         nlpar  = 'betai',  class = 'b') +
-                  # set_prior("target += normal_lpdf(softkappamu | 3, 3)"
                   set_prior("target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)", #expect high concentration (low variation) 
                             check = FALSE) +
-                  prior('normal(3,2)', class = 'Intercept', dpar = 'kappa') +
+                  prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') +
                   prior('student_t(3, 0, 0.5)', class = 'sd', dpar = 'kappa')
 
 #Introduce stan variable for kappamu
@@ -963,15 +993,7 @@ stan_unwrap_fun = stanvar(scode = "
   ",
                           block = 'functions')
 
-#collect data
-dt_highcorr = data.frame(y = as.numeric( rad(unlist(dt_id1)) ),#angles as a numeric vector in radians
-                         ID = factor(x = #individual labels as a unordered categorical (factor)
-                                       sort(
-                                         rep(1:length(dt_id1),
-                                             times = length(dt_id1[[1]]))
-                                         ),
-                                     ordered = FALSE)
-                             )
+
 #run the model
 model_highcorr = brm(
           formula = form_highcorr,
@@ -985,14 +1007,38 @@ model_highcorr = brm(
           backend = 'cmdstan') 
 ```
 
+As for the previous models, for some of the circular variables estimates for different chains are separated, which can make it appear that the model has not converged.
+Each $\beta_i$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
+
+```{r Unwrap individual biases}
+#not all raw estimates look like they have converged
+plot(model_highcorr,
+      ask = FALSE,
+      variable = 'betai',
+      regex = TRUE) #plot raw estimates
+#but they overlap when unwrapped
+plot(x = model_highcorr,
+     variable = c('betai'),
+     regex = TRUE,
+     ask = FALSE,
+     transform = unwrap_circular_deg) 
+
+```
+
+Calculating the $\hat{R}$ values for unwrapped estimates fo $\beta_i$ reveals that all estimates converged well ( $\hat{R}<1.01$).
+
 ```{r Inspect the high correlation individuals model}
 
 sm_highcorr = summary(model_highcorr)
 print(sm_highcorr, digits = 2)
-#random effects betai looks bad, but good after unwrapping
+#betai looks bad, but good after unwrapping
 UnwrapRhats(model_highcorr,
             variable = '^b_betai')
 ```
+
+The estimates of $\kappa_\mu$ here have a slight positive bias, due to a combination of low sample size and our prior to higher values.
+The model nonetheless recovers good estimates of $\beta_0$ and $\beta_i$.
+Importantly, this also allows us to estimate population $\kappa$, that is the concentration of the average individual, which needs to be distinguished from individual differences and the concentration across individuals.
 
 ```{r Plot the high correlation individuals model}
 
@@ -1074,16 +1120,6 @@ with(draws_highcorr,
 )
 
 
-# with(draws_highcorr,
-#      VertHist(data = softplus(kappa_mu), 
-#               main = '\nkappa_mu',
-#               ylim = c(0, 5),
-#               col = adjustcolor(col_kappa, alpha.f = 100/255),
-#               cex.axis = 0.7))
-# abline(h = kappa_mu1,
-#        col = col_rho,
-#        lwd = 7)
-# with(draws_highcorr, paste0(mean(softplus(kappa_mu) > kappa_mu1)*100, '%') ) #overestimates through partial pooling
 with(draws_highcorr,
      VertHist(data = softplus(Intercept_kappa), 
               main = '\npopulation kappa',
@@ -1094,4 +1130,244 @@ abline(h = kappa_id1,
        col = col_rho,
        lwd = 7)
 with(draws_highcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id1)*100, '%') ) #partial pooling allows accurate estimate
+```
+
+# Variable individual parameters
+
+```{r Simulate individuals with variable parameters}
+kappa_mu_var = 1.0 
+kappa_var_mean = 1.5 
+kappa_var_sd = 0.5 
+#simulate data
+set.seed(0120810506)#ISBN Batschelet, 1981 
+kappa_id_var = rnorm(n = ndata, 
+                     mean = kappa_var_mean, 
+                     sd = kappa_var_sd) 
+#rectified 
+kappa_id_var[kappa_id_var<0] = 0
+
+set.seed(0120810506)#ISBN Batschelet, 1981 
+# list of circular datasets 
+dt_var = rvonmises(n = ndata, mu = c0, kappa = kappa_mu_var)
+
+par(pty = 's') 
+par(mar = c(0,0,0,0)) 
+par(mfrow = c(3,4)) 
+#generate a list of individuals with different heading biases 
+#and different concentrations
+dt_id_var = mapply(m = dt_var, 
+                   k = round(kappa_id_var,2), 
+                   seed = 10001+1:length(dt_var), # different seed for each
+                   FUN = DescriptCplot, 
+                   save_sample = TRUE, 
+                   ndata = 40, 
+                   refline = 0, 
+                   sdcol = NA, 
+                   denscol = NA, 
+                   SIMPLIFY = FALSE) 
+#Add the population of biases 
+DescriptCplot(k = kappa_mu_var, 
+              ndata = ndata, 
+              refline = 0, 
+              sdcol = NA, 
+              denscol = NA, 
+              pcol = NA, 
+              cicol = col_sd, 
+              mvcol = col_sd ) 
+
+points.circular(dt_var, 
+                bins = 360/5-1, 
+                stack = TRUE, 
+                sep = 0.05, 
+                shrink = 1.25, 
+                col = col_rho ) 
+
+mean_kappa_id_var = softplus(mean(inv_softplus(kappa_id_var))) 
+#Add decription of the average individual 
+DescriptCplot(k = kappa_var_mean, 
+              ndata = ndata, 
+              refline = 0, 
+              sdcol = NA, 
+              denscol = NA, 
+              pcol = NA, 
+              cicol = col_rho, 
+              mvcol = col_rho ) 
+kappa_id_var_ci = kappa_var_mean + 
+                  kappa_var_sd*qnorm(c(0,1) + c(1,-1)*0.05/2) 
+#rectify 
+kappa_id_var_ci[kappa_id_var_ci<0] = 0
+
+arrows(x0 = sin(c0), 
+       x1 = sin(c0), 
+       y0 = A1(kappa_id_var_ci[1]), 
+       y1 = A1(kappa_id_var_ci[2]), 
+       lwd = 7, 
+       col = adjustcolor(col = col_sd2, alpha.f = 100/255), 
+       length = 0.05, 
+       angle = 90, 
+       code = 3, 
+       lend = 'butt' ) 
+
+mtext(text = paste0('(',paste(signif(kappa_id_var_ci, 2), collapse = ' '), ')'), side = 1, line = -1) 
+```
+
+```{r Rayleigh test on pooled data}
+#v-test is not significant (or Rayleigh test) 
+rayleigh.test(dt_var, mu = c0) 
+#but for each individual 
+rt_lst = lapply(X = lapply(dt_id_var, 
+                           circular, 
+                           units = 'degrees'), 
+                FUN = rayleigh.test) 
+rt_lst_print = data.frame(do.call(what = rbind, args = rt_lst))
+rt_lst_print = within(rt_lst_print, 
+                      {
+                        p.adjusted = p.adjust(p.value, method = 'BH')
+                        statistic = unlist(statistic)
+                        p.value = unlist(p.value)
+                      rm('mu', 'call')})
+print(rt_lst_print, digits = 3)
+
+```
+
+## Fit the model
+
+Although the individuals in this dataset are more variable than those in the high-correlation dataset, the underlying structure is the same.
+Since individuals have the potential to differ in both $\mu$ and $\kappa$, we can use the same formula as before, since it already accounts for this.
+
+```{r Formula for individual effects (low correlation)}
+#collect data
+dt_lowcorr = data.frame(y = as.numeric( rad(unlist(dt_id_var)) ),#angles as a numeric vector in radians
+                         ID = factor(x = #individual labels as a unordered categorical (factor)
+                                       sort(
+                                         rep(1:length(dt_id_var),
+                                             times = length(dt_id_var[[1]]))
+                                         ),
+                                     ordered = FALSE)
+                             )
+#set up formula with both 'nonlinear' and linear predictors
+form_lowcorr = bf(y ~ mu,
+                  nlf(mu ~ beta0 + betai),#a nonlinear formula
+                  beta0 ~ 1,
+                  betai ~ 0 + ID,
+                  kappa ~ 1 + (1|ID),#a linear formula
+                  family = unwrap_von_mises)
+```
+In this case, we expect lower concentration, so we use the prior $\alpha_0 \sim \mathcal{N}(1,3)$, which places more density in $(\kappa\approx 0.3\text{–}3)$.
+As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$.
+Unlike the high-correlation dataset, it would be prudent to account for potentially larger $\sigma_\kappa$, while retaining high density for $\sigma_\kappa \approx 0$.
+This can be achieved by increasing the standard deviation of its prior to 1.0: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,1.0)$.
+
+```{r Model individuals (low correlation)}
+
+prior_lowcorr =  prior('normal(0,pi()/2)', class = 'b', nlpar = 'beta0') +
+                  prior('unwrap_von_mises_vect(0, log1p_exp(softkappamu))',
+                        nlpar  = 'betai',  class = 'b') +
+                  set_prior("target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)", #expect high concentration (low variation) 
+                            check = FALSE) +
+                  prior('normal(1,3)', class = 'Intercept', dpar = 'kappa') +
+                  prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa')
+
+
+#run the model
+model_lowcorr = brm(
+          formula = form_lowcorr,
+           data = dt_lowcorr,
+           family = unwrap_von_mises,
+           stanvars = stan_unwrap_fun + 
+                      modulo_circular_fun + 
+                      stan_softkappamu,
+           prior = prior_lowcorr,
+           silent = 2,
+          backend = 'cmdstan') 
+```
+
+As for the previous models, for some of the circular variables estimates for different chains are separated, which can make it appear that the model has not converged.
+Each $\beta_i$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
+
+```{r Summarise model for low correlation dataset}
+
+sm_lowcorr = summary(model_lowcorr)
+print(sm_lowcorr, digits = 2)
+#betai looks bad, but good after unwrapping
+UnwrapRhats(model_lowcorr,
+            variable = '^b_betai')
+```
+
+```{r Plot the low correlation individuals model}
+
+draws_lowcorr = as_draws_df(model_lowcorr)
+
+par(pty = 's') 
+par(mar = c(0,0,0,0), 
+    mfrow = c(3,4)) 
+for(i in 1:length(dt_id_var) ) { 
+  mu_name = paste0('b_betai_ID',i) 
+  kappa_name = paste0('r_ID__kappa[',i,',Intercept]') 
+  PCfun(dt_id_var[[i]], 
+        col = col_obs, 
+        sep = 0.05, 
+        shrink = 1.25, 
+        plot_rho = FALSE) 
+  arrows.circular(x = dt_var[i], 
+                  y = A1(kappa_id_var[i]), 
+                  col = col_rho, 
+                  lwd = 5, 
+                  length = 0.1/1.25 ) 
+  Draws2Cont(draws_lowcorr, 
+             x_string = 'sin(b_beta0_Intercept + get(mu_name)) *A1(softplus(Intercept_kappa+get(kappa_name)))', 
+             y_string = 'cos(b_beta0_Intercept + get(mu_name))* A1(softplus(Intercept_kappa+get(kappa_name)))' ) 
+  with(draws_lowcorr, 
+       arrows.circular(x = median.circular( 
+         circular(x = mod_circular(b_beta0_Intercept + get(mu_name)), 
+                  units = 'radians', 
+                  rotation = 'clock', 
+                  zero = pi/2) )[1], 
+         y = A1(softplus(median(Intercept_kappa+get(kappa_name)))), 
+         lwd = 2, length = 0.1/1.25, 
+         col = adjustcolor(col_sd, alpha.f = 200/255)) ) 
+  }
+
+#Add the population of biases 
+DescriptCplot(k = kappa_mu_var, 
+              ndata = 10, 
+              refline = 0, 
+              sdcol = NA, 
+              denscol = NA, 
+              pcol = NA, 
+              cicol = NA, 
+              mvcol = col_rho ) 
+points.circular(dt_var, 
+                bins = 360/5-1, 
+                stack = TRUE, 
+                sep = 0.05, 
+                shrink = 1.25, 
+                col = col_rho ) 
+Draws2Cont(draws = draws_lowcorr, 
+           x_string = 'sin(b_beta0_Intercept) *A1(softplus(kappa_mu))',
+           y_string = 'cos(b_beta0_Intercept)* A1(softplus(kappa_mu))' )
+
+with(draws_lowcorr, 
+     arrows.circular(x = mean.circular(
+       circular(b_beta0_Intercept, 
+                units = 'radians', 
+                rotation = 'clock', 
+                zero = pi/2) )[1], 
+       y = A1(softplus(median(kappa_mu))), 
+       lwd = 2, 
+       length = 0.1/1.25, 
+       col = adjustcolor(col_sd, alpha.f = 200/255)) )
+
+with(draws_lowcorr, 
+     VertHist(data = unwrap_circular_deg(b_beta0_Intercept), 
+              main = '\npop. mean direction', 
+              ylim = c(-180, 180),
+              col = adjustcolor(col_sd, 
+                                alpha.f = 100/255), 
+              cex.axis = 0.7)) 
+abline(h = 0, 
+       col = col_rho,
+       lwd = 7) 
+with(draws_lowcorr, 
+     paste0(mean(unwrap_circular_deg(b_beta0_Intercept) > 0)*100, '%') ) #partial pooling allows accurate estimate
 ```
