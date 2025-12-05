@@ -33,25 +33,31 @@ Examination of different dataset structures that may arise in the study of anima
 
  **data types**
 
- Duelli P. & Wehner R.
- (1973) The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor (Formicidae , Hymenoptera ) 
+ Duelli P & Wehner R (1973) 
+ The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor (Formicidae , Hymenoptera ) 
  *Journal of Comparative Physiology* 53(3) 37-53
 
- Papi, F., and Pardi, L.
- (1963). On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
+ Papi F & Pardi L (1963). 
+ On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
  *Biol. Bull.* 124, 97–105. <https://doi.org/10.2307/1539571>.
 
- Edrich, W., Neumeyer, C.
- and von Helversen, O.
- (1979). “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
+ Edrich W, Neumeyer C & von Helversen, O. (1979)
+ “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
  *J. Comp. Physiol.* 134, 151–157.
 
- Dreyer, D., Frost, B., Mouritsen, H., Günther, A., Green, K., Whitehouse, M., Johnsen, S., Heinze, S., and Warrant, E.
- (2018).
+ Dreyer D, Frost B, Mouritsen H, Günther A, Green K, Whitehouse M, Johnsen S, Heinze S & Warrant E (2018)
  The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
  Current Biology *28*, 2160-2166.e5. <https://doi.org/10.1016/j.cub.2018.05.030>.
+ 
+ Baird E, Byrne MJ, Scholtz CH, Warrant E, Dacke M (2010) 
+ Bearing selection in ball-rolling dung beetles: is it constant? *Journal of comparative physiology A* 196:801–6. https://doi.org/10.1007/s00359-010-0559-8
+ 
+ Giraldo YM, Leitch KJ, Ros IG, Warren TL, Weir PT & Dickinson M H (2018).
+ Sun Navigation Requires Compass Neurons in Drosophila. *Current Biology* 28, 2845-2852.e4.
 
- Baird et al., 2010 Bearing selection in ball-rolling dung beetles: is it constant?
+ Kishkinev D, Packmor F, Zechmeister T, Winkler H-C, Chernetsov N, Mouritsen H, Holland RA (2021)
+ Navigation by extrapolation of geomagnetic cues in a migratory songbird. *Current Biology* 12(31) 7, 1563-1569.e4 <https://doi.org/10.1016/j.cub.2021.01.051>
+
 
  **modelling methods**
 
