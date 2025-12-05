@@ -23,58 +23,60 @@ Examination of different dataset structures that may arise in the study of anima
 
 **INPUTS**
 
- `unwrap_functions.R`
+`unwrap_functions.R`
 
- **OUTPUTS**
+**OUTPUTS**
 
- Plotted results.
+Plotted results.
 
- **REFERENCES**
+**REFERENCES**
 
- **data types**
+**data types**
 
- Duelli P & Wehner R (1973) 
- The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor (Formicidae , Hymenoptera ) 
- *Journal of Comparative Physiology* 53(3) 37-53
+Duelli P & Wehner R (1973) The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor (Formicidae , Hymenoptera ) *Journal of Comparative Physiology* 53(3) 37-53
 
- Papi F & Pardi L (1963). 
- On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
- *Biol. Bull.* 124, 97–105. <https://doi.org/10.2307/1539571>.
+Papi F & Pardi L (1963).
+On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
+*Biol. Bull.* 124, 97–105.
+<https://doi.org/10.2307/1539571>.
 
- Edrich W, Neumeyer C & von Helversen, O. (1979)
- “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
- *J. Comp. Physiol.* 134, 151–157.
+Edrich W, Neumeyer C & von Helversen, O.
+(1979) “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
+*J. Comp. Physiol.* 134, 151–157.
 
- Dreyer D, Frost B, Mouritsen H, Günther A, Green K, Whitehouse M, Johnsen S, Heinze S & Warrant E (2018)
- The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
- Current Biology *28*, 2160-2166.e5. <https://doi.org/10.1016/j.cub.2018.05.030>.
- 
- Baird E, Byrne MJ, Scholtz CH, Warrant E, Dacke M (2010) 
- Bearing selection in ball-rolling dung beetles: is it constant? *Journal of comparative physiology A* 196:801–6. https://doi.org/10.1007/s00359-010-0559-8
- 
- Giraldo YM, Leitch KJ, Ros IG, Warren TL, Weir PT & Dickinson M H (2018).
- Sun Navigation Requires Compass Neurons in Drosophila. *Current Biology* 28, 2845-2852.e4.
+Dreyer D, Frost B, Mouritsen H, Günther A, Green K, Whitehouse M, Johnsen S, Heinze S & Warrant E (2018) The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
+Current Biology *28*, 2160-2166.e5.
+<https://doi.org/10.1016/j.cub.2018.05.030>.
 
- Kishkinev D, Packmor F, Zechmeister T, Winkler H-C, Chernetsov N, Mouritsen H, Holland RA (2021)
- Navigation by extrapolation of geomagnetic cues in a migratory songbird. *Current Biology* 12(31) 7, 1563-1569.e4 <https://doi.org/10.1016/j.cub.2021.01.051>
+Baird E, Byrne MJ, Scholtz CH, Warrant E, Dacke M (2010) Bearing selection in ball-rolling dung beetles: is it constant?
+*Journal of comparative physiology A* 196:801–6.
+<https://doi.org/10.1007/s00359-010-0559-8>
 
+Giraldo YM, Leitch KJ, Ros IG, Warren TL, Weir PT & Dickinson M H (2018).
+Sun Navigation Requires Compass Neurons in Drosophila.
+*Current Biology* 28, 2845-2852.e4.
 
- **modelling methods**
+Kishkinev D, Packmor F, Zechmeister T, Winkler H-C, Chernetsov N, Mouritsen H, Holland RA (2021) Navigation by extrapolation of geomagnetic cues in a migratory songbird.
+*Current Biology* 12(31) 7, 1563-1569.e4 <https://doi.org/10.1016/j.cub.2021.01.051>
 
- Sayin S, Couzin-Fuchs E, Petelski I, Günzel Y, Salahshour M, Lee CY, Graving JM, Li L, Deussen O, Sword GA, et al. (2025) The behavioral mechanisms governing collective motion in swarming locusts.
- *Science* 387(6737):995–791
+**modelling methods**
 
- Gabry J, Češnovar R, Johnson A (2022).
- cmdstanr: R Interface to 'CmdStan'.
- <https://mc-stan.org/cmdstanr/>
+Sayin S, Couzin-Fuchs E, Petelski I, Günzel Y, Salahshour M, Lee CY, Graving JM, Li L, Deussen O, Sword GA, et al. (2025) The behavioral mechanisms governing collective motion in swarming locusts.
+*Science* 387(6737):995–791
 
- Bürkner, P.-C.
- (2018). Advanced Bayesian Multilevel Modeling with the R Package brms.
- *The R Journal* 10, 395–411.
+Gabry J, Češnovar R, Johnson A (2022).
+cmdstanr: R Interface to 'CmdStan'.
+<https://mc-stan.org/cmdstanr/>
 
- Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B., Betancourt, M., Brubaker, M., Guo, J., Li, P. and Riddell, A.
- (2017). Stan: A Probabilistic Programming Language.
- *Journal of Statistical Software* 76 doi: 10.18637/jss.v076.i01
+Bürkner, P.-C.
+(2018).
+Advanced Bayesian Multilevel Modeling with the R Package brms.
+*The R Journal* 10, 395–411.
+
+Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B., Betancourt, M., Brubaker, M., Guo, J., Li, P. and Riddell, A.
+(2017).
+Stan: A Probabilistic Programming Language.
+*Journal of Statistical Software* 76 doi: 10.18637/jss.v076.i01
 
 > **TODO**
 >
@@ -102,9 +104,9 @@ col_treat = '#006400' # colour for treatment observations
 
 # Divergence from home direction
 
-![Desert ants of the genus $Cataglyphis$ are known for their use of path integration (dead reckoning) to return to their nest. Perturbation of visual orientation cues can result in deviations from the expected homewards direction.](icons/ant.png)
+![Desert ants of the genus *Cataglyphis* are known for their use of path integration (dead reckoning) to return to their nest. Disruption of visual orientation cues can result in deviations from the expected homewards direction.](icons/ant.png)
 
-In navigation experiments return directions are often compared with the expected home direction to determine if homeward navigation is perturbed.
+In navigation experiments return directions are often compared with the expected home direction to determine whether homeward navigation is perturbed.
 Here, we simulate example data (𝑛 = 20) generated from a distribution with a mean that differs from the expected direction (0°) by only 15°.
 
 ```{r Generate diverging data}
@@ -140,15 +142,18 @@ The data are very far from uniform ($\kappa = 10$), and the mean angle is very c
 Even so, the data show a trend away from the expected angle, 75% of points falling to the left of 0°.
 
 ```{r v-test for uniformity}
-mean(cd_divergence < 0)
-rayleigh.test(cd_divergence, mu = c0)
+mean(cd_divergence < 0)#proportion left of o°
+rayleigh.test(cd_divergence, mu = c0)#v-test with 0° expected direction
 
 ```
 
 ## Fit the model
 
 In order to fit a circular model using the circular modulo and softplus links, we need to define a custom family.
-This family
+This family requires two `Stan` functions.
+One executes the circular modulo transform and the other uses this transform on estimates of $\mu$ before calculating the log-probability of data $y$ using the von Mises log-probability function (LPDF).
+This function will be called whenever the family is used, or the prior for a variable is set to `unwrap_von_mises`.
+Since this applies the circular modulo link function, so we set the link function for $\mu$ to "identity", and the link function for $\kappa$ to "softplus" ($\log(\exp(x)+1))$), which ensures estimates of $\kappa$ remains strictly positive.
 
 ```{r Set up the circular model custom family}
 #set up required Stan functions
@@ -182,7 +187,6 @@ unwrap_von_mises = custom_family(
   ub = c(pi,#upper bound of mu should be pi
          NA),
   type = "real",#takes continuous response data
-  # vars = stan_unwrap_fun + modulo_circular_fun
 )
 
 ```
@@ -225,7 +229,7 @@ Since the mean direction is far from the wrap-point ($-\pi$ or $\pi$), the `Rhat
 
 To inspect the model's predictions, we can extract the post-warmup draws from the model and plot the posterior distribution of estimates alongside the original data.
 $\mu$ `Intercept` can be plotted as an angle in radians on its original scale.
-For $\kappa$, we need to convert estimates to the correct scale using the `softplus` transform ($\log( \exp(x) + 1)$), and then convert it to mean-vector-length scale using the `A1` function.
+For $\kappa$, we need to convert estimates to the correct scale using the `softplus` transform, and then convert it to mean-vector-length scale using the `A1` function.
 There are `4000` posterior estimates, so rather than plotting all of them we'll summarise them as the medians of $\mu$ and $\kappa$ estimates and the normalised 2D kernel density of their mean-vector equivalent.
 
 ```{r Plot the model fitted for divergence data}
@@ -298,7 +302,7 @@ The fitted model indicates that the mean direction is to the left of the expecte
 
 To test the hypothesis that the true mean direction falls in the expected direction, we can fit another model where this is explicitly stated.
 To inform BRMS that we do not want to estimate the mean direction, we use the notation `y~0`, which removes the intercept parameter.
-We can now estimate $\kappa$, *assuming* that the mean direction is 0°, using the same prior for kappa as before.
+We can now estimate $\kappa$, *assuming* that the mean direction is 0°, using the same prior for $\kappa$ as before.
 
 ```{r Model comparison observed vs expected mean direction}
 
@@ -313,8 +317,8 @@ model_expect = brm(formula = bf(y~0,
                 silent = 2,
                 backend = 'cmdstan'
                 )
-#add Leave-One-Out Cross-Validation
 
+#add Leave-One-Out Cross-Validation
 loo_divergence = loo(model_divergence)
 loo_expected = loo(model_expect)
 loo_compare(loo_divergence, loo_expected)
@@ -378,10 +382,14 @@ If the divergence model had higher predictive power, but within one standard err
 
 # Change in direction
 
-![Sandhoppers ($Talitridae$) forage along beaches, following the movement of the sea to avoid drying out. Their movement is guided by celestial cues, including the moon.](icons/sandhopper.png)
+![Sandhoppers (*Talitridae*) forage along beaches, following the movement of the sea to avoid drying out. Their movement is guided by celestial cues, including the moon.](icons/sandhopper.png)
 
-If the expected direction is not known, it can be estimated from control data and compared with treatment data.
-In this example, the two distributions have different random number seeds, to avoid producing two identical distributions of angles with a fixed shift.
+If the expected direction is not known, it can be estimated from control data.
+This estimate can then be compared with treatment data, to determine whether the treatment alters orientation.
+
+In this example, the treatment induces a rightward turn of 30°, changing $\mu$ from 180° to 210°.
+Concentration is intermediate ($\kappa = 3$).
+The two simulated distributions have different random number seeds, to avoid producing two identical distributions of angles with a fixed shift.
 
 ```{r Simulate a change in direction}
 par(pty = 's')
@@ -418,7 +426,7 @@ cd_treatment = DescriptCplot(m = 210,
 
 To model the change in direction, we need to account for potential differences in both direction and concentration between the control and treatment.
 We can combine our two sets of angles together into one vector $y$, that is aligned with the vector $x$, which specifies in Boolean logic (yes: $1$, no: $0$) whether the treatment was applied .
-*N.B.* For stability, a slightly narrower prior on `Intercept`, $N(0,3\pi/2)$, is used.
+*N.B.* For stability, a slightly narrower prior on `Intercept`, $\mathcal{N}(0,3\pi/2)$, is used.
 This reduces the region of $50\%$ prior density from [-240°, 240°] to [-180°, 180°].
 
 ```{r Fit treatment direction model}
@@ -458,7 +466,7 @@ The same is also possible for the coefficient `b_x` (treatment change in angle).
 If we unwrap these estimates, we can confirm that they converged towards the same angle, even if they moved in different directions.
 
 ```{r Unwrap the intercept estimates}
-plot(model_delta, ask = FALSE)
+plot(model_delta)
 #unwrap estimates and convert to degrees
 plot(x = model_delta,
      variable = c('Intercept','b_x'),
@@ -563,10 +571,6 @@ with(draws_delta, paste0( round(
                             ) ), 
                             '°')
      ) #the size recovered is similar to the simulated turn of 210-180
-
-watson.two.test(cd_control, cd_treatment)#no difference detected
-
-
 ```
 
 Uncertainty in the example data results in a wide range of posterior estimates for the treatment direction.
@@ -631,7 +635,9 @@ Conversely, we can conclude that there was no effect of treatment on concentrati
 
 # Change in concentration
 
-![Honeybees performing a "waggle dance" on a horizontal observation hive that view a green light-spot, orient their dances as if viewing the sun. The concentration of a series of dance directions decreases when the brightness of this light spot is reduced.](icons/honeybee.png) An experimental treatment may also affect concentration independently of mean direction.
+![Honeybees performing a "waggle dance" on a horizontal observation hive that view a green light-spot, orient their dances as if viewing the sun. The concentration of a series of dance directions decreases when the brightness of this light spot is reduced.](icons/honeybee.png)
+
+An experimental treatment may also affect concentration independently of mean direction.
 In this example the simulated data for the treatment has exactly the same $\mu$ (0°) as the control, but $\kappa$ decreases by $>80\%$.
 
 ```{r Simulate a decrease in concentration}
@@ -759,7 +765,7 @@ with(draws_conc,
 #calculate contrast on true scale by softplus transforming estimates
 with(draws_conc,
      VertHist(data = softplus(Intercept_kappa+b_kappa_x) - softplus(Intercept_kappa), 
-              main = 'change in kappa',
+              main = '\nchange in kappa',
               ylim = c(-5, 1),
               col = adjustcolor(col_kappa, alpha.f = 100/255),
               cex.axis = 0.7))
@@ -773,21 +779,6 @@ with(draws_conc, paste0(mean(b_kappa_x < 0)*100, '%') ) #nearly all estimates su
 
 Although there is some uncertainty in the particular size of the change in $\kappa$, $99\%$ of posterior estimates support a treatment effect that decreases $\kappa$.
 *N.B.* Since $\kappa$ is estimated on the inverse-softplus scale, the estimates for the control and treatment need to be calculated and then softplus transformed before a difference in $\kappa$ can be calculated on its true scale.
-
-```{r Test for concentration difference}
-#test for any difference
-watson.wheeler.test(y ~ x, data = dt_conc)
-#test for only concentration difference
-eqt = with(dt_conc, equal.kappa.test(y, group = x))
-print(eqt)
-#compare kappa estimates
-print(cbind(kappa_test = eqt$kappa, true = c(3, 0.5)), digits = 3)
-```
-
-A common method to compare two sets of data that may differ in $\mu$, $\kappa$, or both is to apply the Mardia-Watson-Wheeler test for homogeneity.
-For this sample size and combination of sample $\kappa$ values, the test fails to detect a difference (although the p-value is relatively small).
-The `equal.kappa.test` is better suited for this purpose (although the biased estimates of $\kappa$ it produces may fail to detect smaller differences).
-Given that all parts of these hypothesis tests can be modelled, we can instead test the hypothesis of a change in $\kappa$ by model comparison, as we did for the change in direction.
 
 ## Test the direction change hypothesis
 
@@ -842,10 +833,10 @@ As we might have also expected, the effect of treatment on $\mu$, present in our
 In datasets that include repeated measurements across individuals, it is necessary to account for individual differences before attempting to identify any population level trends.
 In the simplest case, the orientation behaviour of different individuals is very similar.
 One example would be where all individuals share a common goal direction $\beta_0$, but differ in alignment with that direction by their individual offsets from that direction $\beta_i$.
-In this case $\mu$ and $\kappa$ depend on the specific values of $\beta_0$ and $\beta_i$, and the distribution across $\beta_i$ is determined by the hyperparameter $\kappa_\mu$.
+In this case $\mu$ and $\kappa$ depend on the specific values of $\beta_0$ and $\beta_i$, and the distribution across $\beta_i$ is determined by the hyperparameter $\kappa_\mu$, the concentration across individual offsets.
 
 In this example, each individual's headings are highly concentrated around their particular directional bias with the distribution $\mu_i = \beta_0 + \beta_i$, $\kappa = 5.0$.
-The distribution of individual biases is moderately concentrated, $\kappa_\mu = 2.0$, so that individuals heading biases are quite close together.
+The distribution of individual biases is moderately concentrated, $\kappa_\mu = 2.0$, so that the heading biases of different individuals are quite close together.
 
 ```{r Simulate high interindividual correlation}
 kappa_mu_highcorr = 2.0
@@ -916,9 +907,9 @@ with(mle_comb_highcorr,
 )
 ```
 
-The high correlation is apparent, since 8/10 individual heading biases are within 45° of the population mean.
-Each individual's sample is also tightly clustered around its individual mean.
-Here individuals are sufficiently correlated that we can recover the population mean direction from the mean of pooled data across individuals.
+The high correlation is apparent, since the majority of individual heading biases are within 45° of the population mean (orange points).
+Each individual's sample is also tightly clustered around its individual mean (blue points).
+Pooling data across individuals (grey points), we can see a preponderance of data in the population mean direction, but a much wider spread (lower concentration) than within any one individual's headings.
 
 We can use a hierarchical model, accounting for differences and similarities between individuals, to measure concentration for the average individual ($\alpha_0$) or across individual heading biases ($\kappa_\mu$), as well as to confirm expectations about the population mean direction ($\beta_0$).
 
@@ -926,9 +917,9 @@ We can use a hierarchical model, accounting for differences and similarities bet
 
 To model this in `BRMS` we can construct a 'nonlinear' formula for predicting the vector of angle $y$ that is comprised of the sum estimates of $\beta_0$ and $\beta_i$.
 $\beta_0$ is estimated as an `Intercept` (single estimate across individuals), and $\beta_i$ lacks an intercept (`~0`) but includes a different offset for each individual.
-We can also estimate the concentration across $\beta_i$, by defining the hyperparameter `softkappamu` in `Stan` code, which is the inverse-softplus of estimates of the $\kappa_\mu$ parameter.
+We can also estimate the concentration across $\beta_i$, by defining the hyperparameter `softkappamu` in `Stan` code, which is the inverse-softplus of estimates for the $\kappa_\mu$ parameter.
 This is linked to estimates of $\beta_i$ because its softplus transform (`log1p_exp(softkappamu)`) acts as a prior on the von Mises distribution of $\beta_i$: $\beta_i \sim \mathcal{M}(0,\kappa_\mu)$.
-Since we would like our estimates to balance similarity between individuals against any clearly identifiable differences (partial pooling) we should set a prior distribution for $\kappa_\mu$ with high prior density towards strong correlation ($10 < \kappa_\mu < 20$) but some density towards weak correlation ($\kappa_\mu<1$).
+Since our estimates need to balance similarity between individuals against any identifiable differences (partial pooling) we should set a prior distribution for $\kappa_\mu$ with high prior density towards strong correlation ($10 < \kappa_\mu < 20$) but some density towards lower values.
 A log-normal distribution $\log \kappa_\mu \sim \mathcal{N}(\log(15),0.6)$ balances these two objectives.
 
 ```{r Formula for an individual effects model}
@@ -955,6 +946,8 @@ That means that to the formula for population level $\kappa$ (`kappa_Intercept`:
 As for $\beta_i$, this implies a set of offsets from the population for each individual ($\alpha_i$) that follow a normal distribution (on the inverse-softplus scale) defined by $\sigma_\kappa$.
 As for $\kappa_\mu$ we require a prior that balances correlation and potentially large differences, with high prior density for $\sigma_\kappa \approx 0$ but some density at much larger values.
 This can be achieved with a the positive half of a student-T distribution with 3 degrees of freedom, a mean at 0, and a standard deviation of 0.5: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,0.5)$.
+
+To apply our von Mises prior to the vector of $\beta_i$ estimates, we now also need to update our `unwrap_von_mises` function, to include a version for vectors (`unwrap_von_mises_vect`).
 
 ```{r Model individuals (high correlation)}
 
@@ -1010,7 +1003,7 @@ model_highcorr = brm(
           backend = 'cmdstan') 
 ```
 
-As for the previous models, for some of the circular variables estimates for different chains are separated, which can make it appear that the model has not converged.
+As for the previous models, for some of the circular variables estimates for different chains are separated (for individuals 7, 8 and 10), which can make it appear that the model has not converged.
 Each $\beta_i$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
 
 ```{r Unwrap individual biases}
@@ -1028,7 +1021,7 @@ plot(x = model_highcorr,
 
 ```
 
-Calculating the $\hat{R}$ values for unwrapped estimates fo $\beta_i$ reveals that all estimates converged well ( $\hat{R}<1.01$).
+Calculating the $\hat{R}$ values for unwrapped estimates for $\beta_i$ reveals that all estimates converged well ( $\hat{R}<1.01$).
 
 ```{r Inspect the high correlation individuals model}
 
@@ -1137,9 +1130,15 @@ abline(h = kappa_id_highcorr,
 with(draws_highcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_highcorr)*100, '%') ) #partial pooling allows accurate estimate
 ```
 
+Despite the bias towards high concentration for $\kappa_\mu$, all individual biases are recovered well by this model (overlap of shaded regions with blue arrows), including those more distant from the population mean direction.
+
 # Low Inter-individual correlation
 
 ![When rolling a dung ball, ball-rolling dung beetles can be induced to repeatedly exit a circular arena, resulting in repeated measurements of exit direction. While a single individual exits repeatedly in the same direction, there is typically no relationship between individual directional biases.](icons/beetle.png)
+
+Individuals within the same population do not necessarily share similar directional biases, and there they do this relationship may be weak (low correlation).
+In this example each individual's headings have a high concentration ($\kappa=5.0$), but the concentration across individual directional biases is low ( $\kappa_\mu = 0.1$).
+As before, the mean direction of the generative distribution is at 0°, but, due to the greater probability of observations distant from this mean direction, this is not necessarily reflected by the mean of individuals in our sample.
 
 ```{r Simulate data with low inter-individual heading correlation}
 kappa_mu_lowcorr = 0.1 #very low concentration across individual heading biases
@@ -1201,13 +1200,11 @@ with(mle_comb_lowcorr,
        )
      }
 )
-rayleigh.test(dt_comb_lowcorr)
-lapply(id_lowcorr, rayleigh.test)
 ```
 
 ## Fit the model
 
-Although the individual headings in this dataset are more variable than those in the high-correlation dataset, the underlying structure is the same.The same formula can account for large individual differences in heading just as well as small ones.
+Although the individual heading biases in this dataset are more variable than those in the high-correlation dataset, the underlying structure is the same.The same formula can account for large individual differences in heading just as well as small ones.
 
 ```{r Formula for individual effects (low correlation)}
 #collect data
@@ -1228,8 +1225,8 @@ form_lowcorr = bf(y ~ mu,
                   family = unwrap_von_mises)
 ```
 
-In this case, we expect lower concentration, so we use the prior $\alpha_0 \sim \mathcal{N}(1,3)$, which places more density in $(\kappa\approx 0.3\text{–}3)$.
-As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$, which in this case are a feature of the data.
+Since the expectations regarding $\mu$, $\kappa$ and $\sigma_\kappa$ do not differ from the high-correlation model, we can use the same priors for these.
+As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$, which in this case are a feature of the data, but the principle of partial pooling still necessitates a positive bias in our prior for $\kappa_\mu$, to ensure any similaries across heading biases are captured by the model.
 
 ```{r Model individuals (low correlation)}
 
@@ -1238,8 +1235,8 @@ prior_lowcorr =  prior('normal(0,3*pi()/2)', class = 'b', nlpar = 'beta0') +
                         nlpar  = 'betai',  class = 'b') +
                   set_prior("target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)", #expect high concentration (low variation) 
                             check = FALSE) +
-                  prior('normal(1,3)', class = 'Intercept', dpar = 'kappa') +
-                  prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa')
+                  prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') +
+                  prior('student_t(3, 0, 0.5)', class = 'sd', dpar = 'kappa')
 
 
 #run the model
@@ -1266,9 +1263,7 @@ print(sm_lowcorr, digits = 2)
 #betai looks bad, but good after unwrapping
 #beta0 and betai look bad, but good after unwrapping
 UnwrapRhats(model_lowcorr,
-            variable = '^b_beta0')
-UnwrapRhats(model_lowcorr,
-            variable = '^b_betai')
+            variable = '^b_beta')
 ```
 
 ```{r Plot the low correlation individuals model}
@@ -1419,7 +1414,7 @@ Nonetheless, both models recover the concentration of the average individual's h
 
 # Variable individual parameters
 
-![Tethered vinegar flies ($Drosophila$) can be induced to fly in a "virtual reality" LED arena, in which their wing motion moves causes visual cues to rotate. A green light spot induces orientation behaviour, with a weak population level bias towards the light, but highly variable performance across individuals.](icons/fly.png)
+![Tethered vinegar flies (*Drosophila*) can be induced to fly in a "virtual reality" LED arena, in which their wing motion moves causes visual cues to rotate. A green light spot induces orientation behaviour, with a weak population level bias towards the light, but highly variable performance across individuals.](icons/fly.png)
 
 ```{r Simulate individuals with variable parameters}
 kappa_mu_var = 1.0 
@@ -1546,6 +1541,7 @@ form_var = bf(y ~ mu,
 As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$.
 Unlike the high-correlation dataset, it would be prudent to account for potentially larger $\sigma_\kappa$, while retaining high density for $\sigma_\kappa \approx 0$.
 This can be achieved by increasing the standard deviation of its prior to 1.0: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,1.0)$.
+In this case, we expect lower concentration, so we use the prior $\alpha_0 \sim \mathcal{N}(1,3)$, which places more density in $(\kappa\approx 0.3\text{–}3)$.
 
 ```{r Model individuals (variable)}
 
