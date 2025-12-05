@@ -17,66 +17,58 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Details
 
-> **DESCRIPTION**
->
-> Examination of different dataset structures that may arise in the study of animal navigation.
+**DESCRIPTION**
 
-> **INPUTS**
->
-> `unwrap_functions.R`
+Examination of different dataset structures that may arise in the study of animal navigation.
 
-> **OUTPUTS**
->
-> Plotted results.
+**INPUTS**
 
-> **REFERENCES**
->
-> **data types**
->
-> Duelli P. & Wehner R.
-> (1973) The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor ( Formicidae , Hymenoptera ) *Journal of Comparative Physiology* 53(3) 37-53
->
-> Papi, F., and Pardi, L.
-> (1963).
-> On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
-> Biol.
-> Bull.
-> *124*, 97–105.
-> <https://doi.org/10.2307/1539571>.
->
-> Edrich, W., Neumeyer, C.
-> and von Helversen, O.
-> (1979).
-> “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
-> *J. Comp. Physiol.* 134, 151–157.
->
-> Dreyer, D., Frost, B., Mouritsen, H., Günther, A., Green, K., Whitehouse, M., Johnsen, S., Heinze, S., and Warrant, E.
-> (2018).
-> The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
-> Current Biology *28*, 2160-2166.e5.
-> <https://doi.org/10.1016/j.cub.2018.05.030>.
->
-> Baird et al., 2010 Bearing selection in ball-rolling dung beetles: is it constant?
->
-> **modelling methods**
->
-> Sayin S, Couzin-Fuchs E, Petelski I, Günzel Y, Salahshour M, Lee CY, Graving JM, Li L, Deussen O, Sword GA, et al. (2025) The behavioral mechanisms governing collective motion in swarming locusts.
-> Science.
-> 387(6737):995–791
->
-> Gabry J, Češnovar R, Johnson A (2022).
-> cmdstanr: R Interface to 'CmdStan'.
-> <https://mc-stan.org/cmdstanr/>
->
-> Bürkner, P.-C.
-> (2018).
-> Advanced Bayesian Multilevel Modeling with the R Package brms.
-> The R Journal 10, 395–411.
->
-> Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B., Betancourt, M., Brubaker, M., Guo, J., Li, P. and Riddell, A.
-> (2017).
-> Stan: A Probabilistic Programming Language.
-> Journal of Statistical Software 76 doi: 10.18637/jss.v076.i01
+ `unwrap_functions.R`
+
+ **OUTPUTS**
+
+ Plotted results.
+
+ **REFERENCES**
+
+ **data types**
+
+ Duelli P. & Wehner R.
+ (1973) The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor (Formicidae , Hymenoptera ) 
+ *Journal of Comparative Physiology* 53(3) 37-53
+
+ Papi, F., and Pardi, L.
+ (1963). On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
+ *Biol. Bull.* 124, 97–105. <https://doi.org/10.2307/1539571>.
+
+ Edrich, W., Neumeyer, C.
+ and von Helversen, O.
+ (1979). “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
+ *J. Comp. Physiol.* 134, 151–157.
+
+ Dreyer, D., Frost, B., Mouritsen, H., Günther, A., Green, K., Whitehouse, M., Johnsen, S., Heinze, S., and Warrant, E.
+ (2018).
+ The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
+ Current Biology *28*, 2160-2166.e5. <https://doi.org/10.1016/j.cub.2018.05.030>.
+
+ Baird et al., 2010 Bearing selection in ball-rolling dung beetles: is it constant?
+
+ **modelling methods**
+
+ Sayin S, Couzin-Fuchs E, Petelski I, Günzel Y, Salahshour M, Lee CY, Graving JM, Li L, Deussen O, Sword GA, et al. (2025) The behavioral mechanisms governing collective motion in swarming locusts.
+ *Science* 387(6737):995–791
+
+ Gabry J, Češnovar R, Johnson A (2022).
+ cmdstanr: R Interface to 'CmdStan'.
+ <https://mc-stan.org/cmdstanr/>
+
+ Bürkner, P.-C.
+ (2018). Advanced Bayesian Multilevel Modeling with the R Package brms.
+ *The R Journal* 10, 395–411.
+
+ Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B., Betancourt, M., Brubaker, M., Guo, J., Li, P. and Riddell, A.
+ (2017). Stan: A Probabilistic Programming Language.
+ *Journal of Statistical Software* 76 doi: 10.18637/jss.v076.i01
 
 > **TODO**
 >
@@ -379,7 +371,8 @@ Now the expected direction model has higher predictive power, even though both f
 If the divergence model had higher predictive power, but within one standard error of the expected direction model, we could not rule out the possibility that the expected direction is the true direction, though evidence would be weaker.
 
 # Change in direction
-![Sandhoppers ($Talitridae$) forage along beaches, following the movement  of the sea to avoid drying out. Their movement is guided by celestial cues, including the moon.](icons/sandhopper.png)
+
+![Sandhoppers ($Talitridae$) forage along beaches, following the movement of the sea to avoid drying out. Their movement is guided by celestial cues, including the moon.](icons/sandhopper.png)
 
 If the expected direction is not known, it can be estimated from control data and compared with treatment data.
 In this example, the two distributions have different random number seeds, to avoid producing two identical distributions of angles with a fixed shift.
@@ -631,8 +624,8 @@ Since the median estimate is close to the true value of 30°, the model's estima
 Conversely, we can conclude that there was no effect of treatment on concentration, since `model_kappadelta` is a much worse fit than the null model (`model_nodelta`).
 
 # Change in concentration
-![Honeybees performing a "waggle dance" on a horizontal observation hive that view a green light-spot, orient their dances as if viewing the sun. The concentration of a series of dance directions decreases when the brightness of this light spot is reduced.](icons/honeybee.png)
-An experimental treatment may also affect concentration independently of mean direction.
+
+![Honeybees performing a "waggle dance" on a horizontal observation hive that view a green light-spot, orient their dances as if viewing the sun. The concentration of a series of dance directions decreases when the brightness of this light spot is reduced.](icons/honeybee.png) An experimental treatment may also affect concentration independently of mean direction.
 In this example the simulated data for the treatment has exactly the same $\mu$ (0°) as the control, but $\kappa$ decreases by $>80\%$.
 
 ```{r Simulate a decrease in concentration}
@@ -1668,9 +1661,7 @@ with(draws_var,
 
 # Individual heading changes parameters
 
-![Birds exhibiting migratory restlessness hop repeatedly in their intended flight
-direction, allowing this to be recorded repeatedly for the same individuals across multiple nights. Individuals may differ somewhat in their hopping directions, but are generally aligned provided they detect the same compass cues. A treatment that affects their perception of these cues causes the entire population to change their hopping direction.](icons/bird.png)
-
+![Birds exhibiting migratory restlessness hop repeatedly in their intended flight direction, allowing this to be recorded repeatedly for the same individuals across multiple nights. Individuals may differ somewhat in their hopping directions, but are generally aligned provided they detect the same compass cues. A treatment that affects their perception of these cues causes the entire population to change their hopping direction.](icons/bird.png)
 
 ```{r Simulate individual heading changes}
 #condition level change in heading of 30°
