@@ -420,7 +420,7 @@ We can combine our two sets of angles together into one vector $y$, that is alig
 This reduces the region of $50\%$ prior density from [-240°, 240°] to [-180°, 180°].
 
 ```{r Fit treatment direction model}
-dt_delta = data.frame(y = rad(
+mu_delta = data.frame(y = rad(
                             as.numeric(
                             c(cd_control,
                               cd_treatment)
@@ -441,7 +441,7 @@ prior_delta = prior('normal(0,3*pi()/2)', class = 'Intercept', dpar = 'mu') +
 
 
 model_delta =  brm(formula = form_delta,
-               data = dt_delta, 
+               data = mu_delta, 
                family = unwrap_von_mises,
                prior = prior_delta, # the kappa and mu priors
                stanvars = stan_unwrap_fun + modulo_circular_fun,
@@ -579,7 +579,7 @@ We do this by setting the formula for $\mu$ and $\kappa$ to `~1` (estimate inter
 #model with effects of treatment on kappa, but not mu
 model_kappadelta =  brm(formula = bf(y~1,
                                      kappa~x),
-               data = dt_delta, 
+               data = mu_delta, 
                family = unwrap_von_mises,
                prior = prior_delta[c(1,3:4),], # the all kappa & 1st mu prior
                stanvars = stan_unwrap_fun + modulo_circular_fun,
@@ -589,7 +589,7 @@ model_kappadelta =  brm(formula = bf(y~1,
 #model with no effects of treatment
 model_nodelta =  brm(formula = bf(y~1,
                                   kappa~1),
-               data = dt_delta, 
+               data = mu_delta, 
                family = unwrap_von_mises,
                prior = prior_delta[c(1,3),], # intercept kappa & mu priors
                stanvars = stan_unwrap_fun + modulo_circular_fun,
@@ -844,25 +844,25 @@ In this example, each individual's headings are highly concentrated around their
 The distribution of individual biases is moderately concentrated, $\kappa_\mu = 2.0$, so that individuals heading biases are quite close together.
 
 ```{r Simulate high interindividual correlation}
-kappa_mu1 = 2.0
-kappa_id1 = 5.0
+kappa_mu_highcorr = 2.0
+kappa_id_highcorr = 5.0
 
 ndata = 10 # moderate sample size
 set.seed(0120810506)#ISBN Batschelet, 1981
-dt1 = rvonmises(n = 10,
+mu_highcorr = rvonmises(n = 10,
                 mu = c0,
-                kappa = kappa_mu1)
-print(round(dt1))
+                kappa = kappa_mu_highcorr)
+print(round(mu_highcorr))
 
 par(pty = 's')
 par(mar = c(0,0,0,0))
 par(mfrow = c(3,4))
 #Loop through individuals generating a random sample for each individual
-dt_id1 = mapply(FUN = DescriptCplot,
-                m = dt1, 
-                seed = 1000*1:length(dt1), #different seed for each
+id_highcorr = mapply(FUN = DescriptCplot,
+                m = mu_highcorr, 
+                seed = 1000*1:length(mu_highcorr), #different seed for each
                 save_sample = TRUE,
-                k = kappa_id1,#all the same concentration
+                k = kappa_id_highcorr,#all the same concentration
                 ndata = 20,
                 refline = 0,
                 sdcol = NA,
@@ -872,7 +872,7 @@ dt_id1 = mapply(FUN = DescriptCplot,
                 SIMPLIFY = FALSE
                 )
 #Add the population of biases
-DescriptCplot(k = kappa_mu1,
+DescriptCplot(k = kappa_mu_highcorr,
               ndata = 10,
               refline = 0,
               sdcol = NA,
@@ -881,7 +881,7 @@ DescriptCplot(k = kappa_mu1,
               cicol = col_sd,
               mvcol = col_sd
 )
-points.circular(dt1,
+points.circular(mu_highcorr,
                 bins = 360/5-1,
                 stack = TRUE,
                 sep = 0.05,
@@ -889,21 +889,15 @@ points.circular(dt1,
                 col = col_rho
 )
 #Show the pooled data across all individuals
-dt_comb1 = do.call(what = c,
-                   args = dt_id1)
-PCfun(angles = dt_comb1,
+dt_comb_highcorr = do.call(what = c,
+                   args = id_highcorr)
+PCfun(angles = dt_comb_highcorr,
       col = 'gray25',
       shrink = 3.0)
 #Fit the maximum likelihood distribution for the pooled data
-mle_comb1 = mle.vonmises(x = dt_comb1,bias = TRUE)
-ci_comb1 = with(mle_comb1,
-                CI_vM(angles = dt_comb1,
-                      m1 = mu,
-                      k1 = kappa,
-                      alternative = 'two.sided')
-)
+mle_comb_highcorr = mle.vonmises(x = dt_comb_highcorr,bias = TRUE)
 #Plot the estimated mean vector across pooled data
-with(mle_comb1,
+with(mle_comb_highcorr,
      {
        arrows.circular(x = circular(mu,
                                     units = 'degrees',
@@ -935,11 +929,11 @@ A log-normal distribution $\log \kappa_\mu \sim \mathcal{N}(\log(15),0.6)$ balan
 
 ```{r Formula for an individual effects model}
 #collect data
-dt_highcorr = data.frame(y = as.numeric( rad(unlist(dt_id1)) ),#angles as a numeric vector in radians
+dt_highcorr = data.frame(y = as.numeric( rad(unlist(id_highcorr)) ),#angles as a numeric vector in radians
                          ID = factor(x = #individual labels as an unordered categorical (factor)
                                        sort(
-                                         rep(1:length(dt_id1),
-                                             times = length(dt_id1[[1]]))
+                                         rep(1:length(id_highcorr),
+                                             times = length(id_highcorr[[1]]))
                                          ),
                                      ordered = FALSE)
                              )
@@ -1054,17 +1048,17 @@ draws_highcorr = as_draws_df(model_highcorr)
 par(pty = 's')
 par(mar = c(0,0,0,0),
     mfrow = c(3,4))
-for(i in 1:length(dt_id1) )
+for(i in 1:length(id_highcorr) )
 {
   mu_name = paste0('b_betai_ID',i)
   kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
-  PCfun(dt_id1[[i]],
+  PCfun(id_highcorr[[i]],
         col = col_obs,
         sep = 0.05,
         shrink = 1.25,
         plot_rho = FALSE)
-  arrows.circular(x = dt1[i],
-                  y = A1(kappa_id1),
+  arrows.circular(x = mu_highcorr[i],
+                  y = A1(kappa_id_highcorr),
                   col = col_obs,
                   lwd = 5,
                   length = 0.1/1.25
@@ -1091,7 +1085,7 @@ for(i in 1:length(dt_id1) )
 }
 
 #Add the population of biases
-DescriptCplot(k = kappa_mu1,
+DescriptCplot(k = kappa_mu_highcorr,
               ndata = 10,
               refline = 0,
               sdcol = NA,
@@ -1100,7 +1094,7 @@ DescriptCplot(k = kappa_mu1,
               cicol = NA,
               mvcol = col_rho
 )
-points.circular(dt1,
+points.circular(mu_highcorr,
                 bins = 360/5-1,
                 stack = TRUE,
                 sep = 0.05,
@@ -1133,32 +1127,31 @@ with(draws_highcorr,
               ylim = c(0, 10),
               col = adjustcolor(col_kappa, alpha.f = 100/255),
               cex.axis = 0.7))
-abline(h = kappa_id1,
+abline(h = kappa_id_highcorr,
        col = col_rho,
        lwd = 7)
-with(draws_highcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id1)*100, '%') ) #partial pooling allows accurate estimate
+with(draws_highcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_highcorr)*100, '%') ) #partial pooling allows accurate estimate
 ```
 
 # Low Inter-individual correlation
 
 ```{r Simulate data with low inter-individual heading correlation}
-kappa_mu = 0.1 #very low concentration across individual heading biases
-kappa_id = 5.0 #high within-individual concentration
+kappa_mu_lowcorr = 0.1 #very low concentration across individual heading biases
+kappa_id_lowcorr = 5.0 #high within-individual concentration
 
 set.seed(591005598)#DOI Baird et al., 2010
-dt2 = rvonmises(n = ndata,
+mu_lowcorr = rvonmises(n = ndata,
                 mu = c0,
-                kappa = kappa_mu)
-print(round(dt2))
+                kappa = kappa_mu_lowcorr)
 
 par(pty = 's')
 par(mar = c(0,0,0,0))
 par(mfrow = c(3,4))
-dt_id2 = mapply(FUN = DescriptCplot,
-                m = dt2, #
-                seed = 1000*1:length(dt2), # different seed for each
+id_lowcorr = mapply(FUN = DescriptCplot,
+                m = mu_lowcorr, #
+                seed = 1000*1:length(mu_lowcorr), # different seed for each
                 save_sample = TRUE,
-                k = kappa_id,
+                k = kappa_id_lowcorr,
                 ndata = 20,
                 refline = 0,
                 sdcol = NA,
@@ -1167,7 +1160,7 @@ dt_id2 = mapply(FUN = DescriptCplot,
                 lwd = 5,
                 SIMPLIFY = FALSE)
 #Add the population of biases
-DescriptCplot(k = kappa_mu,
+DescriptCplot(k = kappa_mu_lowcorr,
               ndata = 10,
               refline = 0,
               sdcol = NA,
@@ -1175,7 +1168,7 @@ DescriptCplot(k = kappa_mu,
               pcol = NA,
               mvcol = col_sd
 )
-points.circular(dt2,
+points.circular(mu_lowcorr,
                 bins = 360/5-1,
                 stack = TRUE,
                 sep = 0.05,
@@ -1183,13 +1176,13 @@ points.circular(dt2,
                 col = col_rho
 )
 
-dt_comb2 = do.call(what = c,
-                   args = dt_id2)
-PCfun(angles = dt_comb2,
+dt_comb_lowcorr = do.call(what = c,
+                   args = id_lowcorr)
+PCfun(angles = dt_comb_lowcorr,
       col = 'gray25',
       shrink = 3.0)
-mle_comb2 = mle.vonmises(x = dt_comb2,bias = TRUE)
-with(mle_comb2,
+mle_comb_lowcorr = mle.vonmises(x = dt_comb_lowcorr,bias = TRUE)
+with(mle_comb_lowcorr,
      {
        arrows.circular(x = circular(mu,
                                     units = 'degrees',
@@ -1202,11 +1195,8 @@ with(mle_comb2,
        )
      }
 )
-mtext(text = paste0('(',paste(signif(ci_comb2[-2], 2), collapse = ' '), ')'),
-      side = 1,
-      line = -1)
-rayleigh.test(dt_comb2)
-rayleigh.test(dt_comb2[1+0:9 * 20])
+rayleigh.test(dt_comb_lowcorr)
+lapply(id_lowcorr, rayleigh.test)
 ```
 
 
@@ -1214,18 +1204,18 @@ rayleigh.test(dt_comb2[1+0:9 * 20])
 
 Although the individual headings in this dataset are more variable than those in the high-correlation dataset, the underlying structure is the same.The same formula can account for large individual differences in heading just as well as small ones.
 
-```{r Formula for individual effects (variable)}
+```{r Formula for individual effects (low correlation)}
 #collect data
-dt_var = data.frame(y = as.numeric( rad(unlist(dt_id_var)) ),#angles as a numeric vector in radians
+dt_lowcorr = data.frame(y = as.numeric( rad(unlist(id_lowcorr)) ),#angles as a numeric vector in radians
                          ID = factor(x = #individual labels as an unordered categorical (factor)
                                        sort(
-                                         rep(1:length(dt_id_var),
-                                             times = length(dt_id_var[[1]]))
+                                         rep(1:length(id_lowcorr),
+                                             times = length(id_lowcorr[[1]]))
                                          ),
                                      ordered = FALSE)
                              )
 #set up formula with both 'nonlinear' and linear predictors
-form_var = bf(y ~ mu,
+form_lowcorr = bf(y ~ mu,
                   nlf(mu ~ beta0 + betai),#a nonlinear formula
                   beta0 ~ 1,
                   betai ~ 0 + ID,
@@ -1233,10 +1223,186 @@ form_var = bf(y ~ mu,
                   family = unwrap_von_mises)
 ```
 In this case, we expect lower concentration, so we use the prior $\alpha_0 \sim \mathcal{N}(1,3)$, which places more density in $(\kappa\approx 0.3\text{–}3)$.
-As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$.
-Unlike the high-correlation dataset, it would be prudent to account for potentially larger $\sigma_\kappa$, while retaining high density for $\sigma_\kappa \approx 0$.
-This can be achieved by increasing the standard deviation of its prior to 1.0: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,1.0)$.
+As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$, which in this case are a feature of the data.
 
+```{r Model individuals (low correlation)}
+
+prior_lowcorr =  prior('normal(0,3*pi()/2)', class = 'b', nlpar = 'beta0') +
+                  prior('unwrap_von_mises_vect(0, log1p_exp(softkappamu))',
+                        nlpar  = 'betai',  class = 'b') +
+                  set_prior("target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)", #expect high concentration (low variation) 
+                            check = FALSE) +
+                  prior('normal(1,3)', class = 'Intercept', dpar = 'kappa') +
+                  prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa')
+
+
+#run the model
+model_lowcorr = brm(
+          formula = form_lowcorr,
+           data = dt_lowcorr,
+           family = unwrap_von_mises,
+           stanvars = stan_unwrap_fun + 
+                      modulo_circular_fun + 
+                      stan_softkappamu,
+           prior = prior_lowcorr,
+           silent = 2,
+          cores = 4,
+          backend = 'cmdstan') 
+```
+
+As for the previous models, for some of the circular variables estimates for different chains are separated, which can make it appear that the model has not converged.
+Each $\beta_i$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
+
+```{r Summarise model for low correlation dataset}
+
+sm_lowcorr = summary(model_lowcorr)
+print(sm_lowcorr, digits = 2)
+#betai looks bad, but good after unwrapping
+#beta0 and betai look bad, but good after unwrapping
+UnwrapRhats(model_lowcorr,
+            variable = '^b_beta0')
+UnwrapRhats(model_lowcorr,
+            variable = '^b_betai')
+```
+
+```{r Plot the low correlation individuals model}
+
+draws_lowcorr = as_draws_df(model_lowcorr)
+
+par(pty = 's')
+par(mar = c(0,0,0,0),
+    mfrow = c(3,4))
+for(i in 1:length(id_lowcorr) )
+{
+  mu_name = paste0('b_betai_ID',i)
+  kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
+  PCfun(id_lowcorr[[i]],
+        col = col_obs,
+        sep = 0.05,
+        shrink = 1.25,
+        plot_rho = FALSE)
+  arrows.circular(x = mu_lowcorr[i],
+                  y = A1(kappa_id_lowcorr),
+                  col = col_obs,
+                  lwd = 5,
+                  length = 0.1/1.25
+  )
+  Draws2Cont(draws_lowcorr,
+             x_string = 'sin(b_beta0_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+             y_string = 'cos(b_beta0_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))'
+             )
+  with(draws_lowcorr,
+       arrows.circular(x = median.circular(
+                             circular(x = 
+                             mod_circular(b_beta0_Intercept + get(mu_name)),
+                                                    units = 'radians',
+                                                    rotation = 'clock',
+                                                    zero = pi/2)
+                                           )[1],
+                       y = A1(softplus(median(Intercept_kappa+get(kappa_name)))),
+                       lwd = 2,
+                       length = 0.1/1.25,
+                       col = adjustcolor(col_sd, alpha.f = 200/255))
+  )
+}
+
+#Add the population of biases
+DescriptCplot(k = kappa_mu_lowcorr,
+              ndata = 10,
+              refline = 0,
+              sdcol = NA,
+              denscol = NA,
+              pcol = NA,
+              cicol = NA,
+              mvcol = col_rho
+)
+points.circular(mu_lowcorr,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+Draws2Cont(draws = draws_lowcorr,
+           x_string = 'sin(b_beta0_Intercept)*
+             A1(softplus(kappa_mu))',
+           y_string = 'cos(b_beta0_Intercept)*
+             A1(softplus(kappa_mu))'
+           )
+
+with(draws_lowcorr,
+     arrows.circular(x = mean.circular(circular(b_beta0_Intercept,
+                                                  units = 'radians',
+                                                  rotation = 'clock',
+                                                  zero = pi/2)
+     )[1],
+     y = A1(softplus(median(kappa_mu_lowcorr))),
+     lwd = 2,
+     length = 0.1/1.25,
+     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+
+
+with(draws_lowcorr,
+     VertHist(data = softplus(Intercept_kappa), 
+              main = '\npopulation kappa',
+              ylim = c(0, 10),
+              col = adjustcolor(col_kappa, alpha.f = 100/255),
+              cex.axis = 0.7))
+abline(h = kappa_id_lowcorr,
+       col = col_rho,
+       lwd = 7)
+with(draws_lowcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_lowcorr)*100, '%') ) #partial pooling allows accurate estimate
+```
+
+## Test shared heading bias hypothesis
+
+For this dataset, we might reasonably question whether individual heading biases have any shared bias. We can investigate this by fitting a model without a $\kappa_\mu$ parameter, but still accounting for individual heading biases and partial pooling for $\kappa$.
+We can set $\beta_0$ to 0° by assigning the formula `~0`, we could also exclude it entirely. Since there are no constraints on where $\beta_i$ can be for each individual, we can set a (near) uniform von Mises prior with $\kappa \approx 0$, although a more complex model could benefit from the normal prior like those used for $\beta_0$ above. Without the extra information from $\kappa_\mu$ about the expected distribution of $\beta_i$ sampling can become unstable, so we can use smaller sampling steps to avoid divergent transitions (which could impede sampling) by setting `adapt_delta` closer to $0.99$ (default value $0.8$). This slows down model estimation, but improves estimate reliability.
+
+```{r LOO-CV kappa_mu}
+#model with effects of treatment on kappa, but not mu 
+#set up formula with both 'nonlinear' and linear predictors
+form_nocorr = bf(y ~ mu,
+                  nlf(mu ~ beta0 + betai),#a nonlinear formula
+                  beta0 ~ 0, #not estimated, anchored at 0°
+                  betai ~ 0 + ID,
+                  kappa ~ 1 + (1|ID),#a linear formula
+                  family = unwrap_von_mises)
+
+prior_nocorr =  prior('unwrap_von_mises_vect(0.0,1e-16)', class = 'b', nlpar = 'betai') + #biases free to fall anywhere on the circle
+                  prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') +
+                  prior('student_t(3, 0, 0.5)', class = 'sd', dpar = 'kappa')
+
+
+#run the model
+model_nocorr = brm(
+          formula = form_nocorr,
+           data = dt_lowcorr,
+           family = unwrap_von_mises,
+           stanvars = stan_unwrap_fun + 
+                      modulo_circular_fun,
+           prior = prior_nocorr,
+           silent = 2,
+          cores = 4,
+          control = list(adapt_delta = 0.97),#slower, but more robust sampling
+          backend = 'cmdstan') 
+
+#all models converge well 
+print(   list(`no kappa_mu` =      summary(model_nocorr),     
+              `unwrapped rhat` =
+                UnwrapRhats(model_nocorr,
+                            variable = c('^b_beta')
+                                  )
+              ),   digits = 3 )
+
+loo_lowcorr = loo(model_lowcorr) 
+loo_nocorr = loo(model_nocorr) 
+print(loo_compare(loo_lowcorr, loo_nocorr))
+```
+Although technically this dataset was simulated with a von Mises distribution with very low concentration $\kappa_\mu = 0.1$, the distribution of individual headings does not detectably differ from uniform. This is certainly plausible for animals without a shared goal direction, and at this level of concentration a considerably larger number of individuals would be needed to recover any group-level bias. Nonetheless, both models recover the concentration of the average individual's headings ($\kappa = \log(\exp(5.0)+1) \approx 5.0$).
 
 # Variable individual parameters
 
@@ -1254,16 +1420,16 @@ kappa_id_var[kappa_id_var<0] = 0
 
 set.seed(0120810506)#ISBN Batschelet, 1981 
 # list of circular datasets 
-dt_var = rvonmises(n = ndata, mu = c0, kappa = kappa_mu_var)
+mu_var = rvonmises(n = ndata, mu = c0, kappa = kappa_mu_var)
 
 par(pty = 's') 
 par(mar = c(0,0,0,0)) 
 par(mfrow = c(3,4)) 
 #generate a list of individuals with different heading biases 
 #and different concentrations
-dt_id_var = mapply(m = dt_var, 
+id_var = mapply(m = mu_var, 
                    k = round(kappa_id_var,2), 
-                   seed = 10001+1:length(dt_var), # different seed for each
+                   seed = 10001+1:length(mu_var), # different seed for each
                    FUN = DescriptCplot, 
                    save_sample = TRUE, 
                    ndata = 40, 
@@ -1283,7 +1449,7 @@ DescriptCplot(k = kappa_mu_var,
               cicol = col_sd, 
               mvcol = col_sd ) 
 
-points.circular(dt_var, 
+points.circular(mu_var, 
                 bins = 360/5-1, 
                 stack = TRUE, 
                 sep = 0.05, 
@@ -1321,9 +1487,9 @@ mtext(text = paste0('(',paste(signif(kappa_id_var_ci, 2), collapse = ' '), ')'),
 
 ```{r Rayleigh test on pooled data}
 #v-test is not significant (or Rayleigh test) 
-rayleigh.test(dt_var, mu = c0) 
+rayleigh.test(mu_var, mu = c0) 
 #but for each individual 
-rt_lst = lapply(X = lapply(dt_id_var, 
+rt_lst = lapply(X = lapply(id_var, 
                            circular, 
                            units = 'degrees'), 
                 FUN = rayleigh.test) 
@@ -1345,11 +1511,11 @@ Since individuals have the potential to differ in both $\mu$ and $\kappa$, we ca
 
 ```{r Formula for individual effects (variable)}
 #collect data
-dt_var = data.frame(y = as.numeric( rad(unlist(dt_id_var)) ),#angles as a numeric vector in radians
+dt_var = data.frame(y = as.numeric( rad(unlist(id_var)) ),#angles as a numeric vector in radians
                          ID = factor(x = #individual labels as an unordered categorical (factor)
                                        sort(
-                                         rep(1:length(dt_id_var),
-                                             times = length(dt_id_var[[1]]))
+                                         rep(1:length(id_var),
+                                             times = length(id_var[[1]]))
                                          ),
                                      ordered = FALSE)
                              )
@@ -1361,7 +1527,6 @@ form_var = bf(y ~ mu,
                   kappa ~ 1 + (1|ID),#a linear formula
                   family = unwrap_von_mises)
 ```
-In this case, we expect lower concentration, so we use the prior $\alpha_0 \sim \mathcal{N}(1,3)$, which places more density in $(\kappa\approx 0.3\text{–}3)$.
 As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$.
 Unlike the high-correlation dataset, it would be prudent to account for potentially larger $\sigma_\kappa$, while retaining high density for $\sigma_\kappa \approx 0$.
 This can be achieved by increasing the standard deviation of its prior to 1.0: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,1.0)$.
@@ -1373,7 +1538,7 @@ prior_var =  prior('normal(0,3*pi()/2)', class = 'b', nlpar = 'beta0') +
                         nlpar  = 'betai',  class = 'b') +
                   set_prior("target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)", #expect high concentration (low variation) 
                             check = FALSE) +
-                  prior('normal(1,3)', class = 'Intercept', dpar = 'kappa') +
+                  prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') +
                   prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa')
 
 
@@ -1413,15 +1578,15 @@ draws_var = as_draws_df(model_var)
 par(pty = 's') 
 par(mar = c(0,0,0,0), 
     mfrow = c(3,4)) 
-for(i in 1:length(dt_id_var) ) { 
+for(i in 1:length(id_var) ) { 
   mu_name = paste0('b_betai_ID',i) 
   kappa_name = paste0('r_ID__kappa[',i,',Intercept]') 
-  PCfun(dt_id_var[[i]], 
+  PCfun(id_var[[i]], 
         col = col_obs, 
         sep = 0.05, 
         shrink = 1.25, 
         plot_rho = FALSE) 
-  arrows.circular(x = dt_var[i], 
+  arrows.circular(x = mu_var[i], 
                   y = A1(kappa_id_var[i]), 
                   col = col_obs, 
                   lwd = 5, 
@@ -1449,7 +1614,7 @@ DescriptCplot(k = kappa_mu_var,
               pcol = NA, 
               cicol = NA, 
               mvcol = col_rho ) 
-points.circular(dt_var, 
+points.circular(mu_var, 
                 bins = 360/5-1, 
                 stack = TRUE, 
                 sep = 0.05, 
@@ -1507,11 +1672,11 @@ kappa_id_hd[kappa_id_hd<0] = 0
 
 # list of circular datasets
 set.seed(0120810506)#ISBN Batschelet, 1981
-dt_hd = rvonmises(n = ndata/2,
+mu_hd = rvonmises(n = ndata/2,
                   mu = c0,
                   kappa = kappa_mu_hd)
 
-dt_delta = rvonmises(n = ndata/2,
+mu_delta = rvonmises(n = ndata/2,
                      mu = c0+delta_mu,
                      kappa = kappa_mu_hd)
 
@@ -1521,7 +1686,7 @@ par(pty = 's')
 par(mar = c(0,0,0,0))
 par(mfrow = c(3,5))
 #before turn
-dt_id_hd = mapply(m = dt_hd, 
+id_hd = mapply(m = mu_hd, 
                   k = round(kappa_id_hd,2), 
                   FUN = DescriptCplot,
                   save_sample = TRUE,
@@ -1535,7 +1700,7 @@ dt_id_hd = mapply(m = dt_hd,
                   seed = 0120810506, #ISBN Batschelet, 1981
                   SIMPLIFY = FALSE)
 #after turn
-dt_id_delta = mapply(m = dt_delta, 
+id_delta = mapply(m = mu_delta, 
                      k = round(kappa_id_hd,2), 
                      FUN = DescriptCplot,
                      save_sample = TRUE,
@@ -1560,7 +1725,7 @@ DescriptCplot(m = delta_mu,
               cicol = col_sd,
               mvcol = col_sd
 )
-points.circular(dt_delta,
+points.circular(mu_delta,
                 bins = 360/5-1,
                 stack = TRUE,
                 sep = 0.05,
@@ -1603,7 +1768,7 @@ mtext(text = paste0('(',paste(signif(kappa_id_hd_ci, 2), collapse = ' '), ')'),
 
 
 dt_comb_hd = do.call(what = c,
-                     args = dt_id_hd)
+                     args = id_hd)
 PCfun(angles = dt_comb_hd,
       col = 'gray25',
       shrink = 3.0)
@@ -1629,7 +1794,7 @@ with(mle_comb_hd,
 )
 
 dt_comb_delta = do.call(what = c,
-                        args = dt_id_delta)
+                        args = id_delta)
 PCfun(angles = dt_comb_delta,
       col = 'darkslategray',
       shrink = 3.0)
@@ -1696,12 +1861,12 @@ watson.two.test(dt_comb_hd, dt_comb_delta)
 ## Fit the model
 ```{r Formula for individual heading change}
 #collect data
-dt_headchange = data.frame(y = as.numeric( rad(c(dt_comb_hd, dt_comb_delta)) ),#angles as a numeric vector in radians
+dt_hd = data.frame(y = as.numeric( rad(c(dt_comb_hd, dt_comb_delta)) ),#angles as a numeric vector in radians
                    x = c(rep(0, times = length(dt_comb_hd)),
                          rep(1, times = length(dt_comb_delta)) ),
                    ID = factor(x = #individual labels as an unordered categorical (factor)
-                                 c(sort(rep(1:length(dt_hd), 20)),
-                                   sort(rep(1:length(dt_delta), 20))),
+                                 c(sort(rep(1:length(mu_hd), 20)),
+                                   sort(rep(1:length(mu_delta), 20))),
                                ordered = FALSE)
                    )
 #set up formula with both 'nonlinear' and linear predictors
@@ -1739,7 +1904,7 @@ set_prior(prior = 'target += normal_lpdf(softkappamux | 0, 1.0)', check = FALSE)
 #run the model
 model_hd = brm(
            formula = form_hd,
-           data = dt_headchange,
+           data = dt_hd,
            family = unwrap_von_mises,
            stanvars = stan_unwrap_fun + 
                       modulo_circular_fun + 
@@ -1763,7 +1928,7 @@ UnwrapRhats(model_hd,
 UnwrapRhats(model_hd,
             variable = '^b_betai')
 ```
-
+## Test hypothesis of treatment effect
 
 ```{r Fit models for model comparison of individual heading change}
 form_hd_kappa = bf(y ~ mu,
@@ -1800,7 +1965,7 @@ set_prior(prior = 'target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.
 #refit and save all parameters for model comparison
 model_hd_treatment = brm(
   formula = form_hd,
-  data = dt_headchange,
+  data = dt_hd,
   family = unwrap_von_mises,
   stanvars = stan_unwrap_fun + 
                       modulo_circular_fun + 
@@ -1816,7 +1981,7 @@ model_hd_treatment = brm(
 
 model_hd_kappa = brm(
   formula = form_hd_kappa,
-  data = dt_headchange,
+  data = dt_hd,
   family = unwrap_von_mises,
   stanvars = stan_unwrap_fun + 
                       modulo_circular_fun + 
@@ -1831,7 +1996,7 @@ model_hd_kappa = brm(
 
 model_hd_null = brm(
   formula = form_hd_null,
-  data = dt_headchange,
+  data = dt_hd,
   family = unwrap_von_mises,
   stanvars = stan_unwrap_fun + 
                       modulo_circular_fun + 
@@ -1857,7 +2022,7 @@ UnwrapRhats(model_hd_null,
 ```
 
 
-## Test hypothesis of treatment effect
+
 
 To compare the predictive power of the models, we can use leave-one-out cross-validation (LOO-CV) to calculate the estimated log predictive density (ELPD) and its standard error for each model.
 A good model increases ELPD.
@@ -1959,13 +2124,13 @@ draws_treat = as_draws_df(model_hd_treatment)
 
 par(pty = 's')
 par(mar = c(0,0,0,0),
-    mfrow = c(2,length(dt_hd)))
+    mfrow = c(2,length(mu_hd)))
 #control
-for(i in 1:length(dt_hd) )
+for(i in 1:length(mu_hd) )
 {
   mu_name = paste0('b_betai_ID',i)
   kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
-  PCfun(dt_id_hd[[i]],
+  PCfun(id_hd[[i]],
         col = col_obs,
         sep = 0.05,
         shrink = 1.25,
@@ -1978,7 +2143,7 @@ for(i in 1:length(dt_hd) )
              ngrid = 100, # needs higher resolution to avoid spillover
              cropc = TRUE
   )
-  arrows.circular(x = dt_hd[i],
+  arrows.circular(x = mu_hd[i],
                   y = A1(kappa_id_hd[i]),
                   col = col_obs,
                   lwd = 5,
@@ -1999,13 +2164,13 @@ for(i in 1:length(dt_hd) )
   )
 }
 #treatment
-for(i in 1:length(dt_delta) )
+for(i in 1:length(mu_delta) )
 {
   mu_name = paste0('b_betai_ID',i)
   mu_delta_name = paste0('b_betai_ID',i , ':x')
   kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
   kappa_delta_name = paste0('r_ID__kappa[',i,',x]')
-  PCfun(dt_id_delta[[i]],
+  PCfun(id_delta[[i]],
         col = col_treat,
         sep = 0.05,
         shrink = 1.25,
@@ -2018,7 +2183,7 @@ for(i in 1:length(dt_delta) )
              ngrid = 100, # needs higher resolution to avoid spillover
              cropc = TRUE
             )
-  arrows.circular(x = dt_delta[i],
+  arrows.circular(x = mu_delta[i],
                   y = A1(kappa_id_hd[i]),
                   col = col_treat,
                   lwd = 5,
@@ -2048,14 +2213,14 @@ This is influenced by the wide spread of individual mean angles and turn angles,
 par(mfrow = c(1,4))
 #Add the population of biases
 DescriptCplot(k = kappa_mu_hd,
-              ndata = length(dt_hd),
+              ndata = length(mu_hd),
               refline = 0,
               denscol = NA,
               pcol = NA,
               sdcol = NA,
               mvcol = col_obs
 )
-points.circular(dt_hd,
+points.circular(mu_hd,
                 bins = 360/5-1,
                 stack = TRUE,
                 sep = 0.05,
@@ -2087,14 +2252,14 @@ with(draws_treat,
 #Add the population of turns
 DescriptCplot(m = delta_mu,
               k = kappa_mu_hd,
-              ndata = length(dt_hd),
+              ndata = length(mu_hd),
               refline = 0,
               denscol = NA,
               pcol = NA,
               sdcol = NA,
               mvcol = col_treat
 )
-points.circular(dt_delta,
+points.circular(mu_delta,
                 bins = 360/5-1,
                 stack = TRUE,
                 sep = 0.05,
