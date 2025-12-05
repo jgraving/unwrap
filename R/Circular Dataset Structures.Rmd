@@ -104,10 +104,12 @@ col_treat = '#006400' # colour for treatment observations
 
 # Divergence from home direction
 
+![Desert ants of the genus $Cataglyphis$ are known for their use of path integration (dead reckoning) to return to their nest. Perturbation of visual orientation cues can result in deviations from the expected homewards direction.](icons/ant.png)
+
 In navigation experiments return directions are often compared with the expected home direction to determine if homeward navigation is perturbed.
 Here, we simulate example data (𝑛 = 20) generated from a distribution with a mean that differs from the expected direction (0°) by only 15°.
 
-```{r Generate diverging data, echo  = FALSE}
+```{r Generate diverging data}
 ndata = 20 #sample size
 
 # circular zero expected angle
@@ -377,6 +379,7 @@ Now the expected direction model has higher predictive power, even though both f
 If the divergence model had higher predictive power, but within one standard error of the expected direction model, we could not rule out the possibility that the expected direction is the true direction, though evidence would be weaker.
 
 # Change in direction
+![Sandhoppers ($Talitridae$) forage along beaches, following the movement  of the sea to avoid drying out. Their movement is guided by celestial cues, including the moon.](icons/sandhopper.png)
 
 If the expected direction is not known, it can be estimated from control data and compared with treatment data.
 In this example, the two distributions have different random number seeds, to avoid producing two identical distributions of angles with a fixed shift.
@@ -628,7 +631,7 @@ Since the median estimate is close to the true value of 30°, the model's estima
 Conversely, we can conclude that there was no effect of treatment on concentration, since `model_kappadelta` is a much worse fit than the null model (`model_nodelta`).
 
 # Change in concentration
-
+![Honeybees performing a "waggle dance" on a horizontal observation hive that view a green light-spot, orient their dances as if viewing the sun. The concentration of a series of dance directions decreases when the brightness of this light spot is reduced.](icons/honeybee.png)
 An experimental treatment may also affect concentration independently of mean direction.
 In this example the simulated data for the treatment has exactly the same $\mu$ (0°) as the control, but $\kappa$ decreases by $>80\%$.
 
@@ -834,6 +837,8 @@ In this case the hypothesis tests are clear, the effect of change in kappa (pres
 As we might have also expected, the effect of treatment on $\mu$, present in our original model but not the $\kappa$-only model, does not improve predictive density, so there is little evidence that the treatment affects $\mu$.
 
 # High inter-individual correlation
+
+![Tethered Bogong moths can be induced to fly in "flight simulators", which allows repeated measurements of flight directions across multiple individuals simultaneously. Individual directional biases may differ somewhat, but are typically highly correlated, aligning with the population's migratory direction.](icons/moth.png)
 
 In datasets that include repeated measurements across individuals, it is necessary to account for individual differences before attempting to identify any population level trends.
 In the simplest case, the orientation behaviour of different individuals is very similar.
@@ -1135,6 +1140,8 @@ with(draws_highcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_highcorr)*
 
 # Low Inter-individual correlation
 
+![When rolling a dung ball, ball-rolling dung beetles can be induced to repeatedly exit a circular arena, resulting in repeated measurements of exit direction. While a single individual exits repeatedly in the same direction, there is typically no relationship between individual directional biases.](icons/beetle.png)
+
 ```{r Simulate data with low inter-individual heading correlation}
 kappa_mu_lowcorr = 0.1 #very low concentration across individual heading biases
 kappa_id_lowcorr = 5.0 #high within-individual concentration
@@ -1199,7 +1206,6 @@ rayleigh.test(dt_comb_lowcorr)
 lapply(id_lowcorr, rayleigh.test)
 ```
 
-
 ## Fit the model
 
 Although the individual headings in this dataset are more variable than those in the high-correlation dataset, the underlying structure is the same.The same formula can account for large individual differences in heading just as well as small ones.
@@ -1222,6 +1228,7 @@ form_lowcorr = bf(y ~ mu,
                   kappa ~ 1 + (1|ID),#a linear formula
                   family = unwrap_von_mises)
 ```
+
 In this case, we expect lower concentration, so we use the prior $\alpha_0 \sim \mathcal{N}(1,3)$, which places more density in $(\kappa\approx 0.3\text{–}3)$.
 As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$, which in this case are a feature of the data.
 
@@ -1359,8 +1366,12 @@ with(draws_lowcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_lowcorr)*10
 
 ## Test shared heading bias hypothesis
 
-For this dataset, we might reasonably question whether individual heading biases have any shared bias. We can investigate this by fitting a model without a $\kappa_\mu$ parameter, but still accounting for individual heading biases and partial pooling for $\kappa$.
-We can set $\beta_0$ to 0° by assigning the formula `~0`, we could also exclude it entirely. Since there are no constraints on where $\beta_i$ can be for each individual, we can set a (near) uniform von Mises prior with $\kappa \approx 0$, although a more complex model could benefit from the normal prior like those used for $\beta_0$ above. Without the extra information from $\kappa_\mu$ about the expected distribution of $\beta_i$ sampling can become unstable, so we can use smaller sampling steps to avoid divergent transitions (which could impede sampling) by setting `adapt_delta` closer to $0.99$ (default value $0.8$). This slows down model estimation, but improves estimate reliability.
+For this dataset, we might reasonably question whether individual heading biases have any shared bias.
+We can investigate this by fitting a model without a $\kappa_\mu$ parameter, but still accounting for individual heading biases and partial pooling for $\kappa$.
+We can set $\beta_0$ to 0° by assigning the formula `~0`, we could also exclude it entirely.
+Since there are no constraints on where $\beta_i$ can be for each individual, we can set a (near) uniform von Mises prior with $\kappa \approx 0$, although a more complex model could benefit from the normal prior like those used for $\beta_0$ above.
+Without the extra information from $\kappa_\mu$ about the expected distribution of $\beta_i$ sampling can become unstable, so we can use smaller sampling steps to avoid divergent transitions (which could impede sampling) by setting `adapt_delta` closer to $0.99$ (default value $0.8$).
+This slows down model estimation, but improves estimate reliability.
 
 ```{r LOO-CV kappa_mu}
 #model with effects of treatment on kappa, but not mu 
@@ -1402,9 +1413,14 @@ loo_lowcorr = loo(model_lowcorr)
 loo_nocorr = loo(model_nocorr) 
 print(loo_compare(loo_lowcorr, loo_nocorr))
 ```
-Although technically this dataset was simulated with a von Mises distribution with very low concentration $\kappa_\mu = 0.1$, the distribution of individual headings does not detectably differ from uniform. This is certainly plausible for animals without a shared goal direction, and at this level of concentration a considerably larger number of individuals would be needed to recover any group-level bias. Nonetheless, both models recover the concentration of the average individual's headings ($\kappa = \log(\exp(5.0)+1) \approx 5.0$).
+
+Although technically this dataset was simulated with a von Mises distribution with very low concentration $\kappa_\mu = 0.1$, the distribution of individual headings does not detectably differ from uniform.
+This is certainly plausible for animals without a shared goal direction, and at this level of concentration a considerably larger number of individuals would be needed to recover any group-level bias.
+Nonetheless, both models recover the concentration of the average individual's headings ($\kappa = \log(\exp(5.0)+1) \approx 5.0$).
 
 # Variable individual parameters
+
+![Tethered vinegar flies ($Drosophila$) can be induced to fly in a "virtual reality" LED arena, in which their wing motion moves causes visual cues to rotate. A green light spot induces orientation behaviour, with a weak population level bias towards the light, but highly variable performance across individuals.](icons/fly.png)
 
 ```{r Simulate individuals with variable parameters}
 kappa_mu_var = 1.0 
@@ -1527,6 +1543,7 @@ form_var = bf(y ~ mu,
                   kappa ~ 1 + (1|ID),#a linear formula
                   family = unwrap_von_mises)
 ```
+
 As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$.
 Unlike the high-correlation dataset, it would be prudent to account for potentially larger $\sigma_\kappa$, while retaining high density for $\sigma_\kappa \approx 0$.
 This can be achieved by increasing the standard deviation of its prior to 1.0: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,1.0)$.
@@ -1649,7 +1666,11 @@ with(draws_var,
      paste0(mean(unwrap_circular_deg(b_beta0_Intercept) > 0)*100, '%') ) #partial pooling allows accurate estimate
 ```
 
-# Individual heading changes parameters 
+# Individual heading changes parameters
+
+![Birds exhibiting migratory restlessness hop repeatedly in their intended flight
+direction, allowing this to be recorded repeatedly for the same individuals across multiple nights. Individuals may differ somewhat in their hopping directions, but are generally aligned provided they detect the same compass cues. A treatment that affects their perception of these cues causes the entire population to change their hopping direction.](icons/bird.png)
+
 
 ```{r Simulate individual heading changes}
 #condition level change in heading of 30°
@@ -1847,7 +1868,6 @@ with(mle_comb_diffs,
 )
 ```
 
-
 ```{r Rayleigh test on heading changes}
 #high density around true mean
 rayleigh.test(dt_comb_diffs, mu = delta_mu)
@@ -1859,6 +1879,7 @@ watson.two.test(dt_comb_hd, dt_comb_delta)
 ```
 
 ## Fit the model
+
 ```{r Formula for individual heading change}
 #collect data
 dt_hd = data.frame(y = as.numeric( rad(c(dt_comb_hd, dt_comb_delta)) ),#angles as a numeric vector in radians
@@ -1928,6 +1949,7 @@ UnwrapRhats(model_hd,
 UnwrapRhats(model_hd,
             variable = '^b_betai')
 ```
+
 ## Test hypothesis of treatment effect
 
 ```{r Fit models for model comparison of individual heading change}
@@ -2009,6 +2031,7 @@ model_hd_null = brm(
   control = list(adapt_delta = 0.97)#slower, but more robust sampling
 )
 ```
+
 ```{r Check convergence for individual heading hypotheses}
 summary(model_hd_treatment)
 UnwrapRhats(model_hd_treatment,
@@ -2020,9 +2043,6 @@ summary(model_hd_null)
 UnwrapRhats(model_hd_null,
             variable = '^b_beta')
 ```
-
-
-
 
 To compare the predictive power of the models, we can use leave-one-out cross-validation (LOO-CV) to calculate the estimated log predictive density (ELPD) and its standard error for each model.
 A good model increases ELPD.
