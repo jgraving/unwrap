@@ -23,58 +23,60 @@ Examination of different dataset structures that may arise in the study of anima
 
 **INPUTS**
 
- `unwrap_functions.R`
+`unwrap_functions.R`
 
- **OUTPUTS**
+**OUTPUTS**
 
- Plotted results.
+Plotted results.
 
- **REFERENCES**
+**REFERENCES**
 
- **data types**
+**data types (inspired by)**
 
- Duelli P & Wehner R (1973) 
- The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor (Formicidae , Hymenoptera ) 
- *Journal of Comparative Physiology* 53(3) 37-53
+Duelli P & Wehner R (1973) The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor (Formicidae , Hymenoptera ) *Journal of Comparative Physiology* 53(3) 37-53
 
- Papi F & Pardi L (1963). 
- On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
- *Biol. Bull.* 124, 97–105. <https://doi.org/10.2307/1539571>.
+Papi F & Pardi L (1963).
+On the Lunar Orientation of Sandhoppers (Amphipoda Talitridae).
+*Biol. Bull.* 124, 97–105.
+<https://doi.org/10.2307/1539571>.
 
- Edrich W, Neumeyer C & von Helversen, O. (1979)
- “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
- *J. Comp. Physiol.* 134, 151–157.
+Edrich W, Neumeyer C & von Helversen, O.
+(1979) “Anti-sun orientation” of bees with regard to a field of ultraviolet light.
+*J. Comp. Physiol.* 134, 151–157.
 
- Dreyer D, Frost B, Mouritsen H, Günther A, Green K, Whitehouse M, Johnsen S, Heinze S & Warrant E (2018)
- The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
- Current Biology *28*, 2160-2166.e5. <https://doi.org/10.1016/j.cub.2018.05.030>.
- 
- Baird E, Byrne MJ, Scholtz CH, Warrant E, Dacke M (2010) 
- Bearing selection in ball-rolling dung beetles: is it constant? *Journal of comparative physiology A* 196:801–6. https://doi.org/10.1007/s00359-010-0559-8
- 
- Giraldo YM, Leitch KJ, Ros IG, Warren TL, Weir PT & Dickinson M H (2018).
- Sun Navigation Requires Compass Neurons in Drosophila. *Current Biology* 28, 2845-2852.e4.
+Dreyer D, Frost B, Mouritsen H, Günther A, Green K, Whitehouse M, Johnsen S, Heinze S & Warrant E (2018) The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
+Current Biology *28*, 2160-2166.e5.
+<https://doi.org/10.1016/j.cub.2018.05.030>.
 
- Kishkinev D, Packmor F, Zechmeister T, Winkler H-C, Chernetsov N, Mouritsen H, Holland RA (2021)
- Navigation by extrapolation of geomagnetic cues in a migratory songbird. *Current Biology* 12(31) 7, 1563-1569.e4 <https://doi.org/10.1016/j.cub.2021.01.051>
+Baird E, Byrne MJ, Scholtz CH, Warrant E, Dacke M (2010) Bearing selection in ball-rolling dung beetles: is it constant?
+*Journal of comparative physiology A* 196:801–6.
+<https://doi.org/10.1007/s00359-010-0559-8>
 
+Giraldo YM, Leitch KJ, Ros IG, Warren TL, Weir PT & Dickinson M H (2018).
+Sun Navigation Requires Compass Neurons in Drosophila.
+*Current Biology* 28, 2845-2852.e4.
 
- **modelling methods**
+Kishkinev D, Packmor F, Zechmeister T, Winkler H-C, Chernetsov N, Mouritsen H, Holland RA (2021) Navigation by extrapolation of geomagnetic cues in a migratory songbird.
+*Current Biology* 12(31) 7, 1563-1569.e4 <https://doi.org/10.1016/j.cub.2021.01.051>
 
- Sayin S, Couzin-Fuchs E, Petelski I, Günzel Y, Salahshour M, Lee CY, Graving JM, Li L, Deussen O, Sword GA, et al. (2025) The behavioral mechanisms governing collective motion in swarming locusts.
- *Science* 387(6737):995–791
+**modelling methods**
 
- Gabry J, Češnovar R, Johnson A (2022).
- cmdstanr: R Interface to 'CmdStan'.
- <https://mc-stan.org/cmdstanr/>
+Sayin S, Couzin-Fuchs E, Petelski I, Günzel Y, Salahshour M, Lee CY, Graving JM, Li L, Deussen O, Sword GA, et al. (2025) The behavioral mechanisms governing collective motion in swarming locusts.
+*Science* 387(6737):995–791
 
- Bürkner, P.-C.
- (2018). Advanced Bayesian Multilevel Modeling with the R Package brms.
- *The R Journal* 10, 395–411.
+Gabry J, Češnovar R, Johnson A (2022).
+cmdstanr: R Interface to 'CmdStan'.
+<https://mc-stan.org/cmdstanr/>
 
- Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B., Betancourt, M., Brubaker, M., Guo, J., Li, P. and Riddell, A.
- (2017). Stan: A Probabilistic Programming Language.
- *Journal of Statistical Software* 76 doi: 10.18637/jss.v076.i01
+Bürkner, P.-C.
+(2018).
+Advanced Bayesian Multilevel Modeling with the R Package brms.
+*The R Journal* 10, 395–411.
+
+Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B., Betancourt, M., Brubaker, M., Guo, J., Li, P. and Riddell, A.
+(2017).
+Stan: A Probabilistic Programming Language.
+*Journal of Statistical Software* 76 doi: 10.18637/jss.v076.i01
 
 > **TODO**
 >
@@ -840,16 +842,15 @@ As we might have also expected, the effect of treatment on $\mu$, present in our
 ![Tethered Bogong moths can be induced to fly in "flight simulators", which allows repeated measurements of flight directions across multiple individuals simultaneously. Individual directional biases may differ somewhat, but are typically highly correlated, aligning with the population's migratory direction.](icons/moth.png)
 
 In datasets that include repeated measurements across individuals, it is necessary to account for individual differences before attempting to identify any population level trends.
-In the simplest case, the orientation behaviour of different individuals is very similar.
-One example would be where all individuals share a common goal direction $\beta_0$, but differ in alignment with that direction by their individual offsets from that direction $\beta_i$.
+In the simplest case, the orientation behaviour of different individuals is very similar: for example, all individuals may share a common goal direction $\beta_0$, but differ in alignment with that direction by their individual offsets from that direction $\beta_i$.
 In this case $\mu$ and $\kappa$ depend on the specific values of $\beta_0$ and $\beta_i$, and the distribution across $\beta_i$ is determined by the hyperparameter $\kappa_\mu$.
 
 In this example, each individual's headings are highly concentrated around their particular directional bias with the distribution $\mu_i = \beta_0 + \beta_i$, $\kappa = 5.0$.
-The distribution of individual biases is moderately concentrated, $\kappa_\mu = 2.0$, so that individuals heading biases are quite close together.
+The distribution of individual biases is moderately concentrated, $\kappa_\mu = 2.0$, so that individuals' heading biases are quite close together.
 
 ```{r Simulate high interindividual correlation}
-kappa_mu_highcorr = 2.0
-kappa_id_highcorr = 5.0
+kappa_mu_highcorr = 2.0 # concentration _across_ individuals
+kappa_id_highcorr = 5.0 # concentration _within_ individual
 
 ndata = 10 # moderate sample size
 set.seed(0120810506)#ISBN Batschelet, 1981
