@@ -1432,12 +1432,12 @@ Nonetheless, both models recover the concentration of the average individual's h
 
 # Variable individual parameters
 
-![Tethered vinegar flies (*Drosophila*) can be induced to fly in a "virtual reality" LED arena, in which their wing motion moves causes visual cues to rotate. A green light spot induces orientation behaviour, with a weak population level bias towards the light, but highly variable performance across individuals.](icons/fly.png)
+![Tethered vinegar flies (*Drosophila*) can be induced to fly in a "virtual reality" LED arena, in which their wing motion causes visual cues to rotate. A green light spot induces orientation behaviour, with a weak population level bias towards the light, but highly variable performance across individuals.](icons/fly.png)
 
 In most datasets, we can reasonably expect inter-individual variation for both $\mu$ and $\kappa$: individuals may differ in perceived or genuine goal direction, accuracy and consistency.
 In this example, there is an moderate concentration across individual biases ($\kappa_\mu = 1.0$), and the average individual's headings are somewhat concentrated ($\alpha_0 = 1.5$).
 However, the concentration within each individual's headings varies ($\sigma_\kappa = 0.5$) with a standard deviation 1/3 of the mean.
-This introduces the possibility of large variations in individual concentration ($\alpha_i$), including a $\approx 1\%$ chance of completely uniform heading distributions ($\kappa = 0$) for some individuals (assuming a rectified normal distribution).
+This introduces the possibility of large variations in individual concentration ($\alpha_i$), including a $\approx 1\%$ chance of completely uniform heading distributions ($\kappa = 0$) for some individuals (assuming a truncated normal distribution).
 
 ```{r Simulate individuals with variable parameters}
 kappa_mu_var = 1.0 # concentration across individuals
@@ -1517,13 +1517,14 @@ arrows(x0 = sin(c0),
 
 mtext(text = paste0('(',paste(signif(kappa_id_var_ci, 2), collapse = ' '), ')'), side = 1, line = -1) 
 ```
-Despite the modest inter-individual correlation, 4 individuals diverge from the population mean direction by $>90°$. Individual concentrations also vary from $\kappa = 1.14$ to  $\kappa = 2.65$, indeed in a larger population we would expect $95\%$ of individual $\alpha_i$ in (0.5, 2.5), corresponding to (circular) standard deviations between 96° and 42°.
 
+Despite the modest inter-individual correlation, 4 individuals diverge from the population mean direction by $>90°$.
+Individual concentrations also vary from $\kappa = 1.14$ to $\kappa = 2.65$, indeed in a larger population we would expect $95\%$ of individual $\alpha_i$ in (0.5, 2.5), corresponding to (circular) standard deviations between 96° and 42°.
 
 ## Fit the model
 
 Although the individuals in this dataset are more variable than those in the high-correlation dataset, the underlying structure is the same.
-Since individuals have the potential to differ in both $\mu$ and $\kappa$, we can use the same formula as before, since it already accounts for this.
+Since individuals have the potential to differ in both $\mu$ and $\kappa$, we can use the same formula as before, which already accounts for this.
 
 ```{r Formula for individual effects (variable)}
 #collect data
@@ -1547,16 +1548,17 @@ form_var = bf(y ~ mu,
 As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$.
 Unlike the high-correlation dataset, it would be prudent to account for potentially larger $\sigma_\kappa$, while retaining high density for $\sigma_\kappa \approx 0$.
 This can be achieved by increasing the standard deviation of its prior to 1.0: $\sigma_\kappa \sim \mathrm{Half}\mathcal{T}(3,0,1.0)$.
-In this case, we expect lower concentration, so we use the prior $\alpha_0 \sim \mathcal{N}(1,3)$, which places more density in $(\kappa\approx 0.3\text{–}3)$.
+In this case, we expect low average concentration, so we use the prior $\alpha_0 \sim \mathcal{N}(1,3)$, which places more density in $(\kappa\approx 0.3\text{–}3)$.
+If we are interested in recovering the population mean direction, we can use an unbiased von Mises prior ($\beta_0 \sim\mathcal{M}(0°, \approx0)$) for mean direction.
 
 ```{r Model individuals (variable)}
 
-prior_var =  prior('normal(0,3*pi()/2)', class = 'b', nlpar = 'beta0') +
+prior_var =  prior('unwrap_von_mises_vect(0,1e-16)', class = 'b', nlpar = 'beta0') +
                   prior('unwrap_von_mises_vect(0, log1p_exp(softkappamu))',
                         nlpar  = 'betai',  class = 'b') +
                   set_prior("target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)", #expect high concentration (low variation) 
                             check = FALSE) +
-                  prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') +
+                  prior('normal(1,3)', class = 'Intercept', dpar = 'kappa') +
                   prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa')
 
 
@@ -1574,8 +1576,8 @@ model_var = brm(
           backend = 'cmdstan') 
 ```
 
-As for the previous models, for some of the circular variables estimates for different chains are separated, which can make it appear that the model has not converged.
-Each $\beta_i$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
+As for the previous models, some of the circular variable estimates are separated between different chains, which can make it appear that the model has not converged.
+Each $\beta$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
 
 ```{r Summarise model for variable dataset}
 
@@ -1584,10 +1586,12 @@ print(sm_var, digits = 2)
 #betai looks bad, but good after unwrapping
 #beta0 and betai look bad, but good after unwrapping
 UnwrapRhats(model_var,
-            variable = '^b_beta0')
-UnwrapRhats(model_var,
-            variable = '^b_betai')
+            variable = '^b_beta')
 ```
+
+The model successfully accounts for individual differences in both directional bias ($\beta_i$) and concentration ($\alpha_i$).
+Both hyperparameters ($\kappa_\mu$ and $\sigma_\kappa$) are recovered quite accurately in this case, although their effects on estimates for the individuals with the most extreme biases are also noticeable: in the absence of additional information individuals with very low concentration and large deviations from the population mean (high uncertainty) are estimated to be slightly closer to the population mean than their true values (shrinkage).
+Despite this uncertainty, the population mean direction is successfully recovered, with a wide posterior distribution for $\beta_0$ centred close to the true value.
 
 ```{r Plot the variable individuals model}
 
@@ -1654,6 +1658,8 @@ with(draws_var,
        col = adjustcolor(col_sd, alpha.f = 200/255)) )
 
 with(draws_var, 
+     paste0(mean(unwrap_circular_deg(b_beta0_Intercept) > 0)*100, '%') ) #partial pooling allows accurate estimate
+with(draws_var, 
      VertHist(data = unwrap_circular_deg(b_beta0_Intercept), 
               main = '\npop. mean direction', 
               ylim = c(-180, 180),
@@ -1663,13 +1669,13 @@ with(draws_var,
 abline(h = 0, 
        col = col_rho,
        lwd = 7) 
-with(draws_var, 
-     paste0(mean(unwrap_circular_deg(b_beta0_Intercept) > 0)*100, '%') ) #partial pooling allows accurate estimate
 ```
 
 # Individual heading changes parameters
 
 ![Birds exhibiting migratory restlessness hop repeatedly in their intended flight direction, allowing this to be recorded repeatedly for the same individuals across multiple nights. Individuals may differ somewhat in their hopping directions, but are generally aligned provided they detect the same compass cues. A treatment that affects their perception of these cues causes the entire population to change their hopping direction.](icons/bird.png)
+
+In many datasets
 
 ```{r Simulate individual heading changes}
 #condition level change in heading of 30°
