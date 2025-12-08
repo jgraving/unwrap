@@ -1437,6 +1437,7 @@ Nonetheless, both models recover the concentration of the average individual's h
 In most datasets, we can reasonably expect inter-individual variation for both $\mu$ and $\kappa$: individuals may differ in perceived or genuine goal direction, accuracy and consistency.
 In this example, there is an moderate concentration across individual biases ($\kappa_\mu = 1.0$), and the average individual's headings are somewhat concentrated ($\alpha_0 = 1.5$).
 However, the concentration within each individual's headings varies ($\sigma_\kappa = 0.5$) with a standard deviation 1/3 of the mean.
+This introduces the possibility of large variations in individual concentration ($\alpha_i$), including a $\approx 1\%$ chance of completely uniform heading distributions ($\kappa = 0$) for some individuals (assuming a rectified normal distribution).
 
 ```{r Simulate individuals with variable parameters}
 kappa_mu_var = 1.0 # concentration across individuals
@@ -1516,25 +1517,8 @@ arrows(x0 = sin(c0),
 
 mtext(text = paste0('(',paste(signif(kappa_id_var_ci, 2), collapse = ' '), ')'), side = 1, line = -1) 
 ```
+Despite the modest inter-individual correlation, 4 individuals diverge from the population mean direction by $>90°$. Individual concentrations also vary from $\kappa = 1.14$ to  $\kappa = 2.65$, indeed in a larger population we would expect $95\%$ of individual $\alpha_i$ in (0.5, 2.5), corresponding to (circular) standard deviations between 96° and 42°.
 
-```{r Rayleigh test on pooled data}
-#v-test is not significant (or Rayleigh test) 
-rayleigh.test(mu_var, mu = c0) 
-#but for each individual 
-rt_lst = lapply(X = lapply(id_var, 
-                           circular, 
-                           units = 'degrees'), 
-                FUN = rayleigh.test) 
-rt_lst_print = data.frame(do.call(what = rbind, args = rt_lst))
-rt_lst_print = within(rt_lst_print, 
-                      {
-                        p.adjusted = p.adjust(p.value, method = 'BH')
-                        statistic = unlist(statistic)
-                        p.value = unlist(p.value)
-                      rm('mu', 'call')})
-print(rt_lst_print, digits = 3)
-
-```
 
 ## Fit the model
 
