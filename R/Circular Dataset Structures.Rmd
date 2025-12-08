@@ -272,6 +272,14 @@ with(draws_divergence,
                      length = 0.1/1.25,
                      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
+
+#calculate the misaligned posterior density 
+with(draws_divergence,
+     {
+       paste0('mu left of expected angle: ',
+              mean(Intercept < 0)*100, '%')
+      }
+     ) #nearly all estimates suggest a leftwards turn
 #add a histogram of estimates for mu-intercept
 with(draws_divergence,
      {
@@ -286,14 +294,6 @@ with(draws_divergence,
 abline(h = 0,
        col = 'gray',
        lwd = 7)
-
-#calculate the misaligned posterior density 
-with(draws_divergence,
-     {
-       paste0('mu left of expected angle: ',
-              mean(Intercept < 0)*100, '%')
-      }
-     ) #nearly all estimates suggest a leftwards turn
 ```
 
 The fitted model indicates that the mean direction is to the left of the expected direction in $>99\%$ of 𝜇 estimates.
@@ -548,6 +548,16 @@ with(draws_delta,
                      length = 0.1/1.25,
                      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
+with(draws_delta, paste0(mean(b_x > 0)*100, '%') ) #nearly all estimates suggest a rightwards turn
+
+with(draws_delta, paste0( round(
+                        deg(median.circular(x =
+                             circular(b_x,
+                                  template = 'none')
+                                  )
+                            ) ), 
+                            '°')
+     ) #the size recovered is similar to the simulated turn of 210-180
 with(draws_delta,
      VertHist(data = Mod360.180(deg(b_x)), 
               main = 'change in mean angle',
@@ -561,16 +571,6 @@ abline(h = 0,
 axis(1)
 axis(2, at = -6:6*15)
 
-with(draws_delta, paste0(mean(b_x > 0)*100, '%') ) #nearly all estimates suggest a rightwards turn
-
-with(draws_delta, paste0( round(
-                        deg(median.circular(x =
-                             circular(b_x,
-                                  template = 'none')
-                                  )
-                            ) ), 
-                            '°')
-     ) #the size recovered is similar to the simulated turn of 210-180
 ```
 
 Uncertainty in the example data results in a wide range of posterior estimates for the treatment direction.
@@ -762,6 +762,7 @@ with(draws_conc,
                      length = 0.1/1.25,
                      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
+with(draws_conc, paste0(mean(b_kappa_x < 0)*100, '%') ) #nearly all estimates suggest a reduction in kappa
 #calculate contrast on true scale by softplus transforming estimates
 with(draws_conc,
      VertHist(data = softplus(Intercept_kappa+b_kappa_x) - softplus(Intercept_kappa), 
@@ -773,7 +774,6 @@ abline(h = 0,
        col = 'gray',
        lwd = 7)
 
-with(draws_conc, paste0(mean(b_kappa_x < 0)*100, '%') ) #nearly all estimates suggest a reduction in kappa
 
 ```
 
@@ -913,16 +913,12 @@ The high correlation is apparent, since the majority of individual heading biase
 Each individual's sample is also tightly clustered around its individual mean (blue points).
 Pooling data across individuals (grey points), we can see a preponderance of data in the population mean direction, but a much wider spread (lower concentration) than within any one individual's headings.
 
-We can use a hierarchical model, accounting for differences and similarities between individuals, to measure concentration for the average individual ($\alpha_0$) or across individual heading biases ($\kappa_\mu$), as well as to confirm expectations about the population mean direction ($\beta_0$).
+We can use a hierarchical model, accounting for differences and similarities between individuals, to measure concentration for the average individual ($\alpha_0$) and across individual heading biases ($\kappa_\mu$), as well as to confirm expectations about the population mean direction ($\beta_0$).
 
 ## Fit the model
 
-To model this in `BRMS` we can construct a 'nonlinear' formula for predicting the vector of angle $y$ that is comprised of the sum estimates of $\beta_0$ and $\beta_i$.
+To model this in `BRMS` we can construct a 'nonlinear' formula for predicting the vector of angles $y$ that is comprised of the sum estimates of $\beta_0$ and $\beta_i$.
 $\beta_0$ is estimated as an `Intercept` (single estimate across individuals), and $\beta_i$ lacks an intercept (`~0`) but includes a different offset for each individual.
-We can also estimate the concentration across $\beta_i$, by defining the hyperparameter `softkappamu` in `Stan` code, which is the inverse-softplus of estimates for the $\kappa_\mu$ parameter.
-This is linked to estimates of $\beta_i$ because its softplus transform (`log1p_exp(softkappamu)`) acts as a prior on the von Mises distribution of $\beta_i$: $\beta_i \sim \mathcal{M}(0,\kappa_\mu)$.
-Since our estimates need to balance similarity between individuals against any identifiable differences (partial pooling) we should set a prior distribution for $\kappa_\mu$ with high prior density towards strong correlation ($10 < \kappa_\mu < 20$) but some density towards lower values.
-A log-normal distribution $\log \kappa_\mu \sim \mathcal{N}(\log(15),0.6)$ balances these two objectives.
 
 ```{r Formula for an individual effects model}
 #collect data
@@ -942,6 +938,12 @@ form_highcorr = bf(y ~ mu,
                   kappa ~ 1 + (1|ID),#a linear formula
                   family = unwrap_von_mises)
 ```
+
+We can also estimate the concentration across $\beta_i$, by defining the hyperparameter `softkappamu` in `Stan` code, which is the inverse-softplus of estimates for the $\kappa_\mu$ parameter.
+This is linked to estimates of $\beta_i$ because its softplus transform (`log1p_exp(softkappamu)`) acts as a prior on the von Mises distribution of $\beta_i$: $\beta_i \sim \mathcal{M}(0,\kappa_\mu)$.
+This parameter is not explicitly stated in our model formula, so its prior needs to be added as Stan code, using the `set_prior` function with `check = FALSE` to inform `BRMS` that is does not need to check the prior against the model formula.
+Since our $\kappa_\mu$ estimates need to balance similarity between individuals against any identifiable differences (partial pooling) we should set a prior distribution for $\kappa_\mu$ with high prior density towards strong correlation ($10 < \kappa_\mu < 20$) but some density towards lower values.
+A log-normal distribution $\log \kappa_\mu \sim \mathcal{N}(\log(15),0.6)$ balances these two objectives.
 
 To include individual differences in $\kappa$ in the model, we can rely on the automatic methods for linear modelling in `BRMS`.
 That means that to the formula for population level $\kappa$ (`kappa_Intercept`: `kappa~1`) we add the individual-effects term `+(1|ID)`.
@@ -1005,7 +1007,7 @@ model_highcorr = brm(
           backend = 'cmdstan') 
 ```
 
-As for the previous models, for some of the circular variables estimates for different chains are separated (for individuals 7, 8 and 10), which can make it appear that the model has not converged.
+As for the previous models, for some of the circular variables estimates from different chains are separated (for individuals 7, 8 and 10), which can make it appear that the model has not converged.
 Each $\beta_i$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
 
 ```{r Unwrap individual biases}
@@ -1119,6 +1121,7 @@ with(draws_highcorr,
      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
 
+with(draws_highcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_highcorr)*100, '%') ) #partial pooling allows accurate estimate
 
 with(draws_highcorr,
      VertHist(data = softplus(Intercept_kappa), 
@@ -1129,16 +1132,15 @@ with(draws_highcorr,
 abline(h = kappa_id_highcorr,
        col = col_rho,
        lwd = 7)
-with(draws_highcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_highcorr)*100, '%') ) #partial pooling allows accurate estimate
 ```
 
 Despite the bias towards high concentration for $\kappa_\mu$, all individual biases are recovered well by this model (overlap of shaded regions with blue arrows), including those more distant from the population mean direction.
 
 # Low Inter-individual correlation
 
-![When rolling a dung ball, ball-rolling dung beetles can be induced to repeatedly exit a circular arena, resulting in repeated measurements of exit direction. While a single individual exits repeatedly in the same direction, there is typically no relationship between individual directional biases.](icons/beetle.png)
+![When rolling a dung ball, ball-rolling dung beetles can be repeatedly returned to the centre of a circular arena on exiting, resulting in repeated measurements of exit direction. While a single individual exits consistently in the same direction, there is typically no relationship between individual directional biases.](icons/beetle.png)
 
-Individuals within the same population do not necessarily share similar directional biases, and there they do this relationship may be weak (low correlation).
+Individuals within the same population do not necessarily share similar directional biases, and where they do this relationship may be weak (low correlation).
 In this example each individual's headings have a high concentration ($\kappa=5.0$), but the concentration across individual directional biases is low ( $\kappa_\mu = 0.1$).
 As before, the mean direction of the generative distribution is at 0°, but, due to the greater probability of observations distant from this mean direction, this is not necessarily reflected by the mean of individuals in our sample.
 
@@ -1206,7 +1208,8 @@ with(mle_comb_lowcorr,
 
 ## Fit the model
 
-Although the individual heading biases in this dataset are more variable than those in the high-correlation dataset, the underlying structure is the same.The same formula can account for large individual differences in heading just as well as small ones.
+Although the individual heading biases in this dataset are more variable than those in the high-correlation dataset, the underlying structure is the same.
+The same formula can account for large individual differences in heading just as well as small ones.
 
 ```{r Formula for individual effects (low correlation)}
 #collect data
@@ -1227,8 +1230,8 @@ form_lowcorr = bf(y ~ mu,
                   family = unwrap_von_mises)
 ```
 
-Since the expectations regarding $\mu$, $\kappa$ and $\sigma_\kappa$ do not differ from the high-correlation model, we can use the same priors for these.
-As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$, which in this case are a feature of the data, but the principle of partial pooling still necessitates a positive bias in our prior for $\kappa_\mu$, to ensure any similaries across heading biases are captured by the model.
+Since the expectations regarding $\mu$, $\kappa$ and $\sigma_\kappa$ do not differ from the high-correlation model, we can use the same priors for these parameters.
+As before, the prior for $\kappa_\mu$ accounts for potentially large differences in $\beta_i$, which in this case are a feature of the data, but the principle of partial pooling still necessitates a positive bias in our prior for $\kappa_\mu$, to ensure any similarities across heading biases are captured by the model.
 
 ```{r Model individuals (low correlation)}
 
@@ -1265,8 +1268,13 @@ print(sm_lowcorr, digits = 2)
 #betai looks bad, but good after unwrapping
 #beta0 and betai look bad, but good after unwrapping
 UnwrapRhats(model_lowcorr,
-            variable = '^b_beta')
+            variable = '^b_beta',#any variable starting "b_beta..."
+            regex = TRUE)
 ```
+
+As for the high-correlation example, the model overestimates $\kappa_\mu$ , but recovers accurate estimates of $\beta_i$ and population $\kappa$.
+Perhaps unsurprisingly given the set of individual heading biases, the population mean direction $\beta_0$ was not successfully recovered, but the broad credible interval around the estimate would suggest there is considerable uncertainty in the model about the precise true direction.
+This may lead us to ask whether or not there is a shared population mean direction.
 
 ```{r Plot the low correlation individuals model}
 
@@ -1345,6 +1353,13 @@ with(draws_lowcorr,
      lwd = 2,
      length = 0.1/1.25,
      col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+#posterior distribution of mean direction estimates (95% CI nearly 50° wide)
+with(draws_lowcorr,
+     round( deg(
+       quantile.circular(x = circular(b_beta0_Intercept, template = 'none'), 
+               probs = c(0,0.5,1) + c(1,0,-1)*0.05/2) 
+       ) ) 
 )
 
 
