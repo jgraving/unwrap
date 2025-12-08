@@ -1273,6 +1273,7 @@ UnwrapRhats(model_lowcorr,
 ```
 
 As for the high-correlation example, the model overestimates $\kappa_\mu$ , but recovers accurate estimates of $\beta_i$ and population $\kappa$.
+As before, most posterior density is close to the true values of $\beta_i$ and falls symmetrically around the true population $\kappa$.
 Perhaps unsurprisingly given the set of individual heading biases, the population mean direction $\beta_0$ was not successfully recovered, but the broad credible interval around the estimate would suggest there is considerable uncertainty in the model about the precise true direction.
 This may lead us to ask whether or not there is a shared population mean direction.
 
@@ -1379,9 +1380,9 @@ with(draws_lowcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_lowcorr)*10
 
 For this dataset, we might reasonably question whether individual heading biases have any shared bias.
 We can investigate this by fitting a model without a $\kappa_\mu$ parameter, but still accounting for individual heading biases and partial pooling for $\kappa$.
-We can set $\beta_0$ to 0° by assigning the formula `~0`, we could also exclude it entirely.
-Since there are no constraints on where $\beta_i$ can be for each individual, we can set a (near) uniform von Mises prior with $\kappa \approx 0$, although a more complex model could benefit from the normal prior like those used for $\beta_0$ above.
-Without the extra information from $\kappa_\mu$ about the expected distribution of $\beta_i$ sampling can become unstable, so we can use smaller sampling steps to avoid divergent transitions (which could impede sampling) by setting `adapt_delta` closer to $0.99$ (default value $0.8$).
+We can set $\beta_0$ to 0° by assigning the formula `~0` (we could also exclude it entirely: `mu ~ betai`).
+Since there are no constraints on where $\beta_i$ can be for each individual, we can set a (near) uniform von Mises prior with $\kappa \approx 0$, although a more complex model could benefit from the normal prior used for $\beta_0$ above.
+Without the extra information from $\kappa_\mu$ about the expected distribution of $\beta_i$ sampling can become unstable, so we can use smaller sampling steps to avoid divergent transitions (which could impede sampling) by setting `adapt_delta` closer to $1.00$ (default value $0.8$).
 This slows down model estimation, but improves estimate reliability.
 
 ```{r LOO-CV kappa_mu}
@@ -1433,10 +1434,14 @@ Nonetheless, both models recover the concentration of the average individual's h
 
 ![Tethered vinegar flies (*Drosophila*) can be induced to fly in a "virtual reality" LED arena, in which their wing motion moves causes visual cues to rotate. A green light spot induces orientation behaviour, with a weak population level bias towards the light, but highly variable performance across individuals.](icons/fly.png)
 
+In most datasets, we can reasonably expect inter-individual variation for both $\mu$ and $\kappa$: individuals may differ in perceived or genuine goal direction, accuracy and consistency.
+In this example, there is an moderate concentration across individual biases ($\kappa_\mu = 1.0$), and the average individual's headings are somewhat concentrated ($\alpha_0 = 1.5$).
+However, the concentration within each individual's headings varies ($\sigma_\kappa = 0.5$) with a standard deviation 1/3 of the mean.
+
 ```{r Simulate individuals with variable parameters}
-kappa_mu_var = 1.0 
-kappa_var_mean = 1.5 
-kappa_var_sd = 0.5 
+kappa_mu_var = 1.0 # concentration across individuals
+kappa_var_mean = 1.5 #concentration of the average individual
+kappa_var_sd = 0.5 #standard deviation of concentration across individuals
 #simulate data
 set.seed(0120810506)#ISBN Batschelet, 1981 
 kappa_id_var = rnorm(n = ndata, 
