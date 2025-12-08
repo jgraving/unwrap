@@ -430,7 +430,7 @@ We can combine our two sets of angles together into one vector $y$, that is alig
 This reduces the region of $50\%$ prior density from [-240°, 240°] to [-180°, 180°].
 
 ```{r Fit treatment direction model}
-mu_delta = data.frame(y = rad(
+dt_delta = data.frame(y = rad(
                             as.numeric(
                             c(cd_control,
                               cd_treatment)
@@ -451,7 +451,7 @@ prior_delta = prior('normal(0,3*pi()/2)', class = 'Intercept', dpar = 'mu') +
 
 
 model_delta =  brm(formula = form_delta,
-               data = mu_delta, 
+               data = dt_delta, 
                family = unwrap_von_mises,
                prior = prior_delta, # the kappa and mu priors
                stanvars = stan_unwrap_fun + modulo_circular_fun,
@@ -585,7 +585,7 @@ We do this by setting the formula for $\mu$ and $\kappa$ to `~1` (estimate inter
 #model with effects of treatment on kappa, but not mu
 model_kappadelta =  brm(formula = bf(y~1,
                                      kappa~x),
-               data = mu_delta, 
+               data = dt_delta, 
                family = unwrap_von_mises,
                prior = prior_delta[c(1,3:4),], # the all kappa & 1st mu prior
                stanvars = stan_unwrap_fun + modulo_circular_fun,
@@ -595,7 +595,7 @@ model_kappadelta =  brm(formula = bf(y~1,
 #model with no effects of treatment
 model_nodelta =  brm(formula = bf(y~1,
                                   kappa~1),
-               data = mu_delta, 
+               data = dt_delta, 
                family = unwrap_von_mises,
                prior = prior_delta[c(1,3),], # intercept kappa & mu priors
                stanvars = stan_unwrap_fun + modulo_circular_fun,
@@ -1675,11 +1675,18 @@ abline(h = 0,
 
 ![Birds exhibiting migratory restlessness hop repeatedly in their intended flight direction, allowing this to be recorded repeatedly for the same individuals across multiple nights. Individuals may differ somewhat in their hopping directions, but are generally aligned provided they detect the same compass cues. A treatment that affects their perception of these cues causes the entire population to change their hopping direction.](icons/bird.png)
 
-In many datasets
+In many experimental designs, we are interested in determining the effect of an experimental treatment on orientation behaviour, just as we did for our examples without repeated-measures.
+In the context of multiple individuals, the treatment may affect $\mu$ and $\kappa$ for the average individual, as well as the hyperparameters $\kappa_\mu$ and $\sigma_\kappa$ that define the distributions of individual differences.
+As for the earlier examples, we can model the effect of treatment as the change in each parameter value as compared with its value for the control (ideally in the same individual).
+
+In this example, the treatment ($m$) induces a rightwards turn of 30° ($\beta_m$).
+The average individual's headings are concentrated in both the control ($\alpha_0 = 3.0$) and treatment ($\kappa = \alpha_0 + \alpha_m$, $\alpha_m = 0$), but vary greatly between individuals ($\sigma_\kappa  = 2.5$): in a larger population we might expect $12\%$ of individuals to produce a uniform distribution of headings.
+This variation is unaffected by the treatment (${\sigma_\kappa}_m = 0$).
+Heading biases are highly concentrated across individuals ($\kappa_\mu = 4.0$), which is also unaffected by the treatment (${\kappa_\mu}_m = 0$).
 
 ```{r Simulate individual heading changes}
 #condition level change in heading of 30°
-delta_mu = circular(x = 30,
+delta_mu_hd = circular(x = 30,
                     units = 'degrees',
                     rotation = 'clock',
                     zero = pi/2)
@@ -1689,6 +1696,13 @@ kappa_mu_hd = 4.0
 kappa_hd_mean = 3.0
 #large variance in individual accuracy
 kappa_hd_sd = 2.5
+#strong possibilty of uniform distribution
+print( paste0( round(
+  pnorm(q = 0,
+      mean =  kappa_hd_mean,
+      sd =  kappa_hd_sd) * 100), "%")
+)
+
 set.seed(0120810506)#ISBN Batschelet, 1981
 kappa_id_hd = rnorm(n = ndata/2,
                     mean = kappa_hd_mean,
@@ -1703,7 +1717,7 @@ mu_hd = rvonmises(n = ndata/2,
                   kappa = kappa_mu_hd)
 
 mu_delta = rvonmises(n = ndata/2,
-                     mu = c0+delta_mu,
+                     mu = c0+delta_mu_hd,
                      kappa = kappa_mu_hd)
 
 
@@ -1741,7 +1755,7 @@ id_delta = mapply(m = mu_delta,
                      SIMPLIFY = FALSE)
 
 #Add the population of biases
-DescriptCplot(m = delta_mu,
+DescriptCplot(m = delta_mu_hd,
               k = kappa_mu_hd,
               ndata = ndata,
               refline = 0,
@@ -1873,17 +1887,14 @@ with(mle_comb_diffs,
 )
 ```
 
-```{r Rayleigh test on heading changes}
-#high density around true mean
-rayleigh.test(dt_comb_diffs, mu = delta_mu)
-#but also at zero difference
-rayleigh.test(dt_comb_diffs, mu = c0)
-#
-#There is a difference between the distributions
-watson.two.test(dt_comb_hd, dt_comb_delta)
-```
+Although this group of individuals is likely too small to estimate many of the effects of interest, there is sufficient correlation across individuals to observe the effect of the treatment: the population-level rightward turn.
+But even for these highly correlated individual heading-biases, there are large differences between individual responses: one individual even favours a left turn after treatment.
+Individuals also differ greatly in the concentration of their headings, ranging from $\kappa = 1.4$ to $\kappa = 8.8$, a range in (circular) standard deviation between 60° and 20°.
 
 ## Fit the model
+
+For this model, we need to update the formula to account for effects of treament on $\mu$, $\kappa$ and their respective hyperparameters.
+We do this by including the treatment vector $x$ as a predictor for $\beta_0$ (`beta0 ~ 1 + x`) and $\alpha_0$ (`kappa ~ 1 + x`), and as an individual-specific predictor of $\beta_i$ (`betai ~ 0 + ID + x:ID`) and $\alpha_i$ (`(1+ x|ID)`).
 
 ```{r Formula for individual heading change}
 #collect data
@@ -1903,6 +1914,13 @@ form_hd = bf(y ~ mu,
                   kappa ~ 1 + x +  (1 + x|ID),#a linear formula
                   family = unwrap_von_mises)
 ```
+
+While the linear formula for $\kappa$ automatically generates the corresponding hyperparameter for the effect of treatment on individual differences in concentration (${\sigma_\kappa}_m$), for the non-linear formula we need to add a treatment effect on the concentration of individual heading biases.
+This is modelled as a change in $\kappa_\mu$ (${\kappa_\mu}_m$) the inverse-softplus scale (${\kappa_\mu}_m \sim \log(\exp({k_\mu}_0 + {k_\mu}_x)+1)$).
+This informs the prior for individual heading biases in the treatment condition (${\beta_i}_m \sim \mathcal{M}(0°, {\kappa_\mu}_m)$) in the same way that $\kappa_\mu$ does for $\beta_i$ in the control.
+`BRMS` generates variables in Stan that represent the number of individuals (`N_1`) and number of conditions (`M_1`).
+Since there are only two conditions, and all individuals experience both treatments once, we can identify the individual parameters for the control as 'slices' of the `b_betai` vector: `b_betai[1:N_1]` and those for the treatment as `b_betai[(N_1+1):(M_1*N_1)]`.
+By default we expect no effect of treatment on $\kappa_\mu$, but moderate increases or decreases are quite plausible, so an appropriate prior is a normal distribution centred at no-change: ${\kappa_\mu}_m \sim \mathcal{N}(0,1)$.
 
 ```{r Fit model for individual heading change}
 
@@ -1950,9 +1968,7 @@ print(sm_hd, digits = 2)
 #betai looks bad, but good after unwrapping
 #beta0 and betai look bad, but good after unwrapping
 UnwrapRhats(model_hd,
-            variable = '^b_beta0')
-UnwrapRhats(model_hd,
-            variable = '^b_betai')
+            variable = '^b_beta')
 ```
 
 ## Test hypothesis of treatment effect
@@ -2275,7 +2291,7 @@ with(draws_treat,
 )
 
 #Add the population of turns
-DescriptCplot(m = delta_mu,
+DescriptCplot(m = delta_mu_hd,
               k = kappa_mu_hd,
               ndata = length(mu_hd),
               refline = 0,
