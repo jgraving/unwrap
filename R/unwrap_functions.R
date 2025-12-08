@@ -66,6 +66,15 @@ unwrap_circular = function(x)
   unwrx = centx + mux
 }
 
+#the unwrapped (no discontinuities)
+unwrap_circular_median = function(x)
+{
+  mux = median.circular(x = circular(x = x, template = 'none'))[[1]]
+  centx = atan2(y = sin(x - mux),
+                x = cos(x  - mux))
+  unwrx = centx + mux
+}
+
 #degree version
 unwrap_circular_deg = function(x)
 {
@@ -776,9 +785,20 @@ CI_unwrap = function(data,
 }
 
 #calculate rhat for circular variables with extreme ranges
-Rhat_unwrap = function(x){rhat(unwrap_circular(x))}
+Rhat_unwrap = function(x,
+                       method = 'mean')
+{
+  switch(EXPR = method,
+         mean = rhat(unwrap_circular(x)),
+         median = rhat(unwrap_circular_median(x)),
+         sine = max(rhat(sin(x)), rhat(cos(x))),
+         rhat(unwrap_circular(x)) )
+         
+}
+
 UnwrapRhats = function(uwmod,
-                       variable = '^b_zmu',
+                       method = 'mean', # median or sine
+                       variable = '^b_betai',
                        regex = TRUE,
                        digits = 5,
                        ...)
@@ -789,7 +809,8 @@ UnwrapRhats = function(uwmod,
                           regex = regex,
                           ...),
           MARGIN = 2,
-          FUN = Rhat_unwrap)
+          FUN = Rhat_unwrap,
+          method = method)
   nrh = names(rh)
   rh = rh[!( nrh %in% c(".chain", ".iteration", ".draw") )]
   return( round(rh,digits = digits) )
