@@ -1681,8 +1681,8 @@ As for the earlier examples, we can model the effect of treatment as the change 
 
 In this example, the treatment ($m$) induces a rightwards turn of 30° ($\beta_m$).
 The average individual's headings are concentrated in both the control ($\alpha_0 = 3.0$) and treatment ($\kappa = \alpha_0 + \alpha_m$, $\alpha_m = 0$), but vary greatly between individuals ($\sigma_\kappa  = 2.5$): in a larger population we might expect $12\%$ of individuals to produce a uniform distribution of headings.
-This variation is unaffected by the treatment (${\sigma_\kappa}_m = 0$).
-Heading biases are highly concentrated across individuals ($\kappa_\mu = 4.0$), which is also unaffected by the treatment (${\kappa_\mu}_m = 0$).
+This variation is unaffected by the treatment ($\sigma_{\kappa,m} = 0$).
+Heading biases are highly concentrated across individuals ($\kappa_\mu = 4.0$), which is also unaffected by the treatment ($\kappa_{\mu,m}=0$).
 
 ```{r Simulate individual heading changes}
 #condition level change in heading of 30°
@@ -1887,13 +1887,13 @@ with(mle_comb_diffs,
 )
 ```
 
-Although this group of individuals is likely too small to estimate many of the effects of interest, there is sufficient correlation across individuals to observe the effect of the treatment: the population-level rightward turn.
-But even for these highly correlated individual heading-biases, there are large differences between individual responses: one individual even favours a left turn after treatment.
-Individuals also differ greatly in the concentration of their headings, ranging from $\kappa = 1.4$ to $\kappa = 8.8$, a range in (circular) standard deviation between 60° and 20°.
+Although this group of individuals is likely too small to estimate many of the effects of interest, there is sufficient inter-individual correlation to observe the effect of the treatment: a population-level rightward turn.
+Nonetheless there are large differences between individual responses: one individual even favours a left turn after treatment.
+Individuals also differ greatly in the concentration of their headings, ranging from $\kappa = 1.4$ to $\kappa = 8.8$, a range in expected (circular) standard deviation between 60° and 20°.
 
 ## Fit the model
 
-For this model, we need to update the formula to account for effects of treament on $\mu$, $\kappa$ and their respective hyperparameters.
+For this model, we need to update the formula to account for effects of treatment on $\mu$, $\kappa$ and their respective hyperparameters.
 We do this by including the treatment vector $x$ as a predictor for $\beta_0$ (`beta0 ~ 1 + x`) and $\alpha_0$ (`kappa ~ 1 + x`), and as an individual-specific predictor of $\beta_i$ (`betai ~ 0 + ID + x:ID`) and $\alpha_i$ (`(1+ x|ID)`).
 
 ```{r Formula for individual heading change}
