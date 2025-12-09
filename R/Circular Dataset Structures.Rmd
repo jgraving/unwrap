@@ -78,6 +78,17 @@ Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B., Betancourt, M.
 Stan: A Probabilistic Programming Language.
 *Journal of Statistical Software* 76 doi: 10.18637/jss.v076.i01
 
+Vehtari, A., Gelman, A., and Gabry, J.
+(2017) Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC.
+*Statistics and Computing* 27(5), 1413–1432.
+<doi:10.1007/s11222-016-9696-4>.
+
+Paananen, T., Piironen, J., Buerkner, P.-C., Vehtari, A.
+(2021).
+Implicitly adaptive importance sampling.
+*Statistics and Computing* 31, 16.
+<doi:10.1007/s11222-020-09982-2>.
+
 > **TODO**
 >
 > -   move necessary functions to unwrap_functions.R
@@ -228,9 +239,10 @@ Since the mean direction is far from the wrap-point ($-\pi$ or $\pi$), the `Rhat
 `Rhat` values for both parameters are $<1.01$ and effective sample size (ESS) indicates most of the 4000 draws explored the posterior distribution efficiently, so we can assume that this model has converged.
 
 To inspect the model's predictions, we can extract the post-warmup draws from the model and plot the posterior distribution of estimates alongside the original data.
+Since we simulated the data, we can also compare the model estimates with the true parameters.
 $\mu$ `Intercept` can be plotted as an angle in radians on its original scale.
 For $\kappa$, we need to convert estimates to the correct scale using the `softplus` transform, and then convert it to mean-vector-length scale using the `A1` function.
-There are `4000` posterior estimates, so rather than plotting all of them we'll summarise them as the medians of $\mu$ and $\kappa$ estimates and the normalised 2D kernel density of their mean-vector equivalent.
+There are `4000` posterior estimates, so rather than plotting all of them we'll summarise them as the medians of $\mu$ and $\kappa$ estimates and the normalised 2D kernel density (red and yellow shaded region) of their mean-vector equivalent.
 
 ```{r Plot the model fitted for divergence data}
 #extract all "draws" of the posterior as a data.frame
@@ -1971,9 +1983,20 @@ UnwrapRhats(model_hd,
             variable = '^b_beta')
 ```
 
-From the raw coefficients, we can already see that parameter recovery has been successful for $\kappa$ and $\kappa_\mu$, even with this minimal sample size. Both the population mean $\kappa$ and the (inverse-softplus scaled) estimate of $\sigma_\kappa$ are close to their true values. The data for the treatment are quite different, even though their true generative distribution differs only in population mean direction ($\mu = \beta_0 + \beta_m$), and as a result there is some uncertainty regarding the effect of treatment $x$ on $\kappa$, $\kappa_\mu$ and $\sigma_\kappa$. For `kappa_x` there is substantial posterior density for both increases and decreases in concentration in the treatment condition (95\% CI: -0.45–4.42), and the range of estimates for `kappa_mu_x` ($\log(\exp(k_{\mu,0} + k_{\mu,x})+1)$) almost entirely overlaps with that for `kappa_mu` in the control condition. Large inter-individual variation in treatment effects on concentration (`sd(kappa_x)`) are estimated, and their correlation with individuals concentration differences for the control also has substantial posterior density for both correlation and anti-correlation (95\% CI  `cor(kappa_Intercept,kappa_x)`: -0.67–0.99), (correctly) suggesting no relationship between variation in the two conditions.
+From the raw coefficients, we can already see that parameter recovery has been quite successful for $\kappa$ and $\kappa_\mu$, given the minimal sample size.
+Both the population mean $\kappa$ and the (inverse-softplus scaled) estimates of $\sigma_\kappa$ are close to their true values.
+The data for the treatment are quite different from those in the control, even though their true generative distribution differs only in population mean direction ($\mu = \beta_0 + \beta_m$).
+As a result there is some uncertainty regarding the effect of treatment $x$ on $\kappa$, $\kappa_\mu$ and $\sigma_\kappa$.
+For `kappa_x` there is substantial posterior density for both increases and decreases in concentration in the treatment condition (95% CI: -0.45–4.42), and the range of estimates for `kappa_mu_x` ($\log(\exp(k_{\mu,0} + k_{\mu,x})+1)$) almost entirely overlaps with that for `kappa_mu` in the control condition.
+Large inter-individual variation in treatment effects on concentration (`sd(kappa_x)`) are estimated, and their correlation with individual differences in concentration for the control also has substantial posterior density for both correlation and anti-correlation (95% CI `cor(kappa_Intercept,kappa_x)`: -0.67–0.99), (correctly) suggesting no relationship between variation in the two conditions.
 
 ## Test hypothesis of treatment effect
+
+Despite the uncertainty in this dataset, should still be possible to test the hypothesis of a population-level change in direction.
+We can do this in the same way as for the example without repeated measures: by fitting a model in which $x$ affects $\kappa$ ('kappa only'), but not $\mu$, and one in which there is no effect of $x$ ('null model').
+Since differences between individuals could still be present if either hypothesis is true, all individual effects ($\beta_i$ & $\alpha_i$) and hyperparameters ($\kappa_\mu$ and $\sigma_\kappa$) unrelated to the treatment effect should remain in all models.
+Due to the small sample size, individual observations can greatly affect model fit.
+To achieve robust model comparison under these circumstances, we will need to fit all models with the settings `save_pars(all = TRUE)`, which allows for [moment matching](https://doi.org/10.1007/s11222-020-09982-2) computation of exact cross-validation for problematic observations.
 
 ```{r Fit models for model comparison of individual heading change}
 form_hd_kappa = bf(y ~ mu,
@@ -2068,7 +2091,9 @@ UnwrapRhats(model_hd_null,
 ```
 
 To compare the predictive power of the models, we can use leave-one-out cross-validation (LOO-CV) to calculate the estimated log predictive density (ELPD) and its standard error for each model.
-A good model increases ELPD.
+The more robustly the model predicts the data, the higher the total ELPD.
+In this case a moment-matching algorithm is used to compensate for observations that have a strong effect on the model posterior (high Pareto-$\hat{k}$ value).
+This takes longer, since models need to be recompiled with `rstan`, but improves the accuracy of model comparison.
 
 ```{r LOO-CV for model comparison}
 #better predictions should justify fitting a treatment model 
@@ -2079,6 +2104,7 @@ lc_nulltreat = loo_compare(loo_null, loo_kappa, loo_treat)
 print(lc_nulltreat)
 ```
 
+In this case, the results of model comparison are quite clear, the model for the hypothesis of an effect of treatment on both $\mu$ and $\kappa$ predicts the data more robustly than the other two hypotheses.
 We can plot this model comparison to get an impression of the scale of the difference in plausibility between the hypotheses.
 
 ```{r Plot the model comparison}
@@ -2102,7 +2128,7 @@ plot(x = 1:dim(lc_plot)[1],
      xlim = c(1,dim(lc_plot)[1]) + c(-1,1)*0.5,
      ylim = with(lc_plot, {range(elpd+se%*% t(c(-2,2)))}), #within 2sigma of all estimates
      pch = 19,
-     col = c(col_obs, col_kappa, col_sd, col_rho),
+     col = c(col_obs, col_kappa, col_treat, col_rho),
      cex = 2,
      axes = FALSE)
 with(lc_plot,
@@ -2115,7 +2141,7 @@ arrows(x0 = 1:dim(lc_plot)[1],
        angle = 90,
        length = 0.1,
        lwd = 3,
-       col =  c(col_obs, col_kappa, col_sd, col_rho)
+       col =  c(col_obs, col_kappa, col_treat, col_rho)
        )
      }
 )
@@ -2134,7 +2160,8 @@ axis(4,
                           {
                             seq(from = 0, to =  elpd[dim(lc_plot)[1]] + se[dim(lc_plot)[1]]*4 - elpd[2],  by = 20)
                           }
-     )
+     ),
+     col = col_rho
 )
 abline(h = lc_plot$elpd[2],
        col = 'gray')
@@ -2149,7 +2176,7 @@ mtext(side = 1,
               'kappa\nmodel',
               'mu & kappa\nmodel',
               'difference'),
-     col = c(col_obs, col_kappa, col_sd, col_rho)
+     col = c(col_obs, col_kappa, col_treat, col_rho)
      )
 
 
@@ -2157,8 +2184,8 @@ mtext(side = 1,
 
 # Plot model predictions
 
-We can also extract the model predictions.
-Since we simulated the data, we can compare the model estimates (red and yellow shaded regions) with the true parameters.
+Now that we have confirmed that this model is the most appropriate (from our chosen set of hypotheses) we extract the model predictions.
+Since the data for the control have different predictors from those in the treatment, that may differ between individuals, these predictions need to be calculated separately for each condition for each individual.
 
 ```{r Model predictions}
 
@@ -2249,7 +2276,7 @@ for(i in 1:length(mu_delta) )
 ```
 
 We can also compare the model parameters with the population parameters.
-Here we see that the estimates of the population mean angle favour a right turn, but there is a lot of uncertainty about the exact size of the turn, or even whether it was to the right or the left.
+Here we see that the estimates of the population mean angle favour a right turn in $99.7\%$ of estimates, but there is a lot of uncertainty about the exact size of the turn, or even whether it was to the right or the left.
 This is influenced by the wide spread of individual mean angles and turn angles, which the model recovered well.
 
 ```{r Plot population parameters}
@@ -2360,6 +2387,10 @@ with(draws_treat,
 )
 
 
+#estimate somewhat favours a turn
+with(draws_treat,
+     paste0(mean(b_beta0_x > 0)*100, '%') 
+)
 
 with(draws_treat,
      VertHist(data = unwrap_circular_deg(b_beta0_x),
@@ -2375,9 +2406,13 @@ abline(h = 0,
        col = 'gray',
        lwd = 7)
 
-#estimate somewhat favours a turn
-with(draws_treat,
-     paste0(mean(b_beta0_x > 0)*100, '%') 
-)
 
 ```
+
+# Summary
+
+-   Circular GLMs can be used to model effects on mean direction $\mu$ and concentration $\kappa$.
+-   The posterior density of parameter estimates can be compared with expected values; for example, an expected angle (such as the 'home direction') or concentration (such as $\kappa = 0$ for the circular uniform distribution).
+-   Where expected values of $\mu$ and $\kappa$ are not known, fitted estimates can be compared between data for control and treatment conditions as an offset parameter between the two.
+-   Grouping factors, such as individual biases, can be accounted for in a hierarchical model, and the properties of the population of individuals estimated as hyperparameters for the concentration of individual mean directions ($\kappa_\mu$) and standard deviation of individual concentrations ($\sigma_\kappa$).
+-   Competing hypotheses about effects within a dataset can be formalised as circular GLMs with differing parameters, and their plausibility contrast directly *via* model-comparison methods such as expected log predictive density.
