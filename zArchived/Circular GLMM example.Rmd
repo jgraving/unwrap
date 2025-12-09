@@ -1,0 +1,1276 @@
+---
+title: "Circular Dataset Structures"
+date: "`r Sys.Date()`"
+author: "James Foster"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Details
+
+> **DESCRIPTION**
+>
+> Example of a circular GLMM.
+
+> **REFERENCES**
+>
+> Sayin S, Couzin-Fuchs E, Petelski I, Günzel Y, Salahshour M, Lee CY, Graving JM, Li L, Deussen O, Sword GA, et al. (2025) The behavioral mechanisms governing collective motion in swarming locusts.
+> Science.
+> 387(6737):995–791
+>
+> Gabry J, Češnovar R, Johnson A (2022).
+> cmdstanr: R Interface to 'CmdStan'.
+> <https://mc-stan.org/cmdstanr/>
+>
+> Bürkner, P.-C.
+> (2018).
+> Advanced Bayesian Multilevel Modeling with the R Package brms.
+> The R Journal 10, 395–411.
+>
+> Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B., Betancourt, M., Brubaker, M., Guo, J., Li, P. and Riddell, A.
+> (2017).
+> Stan: A Probabilistic Programming Language.
+> Journal of Statistical Software 76 doi: 10.18637/jss.v076.i01
+
+## Set up workspace
+
+Set up some colours for plotting.
+
+```{r Set up plot colours}
+col_kappa = '#1E78B5'#colour for kappa parameter
+col_rho = '#F08024' #colour for mean vector length
+col_sd = '#E74A29' #colour for SD and mean angle
+col_sd2 = '#E57461' #colour for other SD heuristics
+col_pdf = adjustcolor(col = '#21A885', # colour for probability density
+                      alpha.f = 0.7)
+col_obs = '#3E1F51' #colour for control observations
+col_treat = '#006400' # colour for treatment observations
+```
+
+# Load packages
+
+```{r Load packages for circular data and Bayesian modelling}
+#package for circular data
+require(circular)
+#package for Bayesian modelling in Stan
+require(cmdstanr)
+#package for building Stan models
+require(brms)
+```
+
+# Set up functions
+
+These functions that wrap angular data into a single circle and generate & plot new samples of circular data.
+
+```{r Functions for plotting and simulation}
+
+#convert angles to signed angles in (-180, 180)
+Mod360.180 = function(x)
+{#use atan2 to convert any angle to the range (-180,180)
+  deg(
+    atan2(y = sin(rad(x)),
+          x = cos(rad(x))
+    )
+  )
+}
+
+#the radian equivalent
+mod_circular = function(x)
+{
+  atan2(y = sin(x),
+        x = cos(x))
+}
+
+#the unwrapped (no discontinuities)
+unwrap_circular = function(x)
+{
+  mux = mean.circular(x = circular(x = x, template = 'none'))
+  centx = atan2(y = sin(x - mux),
+                x = cos(x  - mux))
+  unwrx = centx + mux
+}
+
+#degree version
+unwrap_circular_deg = function(x)
+{
+  mux = mean.circular(x = circular(x = x, template = 'none'))
+  centx = atan2(y = sin(x - mux),
+                x = cos(x  - mux))
+  unwrx = centx + mux
+  return(deg(unwrx))
+}
+
+
+
+DescriptCplot = function(k,
+                         m = 0,#in degrees
+                         ndata = 20,
+                         lw = 3,
+                         pcol = col_obs,
+                         mvcol = col_rho,
+                         denscol = col_pdf,
+                         bins = 360/5-1,
+                         stack = TRUE,
+                         sep = 0.05,
+                         shrink = 1.25,
+                         refline = NA,
+                         save_sample = FALSE,
+                         seed = 20250815,
+                         titleline = -1,
+                         ...#passed to points.circular
+)
+{
+  #convert mu to circular class
+  cm = circular(x = m,
+                units = 'degrees',
+                rotation = 'clock',
+                zero = pi/2)
+  #kappa = 0 v. random, make repeatable
+  set.seed(seed)
+  #generate dataset
+  cd = rvonmises(mu = cm,
+                 kappa = k,
+                 n = ndata)
+  #Generate a vector of angles
+  ra = seq(from = -pi, to = pi, by = 0.01)
+  ra = circular(ra,
+                units = 'radians',
+                rotation = 'counter',
+                zero = 0)
+  #plot dataset
+  plot.circular(x = circular(NA,
+                             units = 'degrees',
+                             rotation = 'clock',
+                             zero = pi/2),
+                stack = stack,
+                bins = bins,
+                shrink = shrink,
+                sep = sep,
+                col = pcol,
+                axes = FALSE
+  )
+  #add reference line
+  if(!is.na(refline))
+  {
+    arrows.circular(x = circular(refline,
+                                 units = 'degrees',
+                                 rotation = 'clock',
+                                 zero = pi/2),
+                    col = 'gray',
+                    length = 0,
+                    lend = 'butt',
+                    lwd = lw)
+  }
+  #add probability density
+  if(!is.na(denscol))
+  {
+  lines.circular(x = ra,
+                 y = dvonmises(x = ra, 
+                               mu = cm,
+                               kappa = k)/shrink,
+                 col = denscol,
+                 lwd = lw)
+  }
+  points.circular(cd,
+                  stack = stack,
+                  bins = bins,
+                  shrink = shrink,
+                  sep = sep,
+                  col = pcol,
+                  ...
+  )
+  #add the mean vector
+  if(k>0)
+  {
+    arrows.circular(x = cm,
+                    y = A1(k),
+                    col = mvcol,
+                    lwd = lw,
+                    length = 0.1/shrink#,shrink = 1/shrink
+    )
+  }else
+  {
+    points(x = 0,
+           y = 0, 
+           col = mvcol,
+           pch = 19,
+           lwd = lw)
+  }
+  
+  #add a title
+  mtext(text = paste0('κ = ', k),
+        side = 1,
+        line = titleline)
+  if(save_sample)
+  {return(cd)}
+}
+
+PCfun = function(angles,
+                 col = 'darkblue',
+                 shrink = 1.5,
+                 title = '',
+                 plot_rho = TRUE,
+                 side = 1,
+                 ...)
+{
+  ca = circular(x = angles,
+                units = 'degrees',
+                rotation = 'clock')
+  plot.circular(x = ca,
+                col = col,
+                stack = TRUE,
+                bins = 355/5,
+                units = 'degrees',
+                rotation = 'clock',
+                zero = pi/2,
+                shrink = shrink,
+                ...)
+  mtext(text = title,
+        side = side,
+        line = -2)
+  lines(x = c(0,0),
+        y = c(-1,1),
+        col = 'gray')
+  if(plot_rho)
+  {
+    arrows.circular(x = mean.circular(ca),
+                    y = rho.circular(ca),
+                    zero = pi/2,
+                    rotation = 'clock',
+                    col = col,
+                    length =0.1)
+  }
+}
+
+
+
+```
+
+These functions extract and plot model predictions.
+Vertical histograms and circular density plots are used to show posterior density of model estimates.
+The Rhat unwrapping functions transform estimates to wrapped, centred circular distributions before calculating Rhat (chains may otherwise appear to diverge by $2\pi$).
+A custom log likelihood function for unwrapped models is needed for LOO-CV.
+
+```{r Functions for model predictions}
+## Modelling functions ---------------------------------------------------
+
+
+#histograms on a vertical axis
+#any data, but plotted as a histogram on a vertical rather than horizontal axis
+VertHist = function(data, # numerical data vector
+                    breaks = 1e2,
+                    ylab = 'data',
+                    xlab = 'density',
+                    ylim = NULL,
+                    main = '',
+                    col = 'gray',
+                    border = NA,
+                    axes = TRUE,
+                    ...)
+{
+  hst = hist(x = data, # calculate the histogram but don't plot it
+             breaks = breaks, # user defined breaks
+             plot = FALSE)
+  with(hst,
+       {
+         plot(x = NULL, #open an empty plot
+              xlim = c(0, max(density)),
+              ylim = if(is.null(ylim)){range(mids)}else{ylim},
+              xlab = xlab,
+              ylab = ylab,
+              main = main,
+              axes = axes)
+         #plot each bar
+         for(i in 1:length(mids))
+         {
+           rect(xleft = 0,
+                xright = density[i],
+                ybottom = breaks[i], 
+                ytop = breaks[i + 1],
+                col = col,
+                border = border,
+                ...
+           )
+         }
+       }
+  )
+}
+
+
+#add contours
+Draws2Cont = function(draws,
+                      palette = 'Heat 2',
+                      nlevels = 20,
+                      x_string = 'sin(Intercept)*A1(softplus(Intercept_kappa))',
+                      y_string = 'cos(Intercept)*A1(softplus(Intercept_kappa))',
+                      alpha = 200/255,
+                      ngrid = 25, # defaults to a 25x25 grid
+                      cropc = FALSE, #crop region outside circle
+                      denstype = 'relative' # 'normalised' or 'relative' (normalised fails to plot low densities)
+)
+{
+  kdc = with(draws,
+             {
+               MASS::kde2d(x = eval(str2lang(x_string)),
+                           y = eval(str2lang(y_string)),
+                           n = ngrid)
+             }
+  )
+  if(cropc)
+  {
+    xy = with(kdc, expand.grid(x = x,y= y))#find coordinates of z variable
+    idc = with(xy, x^2+y^2 < 1.0)
+    #crop edge of circle
+    kdc = within(kdc,
+                 {z[!idc] = 0})
+  }
+  with(kdc,
+       {
+         .filled.contour(x = x,
+                         y = y,
+                         z = z,
+                         levels = (1:nlevels)*
+                           switch(EXPR = denstype,
+                                  relative = max(z/nlevels),
+                                  normalised = sum(z/nlevels),#warning, fails to plot low densities
+                                  max(z/nlevels)
+                           ),
+                         col = hcl.colors(n = nlevels,
+                                          palette = palette,
+                                          rev = TRUE,
+                                          alpha = alpha)
+         )
+       }
+  )
+}
+
+
+#invert the softplus link
+#https://en.wikipedia.org/wiki/Softplus
+#we are using this as our _inverse_ link function for kappa,
+#maps almost 1:1 but keeps values >0 for low estimates
+softplus = function(x)
+{
+  log(exp(x)+1) 
+}
+#this would return our kappa estimates back to the original scale
+inv_softplus = function(x)
+{
+  log(exp(x)-1) 
+}
+
+
+#calculate rhat for circular variables with extreme ranges
+Rhat_unwrap = function(x){rhat(unwrap_circular(x))}
+UnwrapRhats = function(uwmod,
+                       variable = '^b_imu',
+                       regex = TRUE,
+                       digits = 5,
+                       ...)
+{
+  rh =   
+    apply(X = as_draws_df(uwmod,
+                          variable = variable, 
+                          regex = regex,
+                          ...),
+          MARGIN = 2,
+          FUN = Rhat_unwrap)
+  nrh = names(rh)
+  rh = rh[!( nrh %in% c(".chain", ".iteration", ".draw") )]
+  return( round(rh,digits = digits) )
+}
+
+#copy of log_lik_von_mises, with helper functions included & removal of circular formatting
+log_lik_unwrap_von_mises <- function(i, prep) {
+  #remove circular formatting?
+  prep$data$Y = as.numeric(prep$data$Y)
+  
+  args <- list(
+    mu = get_dpar(prep, "mu", i),
+    kappa = get_dpar(prep, "kappa", i = i)
+  )
+  
+  # ----------- log_lik helper-functions -----------
+  # compute (possibly censored) log_lik values
+  # @param dist name of a distribution for which the functions
+  #   d<dist> (pdf) and p<dist> (cdf) are available
+  # @param args additional arguments passed to pdf and cdf
+  # @param prep a brmsprep object
+  # @return vector of log_lik values
+  log_lik_censor <- function(dist, args, i, prep) {
+    pdf <- get(paste0("d", dist), mode = "function")
+    cdf <- get(paste0("p", dist), mode = "function")
+    y <- prep$data$Y[i]
+    cens <- prep$data$cens[i]
+    if (is.null(cens) || cens == 0) {
+      x <- do_call(pdf, c(y, args, log = TRUE))
+    } else if (cens == 1) {
+      x <- do_call(cdf, c(y, args, lower.tail = FALSE, log.p = TRUE))
+    } else if (cens == -1) {
+      x <- do_call(cdf, c(y, args, log.p = TRUE))
+    } else if (cens == 2) {
+      rcens <- prep$data$rcens[i]
+      x <- log(do_call(cdf, c(rcens, args)) - do_call(cdf, c(y, args)))
+    }
+    x
+  }
+  
+  # adjust log_lik in truncated models
+  # @param x vector of log_lik values
+  # @param cdf a cumulative distribution function
+  # @param args arguments passed to cdf
+  # @param i observation number
+  # @param prep a brmsprep object
+  # @return vector of log_lik values
+  log_lik_truncate <- function(x, cdf, args, i, prep) {
+    lb <- prep$data[["lb"]][i]
+    ub <- prep$data[["ub"]][i]
+    if (is.null(lb) && is.null(ub)) {
+      return(x)
+    }
+    if (!is.null(lb)) {
+      log_cdf_lb <- do_call(cdf, c(lb, args, log.p = TRUE))
+    } else {
+      log_cdf_lb <- rep(-Inf, length(x))
+    }
+    if (!is.null(ub)) {
+      log_cdf_ub <- do_call(cdf, c(ub, args, log.p = TRUE))
+    } else {
+      log_cdf_ub <- rep(0, length(x))
+    }
+    x - log_diff_exp(log_cdf_ub, log_cdf_lb)
+  }
+  
+  # weight log_lik values according to defined weights
+  # @param x vector of log_lik values
+  # @param i observation number
+  # @param prep a brmsprep object
+  # @return vector of log_lik values
+  log_lik_weight <- function(x, i, prep) {
+    weight <- prep$data$weights[i]
+    if (!is.null(weight)) {
+      x <- x * weight
+    }
+    x
+  }
+  
+  
+  out <- log_lik_censor(
+    dist = "von_mises", args = args, i = i, prep = prep
+  )
+  out <- log_lik_truncate(
+    out, cdf = pvon_mises, args = args, i = i, prep = prep
+  )
+  log_lik_weight(out, i = i, prep = prep)
+}
+
+```
+
+# Dataset with individual heading changes
+
+Generate a dataset for a hypothetical experiment, in which a treatment causes individuals to change their headings.
+
+## Set up population level parameters
+
+The dataset includes repeated measures across individuals, with a large number of observations for each treatment.
+The treatment causes an average change in heading of only 30°.
+Individual directional biases are somewhat correlated ($\kappa=4.0$), the average individual is quite consistent across trials ($\kappa=3.0$) and individuals vary in consistency ($\sigma_\kappa=0.7$).
+
+```{r Parameters for correlated individual heading changes}
+# moderate sample of individuals
+nindiv = 10
+# large sample size per individual
+ndata = 20
+
+#moderate change in heading (30°) with change in treatment
+delta_mu = circular(x = 30,
+                    units = 'degrees',
+                    rotation = 'clock',
+                    zero = pi/2)
+#individual differences with kappa = 4 (both treatments)
+kappa_mu_treat = 4.0
+#average individual quite consistent
+kappa_treat_mean = 3.0
+#large variance in individual consistency
+kappa_treat_sd = 0.7
+
+```
+
+## Simulate individual level parameters
+
+Here, each individual is assigned a unique von\~Mises distribution, parametrised by mean angle $\mu$ and concentration $\kappa$.
+The treatment changes the population mean direction by $\delta_\mu$.
+
+```{r Simulate individuals}
+# circular zero
+c0 = circular(x = 0,
+              units = 'degrees',
+              rotation = 'clock',
+              zero = pi/2)
+
+set.seed(20251029)#Script started
+#individual consistency
+kappa_id_treat = rnorm(n = nindiv,
+                    mean = kappa_treat_mean,
+                    sd = kappa_treat_sd)
+#rectified (kappa must be larger than 0)
+kappa_id_treat[kappa_id_treat<0] = 0
+
+# list of circular datasets
+# set.seed(0120810506)#ISBN Batschelet, 1981
+#generate individual headings for control
+dt_treat = rvonmises(n = nindiv,
+                  mu = c0,
+                  kappa = kappa_mu_treat)
+#generate individual headings after turn (delta mu)
+dt_delta = rvonmises(n = nindiv,
+                     mu = c0+delta_mu,
+                     kappa = kappa_mu_treat)
+
+```
+
+## Generate dataset of trials per individual and treatment
+
+Now, those individual parameters can be used to generate data for each individual and treatment.
+To avoid excessive correlation, different random number seeds are used each time.
+
+```{r Generate and plot dataset}
+
+par(pty = 's')
+par(mar = c(0,0,0,0))
+par(mfrow = c(2*2,ceiling(nindiv/2)))
+#control treatment
+dt_id_treat = mapply(m = dt_treat, 
+                  k = round(kappa_id_treat,2), 
+                  FUN = DescriptCplot,
+                  save_sample = TRUE,
+                  ndata = ndata,
+                  refline = 0,
+                  denscol = NA,
+                  seed = 0120810506 + 1:nindiv, #ISBN Batschelet, 1981
+                  SIMPLIFY = FALSE)
+#experiment treatment
+dt_id_delta = mapply(m = dt_delta, 
+                     k = round(kappa_id_treat,2), 
+                     FUN = DescriptCplot,
+                     save_sample = TRUE,
+                     pcol = 'darkgreen',
+                     ndata = ndata,
+                     refline = 0,
+                     denscol = NA,
+                     seed = 1981 + 1:nindiv,#Publication year Batschelet
+                     SIMPLIFY = FALSE)
+#unlist and compile dataset
+dt_comb_treat = do.call(what = c,
+                     args = dt_id_treat)
+dt_comb_delta = do.call(what = c,
+                        args = dt_id_delta)
+
+treat_data = data.frame(
+              y = as.numeric(
+                      rad( c(dt_comb_treat, dt_comb_delta) )
+                  ),
+               ID = factor(
+                     c(sort(rep(1:nindiv, ndata)),#control
+                        sort(rep(1:nindiv, ndata))),#turn 
+                     ordered = FALSE
+                     ),
+               treatment = sort(rep(1:2 - 1, ndata*nindiv))
+          )
+```
+
+Here we see the population level parameters.
+The average individual turns right by 30°, but each individual turns by a different angle with a concentration of $\kappa=4.0$ across the population of individuals.
+
+```{r Plot population level parameters}
+par(pty = 's')
+par(mar = c(0,0,0,0))
+par(mfrow = c(1,3))
+#Average individual for the control
+DescriptCplot(k = kappa_treat_mean,
+              ndata = ndata,
+              refline = 0,
+              pcol = NA,
+              mvcol = col_rho
+)
+mtext('Average individual:\ncontrol',
+      side = 1,
+      line = 2)
+#Average individual for the treatment
+DescriptCplot(k = kappa_treat_mean,
+              m = as.numeric(30), 
+              ndata = ndata,
+              refline = 0,
+              pcol = NA,
+              mvcol = col_rho
+)
+mtext('Average individual:\ntreatment',
+      side = 1,
+      line = 2)
+#Population individual turn biases
+DescriptCplot(m = as.numeric(delta_mu),
+              k = kappa_mu_treat,
+              ndata = ndata,
+              refline = 0,
+              pcol = NA,
+              mvcol = col_sd
+)
+points.circular(dt_delta,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+mtext('Individual\ntreatment effects',
+      side = 1,
+      line = 2)
+```
+
+# Fit a circular model
+
+## Set up circular modelling functions
+
+In order to fit a circular model using the shifted modulo and softplus links, we need to define a custom family.
+This family requires a custom log probability density function (LPDF), which in this case is just the von\~Mises LPDF, but applied after estimates have been shifted from $[-\infty,\infty]$ to $[-\pi, \pi]$—where von\~Mises LPDF $\>0$ in `Stan`.
+
+```{r Set up the circular model custom family}
+#set up required Stan functions
+#shifted modulo in Stan code
+mod_circular_fun = stanvar(scode = "
+  real mod_circular(real y) {
+    return fmod(y + pi(), 2*pi()) - pi();
+  }
+",
+                           block = 'functions')
+
+#custom likelihood function using the shifted modulo link
+stan_unwrap_fun = stanvar(scode = "
+  real unwrap_von_mises_lpdf(real y, real mu, real kappa) {
+    return von_mises_lpdf(y | mod_circular(mu), kappa);
+  }
+  real unwrap_von_mises_vect_lpdf(vector y, real mu, real kappa) {
+    real tmp = 0;
+    for(i in 1:size(y))
+    {
+    tmp = tmp + unwrap_von_mises_lpdf(y[i] | mu, kappa);
+    }
+      return tmp;
+  }
+  real unwrap_von_mises_rng(real mu, real kappa) {
+    return von_mises_rng( mod_circular(mu) , kappa);
+  }
+",
+                          block = 'functions') 
+
+#Individual headings hyperparameter
+stan_kappamu = stanvar(scode = "
+real kappamu;
+                           ",
+                           block = "parameters") + 
+  stanvar(scode = "
+real kappa_mu = log1p_exp(kappamu);
+          ", 
+          block = 'genquant')
+
+#Individual turns hyperparameter
+stan_kappamudelta = stanvar(scode = "
+real deltakappamu;
+                           ",
+                       block = "parameters") + 
+  stanvar(scode = "
+real kappa_mu_delta = log1p_exp(kappamu + deltakappamu);
+          ", 
+          block = 'genquant')
+
+stan_all = mod_circular_fun + stan_unwrap_fun + 
+            stan_kappamu + stan_kappamudelta
+
+#define the custom family
+unwrap_von_mises = custom_family(
+  name = "unwrap_von_mises",
+  dpars = c("mu",
+            "kappa"),
+  links = c('identity',#N.B. the link function is defined via the LPD function
+            "softplus"), 
+  lb = c(-pi,#lower bound of mu should be -pi
+         0),
+  ub = c(pi,#upper bound of mu should be pi
+         NA),
+  type = "real"#takes continuous response data
+)
+
+```
+
+## Set up the model formula and priors
+
+We can fit models to test three different hypotheses: an effect of treatment on population (and individual) mean angle and consistency (`form_treat`), an effect of treatment on consistency only (`form_kappa`), or no effect of treatment on either (`form_null`) while still accounting for individual differences.
+With `BRMS` these can be fitted as non-linear models, in which $\mu$ is the sum of the population level mean angle (`pmu`) and individual mean angles (`imu`).
+
+Each parameter needs a carefullly-chosen prior.
+Here the prior on the concentration of individual biases $\kappa_\mu$ is set to expect partial pooling: by default individuals should be similar ($50\%$ probability density in $[10, 22]$), but with some probability that individual headings are weakly correlated ($\kappa_\mu \approx 1.0$) or uncorrelated ($\kappa_\mu \approx 0.0$).
+
+```{r Formula for a circular GLMM}
+form_treat = bf(y ~ mu, #observed angle is predicted by mean angle
+             nlf(mu ~ pmu + imu), #mean angle is predicted by the sum of population and individual means
+             pmu ~ 1 + treatment, 
+             imu ~ 0 + ID + treatment + treatment:ID,
+             kappa ~ 1 + treatment + (1 + treatment|ID),
+             nl = TRUE)
+#model without effect of treatment on mu
+form_kappa = bf(y ~ mu, #observed angle is predicted by mean angle
+             nlf(mu ~ pmu + imu), #mean angle is predicted by the sum of population and individual means
+             pmu ~ 1 , 
+             imu ~ 0 + ID ,
+             kappa ~ 1 + treatment + (1 + treatment|ID),
+             nl = TRUE)
+#null model without effect of treatment
+form_null = bf(y ~ mu, #observed angle is predicted by mean angle
+             nlf(mu ~ pmu + imu), #mean angle is predicted by the sum of population and individual means
+             pmu ~ 1 , 
+             imu ~ 0 + ID ,
+             kappa ~ 1  + (1 |ID),
+             nl = TRUE)
+
+#priors chosen for parameter recovery
+prior_treat = prior('normal(0, 2*pi())',class = 'b', nlpar = 'pmu') + #wider prior helps avoid bias
+  prior('unwrap_von_mises(0, 0.3)',class = 'b', nlpar = 'pmu', coef = 'treatment') + #expectation of moderate sized turns
+  set_prior(paste("target +=", 
+                  'unwrap_von_mises_vect_lpdf(b_imu[1:N_1] | 0, log1p_exp(kappamu))',
+                     '+ normal_lpdf(b_imu[1:N_1] | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
+                     ),
+            check = FALSE) +
+  set_prior(paste("target +=", 
+                  'unwrap_von_mises_vect_lpdf(b_imu[(N_1 + 1) : (M_1 * N_1)] | 0, log1p_exp(kappamu+deltakappamu))',
+                     '+ normal_lpdf(b_imu[(N_1 + 1) : (M_1 * N_1)] | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
+                     ),
+            check = FALSE) +
+  # set_prior("target += normal_lpdf(kappamu | 3.0, 3.0)", #prior to higher values, indiv differences should be small
+  set_prior("target += lognormal_lpdf(log1p_exp(kappamu) | log(15), 0.6)", #shrinkage prior, 
+            check = FALSE) +
+  # set_prior("target += normal_lpdf(deltakappamu | 0.0, 1.0)", #turns should follow individual distribution
+  #           check = FALSE) +
+  set_prior("target += lognormal_lpdf(log1p_exp(kappamu + deltakappamu) | log(15), 0.6)", #prior to higher values, indiv differences should be small
+            check = FALSE) +
+  prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('normal( 0.0, 3.0)', class = 'b', dpar = 'kappa', coef = 'treatment') + #turns should not affect population accuracy
+  prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa') +  #now expect substantial variation, but too much makes sampling unstable
+  prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa', coef = 'treatment', group = 'ID') #now expect substantial variation, but too much makes sampling unstable
+
+#priors chosen for parameter recovery
+prior_kappa = prior('normal(0, 2*pi())',class = 'b', nlpar = 'pmu') + #wider prior helps avoid bias
+  set_prior(paste("target +=", 
+                  'unwrap_von_mises_vect_lpdf(b_imu[1:N_1] | 0, log1p_exp(kappamu))',
+                     '+ normal_lpdf(b_imu[1:N_1] | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
+                     ),
+            check = FALSE) +
+  set_prior("target += lognormal_lpdf(log1p_exp(kappamu) | log(15), 0.6)", #shrinkage prior, 
+            check = FALSE) +
+  # set_prior("target += normal_lpdf(deltakappamu | 0.0, 1.0)", #turns should follow individual distribution
+  #           check = FALSE) +
+  set_prior("target += lognormal_lpdf(log1p_exp(kappamu + deltakappamu) | log(15), 0.6)", #prior to higher values, indiv differences should be small
+            check = FALSE) +
+  prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('normal( 0.0, 3.0)', class = 'b', dpar = 'kappa', coef = 'treatment') + #turns should not affect population accuracy
+  prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa') +  #now expect substantial variation, but too much makes sampling unstable
+  prior('student_t(3, 0, 1.0)', class = 'sd', dpar = 'kappa', coef = 'treatment', group = 'ID') #now expect substantial variation, but too much makes sampling unstable
+
+#priors for null model
+prior_null = prior('normal(0, 2*pi())',class = 'b', nlpar = 'pmu') + #wider prior helps avoid bias
+  set_prior(paste("target +=", 
+                  'unwrap_von_mises_vect_lpdf(b_imu[1:N_1] | 0, log1p_exp(kappamu))',
+                     '+ normal_lpdf(b_imu[1:N_1] | 0, 2*pi())'# additional prior to keep estimates from walking around the circle
+                     ),
+            check = FALSE) +
+  # set_prior("target += normal_lpdf(kappamu | 3.0, 3.0)", #prior to higher values, indiv differences should be small
+  set_prior("target += lognormal_lpdf(log1p_exp(kappamu) | log(15), 0.6)", #shrinkage prior, 
+            check = FALSE) +
+  # set_prior("target += normal_lpdf(deltakappamu | 0.0, 1.0)", #turns should follow individual distribution
+  #           check = FALSE) +
+  set_prior("target += lognormal_lpdf(log1p_exp(kappamu + deltakappamu) | log(15), 0.6)", #prior to higher values, indiv differences should be small
+            check = FALSE) +
+  prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa') #now expect substantial variation, but too much makes sampling unstable
+
+
+```
+
+For this size of dataset, expect model fitting to take around 10 minutes.
+
+## Fit the model
+
+```{r Fit the circular GLMM}
+glmm_treatment = brm(
+  formula = form_treat,
+  data = treat_data,
+  family = unwrap_von_mises,
+  stanvars = stan_all,
+  prior = prior_treat,
+  cores = 4,
+  silent = 1, # without printing
+  refresh = 1000, # echo chain progress every n iterations
+  backend = 'cmdstan',
+  save_pars = save_pars(all = TRUE),
+  control = list(adapt_delta = 0.97)#slower, but more robust sampling
+)
+
+glmm_kappa = brm(
+  formula = form_kappa,
+  data = treat_data,
+  family = unwrap_von_mises,
+  stanvars = stan_all,
+  prior = prior_kappa,
+  cores = 4,
+  silent = 1, # without printing
+  refresh = 1000, # echo chain progress every n iterations
+  save_pars = save_pars(all = TRUE),
+  backend = 'cmdstan',
+  control = list(adapt_delta = 0.97)#slower, but more robust sampling
+)
+
+glmm_null = brm(
+  formula = form_null,
+  data = treat_data,
+  family = unwrap_von_mises,
+  stanvars = stan_all,
+  prior = prior_null,
+  cores = 4,
+  silent = 1, # without printing
+  refresh = 1000, # echo chain progress every n iterations
+  save_pars = save_pars(all = TRUE),
+  backend = 'cmdstan',
+  control = list(adapt_delta = 0.97)#slower, but more robust sampling
+)
+```
+
+We can now inspect the convergence heuristics of each model, which are a prerequisite for comparing them.
+Since circular estimates are periodic and unbounded, chains may have estimates separated by multiples of $2\pi$, which triggers warnings.
+These estimates need to be transformed before convergence can be assesses.
+We will first focus on the linear parameters.
+
+```{r Check convergence of linear parameters}
+#extract the medians of all linear parameters
+sm_treat = summary(glmm_treatment, robust = TRUE)
+sm_kappa = summary(glmm_kappa, robust = TRUE)
+sm_null = summary(glmm_null, robust = TRUE)
+```
+
+```{r Inspect treatment model}
+#treatment model
+print(sm_treat$fixed[c('kappa_Intercept',
+                      'kappa_treatment'
+                     ),],
+      digits = 3)
+print(sm_treat$spec_pars,
+      digits = 3)
+
+plot(glmm_treatment,
+     variable = c('kappa_Intercept',
+                  'kappa_treatment',
+                  'kappa_mu',
+                  'kappa_mu_delta'
+                  ),
+     regex = TRUE,
+     ask = FALSE)
+```
+
+```{r Inspect kappa model}
+#kappa model
+print(sm_kappa$fixed[c('kappa_Intercept',
+                      'kappa_treatment'
+                     ),],
+      digits = 3)
+print(sm_kappa$spec_pars,
+      digits = 3)
+
+plot(glmm_kappa,
+     variable = c('kappa_Intercept',
+                  'kappa_treatment',
+                  'kappa_mu'
+                  ),
+     regex = TRUE,
+     ask = FALSE)
+```
+
+```{r Inspect null model}
+#null model
+print(sm_null$fixed[c('kappa_Intercept'
+                     ),],
+      digits = 3)
+print(sm_null$spec_pars,
+      digits = 3)
+
+
+plot(glmm_null,
+     variable = c('kappa_Intercept',
+                  'kappa_treatment',
+                  'kappa_mu',
+                  'kappa_mu_delta'
+                  ),
+     regex = TRUE,
+     ask = FALSE)
+```
+
+We can now transform the circular parameters to their circular mean $\pm \pi$.
+This has the opposite effect on the $\hat{R}$, now the limited range gives some values $< 0.999$.
+Plotting the transformed chains we can see that the estimates do indeed line up after the transform.
+
+```{r Check circular parameters}
+#treatment model
+#population mean angle
+UnwrapRhats(glmm_treatment, variable = 'pmu')
+#individual mean angles
+UnwrapRhats(glmm_treatment, variable = 'imu')
+plot(glmm_treatment,
+     variable = 'pmu',
+     transform = unwrap_circular_deg,
+     regex = TRUE,
+     ask = FALSE)
+
+#kappa model
+#population mean angle
+UnwrapRhats(glmm_kappa, variable = 'pmu')
+#individual mean angles
+UnwrapRhats(glmm_kappa, variable = 'imu')
+plot(glmm_kappa,
+     variable = 'pmu',
+     transform = unwrap_circular_deg,
+     regex = TRUE,
+     ask = FALSE)
+
+#null model
+#population mean angle
+UnwrapRhats(glmm_null, variable = 'pmu')
+#individual mean angles
+UnwrapRhats(glmm_null, variable = 'imu')
+plot(glmm_null,
+     variable = 'pmu',
+     transform = unwrap_circular_deg,
+     regex = TRUE,
+     ask = FALSE)
+```
+
+# Test hypothesis of treatment effect
+
+To compare the predictive power of the models, we can use leave-one-out cross-validation (LOO-CV) to calculate the estimated log predictive density (ELPD) and its standard error for each model.
+A good model increases ELPD.
+
+```{r LOO-CV for model comparison}
+#better predictions should justify fitting a treatment model 
+loo_null = loo(glmm_null, moment_match = TRUE)
+loo_kappa = loo(glmm_kappa, moment_match = TRUE)
+loo_treat = loo(glmm_treatment, moment_match = TRUE)
+lc_nulltreat = loo_compare(loo_null, loo_kappa, loo_treat)
+print(lc_nulltreat)
+```
+
+We can plot this model comparison to get an impression of the scale of the difference in plausibility between the hypotheses.
+
+```{r Plot the model comparison}
+
+lc_plot = data.frame(elpd = c(loo_null$estimates['elpd_loo','Estimate'],
+                              loo_kappa$estimates['elpd_loo','Estimate'],
+                              loo_treat$estimates['elpd_loo','Estimate'],
+                              loo_kappa$estimates['elpd_loo','Estimate'] - lc_nulltreat[2,'elpd_diff']),
+                     se = c(loo_null$estimates['elpd_loo','SE'],
+                            loo_kappa$estimates['elpd_loo','SE'],
+                            loo_treat$estimates['elpd_loo','SE'],
+                            lc_nulltreat[2,'se_diff'])
+                     )
+
+par(mar = c(0,4,0,4),
+    mfrow = c(1,1))
+plot(x = 1:dim(lc_plot)[1],
+     y = lc_plot$elpd,
+     xlab = '',
+     ylab = 'expected log predictive density',
+     xlim = c(1,dim(lc_plot)[1]) + c(-1,1)*0.5,
+     ylim = with(lc_plot, {range(elpd+se%*% t(c(-2,2)))}), #within 2sigma of all estimates
+     pch = 19,
+     col = c(col_obs, col_kappa, col_sd, col_rho),
+     cex = 2,
+     axes = FALSE)
+with(lc_plot,
+     {
+arrows(x0 = 1:dim(lc_plot)[1],
+       x1 = 1:dim(lc_plot)[1],
+       y0 = elpd - se,
+       y1 = elpd + se,
+       code = 3,
+       angle = 90,
+       length = 0.1,
+       lwd = 3,
+       col =  c(col_obs, col_kappa, col_sd, col_rho)
+       )
+     }
+)
+axis(2,
+     at = pretty(c(0,
+                   with(lc_plot, {range(elpd+se%*% t(c(-2,2)))}))
+                 )
+     )
+axis(4,
+     at = with(lc_plot,
+               {
+               seq(from = elpd[2], to = elpd[dim(lc_plot)[1]] + se[dim(lc_plot)[1]]*4, by = 20)
+               }
+               ),
+     labels = with(lc_plot,
+                          {
+                            seq(from = 0, to =  elpd[dim(lc_plot)[1]] + se[dim(lc_plot)[1]]*4 - elpd[2],  by = 20)
+                          }
+     )
+)
+abline(h = lc_plot$elpd[2],
+       col = 'gray')
+mtext(text = 'ELPD difference',
+      side = 4,
+      line = 3
+      )
+mtext(side = 1,
+      line = -1,
+      at = 1:dim(lc_plot)[1],
+     text = c('null\nmodel',
+              'kappa\nmodel',
+              'mu & kappa\nmodel',
+              'difference'),
+     col = c(col_obs, col_kappa, col_sd, col_rho)
+     )
+
+
+```
+
+# Plot model predictions
+
+We can also extract the model predictions.
+Since we simulated the data, we can compare the model estimates (red and yellow shaded regions) with the true parameters.
+
+```{r Model predictions}
+
+
+draws_treat = as_draws_df(glmm_treatment)
+
+par(pty = 's')
+par(mar = c(0,0,0,0),
+    mfrow = c(2*2,ceiling(nindiv/2)))
+#control
+for(i in 1:length(dt_treat) )
+{
+  mu_name = paste0('b_imu_ID',i)
+  kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
+  PCfun(dt_id_treat[[i]],
+        col = col_obs,
+        sep = 0.05,
+        shrink = 1.25,
+        plot_rho = FALSE)
+  Draws2Cont(draws_treat,
+             x_string = 'sin(b_pmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+             y_string = 'cos(b_pmu_Intercept + get(mu_name))*
+                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+             ngrid = 100, # needs higher resolution to avoid spillover
+             cropc = TRUE
+  )
+  arrows.circular(x = dt_treat[i],
+                  y = A1(kappa_id_treat[i]),
+                  col = col_obs,
+                  lwd = 5,
+                  length = 0.1/1.25
+  )
+  with(draws_treat,
+       arrows.circular(x = median.circular(
+         circular(x = 
+                    mod_circular(b_pmu_Intercept + get(mu_name)),
+                  units = 'radians',
+                  rotation = 'clock',
+                  zero = pi/2)
+       )[1],
+       y = A1(softplus(median(Intercept_kappa+get(kappa_name)))),
+       lwd = 2,
+       length = 0.1/1.25,
+       col = adjustcolor(col_sd, alpha.f = 200/255))
+  )
+}
+#treatment
+for(i in 1:length(dt_delta) )
+{
+  mu_name = paste0('b_imu_ID',i)
+  mu_delta_name = if(i>1)
+                  {paste0('b_imu_ID',i , ':treatment')}else
+                  {paste0('b_imu_', 'treatment')}
+  kappa_name = paste0('r_ID__kappa[',i,',Intercept]')
+  kappa_delta_name = paste0('r_ID__kappa[',i,',treatment]')
+  PCfun(dt_id_delta[[i]],
+        col = 'darkgreen',
+        sep = 0.05,
+        shrink = 1.25,
+        plot_rho = FALSE)
+  Draws2Cont(draws_treat,
+             x_string = 'sin(b_pmu_Intercept + b_pmu_treatment + get(mu_name) + get(mu_delta_name))*
+                         A1(softplus(Intercept_kappa+b_kappa_treatment+get(kappa_name)+get(kappa_delta_name)))',
+             y_string = 'cos(b_pmu_Intercept + b_pmu_treatment + get(mu_name) + get(mu_delta_name))*
+                         A1(softplus(Intercept_kappa+b_kappa_treatment+get(kappa_name)+get(kappa_delta_name)))',
+             ngrid = 100, # needs higher resolution to avoid spillover
+             cropc = TRUE
+            )
+  arrows.circular(x = dt_delta[i],
+                  y = A1(kappa_id_treat[i]),
+                  col = 'darkgreen',
+                  lwd = 5,
+                  length = 0.1/1.25
+  )
+  with(draws_treat,
+       arrows.circular(x = median.circular(
+         circular(x = 
+                    mod_circular(b_pmu_Intercept+ b_pmu_treatment + get(mu_name)  + get(mu_delta_name)),
+                  units = 'radians',
+                  rotation = 'clock',
+                  zero = pi/2)
+       )[1],
+       y = A1(softplus(median(Intercept_kappa + b_kappa_treatment + get(kappa_name) + get(kappa_delta_name)))),
+       lwd = 2,
+       length = 0.1/1.25,
+       col = adjustcolor(col_sd, alpha.f = 200/255))
+  )
+}
+```
+
+We can also compare the model parameters with the population parameters.
+Here we see that the estimates of the population mean angle favour a right turn, but there is a lot of uncertainty about the exact size of the turn, or even whether it was to the right or the left.
+This is influenced by the wide spread of individual mean angles and turn angles, which the model recovered well.
+
+```{r Plot population parameters}
+par(mfrow = c(1,4))
+#Add the population of biases
+DescriptCplot(k = kappa_mu_treat,
+              ndata = nindiv,
+              refline = 0,
+              denscol = NA,
+              pcol = NA,
+              mvcol = col_obs
+)
+points.circular(dt_treat,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+
+Draws2Cont(draws = draws_treat,
+           x_string = 'sin(b_pmu_Intercept)*
+             A1(kappa_mu)',
+           y_string = 'cos(b_pmu_Intercept)*
+             A1(kappa_mu)',
+           ngrid = 100, # needs higher resolution to avoid spillover
+           cropc = TRUE
+)
+
+with(draws_treat,
+     arrows.circular(x = mean.circular(circular(b_pmu_Intercept,
+                                                units = 'radians',
+                                                rotation = 'clock',
+                                                zero = pi/2)
+     )[1],
+     y = A1(median(kappa_mu)),
+     lwd = 2,
+     length = 0.1/1.25,
+     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+
+#Add the population of turns
+DescriptCplot(m = delta_mu,
+              k = kappa_mu_treat,
+              ndata = nindiv,
+              refline = 0,
+              denscol = NA,
+              pcol = NA,
+              mvcol = 'darkgreen'
+)
+points.circular(dt_delta,
+                bins = 360/5-1,
+                stack = TRUE,
+                sep = 0.05,
+                shrink = 1.25,
+                col = col_rho
+)
+
+Draws2Cont(draws = draws_treat,
+           x_string = 'sin(b_pmu_treatment)*
+             A1(kappa_mu_delta)',
+           y_string = 'cos(b_pmu_treatment)*
+             A1(kappa_mu_delta)',
+           ngrid = 100, # needs higher resolution to avoid spillover
+           cropc = TRUE
+)
+with(draws_treat,
+     arrows.circular(x = mean.circular(circular(b_pmu_treatment,
+                                                units = 'radians',
+                                                rotation = 'clock',
+                                                zero = pi/2)
+     )[1],
+     y = A1(median(kappa_mu_delta)),
+     lwd = 2,
+     length = 0.1/1.25,
+     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+
+#Add description of the average individual
+DescriptCplot(k = kappa_treat_mean,
+              ndata = ndata/2,
+              refline = 0,
+              denscol = NA,
+              pcol = NA,
+              mvcol = col_obs
+)
+Draws2Cont(draws = draws_treat,
+           x_string = 'sin(b_pmu_Intercept)*
+             A1(softplus(Intercept_kappa))',
+           y_string = 'cos(b_pmu_Intercept)*
+             A1(softplus(Intercept_kappa))',
+           ngrid = 100, # needs higher resolution to avoid spillover
+           cropc = TRUE
+)
+with(draws_treat,
+     arrows.circular(x = mean.circular(circular(b_pmu_Intercept,
+                                                units = 'radians',
+                                                rotation = 'clock',
+                                                zero = pi/2)
+     )[1],
+     y = A1(softplus(median(Intercept_kappa))),
+     lwd = 2,
+     length = 0.1/1.25,
+     col = adjustcolor(col_sd, alpha.f = 200/255))
+)
+
+
+
+with(draws_treat,
+     VertHist(data = unwrap_circular_deg(b_pmu_treatment),
+              main = 'change in mean angle',
+              ylim = c(-180, 180),
+              col = adjustcolor(col_sd, alpha.f = 100/255),
+              cex.axis = 0.7,
+              axes = FALSE))
+axis(side = 1)
+axis(side = 2,
+     at = -6:6*(180/6) )
+abline(h = 0,
+       col = 'gray',
+       lwd = 7)
+
+#estimate somewhat favours a turn
+with(draws_treat,
+     paste0(mean(b_pmu_treatment > 0)*100, '%') 
+)
+
+```
