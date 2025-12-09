@@ -15,7 +15,7 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Details
+# Details
 
 **DESCRIPTION**
 
@@ -31,7 +31,7 @@ Plotted results.
 
 **REFERENCES**
 
-**data types**
+**data types (inspired by)**
 
 Duelli P & Wehner R (1973) The Spectral Sensitivity of Polarized Light Orientation in Cataglyphis bicolor (Formicidae , Hymenoptera ) *Journal of Comparative Physiology* 53(3) 37-53
 
@@ -45,18 +45,18 @@ Edrich W, Neumeyer C & von Helversen, O.
 *J. Comp. Physiol.* 134, 151–157.
 
 Dreyer D, Frost B, Mouritsen H, Günther A, Green K, Whitehouse M, Johnsen S, Heinze S & Warrant E (2018) The Earth’s Magnetic Field and Visual Landmarks Steer Migratory Flight Behavior in the Nocturnal Australian Bogong Moth.
-Current Biology *28*, 2160-2166.e5.
+*Current Biology* *28*, 2160-2166.e5.
 <https://doi.org/10.1016/j.cub.2018.05.030>.
 
 Baird E, Byrne MJ, Scholtz CH, Warrant E, Dacke M (2010) Bearing selection in ball-rolling dung beetles: is it constant?
-*Journal of comparative physiology A* 196:801–6.
+*Journal of Comparative Physiology A* 196:801–6.
 <https://doi.org/10.1007/s00359-010-0559-8>
 
 Giraldo YM, Leitch KJ, Ros IG, Warren TL, Weir PT & Dickinson M H (2018).
 Sun Navigation Requires Compass Neurons in Drosophila.
 *Current Biology* 28, 2845-2852.e4.
 
-Kishkinev D, Packmor F, Zechmeister T, Winkler H-C, Chernetsov N, Mouritsen H, Holland RA (2021) Navigation by extrapolation of geomagnetic cues in a migratory songbird.
+Kishkinev D, Packmor F, Zechmeister T, Winkler H-C, Chernetsov N, Mouritsen H & Holland RA (2021) Navigation by extrapolation of geomagnetic cues in a migratory songbird.
 *Current Biology* 12(31) 7, 1563-1569.e4 <https://doi.org/10.1016/j.cub.2021.01.051>
 
 **modelling methods**
@@ -89,12 +89,15 @@ Implicitly adaptive importance sampling.
 *Statistics and Computing* 31, 16.
 <doi:10.1007/s11222-020-09982-2>.
 
-> **TODO**
->
-> -   move necessary functions to unwrap_functions.R
-> -   make functions for result extraction from BRMS
+# Motivation
 
-## Set up workspace
+These simulated circular datasets provide examples of effects on mean direction, concentration, and individual differences.
+Fitted circular models are used to estimate these effects and compare hypotheses about their causes.
+
+# Set up workspace
+
+Before generating these examples, we need to load the appropriate functions.
+Make sure that the `circular`, `cmdstanr` and `brms` are installed, and (on Windows) that you have installed the latest version of [Rtools](https://cran.r-project.org/bin/windows/Rtools/).
 
 ```{r Load functions and packages}
 source('unwrap_functions.R')
@@ -153,18 +156,20 @@ The data are very far from uniform ($\kappa = 10$), and the mean angle is very c
 Even so, the data show a trend away from the expected angle, 75% of points falling to the left of 0°.
 
 ```{r v-test for uniformity}
-mean(cd_divergence < 0)#proportion left of o°
+mean(cd_divergence < 0)#proportion left of 0°
 rayleigh.test(cd_divergence, mu = c0)#v-test with 0° expected direction
 
 ```
+
+We can gain more information about any potential differences between the mean direction and the expected angle by fitting a circular generalised linear model (GLM) that estimates the mean direction ($\mu$) for this dataset.
 
 ## Fit the model
 
 In order to fit a circular model using the circular modulo and softplus links, we need to define a custom family.
 This family requires two `Stan` functions.
-One executes the circular modulo transform and the other uses this transform on estimates of $\mu$ before calculating the log-probability of data $y$ using the von Mises log-probability function (LPDF).
+One executes the circular modulo transform and the other uses this transform on estimates of $\mu$ before calculating the log-probability of data $y$ using the von Mises log-probability-density function (LPDF).
 This function will be called whenever the family is used, or the prior for a variable is set to `unwrap_von_mises`.
-Since this applies the circular modulo link function, so we set the link function for $\mu$ to "identity", and the link function for $\kappa$ to "softplus" ($\log(\exp(x)+1))$), which ensures estimates of $\kappa$ remains strictly positive.
+Since this applies the circular modulo link function, so we set the link function for $\mu$ to "identity", and the link function for $\kappa$ to "softplus" ($\log(\exp(x)+1))$), which ensures estimates of $\kappa$ remain strictly positive.
 
 ```{r Set up the circular model custom family}
 #set up required Stan functions
@@ -235,13 +240,13 @@ model_divergence = brm(formula = form_divergence,
 summary(model_divergence)
 ```
 
-Since the mean direction is far from the wrap-point ($-\pi$ or $\pi$), the `Rhat` convergence heuristic for the mu `Intercept` can be interpreted on the linear scale.
-`Rhat` values for both parameters are $<1.01$ and effective sample size (ESS) indicates most of the 4000 draws explored the posterior distribution efficiently, so we can assume that this model has converged.
+Since the mean direction is far from the wrap-point ($-\pi$ or $\pi$), the `Rhat` convergence heuristic for the $\mu$ `Intercept` can be interpreted on the linear scale.
+`Rhat` values for both parameters are $<1.01$ and effective sample size (ESS) indicates most of the 4000 draws (estimates) explored the posterior distribution efficiently, so we can assume that this model has converged.
 
 To inspect the model's predictions, we can extract the post-warmup draws from the model and plot the posterior distribution of estimates alongside the original data.
-Since we simulated the data, we can also compare the model estimates with the true parameters.
+Since we simulated the data, we can also compare the model estimates with the true parameters (a luxury we do not have for genuine datasets).
 $\mu$ `Intercept` can be plotted as an angle in radians on its original scale.
-For $\kappa$, we need to convert estimates to the correct scale using the `softplus` transform, and then convert it to mean-vector-length scale using the `A1` function.
+For $\kappa$, we need to convert estimates to the correct scale using the `softplus` transform, and then calculate its mean-vector-length equivalent using the `A1` function.
 There are `4000` posterior estimates, so rather than plotting all of them we'll summarise them as the medians of $\mu$ and $\kappa$ estimates and the normalised 2D kernel density (red and yellow shaded region) of their mean-vector equivalent.
 
 ```{r Plot the model fitted for divergence data}
