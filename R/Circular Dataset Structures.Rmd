@@ -1916,11 +1916,11 @@ form_hd = bf(y ~ mu,
 ```
 
 While the linear formula for $\kappa$ automatically generates the corresponding hyperparameter for the effect of treatment on individual differences in concentration (${\sigma_\kappa}_m$), for the non-linear formula we need to add a treatment effect on the concentration of individual heading biases.
-This is modelled as a change in $\kappa_\mu$ (${\kappa_\mu}_m$) the inverse-softplus scale (${\kappa_\mu}_m \sim \log(\exp({k_\mu}_0 + {k_\mu}_x)+1)$).
-This informs the prior for individual heading biases in the treatment condition (${\beta_i}_m \sim \mathcal{M}(0°, {\kappa_\mu}_m)$) in the same way that $\kappa_\mu$ does for $\beta_i$ in the control.
+This is modelled as a change in $\kappa_\mu$ ($\kappa_{\mu,m}$) the inverse-softplus scale ($\kappa_{\mu,m} \sim \log(\exp(k_{\mu,0} + k_{\mu,x})+1)$).
+This informs the prior for individual heading biases in the treatment condition ($\beta_{i,m} \sim \mathcal{M}(0°, \kappa_{\mu,m})$) in the same way that $\kappa_\mu$ does for $\beta_i$ in the control.
 `BRMS` generates variables in Stan that represent the number of individuals (`N_1`) and number of conditions (`M_1`).
 Since there are only two conditions, and all individuals experience both treatments once, we can identify the individual parameters for the control as 'slices' of the `b_betai` vector: `b_betai[1:N_1]` and those for the treatment as `b_betai[(N_1+1):(M_1*N_1)]`.
-By default we expect no effect of treatment on $\kappa_\mu$, but moderate increases or decreases are quite plausible, so an appropriate prior is a normal distribution centred at no-change: ${\kappa_\mu}_m \sim \mathcal{N}(0,1)$.
+By default we expect no effect of treatment on $\kappa_\mu$, but moderate increases or decreases are quite plausible, so an appropriate prior is a normal distribution centred at no-change: $\kappa_{\mu,m} \sim \mathcal{N}(0,1)$.
 
 ```{r Fit model for individual heading change}
 
@@ -1970,6 +1970,8 @@ print(sm_hd, digits = 2)
 UnwrapRhats(model_hd,
             variable = '^b_beta')
 ```
+
+From the raw coefficients, we can already see that parameter recovery has been successful for $\kappa$ and $\kappa_\mu$, even with this minimal sample size. Both the population mean $\kappa$ and the (inverse-softplus scaled) estimate of $\sigma_\kappa$ are close to their true values. The data for the treatment are quite different, even though their true generative distribution differs only in population mean direction ($\mu = \beta_0 + \beta_m$), and as a result there is some uncertainty regarding the effect of treatment $x$ on $\kappa$, $\kappa_\mu$ and $\sigma_\kappa$. For `kappa_x` there is substantial posterior density for both increases and decreases in concentration in the treatment condition (95\% CI: -0.45–4.42), and the range of estimates for `kappa_mu_x` ($\log(\exp(k_{\mu,0} + k_{\mu,x})+1)$) almost entirely overlaps with that for `kappa_mu` in the control condition. Large inter-individual variation in treatment effects on concentration (`sd(kappa_x)`) are estimated, and their correlation with individuals concentration differences for the control also has substantial posterior density for both correlation and anti-correlation (95\% CI  `cor(kappa_Intercept,kappa_x)`: -0.67–0.99), (correctly) suggesting no relationship between variation in the two conditions.
 
 ## Test hypothesis of treatment effect
 
