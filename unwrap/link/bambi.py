@@ -13,3 +13,9 @@ LINKS = {
     )
     for name in common_keys
 }
+
+# Export each link as a module-level variable
+globals().update(LINKS)
+
+# Optional: define __all__ for clean imports
+__all__ = list(LINKS.keys()) + ["LINKS"]
