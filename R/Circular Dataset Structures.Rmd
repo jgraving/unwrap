@@ -123,7 +123,6 @@ col_treat = '#006400' # colour for treatment observations
 ![Desert ants of the genus *Cataglyphis* are known for their use of path integration (dead reckoning) to return to their nest. Disruption of visual orientation cues can result in deviations from the expected homewards direction.](icons/ant.png)
 
 
-
 In navigation experiments, return directions are often compared with the expected home direction to determine whether homeward navigation is perturbed.
 Here, we simulate example data (𝑛 = 20) generated from a distribution with a mean that differs from the expected direction (0°) by only 15°.
 
@@ -405,8 +404,6 @@ If the divergence model had higher predictive power, but within one standard err
 
 ![Sandhoppers (*Talitridae*) forage along beaches, following the movement of the sea to avoid drying out. Their movement is guided by celestial cues, including the moon.](icons/sandhopper.png)
 
-
-
 If the expected direction is not known, it can be estimated from control data.
 This estimate can then be compared with treatment data, to determine whether the treatment alters orientation.
 In this example, the treatment induces a rightward turn of 30°, changing $\mu$ from 180° to 210°.
@@ -659,8 +656,6 @@ Conversely, we can conclude that there was no effect of treatment on concentrati
 
 ![Honeybees performing a "waggle dance" on a horizontal observation hive that view a green light-spot, orient their dances as if viewing the sun. The concentration of a series of dance directions decreases when the brightness of this light spot is reduced.](icons/honeybee.png)
 
-
-
 An experimental treatment may also affect concentration independently of mean direction.
 In this example the simulated data for the treatment has exactly the same $\mu$ (0°) as the control, but $\kappa$ decreases by $>80\%$.
 
@@ -856,8 +851,6 @@ As we might have also expected, the effect of treatment on $\mu$, present in our
 # High inter-individual correlation
 
 ![Tethered Bogong moths can be induced to fly in "flight simulators", which allows repeated measurements of flight directions across multiple individuals simultaneously. Individual directional biases may differ somewhat, but are typically highly correlated, aligning with the population's migratory direction.](icons/moth.png)
-
-
 
 In datasets that include repeated measurements across individuals, it is necessary to account for individual differences before attempting to identify any population level trends.
 In the simplest case, the orientation behaviour of different individuals is very similar: for example, all individuals may share a common goal direction $\beta_0$, but differ in alignment with that direction by their individual offsets from that direction $\beta_i$.
@@ -1172,8 +1165,6 @@ Despite the bias towards high concentration for $\kappa_\mu$, all individual bia
 
 ![When rolling a dung ball, ball-rolling dung beetles can be repeatedly returned to the centre of a circular arena on exiting, resulting in repeated measurements of exit direction. While a single individual exits consistently in the same direction, there is typically no relationship between individual directional biases.](icons/beetle.png)
 
-
-
 Individuals within the same population do not necessarily share similar directional biases, and where they do this relationship may be weak (low correlation).
 In this example each individual's headings have a high concentration ($\kappa=5.0$), but the concentration across individual directional biases is low ($\kappa_\mu = 0.1$).
 As before, the mean direction of the generative distribution is at 0°, but, due to the greater probability of observations distant from this mean direction, this is not necessarily reflected by the mean of individuals in our sample.
@@ -1472,8 +1463,6 @@ Nonetheless, both models recover the concentration of the average individual's h
 
 ![Tethered vinegar flies (*Drosophila*) can be induced to fly in a "virtual reality" LED arena, in which their wing motion causes visual cues to rotate. A green light spot induces orientation behaviour, with a weak population level bias towards the light, but highly variable performance across individuals.](icons/fly.png)
 
-
-
 In most datasets, we can reasonably expect inter-individual variation for both $\mu$ and $\kappa$: individuals may differ in perceived or genuine goal direction, accuracy and consistency.
 In this example, there is an moderate concentration across individual biases ($\kappa_\mu = 1.0$), and the average individual's headings are somewhat concentrated ($\alpha_0 = 1.5$).
 However, the concentration within each individual's headings varies ($\sigma_\kappa = 0.5$) with a standard deviation 1/3 of the mean.
@@ -1714,12 +1703,9 @@ axis(1)
 axis(2, at = -6:6*30)
 ```
 
-
 # Individual heading changes parameters
 
 ![Birds exhibiting migratory restlessness hop repeatedly in their intended flight direction, allowing this to be recorded repeatedly for the same individuals across multiple nights. Individuals may differ somewhat in their hopping directions, but are generally aligned provided they detect the same compass cues. A treatment that affects their perception of these cues causes the entire population to change their hopping direction.](icons/bird.png)
-
-
 
 In many experimental designs, we are interested in determining the effect of an experimental treatment on orientation behaviour, just as we did for our examples without repeated-measures.
 In the context of multiple individuals, the treatment may affect $\mu$ and $\kappa$ for the average individual, as well as the hyperparameters $\kappa_\mu$ and $\sigma_\kappa$ that define the distributions of individual differences.
@@ -1983,7 +1969,7 @@ real kappa_mu_x = log1p_exp(softkappamu + softkappamux);
 prior_hd = prior('normal(0, 3*pi()/2)',class = 'b', nlpar = 'beta0') + #wider prior helps avoid bias
   prior('normal(0, pi()/2)',class = 'b', nlpar = 'beta0', coef = 'x') + #expectation of moderate sized turns
   set_prior(prior = 'target += unwrap_von_mises_vect_lpdf(b_betai[1:N_1] | 0, log1p_exp(softkappamu))', check = FALSE) + #prior for the control
-set_prior(prior = 'target += unwrap_von_mises_vect_lpdf(b_betai[(N_1+1):(M_1*N_1)] | 0, log1p_exp(softkappamu+softkappamux))', check = FALSE) + #prior for the treatment (2nd N_1 betai estimates)
+set_prior(prior = 'target += unwrap_von_mises_vect_lpdf(b_betai[1:N_1] + b_betai[(N_1+1):(M_1*N_1)] | 0, log1p_exp(softkappamu+softkappamux))', check = FALSE) + #prior for the treatment (2nd N_1 betai estimates)
 set_prior(prior = 'target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)', check = FALSE) + #prior to higher values, indiv differences should be small
 set_prior(prior = 'target += normal_lpdf(softkappamux | 0, 1.0)', check = FALSE) + #expect only small effect of treatment on distrib. of individuals
   prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
