@@ -1,8 +1,12 @@
-# Unwrap: Circular GLMs with PyMC and Bambi
+# Unwrap
 
-A minimalist package for working with circular GLMs in [PyMC](https://www.pymc.io/) and [Bambi](https://bambinos.github.io/bambi/).
+`unwrap` is a lightweight package for fitting **circular GLMs** (e.g., von Mises models for angles) with **PyMC** and a **Bambi**-style formula interface.
 
-## Installation
+<p align="center">
+  <img src="assets/graphic-abstract.png" alt="Unwrap visual abstract" width="900">
+</p>
+
+## Install
 
 ```bash
 pip install git+https://github.com/jgraving/unwrap
