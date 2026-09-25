@@ -71,6 +71,10 @@ sampleArray = cat(3, samples{:});
 % Assign readable labels for each model parameter.
 [paramMean, paramSD, rhat, ess, hdiLower, hdiUpper] = mcmcSummaries(sampleArray);
 
+% Assign readable labels for each model parameter.
+paramNames = [compose("b%d", 1:Kc), "Intercept", ...
+    compose("b_kappa%d", 1:Kc_kappa), "Intercept_kappa"];
+
 summaryTbl = table(paramNames(:), paramMean, paramSD, rhat, ess, hdiLower, hdiUpper, ...
     'VariableNames', {'Parameter', 'Mean', 'StdDev', 'Rhat', 'ESS', 'HDI_Lower', 'HDI_Upper'});
 disp(summaryTbl);
@@ -97,6 +101,52 @@ for i = 1:numParams
         xlabel('Iteration');
     end
 end
+
+
+
+
+%% --- Plot Predictions ---
+[numSamples, ~, numChains] = size(sampleArray);
+% Stack chains (dim 3) under each other before flattening, keeping parameters in columns.
+pooledSamples = reshape(permute(sampleArray, [1 3 2]), numSamples * numChains, numParams);
+
+xObs = X(:, 2);
+xGrid = linspace(min(xObs), max(xObs), 200)';
+xGridC = xGrid - means_X;
+
+muDraws = zeros(numel(xGrid), size(pooledSamples, 1));
+
+for s = 1:size(pooledSamples, 1)
+    p = pooledSamples(s, :)';
+    b = p(1:Kc);
+    intercept = p(Kc + 1);
+    muDraws(:, s) = intercept + xGridC * b;
+end
+
+muLinearMean = mean(muDraws, 2);
+muCircularMean = angle(mean(exp(1i * muDraws), 2));
+yWrapped = mod(Y + pi, 2 * pi) - pi;
+
+% Wrap each draw's line to [-pi, pi) and break it where it wraps,
+% then join all draws into one NaN-separated line for fast plotting.
+drawsWrapped = mod(muDraws + pi, 2 * pi) - pi;
+drawsWrapped([false(1, size(drawsWrapped, 2)); abs(diff(drawsWrapped)) > pi]) = NaN;
+xDraws = repmat([xGrid; NaN], 1, size(drawsWrapped, 2));
+yDraws = [drawsWrapped; NaN(1, size(drawsWrapped, 2))];
+
+figure('Name', 'Model Predictions vs Data', 'Color', 'w');
+hold on;
+hDraws = plot(xDraws(:), yDraws(:), '-', 'Color', [0.5 0.5 0.5 0.02], 'LineWidth', 0.5);
+hData = scatter(xObs, yWrapped, 45, 'filled', 'MarkerFaceAlpha', 0.7);
+hLinear = plot(xGrid, muLinearMean, 'k--', 'LineWidth', 1.5);
+hCircular = plot(xGrid, muCircularMean, 'r-', 'LineWidth', 2);
+grid on;
+xlabel('Predictor');
+ylabel('Circular Response');
+title('Observed Data and Posterior Predictions');
+legend([hData, hDraws, hLinear, hCircular], ...
+    {'Observed data', 'Posterior draws', 'Latent mean', 'Circular mean'}, 'Location', 'best');
+
 
 %% --- Helper Functions ---
 % Evaluate the log posterior density for the sampler.
@@ -169,7 +219,7 @@ end
 function [paramMean, paramSD, rhat, ess, hdiLower, hdiUpper] = mcmcSummaries(sampleArray)
     [numSamples, numParams, ~] = size(sampleArray);
 
-    pooled = reshape(sampleArray, [], numParams);
+    pooled = reshape(permute(sampleArray, [1 3 2]), [], numParams);
     paramMean = mean(pooled, 1)';
     paramSD = std(pooled, 0, 1)';
 
