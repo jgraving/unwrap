@@ -127,17 +127,22 @@ muLinearMean = mean(muDraws, 2);
 muCircularMean = angle(mean(exp(1i * muDraws), 2));
 yWrapped = mod(Y + pi, 2 * pi) - pi;
 
+% Plot a random subset of draws so the faint lines don't saturate.
+numPlotDraws = min(500, size(muDraws, 2));
+plotDrawIdx = randperm(size(muDraws, 2), numPlotDraws);
+
 % Wrap each draw's line to [-pi, pi) and break it where it wraps,
 % then join all draws into one NaN-separated line for fast plotting.
-drawsWrapped = mod(muDraws + pi, 2 * pi) - pi;
+drawsWrapped = mod(muDraws(:, plotDrawIdx) + pi, 2 * pi) - pi;
 drawsWrapped([false(1, size(drawsWrapped, 2)); abs(diff(drawsWrapped)) > pi]) = NaN;
 xDraws = repmat([xGrid; NaN], 1, size(drawsWrapped, 2));
 yDraws = [drawsWrapped; NaN(1, size(drawsWrapped, 2))];
 
 figure('Name', 'Model Predictions vs Data', 'Color', 'w');
 hold on;
-hDraws = plot(xDraws(:), yDraws(:), '-', 'Color', [0.5 0.5 0.5 0.02], 'LineWidth', 0.5);
-hData = scatter(xObs, yWrapped, 45, 'filled', 'MarkerFaceAlpha', 0.7);
+plot(xDraws(:), yDraws(:), '-', 'Color', [0.75 0.75 0.75 0.1], 'LineWidth', 0.5);
+hDraws = plot(NaN, NaN, '-', 'Color', [0.6 0.6 0.6]); % visible legend proxy for the faint draws
+hData = scatter(xObs, yWrapped, 45, [0 0.447 0.741], 'filled', 'MarkerFaceAlpha', 0.7);
 hLinear = plot(xGrid, muLinearMean, 'k--', 'LineWidth', 1.5);
 hCircular = plot(xGrid, muCircularMean, 'r-', 'LineWidth', 2);
 grid on;
