@@ -1,0 +1,21 @@
+site_name: Unwrap
+site_description: Bayesian circular regression with Bambi and PyMC
+repo_url: https://github.com/jgraving/unwrap
+edit_uri: blob/main/docs/
+theme:
+  name: mkdocs
+  color_mode: auto
+nav:
+  - Overview: index.md
+  - Python setup: getting-started.md
+  - Circular links: links.md
+  - Python API guide: api.md
+  - R and MATLAB: languages.md
+  - Development: development.md
+validation:
+  nav:
+    not_found: warn
+  links:
+    not_found: warn
+    unrecognized_links: warn
+    anchors: warn

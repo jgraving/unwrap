@@ -147,6 +147,13 @@ These are working analysis notebooks; their setup and dependencies are not yet
 standardized. Check the installation cells and data paths before running them.
 Notebook organization and reproducible setup instructions are planned.
 
+## Documentation
+
+Start with the [documentation guide](docs/index.md) for Python setup, circular
+links, the API guide, and R/MATLAB entry points. See [development](docs/development.md)
+to build or preview the MkDocs site locally. CI checks the documentation build
+and retains a static-site artifact; public hosting is not configured yet.
+
 ## R and MATLAB
 
 The language implementations currently have separate interfaces and setup
@@ -201,8 +208,8 @@ short Bambi sampling run with circular summaries. The short chains check that
 fitting works, not statistical convergence or parameter recovery. R/MATLAB and
 full analysis notebooks are not covered by this CI yet.
 
-Remaining work includes code organization and API documentation, broader tests,
-reproducible example notebooks, and shared reference examples across languages.
+Remaining work includes broader API tests, reproducible research notebooks,
+and shared reference examples across languages.
 
 Changes should be proposed as small, focused pull requests with a clear purpose
 and a description of how they were checked. Keep code moves, behaviour changes,
