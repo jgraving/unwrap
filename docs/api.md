@@ -32,12 +32,6 @@ zero and concentration at machine epsilon.
 components. Weights must sum to one, means are radians, and concentrations are
 positive. `.dist(w, mu, kappa, **kwargs)` constructs an unnamed distribution.
 
-`BimodalVonMises(name, mu, kappa, p, **kwargs)` is a two-component convenience
-wrapper with weights `p` and `1-p`; the final axis of `mu` and `kappa` must have
-length two. `.dist(...)` is also provided. This helper's symbolic shape handling
-has not yet been covered by the initial tests; use the general mixture interface
-for explicit component construction.
-
 ## Synthetic data: `unwrap.data`
 
 `generate_circular_regression_data(num_samples, x_range, mean_intercept,
