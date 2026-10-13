@@ -13,9 +13,10 @@ setup(
     description='A brief description of your package',
     packages=find_packages(),
     install_requires=requirements,
+    extras_require={"test": ["pytest>=8,<10"]},
     classifiers=[
         'Programming Language :: Python :: 3',
         'Operating System :: OS Independent',
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.10',
 )

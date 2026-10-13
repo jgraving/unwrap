@@ -24,10 +24,26 @@ python -m pip install --upgrade pip
 python -m pip install git+https://github.com/jgraving/unwrap.git
 ```
 
-The declared dependencies are Bambi, PyMC, and ArviZ; see
-[requirements.txt](requirements.txt) for their version constraints. Use a Python
-version supported by the versions of those dependencies you install. A tested
-Python/dependency compatibility matrix is planned.
+Python 3.10 or newer is required. CI exercises Python 3.10–3.14 on Linux,
+plus Python 3.12 on macOS and Windows. Dependency ranges are declared in
+[requirements.txt](requirements.txt); the resolver selects versions compatible
+with your Python version. PyMC 6 and ArviZ 1 support require a separate migration.
+
+### Install with uv
+
+With [uv installed](https://docs.astral.sh/uv/getting-started/installation/):
+
+```bash
+uv venv --python 3.12
+uv pip install git+https://github.com/jgraving/unwrap.git
+uv run --no-project python -c "import unwrap"
+```
+
+To add Unwrap to an existing uv project instead:
+
+```bash
+uv add git+https://github.com/jgraving/unwrap.git
+```
 
 For local development, clone the repository and install in editable mode:
 
@@ -162,13 +178,31 @@ using MATLAB's `hmcSampler`.
 
 ## Development
 
-Planned work includes:
+Run the Python tests from a checkout using uv:
 
-- Organizing and documenting the code and its public interfaces.
-- Adding automated tests and continuous integration.
-- Building user and API documentation.
-- Organizing example notebooks with reproducible setup instructions.
-- Comparing the language implementations on shared reference examples.
+```bash
+uv venv --python 3.12
+uv pip install -e ".[test]"
+uv run --no-project python -m pytest -q
+```
+
+Or, in an activated virtual environment, use
+`python -m pip install -e ".[test]"` followed by `python -m pytest -q`.
+
+[CI](.github/workflows/tests.yml) runs on pull requests and pushes to `main`.
+It checks the latest compatible dependencies across the Python/OS matrix above,
+and the lowest compatible direct dependencies on Python 3.10. It also builds
+and installs a source distribution and wheel. Resolved package versions appear
+in each job's log; this matrix does not cover every possible dependency combination.
+
+The initial suite checks circular links across numerical backends, concentration
+conversion, likelihoods against independent references, synthetic data, and a
+short Bambi sampling run with circular summaries. The short chains check that
+fitting works, not statistical convergence or parameter recovery. R/MATLAB and
+full analysis notebooks are not covered by this CI yet.
+
+Remaining work includes code organization and API documentation, broader tests,
+reproducible example notebooks, and shared reference examples across languages.
 
 Changes should be proposed as small, focused pull requests with a clear purpose
 and a description of how they were checked. Keep code moves, behaviour changes,
