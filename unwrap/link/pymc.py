@@ -24,7 +24,8 @@ def inverse_softplus(mu):
     ``mu`` must be positive for a finite real result. This is the forward
     ``link`` paired with ``softplus``. Zero maps to negative infinity;
     negative inputs are outside the real-valued domain."""
-    return pt.log(pt.expm1(mu))
+    mu = pt.as_tensor_variable(mu)
+    return mu + pt.log(-pt.expm1(-mu))
 
 
 def softplus(eta):
