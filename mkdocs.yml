@@ -1,4 +1,5 @@
 site_name: Unwrap
+site_url: https://jgraving.github.io/unwrap/
 site_description: Bayesian circular regression with Bambi and PyMC
 repo_url: https://github.com/jgraving/unwrap
 edit_uri: blob/main/docs/

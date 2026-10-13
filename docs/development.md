@@ -33,5 +33,11 @@ uv run --no-project --python .venv-docs mkdocs serve
 ```
 
 The documentation workflow builds with strict link validation and uploads the
-static site as a GitHub Actions artifact. This PR does not configure public
-hosting; deployment can be a separate change after reviewing the content.
+static site as a GitHub Actions artifact for every PR. Pushes to `main` also
+publish the site to <https://jgraving.github.io/unwrap/> through GitHub Pages.
+Deployment only runs after a successful build, using the `github-pages`
+environment. PRs do not deploy or receive deployment permissions.
+
+Repository **Settings → Pages → Build and deployment → Source** must be set to
+**GitHub Actions**. To republish without a code change, run the **Documentation**
+workflow manually from the Actions tab with `main` selected.
