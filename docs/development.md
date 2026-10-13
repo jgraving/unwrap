@@ -6,6 +6,17 @@ and analysis updates. Include the reason for the change and how it was checked.
 ## Tests
 
 ```bash
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[test]"
+python -m pytest -q
+```
+
+Alternatively, with `uv` (optional):
+
+```bash
 uv venv --python 3.12
 uv pip install -e ".[test]"
 uv run --no-project python -m pytest -q
@@ -24,6 +35,18 @@ coverage targets.
 ## Build and preview documentation
 
 Docs dependencies are separate from the modelling environment:
+
+```bash
+python -m venv .venv-docs
+# macOS / Linux
+source .venv-docs/bin/activate
+# Windows PowerShell: .venv-docs\Scripts\Activate.ps1
+python -m pip install -r requirements-docs.txt
+python -m mkdocs build --strict
+python -m mkdocs serve
+```
+
+Alternatively, with `uv` (optional):
 
 ```bash
 uv venv .venv-docs --python 3.12
