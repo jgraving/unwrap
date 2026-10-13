@@ -36,7 +36,7 @@ plus Python 3.12 on macOS and Windows. Dependency ranges are declared in
 [requirements.txt](requirements.txt); the resolver selects versions compatible
 with your Python version. PyMC 6 and ArviZ 1 support require a separate migration.
 
-### Install with uv
+### Install with uv (optional)
 
 With [uv installed](https://docs.astral.sh/uv/getting-started/installation/):
 
@@ -192,16 +192,24 @@ using MATLAB's `hmcSampler`.
 
 ## Development
 
-Run the Python tests from a checkout using uv:
+Run the Python tests from a checkout:
+
+```bash
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[test]"
+python -m pytest -q
+```
+
+Alternatively, with `uv` (optional):
 
 ```bash
 uv venv --python 3.12
 uv pip install -e ".[test]"
 uv run --no-project python -m pytest -q
 ```
-
-Or, in an activated virtual environment, use
-`python -m pip install -e ".[test]"` followed by `python -m pytest -q`.
 
 [CI](.github/workflows/tests.yml) runs on pull requests and pushes to `main`.
 It checks the latest compatible dependencies across the Python/OS matrix above,
