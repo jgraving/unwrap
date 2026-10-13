@@ -13,7 +13,7 @@ saved outputs do not establish that they run from a fresh kernel today.
 | [Beetles](beetles.ipynb) | Directional responses under lighting treatments; alternative mean/concentration models. | Uses bundled `datasets/SecurityLightBergsig.txt` (tab-separated). Its relative path assumes a kernel working directory of `notebooks/`. Contains package uninstall/install cells. |
 | [Zebra escape](zebra_escape.ipynb) | Circular regression of zebra escape bearings using block-level data. | Bundled file: `datasets/zebra_bearings_blocks.parquet`. The notebook currently reads `zebra_bearings_blocks.parquet` without the `datasets/` prefix. Contains package uninstall/install cells. |
 | [Locust direction mixture](locust_direction_mixture_model.ipynb) | Direct PyMC mixture and single-component models of locust directions, with model comparisons and figures. | Bundled file: `datasets/bimodal_locust.parquet`. The notebook currently reads `bimodal_locust.parquet` without the `datasets/` prefix. |
-| [Locust density and order](locust_density_order.ipynb) | Trajectory processing and circular regression against density and collective order, including model sweeps. | Expects an `XY_parquet_parts/` directory of trajectory files, which is not included. Later cells read `mu_kappa_matched_model_sweep_pointwise_delta.parquet`, produced by an earlier model-sweep cell. |
+| [Locust density and order](locust_density_order.ipynb) | Trajectory processing and circular regression against density and collective order, including model sweeps. | Its preprocessing section expects an `XY_parquet_parts/` directory of full trajectory files. These are intentionally not bundled: the full locust datasets are tens of GB, and only rediscretized vectors are shared after preprocessing. Later cells read `mu_kappa_matched_model_sweep_pointwise_delta.parquet`, produced by an earlier model-sweep cell. |
 | [Periodic, not circular](periodic_not_circular.ipynb) | Simulated Beta regression with periodic time predictors and a non-angular response. | Generates its own data; not executed in CI. |
 | [Von Mises policy](von_mises_policy.ipynb) | Illustrates goal-directed trajectories sampled from von Mises heading distributions. | Generates its own data and writes figures; not executed in CI. |
 
@@ -50,6 +50,21 @@ exist. Several illustrations request Arial, so typography can vary by system.
 
 The beetle and zebra notebooks still contain cells that uninstall or reinstall
 Unwrap. Review those cells before running them in an existing environment.
+
+## Locust data scope
+
+The full locust trajectory datasets are tens of GB and are intentionally kept
+outside this example repository. The shared data are rediscretized vectors
+produced by preprocessing, rather than the full trajectories. The bundled
+`datasets/bimodal_locust.parquet` is the input used by the direction-mixture
+notebook.
+
+The density-and-order notebook still includes preprocessing from the external
+`XY_parquet_parts/` files. A fresh checkout therefore cannot run that section
+without those inputs. Its cleanup should clearly separate trajectory
+preprocessing from analysis of shared, preprocessed inputs and identify the
+exact input required by each analysis; it should not require adding the full
+trajectory archive to GitHub.
 
 ## Scope of the next cleanup
 
