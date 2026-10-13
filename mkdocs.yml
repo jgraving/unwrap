@@ -4,8 +4,33 @@ site_description: Bayesian circular regression with Bambi and PyMC
 repo_url: https://github.com/jgraving/unwrap
 edit_uri: blob/main/docs/
 theme:
-  name: mkdocs
-  color_mode: auto
+  name: material
+  font: false
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
 nav:
   - Overview: index.md
   - Python setup: getting-started.md
