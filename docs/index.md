@@ -1,5 +1,10 @@
 # Unwrap
 
+<div class="unwrap-brand">
+  <img class="unwrap-logo-light" src="assets/unwrap-logo.svg" alt="unwrap — Bayesian circular regression" width="560" height="193">
+  <img class="unwrap-logo-dark" src="assets/unwrap-logo-dark.svg" alt="unwrap — Bayesian circular regression" width="560" height="193">
+</div>
+
 Unwrap supplies circular links, priors, and distribution helpers for Bayesian
 models of individual angular observations. Build formula-based models with
 Bambi or use the components directly with PyMC.
