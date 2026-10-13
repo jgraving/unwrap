@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      MPLBACKEND: Agg
       OMP_NUM_THREADS: '1'
       OPENBLAS_NUM_THREADS: '1'
     steps:
@@ -38,6 +37,8 @@ jobs:
           path = Path("notebooks/circular_regression.ipynb")
           notebook = nbformat.read(path, as_version=4)
           NotebookClient(notebook, timeout=600, kernel_name="python3").execute()
+          assert any("image/png" in output.get("data", {})
+                     for cell in notebook.cells for output in cell.get("outputs", [])), "No rendered figures"
           Path("executed").mkdir()
           nbformat.write(notebook, "executed/circular_regression.ipynb")
           PY
