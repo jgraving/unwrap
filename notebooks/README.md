@@ -23,6 +23,17 @@ From the repository root, install the notebook environment and launch the tested
 introduction:
 
 ```bash
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[notebook]"
+python -m jupyterlab notebooks/circular_regression.ipynb
+```
+
+Alternatively, with `uv` (optional):
+
+```bash
 uv venv --python 3.12
 uv pip install -e ".[notebook]"
 uv run --no-project jupyter lab notebooks/circular_regression.ipynb
