@@ -1,0 +1,82 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }} / ${{ matrix.dependencies }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        dependencies: [latest]
+        include:
+          - os: ubuntu-latest
+            python: '3.10'
+            dependencies: minimum
+          - os: macos-latest
+            python: '3.12'
+            dependencies: latest
+          - os: windows-latest
+            python: '3.12'
+            dependencies: latest
+    env:
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - name: Create environment
+        run: uv venv
+      - name: Install latest compatible dependencies
+        if: matrix.dependencies == 'latest'
+        run: uv pip install -e '.[test]'
+      - name: Install minimum direct dependencies
+        if: matrix.dependencies == 'minimum'
+        run: uv pip install -e '.[test]' --resolution lowest-direct
+      - name: Check dependencies and record versions
+        run: |
+          uv pip check
+          uv pip freeze
+      - name: Run tests
+        run: uv run --no-project python -m pytest -q
+
+  build:
+    name: Build and install distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+      - name: Build sdist and wheel
+        run: uv build
+      - name: Install from source distribution
+        run: |
+          uv venv
+          uv pip install dist/*.tar.gz
+          uv pip check
+          uv run --no-project python -I -c "import unwrap; from unwrap.prior import CircularUniformPrior"
+      - name: Install wheel
+        run: |
+          uv pip install --reinstall --no-deps dist/*.whl
+          uv run --no-project python -I -c "import unwrap; from unwrap.data import generate_circular_regression_data"
