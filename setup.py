@@ -13,7 +13,10 @@ setup(
     description='A brief description of your package',
     packages=find_packages(),
     install_requires=requirements,
-    extras_require={"test": ["pytest>=8,<10"]},
+    extras_require={
+        "test": ["pytest>=8,<10"],
+        "notebook": ["jupyterlab>=4,<5", "nbclient>=0.10,<1", "ipykernel>=6,<8"],
+    },
     classifiers=[
         'Programming Language :: Python :: 3',
         'Operating System :: OS Independent',
