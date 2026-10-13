@@ -6,7 +6,18 @@ The package currently uses PyMC 5 and ArviZ 0.x APIs.
 
 ## Install from GitHub
 
-With [uv](https://docs.astral.sh/uv/getting-started/installation/):
+Create and activate a virtual environment, then install with pip:
+
+```bash
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install git+https://github.com/jgraving/unwrap.git
+python -c "import unwrap"
+```
+
+Alternatively, with [uv](https://docs.astral.sh/uv/getting-started/installation/) (optional):
 
 ```bash
 uv venv --python 3.12
@@ -15,11 +26,6 @@ uv run --no-project python -c "import unwrap"
 ```
 
 In an existing uv project, use `uv add git+https://github.com/jgraving/unwrap.git`.
-For pip, activate a virtual environment and run:
-
-```bash
-python -m pip install git+https://github.com/jgraving/unwrap.git
-```
 
 Use the GitHub URL: the `unwrap` name on PyPI currently refers to a different
 project. For a reproducible analysis, record the Git commit and resolved package
@@ -30,6 +36,17 @@ versions, or pin the dependency to a commit in your project's lockfile.
 ```bash
 git clone https://github.com/jgraving/unwrap.git
 cd unwrap
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[notebook]"
+python -m jupyterlab notebooks/circular_regression.ipynb
+```
+
+Alternatively, with `uv` (optional):
+
+```bash
 uv venv --python 3.12
 uv pip install -e ".[notebook]"
 uv run --no-project jupyter lab notebooks/circular_regression.ipynb
