@@ -127,7 +127,7 @@ for a longer example with plots.
 | --- | --- |
 | [`unwrap/link/`](unwrap/link/) | NumPy and PyTensor/PyMC link functions, plus Bambi link objects |
 | [`unwrap/prior.py`](unwrap/prior.py) | Bambi prior helpers |
-| [`unwrap/distributions.py`](unwrap/distributions.py) | Circular uniform helper, von Mises mixtures, and a sufficient-statistics likelihood |
+| [`unwrap/distributions.py`](unwrap/distributions.py) | Circular uniform helper and von Mises mixtures |
 | [`unwrap/data.py`](unwrap/data.py) | Synthetic circular regression data |
 | [`unwrap/bessel.py`](unwrap/bessel.py) | Helpers relating von Mises concentration to mean resultant length |
 | [`notebooks/`](notebooks/) | Python examples and analyses |
