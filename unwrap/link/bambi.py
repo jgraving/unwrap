@@ -1,3 +1,11 @@
+"""Bambi adapters combining numerical and symbolic link implementations.
+
+``LINKS[name]`` is a ``bambi.Link``. Each registry key is also exported as a
+module attribute (for example ``circular_modulo``); these attributes are Link
+objects, not the functions with the same names in the other backends.
+
+Alias keys keep their own Bambi ``name`` while sharing transform behaviour.
+"""
 import bambi as bmb
 from unwrap.link.numpy import LINKS as NP_LINKS
 from unwrap.link.pymc import LINKS as PYMC_LINKS
