@@ -66,3 +66,29 @@ def test_symbolic_inverse_softplus_gradient_at_large_input():
     mu = pt.dscalar("mu")
     derivative = pt.grad(pt_links.inverse_softplus(mu), mu)
     assert_allclose(derivative.eval({mu: 1000.0}), 1.0, atol=1e-12)
+
+
+def test_public_registry_names_and_bambi_exports():
+    from unwrap.link import bambi as bambi_links
+    expected = {
+        "softplus", "logexpm1", "log1pexp", "reciprocal_softplus", "inv_softplus",
+        "modulo", "mod", "shifted_modulo", "shift_mod", "rotated_modulo",
+        "rot_mod", "circular_modulo", "circ_mod", "rectifier", "relu", "atan2",
+    }
+    assert set(np_links.LINKS) == set(pt_links.LINKS) == set(LINKS) == expected
+    for name in expected:
+        assert getattr(bambi_links, name) is LINKS[name]
+        assert LINKS[name].name == name
+
+
+@pytest.mark.parametrize("alias,canonical", [
+    ("logexpm1", "softplus"), ("log1pexp", "softplus"),
+    ("inv_softplus", "reciprocal_softplus"), ("mod", "modulo"),
+    ("shifted_modulo", "circular_modulo"), ("shift_mod", "circular_modulo"),
+    ("rotated_modulo", "circular_modulo"), ("rot_mod", "circular_modulo"),
+    ("circ_mod", "circular_modulo"), ("relu", "rectifier"),
+])
+def test_aliases_use_the_canonical_transforms(alias, canonical):
+    for backend in (np_links, pt_links):
+        assert backend.LINKS[alias].link is backend.LINKS[canonical].link
+        assert backend.LINKS[alias].linkinv is backend.LINKS[canonical].linkinv
