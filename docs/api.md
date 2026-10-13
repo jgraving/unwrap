@@ -34,9 +34,9 @@ positive. `.dist(w, mu, kappa, **kwargs)` constructs an unnamed distribution.
 
 `BimodalVonMises(name, mu, kappa, p, **kwargs)` is a two-component convenience
 wrapper with weights `p` and `1-p`; the final axis of `mu` and `kappa` must have
-length two. `.dist(...)` is also provided. This helper's symbolic shape handling
-has not yet been covered by the initial tests; use the general mixture interface
-for explicit component construction.
+length two. `.dist(...)` is also provided. Lists, NumPy arrays, and symbolic tensors are accepted. Known invalid
+component dimensions are rejected at construction; unknown symbolic dimensions
+are checked at evaluation. Leading dimensions follow PyMC's broadcasting rules.
 
 ## Synthetic data: `unwrap.data`
 

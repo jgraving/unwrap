@@ -51,6 +51,16 @@ class VonMisesMixture:
         return pm.Mixture.dist(w, pm.VonMises.dist(mu=mu, kappa=kappa), **kwargs)
 
 
+def _bimodal_component(value):
+    """Require a final component axis of length two, including at runtime."""
+    value = pt.as_tensor_variable(value)
+    if value.ndim == 0 or value.type.shape[-1] not in (None, 2):
+        raise ValueError("mu and kappa must have last dimension of size 2.")
+    if value.type.shape[-1] is None:
+        value = pt.specify_shape(value, (*value.type.shape[:-1], 2))
+    return value
+
+
 class BimodalVonMises:
     r"""
     A distribution representing a mixture of two Von Mises distributions, used to model circular data with bimodal characteristics.
@@ -73,27 +83,25 @@ class BimodalVonMises:
     ----------
     p : tensor_like of float
         The probability of the first component (0 < p < 1).
-    mu : tensor_like of float, 2D tensor
+    mu : tensor_like of float
         The component means (angles, in radians). Must have last dimension of size 2.
-    kappa : tensor_like of float, 2D tensor
+    kappa : tensor_like of float
         The concentration parameters for the components. Must have last dimension of size 2.
     kwargs : dict, optional
         Additional keyword arguments passed to the Mixture distribution.
     """
 
     def __new__(cls, name, mu, kappa, p, **kwargs):
-        if mu.shape[-1] != 2 or kappa.shape[-1] != 2:
-            raise ValueError("mu and kappa must have last dimension of size 2.")
-
+        mu, kappa = _bimodal_component(mu), _bimodal_component(kappa)
+        p = pt.as_tensor_variable(p)
         w = pt.stack([p, 1 - p], axis=-1)
 
         return VonMisesMixture(name, w, mu, kappa, **kwargs)
 
     @classmethod
     def dist(cls, mu, kappa, p, **kwargs):
-        if mu.shape[-1] != 2 or kappa.shape[-1] != 2:
-            raise ValueError("mu and kappa must have last dimension of size 2.")
-
+        mu, kappa = _bimodal_component(mu), _bimodal_component(kappa)
+        p = pt.as_tensor_variable(p)
         w = pt.stack([p, 1 - p], axis=-1)
 
         return VonMisesMixture.dist(w, mu, kappa, **kwargs)
