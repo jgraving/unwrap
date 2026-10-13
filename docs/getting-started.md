@@ -40,6 +40,12 @@ The tutorial uses seeded synthetic data and prints dependency versions. Its
 saved outputs are cleared; CI executes it and retains an executed copy as an
 artifact. Other analysis notebooks are not yet part of that execution check.
 
+## Research notebooks
+
+See the [notebook inventory](https://github.com/jgraving/unwrap/blob/main/notebooks/README.md)
+for each analysis's purpose, bundled or missing data, additional dependencies,
+and current setup issues. Only the introductory notebook is executed in CI.
+
 ## Angular conventions
 
 Use radians for Python model inputs. Convert degrees with `np.deg2rad` and choose
