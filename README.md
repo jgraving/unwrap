@@ -1,5 +1,12 @@
 # Unwrap
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/unwrap-logo-dark.svg">
+    <img src="docs/assets/unwrap-logo.svg" alt="unwrap — Bayesian circular regression" width="560" height="193">
+  </picture>
+</p>
+
 `unwrap` provides tools for Bayesian circular regression: modelling angular
 responses with von Mises distributions, circular links for mean direction, and
 positive links for concentration. The Python package works with **Bambi** and

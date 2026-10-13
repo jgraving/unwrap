@@ -1,0 +1,18 @@
+.unwrap-brand {
+  margin: 1rem 0 2rem;
+  text-align: center;
+}
+
+.unwrap-brand img {
+  width: min(100%, 35rem);
+  height: auto;
+}
+
+.unwrap-logo-dark,
+[data-md-color-scheme="slate"] .unwrap-logo-light {
+  display: none;
+}
+
+[data-md-color-scheme="slate"] .unwrap-logo-dark {
+  display: inline-block;
+}

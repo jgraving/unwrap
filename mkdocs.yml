@@ -5,6 +5,8 @@ repo_url: https://github.com/jgraving/unwrap
 edit_uri: blob/main/docs/
 theme:
   name: material
+  logo: assets/unwrap-mark.svg
+  favicon: assets/unwrap-mark.svg
   font: false
   palette:
     - media: "(prefers-color-scheme: light)"
@@ -45,3 +47,6 @@ validation:
     not_found: warn
     unrecognized_links: warn
     anchors: warn
+
+extra_css:
+  - stylesheets/brand.css
