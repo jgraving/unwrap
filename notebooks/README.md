@@ -1,26 +1,30 @@
 # Notebook guide
 
-Start with [circular_regression.ipynb](circular_regression.ipynb). It uses seeded
-synthetic data, explains the model and diagnostics, and runs end to end in CI.
-The other notebooks are research analyses or exploratory illustrations. Their
-saved outputs do not establish that they run from a fresh kernel today.
+Start with [Circular regression](circular_regression.ipynb), a worked example
+using simulated observations. It introduces model fitting, summaries of mean
+direction and concentration, and comparisons between predictions and data.
 
-## Inventory
+## Animal navigation and collective movement
 
-| Notebook | Purpose | Data and current setup |
-| --- | --- | --- |
-| [Circular regression](circular_regression.ipynb) | Introductory Bambi regression for mean direction and concentration, with posterior predictive checks. | Generates its own data. Executed in CI. |
-| [Beetles](beetles.ipynb) | Directional responses under lighting treatments; alternative mean/concentration models. | Uses bundled `datasets/SecurityLightBergsig.txt` (tab-separated). Its relative path assumes a kernel working directory of `notebooks/`. Contains package uninstall/install cells. |
-| [Zebra escape](zebra_escape.ipynb) | Circular regression of zebra escape bearings using block-level data. | Bundled file: `datasets/zebra_bearings_blocks.parquet`. The notebook currently reads `zebra_bearings_blocks.parquet` without the `datasets/` prefix. Contains package uninstall/install cells. |
-| [Locust direction mixture](locust_direction_mixture_model.ipynb) | Direct PyMC mixture and single-component models of locust directions, with model comparisons and figures. | Bundled file: `datasets/bimodal_locust.parquet`. The notebook currently reads `bimodal_locust.parquet` without the `datasets/` prefix. |
-| [Locust density and order](locust_density_order.ipynb) | Trajectory processing and circular regression against density and collective order, including model sweeps. | Its preprocessing section expects an `XY_parquet_parts/` directory of full trajectory files. These are intentionally not bundled: the full locust datasets are tens of GB, and only rediscretized vectors are shared after preprocessing. Later cells read `mu_kappa_matched_model_sweep_pointwise_delta.parquet`, produced by an earlier model-sweep cell. |
-| [Periodic, not circular](periodic_not_circular.ipynb) | Simulated Beta regression with periodic time predictors and a non-angular response. | Generates its own data; not executed in CI. |
-| [Von Mises policy](von_mises_policy.ipynb) | Illustrates goal-directed trajectories sampled from von Mises heading distributions. | Generates its own data and writes figures; not executed in CI. |
+These examples use circular regression to connect directional behaviour to
+biological questions. The descriptions follow the case studies in the
+[accompanying manuscript](https://github.com/jgraving/circstats/blob/main/elife-template.tex).
 
-## Environment and working directory
+| Notebook | Question |
+| --- | --- |
+| [Artificial light and dung beetle orientation](beetles.ipynb) | Examine how a floodlight changes mean direction, within-individual directional consistency, and alignment between individuals. |
+| [Grevy’s zebra escape response](zebra_escape.ipynb) | Compare body orientation before and after a human approach, separating group reorientation, between-individual alignment, and within-individual directional consistency. |
+| [Order, density, and locust alignment](locust_density_order.ipynb) | Ask how the directional coherence and density of a virtual swarm influence a focal locust’s alignment with its neighbours. |
+| [Directional decisions in marching locusts](locust_direction_mixture_model.ipynb) | Compare optic-flow and vectorial-encoding hypotheses through their predictions of forward marching or lateral turns toward virtual neighbour groups. |
 
-From the repository root, install the notebook environment and launch the tested
-introduction:
+## Further illustrations
+
+- [Periodic but not circular](periodic_not_circular.ipynb): Model a response that varies over a daily cycle but is not itself an angle.
+- [Goal-directed movement](von_mises_policy.ipynb): Explore simulated trajectories in which headings are drawn from a von Mises distribution.
+
+## Run a notebook
+
+From the repository root:
 
 ```bash
 python -m venv .venv
@@ -39,48 +43,37 @@ uv pip install -e ".[notebook]"
 uv run --no-project jupyter lab notebooks/circular_regression.ipynb
 ```
 
-Select the kernel belonging to that environment. The introductory notebook's
-setup is also described in the [installation guide](../docs/getting-started.md).
+Select the kernel for your environment and run the cells in order. The research
+examples fit models to experimental observations and can take longer to run
+than the introductory tutorial. Later figures depend on the model fits from
+earlier cells; opening a notebook with saved figures does not restore a fitted
+model.
 
-The research notebooks import additional packages. The following is an inventory
-of direct imports beyond the core modelling stack, not a validated environment
-specification for reproducing every analysis:
+## Data and additional packages
 
-| Notebook | Additional imports or file-reader requirements |
-| --- | --- |
-| Beetles | `seaborn` |
-| Zebra escape | `seaborn`, a pandas Parquet engine such as `pyarrow` |
-| Locust direction mixture | `seaborn`, `joblib`, `numba`, `tqdm`, a Parquet engine such as `pyarrow` |
-| Locust density and order | `pyarrow`, `joblib`, `tqdm` |
+The beetle, zebra, and locust direction examples include their analysis data.
+The introductory tutorial and further illustrations generate simulated data.
 
-Relative paths are resolved from the kernel's working directory. Check it with
-`%pwd`; for the bundled research data, `notebooks/` is the intended starting
-point. The two missing `datasets/` prefixes listed above still need correction.
-Some figure cells write to `../figures/`; check that their output directories
-exist. Several illustrations request Arial, so typography can vary by system.
+| Example | Included data | Additional packages |
+| --- | --- | --- |
+| Dung beetle orientation | `datasets/SecurityLightBergsig.txt` | `seaborn` |
+| Grevy’s zebra escape response | `datasets/zebra_bearings_blocks.parquet` | `seaborn`, `pyarrow` |
+| Locust directional decisions | `datasets/bimodal_locust.parquet` | `seaborn`, `joblib`, `numba`, `tqdm`, `pyarrow` |
+| Locust order and density | The preprocessing section requires external trajectories. | `pyarrow`, `joblib`, `tqdm` |
 
-The beetle and zebra notebooks still contain cells that uninstall or reinstall
-Unwrap. Review those cells before running them in an existing environment.
+Install the additional packages needed for your chosen example in the same
+environment, for example `python -m pip install seaborn pyarrow` for the zebra
+analysis.
 
-## Locust data scope
+Start the research notebooks in `notebooks/` and follow any setup instructions
+at the top of your chosen notebook. If a data-loading cell uses only a filename,
+add the `datasets/` prefix to read the included file. Skip package-installation
+cells if you have already installed Unwrap in your environment, and create any
+figure output directories requested by the notebook.
 
-The full locust trajectory datasets are tens of GB and are intentionally kept
-outside this example repository. The shared data are rediscretized vectors
-produced by preprocessing, rather than the full trajectories. The bundled
-`datasets/bimodal_locust.parquet` is the input used by the direction-mixture
-notebook.
-
-The density-and-order notebook still includes preprocessing from the external
-`XY_parquet_parts/` files. A fresh checkout therefore cannot run that section
-without those inputs. Its cleanup should clearly separate trajectory
-preprocessing from analysis of shared, preprocessed inputs and identify the
-exact input required by each analysis; it should not require adding the full
-trajectory archive to GitHub.
-
-## Scope of the next cleanup
-
-Work through one research notebook per PR: clarify setup, correct data paths,
-and document inputs and outputs before changing execution order or removing
-cells. Preserve model formulas, priors, mixture constraints, and scientific
-results during that organizational work. Changes to the analyses themselves
-need separate review and validation.
+The full locust trajectories are tens of GB and are intentionally not distributed
+here. Shared locust data consist of rediscretized movement vectors produced
+after preprocessing. The order-and-density notebook includes a preprocessing
+section that requires the external `XY_parquet_parts/` trajectory directory;
+that section cannot be run from the included data alone. Its later comparisons
+also use a table produced by an earlier model-fitting step.
