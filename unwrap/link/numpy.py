@@ -22,7 +22,8 @@ def inverse_softplus(mu):
     ``mu`` must be positive for a finite real result. This is the forward
     ``link`` paired with ``softplus``. Zero maps to negative infinity;
     negative inputs are outside the real-valued domain."""
-    return np.log(np.expm1(mu))
+    mu = np.asarray(mu)
+    return mu + np.log(-np.expm1(-mu))
 
 
 def softplus(eta):
@@ -30,7 +31,7 @@ def softplus(eta):
 
     This is ``LINKS["softplus"].linkinv``, useful for concentration ``kappa``.
     Floating-point underflow can produce zero at sufficiently negative inputs."""
-    return np.log1p(np.exp(eta))
+    return np.logaddexp(0, eta)
 
 
 def reciprocal_softplus(eta):

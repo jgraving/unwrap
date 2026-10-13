@@ -45,3 +45,24 @@ def test_positive_link_roundtrip(name):
             positive, result = positive.eval(), result.eval()
         assert np.all(positive > 0)
         assert_allclose(result, eta, atol=1e-10)
+
+
+@pytest.mark.parametrize("backend", [np_links, pt_links])
+def test_softplus_extreme_inputs_stay_finite(backend):
+    eta = np.array([-100.0, 0.0, 100.0, 1000.0])
+    mu = backend.softplus(eta)
+    if backend is pt_links:
+        mu = mu.eval()
+    assert np.isfinite(mu).all()
+    assert np.all(mu > 0)
+    assert_allclose(mu, np.logaddexp(0, eta), rtol=1e-12)
+    recovered = backend.inverse_softplus(mu)
+    if backend is pt_links:
+        recovered = recovered.eval()
+    assert_allclose(recovered, eta, atol=1e-12)
+
+
+def test_symbolic_inverse_softplus_gradient_at_large_input():
+    mu = pt.dscalar("mu")
+    derivative = pt.grad(pt_links.inverse_softplus(mu), mu)
+    assert_allclose(derivative.eval({mu: 1000.0}), 1.0, atol=1e-12)

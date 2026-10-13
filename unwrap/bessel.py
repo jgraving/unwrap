@@ -1,5 +1,6 @@
 import numpy as np
-from scipy.special import i0, i1
+from numbers import Integral
+from scipy.special import i0e, i1e
 
 def bessel_ratio(kappa: float) -> float:
     """
@@ -9,12 +10,17 @@ def bessel_ratio(kappa: float) -> float:
     with concentration parameter kappa.
 
     Args:
-        kappa: Concentration parameter of the von Mises distribution (kappa >= 0).
+        kappa: Scalar concentration parameter of the von Mises distribution (kappa >= 0).
 
     Returns:
         The mean resultant vector length R. Returns 1.0 if kappa is infinite.
     """
-    return i1(kappa) / i0(kappa) if kappa < np.inf else 1.0
+    if np.isnan(kappa) or kappa < 0:
+        raise ValueError("kappa must be nonnegative and not NaN.")
+    if np.isposinf(kappa):
+        return 1.0
+    # Exponential scaling cancels in the ratio and prevents inf / inf.
+    return i1e(kappa) / i0e(kappa)
 
 
 def inverse_bessel_ratio(R: float, tolerance: float = 1e-10, max_iterations: int = 1000) -> float:
@@ -26,43 +32,47 @@ def inverse_bessel_ratio(R: float, tolerance: float = 1e-10, max_iterations: int
 
     Args:
         R: The mean resultant vector length. Must be in the range [0, 1).
-        tolerance: The desired accuracy for the solution.
+        tolerance: Positive relative tolerance for the concentration bracket.
+            Accuracy near R=1 is ultimately limited by floating-point precision.
         max_iterations: The maximum number of iterations for the bisection method.
 
     Returns:
         The estimated value of kappa.
 
     Raises:
-        ValueError: If R is not in the valid range [0, 1).
+        ValueError: If R is outside [0, 1) or solver controls are invalid.
         RuntimeError: If the root cannot be bracketed or the bisection method does not converge
                      within the maximum number of iterations.
     """
     if not (0 <= R < 1):
         raise ValueError("R must be in [0, 1).")
 
-    if np.isclose(R, 0.0):
+    if not np.isfinite(tolerance) or tolerance <= 0:
+        raise ValueError("tolerance must be finite and positive.")
+    if not isinstance(max_iterations, Integral) or max_iterations < 1:
+        raise ValueError("max_iterations must be a positive integer.")
+    if R == 0.0:
         return 0.0
 
     def objective(kappa: float) -> float:
         return bessel_ratio(kappa) - R
 
-    a, b = 0.0, 10.0  # Initial bracket
+    # A scale-aware initial bracket also resolves very small positive R.
+    a, b = 0.0, max(4.0 * R, 1.0 / (1.0 - R))
     while objective(b) < 0:
         b *= 2
-        if b > 1e12:
-            raise RuntimeError("Could not bracket the root; R extremely close to 1.")
+        if not np.isfinite(b):
+            raise RuntimeError("Could not bracket the root at floating-point precision.")
 
     for _ in range(max_iterations):
-        mid = 0.5 * (a + b)
-        fmid = objective(mid)
-        if abs(fmid) < tolerance or b - a < tolerance:  # Convergence check
+        mid = a + 0.5 * (b - a)
+        if mid == a or mid == b or b - a <= tolerance * mid:
             return mid
-        if fmid > 0:
+        if objective(mid) > 0:
             b = mid
         else:
             a = mid
-
-    return 0.5 * (a + b)  # Return midpoint if max iterations reached (may not have converged)
+    raise RuntimeError("Concentration inversion did not converge within max_iterations.")
 
 
 
