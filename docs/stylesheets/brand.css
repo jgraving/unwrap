@@ -16,3 +16,15 @@
 [data-md-color-scheme="slate"] .unwrap-logo-dark {
   display: inline-block;
 }
+
+/* The overview already has a wordmark. Keep its generated title accessible
+   without displaying a second brand heading above the logo. */
+.md-content:has(.unwrap-brand) h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
