@@ -1,49 +1,76 @@
 # Python setup
 
-Python 3.10 or newer is required. CI checks Python 3.10–3.14 on Linux and Python
-3.12 on macOS and Windows; dependency versions vary with the Python interpreter.
-The package currently uses PyMC 5 and ArviZ 0.x APIs.
+Use Python 3.10 or newer and install from GitHub in a virtual environment.
+This keeps the notebook's dependencies together.
 
-## Install from GitHub
+## Install and open the tutorial
 
-With [uv](https://docs.astral.sh/uv/getting-started/installation/):
+From a terminal:
 
 ```bash
-uv venv --python 3.12
-uv pip install git+https://github.com/jgraving/unwrap.git
-uv run --no-project python -c "import unwrap"
+git clone https://github.com/jgraving/unwrap.git
+cd unwrap
+python -m venv .venv
 ```
 
-In an existing uv project, use `uv add git+https://github.com/jgraving/unwrap.git`.
-For pip, activate a virtual environment and run:
+Activate the environment on macOS or Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+On Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Then install the package and open the tutorial:
+
+```bash
+python -m pip install -e ".[notebook]"
+python -m jupyterlab notebooks/circular_regression.ipynb
+```
+
+Select the kernel for this environment and run the cells in order. The tutorial
+creates its own data, so no download is needed. It shows how to estimate mean
+direction and directional concentration, display uncertainty, and compare
+model predictions with observations.
+
+For an existing analysis environment, install just the package with:
 
 ```bash
 python -m pip install git+https://github.com/jgraving/unwrap.git
 ```
 
-Use the GitHub URL: the `unwrap` name on PyPI currently refers to a different
-project. For a reproducible analysis, record the Git commit and resolved package
-versions, or pin the dependency to a commit in your project's lockfile.
+## Optional: use uv
 
-## Run the introductory notebook
+If you already use [uv](https://docs.astral.sh/uv/), you can install and run the
+same tutorial from the repository root with:
 
 ```bash
-git clone https://github.com/jgraving/unwrap.git
-cd unwrap
 uv venv --python 3.12
 uv pip install -e ".[notebook]"
 uv run --no-project jupyter lab notebooks/circular_regression.ipynb
 ```
 
-Select the kernel belonging to this environment and run all cells in order.
-The tutorial uses seeded synthetic data and prints dependency versions. Its
-saved outputs are cleared; CI executes it and retains an executed copy as an
-artifact. Other analysis notebooks are not yet part of that execution check.
+## Prepare your angles
 
-## Angular conventions
+Python model inputs use **radians**. Convert degrees with `np.deg2rad` and keep
+the reference direction and clockwise or anticlockwise convention consistent.
+For the von Mises examples here, `circular_modulo` wraps angles to `[-pi, pi)`.
 
-Use radians for Python model inputs. Convert degrees with `np.deg2rad` and choose
-a consistent reference direction and rotation convention. For the von Mises
-workflow here, wrap observations with `circular_modulo` to `[-pi, pi)`.
-An angular parameter needs circular summaries; averaging -179 and 179 degrees
-as ordinary numbers would give a misleading direction.
+Summarise angles on the circle: the average of 179° and −179° is near 180°, not
+0°. The tutorial demonstrates circular summaries and plots. The
+[link guide](links.md) explains the mathematical conventions.
+
+## Run a biological example
+
+The [example guide](examples.md) lists the data and extra dependencies for each
+research notebook. Zebra and locust mixture observations are bundled with the
+repository. The locust density analysis also needs original trajectory files
+that are not included.
+
+The introductory notebook is executed automatically in CI. Research notebooks
+are not yet checked end to end. To make your own analysis reproducible, record
+the repository commit and installed package versions with your results.
