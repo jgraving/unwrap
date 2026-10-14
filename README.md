@@ -1,5 +1,3 @@
-# Unwrap
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/unwrap-logo-dark.svg">
@@ -7,15 +5,31 @@
   </picture>
 </p>
 
-`unwrap` provides tools for Bayesian circular regression: modelling angular
-responses with von Mises distributions, circular links for mean direction, and
-positive links for concentration. The Python package works with **Bambi** and
-**PyMC**. This repository also contains **R** and **MATLAB** implementations and
-examples.
+`unwrap` helps you model angles and directions: where animals tend to point,
+how consistent their directions are, and how these patterns change with
+experimental conditions. It supports Bayesian circular regression with
+**Bambi** and **PyMC**, alongside examples in **R** and **MATLAB**.
 
-<p align="center">
-  <img src="assets/graphic-abstract.png" alt="Unwrap visual abstract" width="900">
-</p>
+**Start here:** [Read the guide](https://jgraving.github.io/unwrap/) ·
+[Try a worked example](notebooks/circular_regression.ipynb) ·
+[Explore the biological analyses](notebooks/README.md)
+
+## What can you learn from a circular model?
+
+A change in average direction and a change in directional consistency are
+different biological responses. The models here estimate both:
+
+- **Mean direction:** the direction around which observations tend to cluster.
+- **Directional concentration:** how tightly observations cluster around that
+  direction. Higher concentration means more consistent directions.
+- **Individual differences:** repeated observations can be grouped by animal,
+  separating differences between animals from variation within an animal.
+
+The framework uses the von Mises distribution, a circular counterpart of the
+normal distribution, and can model mean direction and concentration together.
+The [guide](https://jgraving.github.io/unwrap/) introduces these ideas before
+the implementation details. For the mathematical treatment, see the
+[accompanying manuscript](https://github.com/jgraving/circstats/blob/main/elife-template.tex).
 
 ## Python installation
 
@@ -31,10 +45,8 @@ python -m pip install --upgrade pip
 python -m pip install git+https://github.com/jgraving/unwrap.git
 ```
 
-Python 3.10 or newer is required. CI exercises Python 3.10–3.14 on Linux,
-plus Python 3.12 on macOS and Windows. Dependency ranges are declared in
-[requirements.txt](requirements.txt); the resolver selects versions compatible
-with your Python version. PyMC 6 and ArviZ 1 support require a separate migration.
+Python 3.10 or newer is required. Install using the GitHub URL shown above.
+See the [setup guide](docs/getting-started.md) to run a notebook in this environment.
 
 ### Install with uv
 
@@ -46,7 +58,7 @@ uv pip install git+https://github.com/jgraving/unwrap.git
 uv run --no-project python -c "import unwrap"
 ```
 
-To add Unwrap to an existing uv project instead:
+To add `unwrap` to an existing uv project instead:
 
 ```bash
 uv add git+https://github.com/jgraving/unwrap.git
@@ -128,38 +140,17 @@ parameters, as shown for the intercept.
 See [the circular regression notebook](notebooks/circular_regression.ipynb)
 for a longer example with plots.
 
-## Code and examples
+## Examples and documentation
 
-| Location | Contents |
-| --- | --- |
-| [`unwrap/link/`](unwrap/link/) | NumPy and PyTensor/PyMC link functions, plus Bambi link objects |
-| [`unwrap/prior.py`](unwrap/prior.py) | Bambi prior helpers |
-| [`unwrap/distributions.py`](unwrap/distributions.py) | Circular uniform helper and von Mises mixtures |
-| [`unwrap/data.py`](unwrap/data.py) | Synthetic circular regression data |
-| [`unwrap/bessel.py`](unwrap/bessel.py) | Helpers relating von Mises concentration to mean resultant length |
-| [`notebooks/`](notebooks/) | Python examples and analyses |
-| [`notebooks/datasets/`](notebooks/datasets/) | Data files included for the notebooks |
-| [`R/`](R/) | R functions, a brms custom family, and examples |
-| [`Matlab/`](Matlab/) | MATLAB examples using Stan and MATLAB sampling tools |
+Start with [circular regression](notebooks/circular_regression.ipynb), which
+generates a small dataset and walks through fitting, interpreting, and checking
+a model. The [notebook guide](notebooks/README.md) describes the biological
+analyses and their data requirements.
 
-Python notebooks include:
-
-- [Circular regression](notebooks/circular_regression.ipynb)
-- [Beetles](notebooks/beetles.ipynb)
-- [Locust density and order](notebooks/locust_density_order.ipynb)
-- [Locust direction mixture model](notebooks/locust_direction_mixture_model.ipynb)
-- [Zebra escape](notebooks/zebra_escape.ipynb)
-
-These are working analysis notebooks; their setup and dependencies are not yet
-standardized. Check the installation cells and data paths before running them.
-Notebook organization and reproducible setup instructions are planned.
-
-## Documentation
-
-Start with the [documentation guide](docs/index.md) for Python setup, circular
-links, the API guide, and R/MATLAB entry points. See [development](docs/development.md)
-to build or preview the MkDocs site locally. CI checks the documentation build
-and retains a static-site artifact; public hosting is not configured yet.
+The [documentation](https://jgraving.github.io/unwrap/) includes installation,
+interpretation, circular links, and a Python API reference. Readers familiar
+with GLMs can go directly to the [link conventions](docs/links.md) and
+[API guide](docs/api.md).
 
 ## R and MATLAB
 
@@ -190,38 +181,10 @@ adjusted for your installation.
 [`Matlab/MatlabOnly/`](Matlab/MatlabOnly/) contains an alternative example
 using MATLAB's `hmcSampler`.
 
-## Development
+## Contributing
 
-Run the Python tests from a checkout using uv:
-
-```bash
-uv venv --python 3.12
-uv pip install -e ".[test]"
-uv run --no-project python -m pytest -q
-```
-
-Or, in an activated virtual environment, use
-`python -m pip install -e ".[test]"` followed by `python -m pytest -q`.
-
-[CI](.github/workflows/tests.yml) runs on pull requests and pushes to `main`.
-It checks the latest compatible dependencies across the Python/OS matrix above,
-and the lowest compatible direct dependencies on Python 3.10. It also builds
-and installs a source distribution and wheel. Resolved package versions appear
-in each job's log; this matrix does not cover every possible dependency combination.
-
-The initial suite checks circular links across numerical backends, concentration
-conversion, likelihoods against independent references, synthetic data, and a
-short Bambi sampling run with circular summaries. The short chains check that
-fitting works, not statistical convergence or parameter recovery. R/MATLAB and
-full analysis notebooks are not covered by this CI yet.
-
-Remaining work includes broader API tests, reproducible research notebooks,
-and shared reference examples across languages.
-
-Changes should be proposed as small, focused pull requests with a clear purpose
-and a description of how they were checked. Keep code moves, behaviour changes,
-and notebook rewrites in separate PRs where practical so each change is easy to
-review and revert.
+See the [development guide](docs/development.md) for tests, documentation builds,
+and the scope of automated checks.
 
 ## License
 

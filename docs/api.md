@@ -1,6 +1,6 @@
 # Python API guide
 
-Import helpers from their defining modules. Unwrap provides components for Bambi
+Import helpers from their defining modules. `unwrap` provides components for Bambi
 and PyMC; it does not define a separate top-level model-fitting class.
 
 ## Links
