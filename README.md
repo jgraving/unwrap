@@ -45,8 +45,11 @@ parameters is called **distributional regression**; it extends the usual GLM
 approach beyond modelling only the mean.
 
 The [model guide](docs/models.md) connects these biological questions to GLM
-and GLMM formulas, links, and interpretation. For the mathematical treatment,
-see the
+and GLMM formulas, links, and interpretation. The
+[mathematical guide](docs/math/von-mises.md)
+builds from the von Mises likelihood through GLMs, GLMMs, and mixture
+extensions, with equations and biological interpretations at each level.
+For the full treatment, see the
 [accompanying manuscript](https://github.com/jgraving/circstats/blob/main/elife-template.tex).
 
 ## Python installation

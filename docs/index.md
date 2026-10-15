@@ -68,6 +68,7 @@ can each hold a steady heading while pointing in different directions.
 
 - [Biological examples](examples.md): choose an analysis and check its inputs.
 - [Circular GLMs and GLMMs](models.md): connect biological questions to model formulas.
+- [Mathematical guide](math/von-mises.md): build from the von Mises likelihood to GLMs, GLMMs, and mixtures.
 - [Circular links](links.md): how predictors map to directions and concentration.
 - [Python API guide](api.md): components for Bambi and PyMC models.
 - [R and MATLAB](languages.md): setup and examples for the other implementations.
