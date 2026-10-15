@@ -78,7 +78,5 @@ additional data and validation requirements, described in the example guide.
 
 ## Citation
 
-**Forthcoming manuscript.** Citation details are provisional.
-
 > Graving, J. M., Sayin, S., Costelloe, B. R., Goldshtein, A., and Foster, J. J.
 > *Unwrapping Circular Statistics with Bayesian Multilevel Models.*
