@@ -1,6 +1,6 @@
 site_name: unwrap
 site_url: https://jgraving.github.io/unwrap/
-site_description: Bayesian circular regression with Bambi and PyMC
+site_description: Bayesian circular GLMs and GLMMs with PyMC and Bambi
 repo_url: https://github.com/jgraving/unwrap
 edit_uri: blob/main/docs/
 theme:
@@ -36,6 +36,7 @@ markdown_extensions:
 nav:
   - Overview: index.md
   - Python setup: getting-started.md
+  - Circular GLMs and GLMMs: models.md
   - Biological examples: examples.md
   - Circular links: links.md
   - Python API guide: api.md

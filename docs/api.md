@@ -1,7 +1,16 @@
 # Python API guide
 
-Import helpers from their defining modules. `unwrap` provides components for Bambi
-and PyMC; it does not define a separate top-level model-fitting class.
+`unwrap` provides components for circular GLMs and GLMMs in **PyMC**, and for
+**Bambi**, the high-level formula interface built on PyMC. Specify and fit
+models through those APIs, importing `unwrap` helpers from their defining
+modules. The [model guide](models.md) explains how the components work together.
+
+| Model component | Biological role | Python interface |
+| --- | --- | --- |
+| Regression formulas | Relate mean direction and concentration to treatments or continuous predictors; add animal or group differences | `bmb.Formula` and `bmb.Model` from Bambi |
+| Circular and positive links | Map regression predictions to mean direction and positive concentration | `unwrap.link.bambi.LINKS` for Bambi; `unwrap.link.pymc` for explicit PyMC models |
+| Priors | Express plausible parameter values before fitting | Bambi or PyMC priors, with helpers in `unwrap.prior` and `unwrap.distributions` |
+| Fitting and checking | Estimate uncertainty and assess whether predictions describe the observations | Bambi's `model.fit()` or PyMC's sampling API; ArviZ for diagnostics and summaries |
 
 ## Links
 

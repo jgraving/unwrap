@@ -5,10 +5,21 @@
   </picture>
 </p>
 
-`unwrap` helps you model angles and directions: where animals tend to point,
-how consistent their directions are, and how these patterns change with
-experimental conditions. It supports Bayesian circular regression with
-**Bambi** and **PyMC**, alongside examples in **R** and **MATLAB**.
+`unwrap` helps you explain where animals tend to point, how consistent their
+directions are, and how these patterns change with experimental conditions.
+It brings circular data into **Bayesian generalized linear models (GLMs)**:
+regression models that relate an outcome, such as heading, to predictors such
+as treatment, neighbour density, or a directional cue.
+
+For repeated observations of animals or groups, **generalized linear mixed
+models (GLMMs)** add individual or group differences to those relationships.
+These multilevel models can separate variation within animals from variation
+between animals while estimating population-level responses.
+
+The Python package targets **PyMC** for flexible model construction and Bayesian
+inference, and **Bambi**, a high-level, formula-based interface built on PyMC
+for GLMs and GLMMs. `unwrap` supplies circular links and prior helpers for these existing
+APIs. The repository also includes examples in **R** and **MATLAB**.
 
 **Start here:** [Read the guide](https://jgraving.github.io/unwrap/) ·
 [Try a worked example](notebooks/circular_regression.ipynb) ·
@@ -25,10 +36,17 @@ different biological responses. The models here estimate both:
 - **Individual differences:** repeated observations can be grouped by animal,
   separating differences between animals from variation within an animal.
 
-The framework uses the von Mises distribution, a circular counterpart of the
-normal distribution, and can model mean direction and concentration together.
-The [guide](https://jgraving.github.io/unwrap/) introduces these ideas before
-the implementation details. For the mathematical treatment, see the
+The framework uses the **von Mises distribution**, a circular counterpart of
+the normal distribution that treats 359° and 1° as neighbouring directions.
+Predictors can influence mean direction, concentration, or both. For example,
+animals might turn toward a cue without becoming more consistent, or become
+more consistent without changing their mean direction. Modelling both
+parameters is called **distributional regression**; it extends the usual GLM
+approach beyond modelling only the mean.
+
+The [model guide](docs/models.md) connects these biological questions to GLM
+and GLMM formulas, links, and interpretation. For the mathematical treatment,
+see the
 [accompanying manuscript](https://github.com/jgraving/circstats/blob/main/elife-template.tex).
 
 ## Python installation
@@ -74,9 +92,11 @@ python -m pip install -e .
 
 ## Quick start: circular regression in Python
 
-This example generates synthetic angles and fits a model in which both mean
-direction (`mu`) and concentration (`kappa`) depend on a predictor `x`.
-It uses Bambi's model interface with links and a prior supplied by `unwrap`.
+This example generates synthetic angles and fits a circular GLM in which both
+mean direction (`mu`) and concentration (`kappa`) depend on a predictor `x`.
+In a biological study, `x` might be a standardised measure of neighbour density
+and `y` the animal's heading. Bambi's formulas `y ~ x` and `kappa ~ x` specify
+the two relationships; `unwrap` supplies their links and a circular prior.
 
 ```python
 import numpy as np
@@ -129,13 +149,18 @@ print(
 Angles are in **radians**. The `circular_modulo` link wraps the mean predictor
 to `[-pi, pi)`; the `softplus` link maps the concentration predictor to positive
 values. Larger `kappa` means a more concentrated distribution of angles.
+These **inverse links** turn the intercept-plus-slope predictions into valid
+directions and concentrations. The mean slope describes angular change in
+radians per unit of `x` before wrapping; the concentration slope is on the
+pre-softplus scale, so interpret its size through predicted `kappa` values.
 `CircularUniformPrior()` approximates a uniform distribution on the circle
 using a von Mises distribution with near-zero concentration.
 
-The priors above are illustrative and should be adapted to the scale of your
-predictors. Inspect sampling diagnostics and posterior predictive behaviour
-before interpreting a fitted model. Use circular summaries for angular
-parameters, as shown for the intercept.
+Priors express plausible parameter values before fitting; those above are
+illustrative and should be adapted to the scale of your predictors. Inspect
+sampling diagnostics and use posterior predictive checks, comparing observations
+simulated from the fitted model with your data, before interpreting results.
+Use circular summaries for angular parameters, as shown for the intercept.
 
 See [the circular regression notebook](notebooks/circular_regression.ipynb)
 for a longer example with plots.
@@ -148,8 +173,9 @@ a model. The [notebook guide](notebooks/README.md) describes the biological
 analyses and their data requirements.
 
 The [documentation](https://jgraving.github.io/unwrap/) includes installation,
-interpretation, circular links, and a Python API reference. Readers familiar
-with GLMs can go directly to the [link conventions](docs/links.md) and
+[circular GLMs and GLMMs](docs/models.md), biological interpretation, circular
+links, and a Python API reference. Readers familiar with GLMs can go directly
+to the [link conventions](docs/links.md) and
 [API guide](docs/api.md).
 
 ## R and MATLAB
