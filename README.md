@@ -210,8 +210,6 @@ using MATLAB's `hmcSampler`.
 
 ## Citation
 
-**Forthcoming manuscript.** Citation details are provisional.
-
 > Graving, J. M., Sayin, S., Costelloe, B. R., Goldshtein, A., and Foster, J. J.
 > *Unwrapping Circular Statistics with Bayesian Multilevel Models.*
 
