@@ -2,7 +2,15 @@
 
 Start with the
 [circular regression tutorial](https://github.com/jgraving/unwrap/blob/main/notebooks/circular_regression.ipynb)
-for a complete introduction using simulated observations.
+for a complete introduction using simulated observations. It fits a circular
+generalized linear model (GLM) with predictors for both mean direction and
+concentration, using Bambi's formula interface and PyMC for inference.
+
+The research examples extend the same framework to biological experiments.
+Repeated observations can be represented with generalized linear mixed models
+(GLMMs), which estimate animal-specific variation alongside population-level
+effects. The [model guide](models.md) connects these terms to biological
+questions and model formulas.
 
 The [notebook guide](https://github.com/jgraving/unwrap/blob/main/notebooks/README.md)
 lists all examples, their inputs, and their current execution status.

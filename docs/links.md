@@ -1,9 +1,19 @@
 # Circular and positive links
 
-`link` maps a response parameter to predictor scale. `linkinv` maps the linear
-predictor to response-parameter scale. For example, softplus maps an unconstrained
-predictor to a positive concentration parameter; inverse softplus reverses that
-mapping for positive inputs.
+In a circular GLM or GLMM, a linear predictor combines an intercept with
+effects of treatment, density, or other predictors. An **inverse link** turns
+that sum into a parameter of the von Mises distribution. For example,
+`circular_modulo` turns a predicted angle into a direction on the circle;
+`softplus` turns a concentration predictor into a positive `kappa`. This lets
+the same regression framework describe both reorientation and changes in
+directional consistency. See the [model guide](models.md) for GLM and GLMM
+formulas and their biological interpretation.
+
+In the API, `link` maps a response parameter to predictor scale; `linkinv`
+maps the linear predictor to response-parameter scale. Softplus is an inverse
+link; inverse softplus reverses that mapping for positive inputs. A
+concentration coefficient is therefore interpreted before softplus, rather
+than as a constant additive change in `kappa`.
 
 ## Backends
 

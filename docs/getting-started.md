@@ -33,9 +33,15 @@ python -m jupyterlab notebooks/circular_regression.ipynb
 ```
 
 Select the kernel for this environment and run the cells in order. The tutorial
-creates its own data, so no download is needed. It shows how to estimate mean
-direction and directional concentration, display uncertainty, and compare
-model predictions with observations.
+creates its own data, so no download is needed. It fits a circular generalized
+linear model (GLM) using Bambi's formula interface, with `unwrap` links and
+priors and PyMC performing Bayesian inference. Both mean direction and
+directional concentration depend on a predictor. The tutorial shows how to
+display uncertainty and compare model predictions with observations.
+
+The [model guide](models.md) explains GLM formulas and their extension to
+generalized linear mixed models (GLMMs) for repeated observations of animals
+or groups.
 
 For an existing analysis environment, install just the package with:
 
