@@ -5,6 +5,11 @@ It could change the animal's preferred heading, make its headings more
 consistent, or do both. A circular regression models the observed headings
 directly and estimates these responses separately, with uncertainty.
 
+For the equations, follow the mathematical guide in increasing complexity:
+[von Mises distribution](math/von-mises.md), [GLMs](math/glms.md),
+[GLMMs](math/glmms.md), and [mixture extensions](math/mixtures.md).
+Each section defines the notation alongside its biological interpretation.
+
 ## From a biological question to a GLM
 
 A **generalized linear model (GLM)** relates a measured outcome to explanatory

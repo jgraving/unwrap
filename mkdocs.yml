@@ -30,6 +30,8 @@ theme:
     - search.highlight
     - content.code.copy
 markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.superfences
@@ -37,6 +39,11 @@ nav:
   - Overview: index.md
   - Python setup: getting-started.md
   - Circular GLMs and GLMMs: models.md
+  - Mathematical guide:
+      - 1. Von Mises distribution: math/von-mises.md
+      - 2. Circular GLMs: math/glms.md
+      - 3. Circular GLMMs: math/glmms.md
+      - 4. Mixture extensions: math/mixtures.md
   - Biological examples: examples.md
   - Circular links: links.md
   - Python API guide: api.md
@@ -52,3 +59,7 @@ validation:
 
 extra_css:
   - stylesheets/brand.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
