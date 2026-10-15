@@ -5,9 +5,6 @@ consistent, or do both. A circular generalized linear model (GLM) describes
 these as separate relationships with predictors, using the
 [von Mises distribution](von-mises.md) for the observed angles.
 
-The equations follow *Models: A Generalized Linear Model for Circular Data*
-in the [paper](https://github.com/jgraving/circstats/blob/438d2f2e2880defb792bc8d4e2ecefbc7337470d/elife-template.tex).
-
 ## Two regression equations, one angular outcome
 
 Let $n=1,\ldots,N$ index observations. The predictor vector
@@ -34,7 +31,7 @@ also be held constant.
 
 ## Map predictions onto the circle and positive values
 
-The paper's inverse links give
+The circular-modulo and softplus inverse links give
 
 $$
 \begin{aligned}

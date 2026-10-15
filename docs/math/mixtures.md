@@ -5,9 +5,6 @@ instead combine directed and undirected headings, or contain competing
 preferred directions. Mixtures extend the [GLM](glms.md) and [GLMM](glmms.md)
 framework by combining observation densities with estimated weights.
 
-These equations follow *Methods: Mixture likelihoods for circular outcomes*
-and the *Mixture von Mises Likelihoods* and *Mixture weights* appendices in the
-[paper](https://github.com/jgraving/circstats/blob/438d2f2e2880defb792bc8d4e2ecefbc7337470d/elife-template.tex).
 Here $\mathcal{M}$ denotes the [von Mises density](von-mises.md), $n$ indexes
 observations, and $i$ identifies an animal.
 
@@ -143,8 +140,8 @@ unchanged. Fix one reference predictor, such as $\eta_{\pi,nK}=0$, or impose
 a sum-to-zero constraint to remove this redundancy. This is separate from
 the component-label issue below. For numerical stability, subtract the
 largest weight predictor before evaluating the exponentials; the weights
-are unchanged. The paper's worked applications focus on
-two components; additional components require more data and careful evaluation.
+are unchanged. The [locust mixture example](../examples.md#locusts-preferred-directions-and-responses-to-virtual-neighbours)
+uses two components; additional components require more data and careful evaluation.
 
 ## Component labels and interpretation
 

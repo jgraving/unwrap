@@ -5,9 +5,6 @@ from observation to observation. The von Mises distribution describes this
 pattern on the circle. It is the observation model used throughout the
 [GLM](glms.md), [GLMM](glmms.md), and [mixture](mixtures.md) extensions below.
 
-This mathematical guide follows the
-[accompanying paper](https://github.com/jgraving/circstats/blob/438d2f2e2880defb792bc8d4e2ecefbc7337470d/elife-template.tex),
-especially its *Models* section and the hierarchical and mixture appendices.
 The [conceptual guide](../models.md) introduces the same ideas through
 biological questions and Bambi formulas.
 
@@ -34,7 +31,7 @@ $$
 | $\mu$ | Mean direction, around which observations cluster |
 | $\kappa$ | Concentration: larger values give tighter clustering |
 | $I_0(\kappa)$ | The modified Bessel function of the first kind, order zero |
-| $2\pi I_0(\kappa)$ | The normalising factor, also written $Z(\kappa)$ in the paper; it makes the density integrate to one |
+| $2\pi I_0(\kappa)$ | The normalising factor, also written $Z(\kappa)$; it makes the density integrate to one |
 
 The cosine measures agreement between an observation and the mean direction.
 It treats directions a full turn apart as identical. Concentration controls
@@ -49,8 +46,8 @@ exact direction is not a probability.
 ## Angular conventions
 
 All model equations use radians. The Python circular-modulo function represents
-angles in $[-\pi,\pi)$; the paper also uses the equivalent $(-\pi,\pi]$
-convention. The endpoints describe the same direction. Keep the angular origin
+angles in $[-\pi,\pi)$. The alternative $(-\pi,\pi]$ convention is equivalent:
+the endpoints describe the same direction. Keep the angular origin
 and clockwise or anticlockwise convention consistent across observations and
 predictions.
 

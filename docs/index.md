@@ -72,8 +72,6 @@ can each hold a steady heading while pointing in different directions.
 - [Circular links](links.md): how predictors map to directions and concentration.
 - [Python API guide](api.md): components for Bambi and PyMC models.
 - [R and MATLAB](languages.md): setup and examples for the other implementations.
-- [Accompanying manuscript](https://github.com/jgraving/circstats/blob/main/elife-template.tex):
-  the statistical framework and biological applications.
 
 The introductory tutorial is checked automatically. Research notebooks have
 additional data and validation requirements, described in the example guide.
