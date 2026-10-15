@@ -5,10 +5,6 @@ heading and whether different animals agree. A generalized linear mixed
 model (GLMM), also called a hierarchical or multilevel model, extends the
 [GLM](glms.md) with animal- or group-specific departures from population effects.
 
-The equations follow *Models: Hierarchical, Multilevel Models* and the
-*Hierarchical Generalized Linear Model* appendix in the
-[paper](https://github.com/jgraving/circstats/blob/438d2f2e2880defb792bc8d4e2ecefbc7337470d/elife-template.tex).
-
 ## Add individual effects to the regression coefficients
 
 Let $i$ identify an animal and $n$ an observation from that animal. The
@@ -42,7 +38,7 @@ the grouping and varying effects to match the experiment.
 
 ## Partial pooling on the predictor scale
 
-For offsets on an unconstrained scale before the links, the paper gives
+For offsets on an unconstrained scale before the links, a common construction is
 
 $$
 \mathbf{b}_i\sim\mathcal{N}(\mathbf{0},\Sigma_\beta),
@@ -63,7 +59,7 @@ An angular offset can instead use the circular construction below.
 ## Circular offsets: between-animal alignment
 
 For a genuinely angular effect, such as an animal's baseline directional
-offset, the paper also uses
+offset, a circular alternative is
 
 $$
 b_{i,0}\sim\mathcal{M}(0,\kappa_\mu),

@@ -47,5 +47,6 @@ are distinct quantities. Read the notebook's figure descriptions to see which
 level is being summarised.
 
 For the statistical framework and biological context, see the
-[accompanying manuscript](https://github.com/jgraving/circstats/blob/main/elife-template.tex).
+[model guide](../docs/models.md) and
+[mathematical guide](../docs/math/von-mises.md).
 

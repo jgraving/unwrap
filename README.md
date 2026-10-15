@@ -49,8 +49,6 @@ and GLMM formulas, links, and interpretation. The
 [mathematical guide](docs/math/von-mises.md)
 builds from the von Mises likelihood through GLMs, GLMMs, and mixture
 extensions, with equations and biological interpretations at each level.
-For the full treatment, see the
-[accompanying manuscript](https://github.com/jgraving/circstats/blob/main/elife-template.tex).
 
 ## Python installation
 
@@ -209,6 +207,13 @@ adjusted for your installation.
 
 [`Matlab/MatlabOnly/`](Matlab/MatlabOnly/) contains an alternative example
 using MATLAB's `hmcSampler`.
+
+## Citation
+
+**Forthcoming manuscript.** Citation details are provisional.
+
+> Graving, J. M., Sayin, S., Costelloe, B. R., Goldshtein, A., and Foster, J. J.
+> *Unwrapping Circular Statistics with Bayesian Multilevel Models.*
 
 ## Contributing
 
