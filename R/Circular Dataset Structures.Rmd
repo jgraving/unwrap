@@ -8,6 +8,17 @@ output:
     highlight: github
     toc: true
     fig_caption: true
+  pdf_document:
+    toc: true
+    fig_caption: true
+    latex_engine: xelatex
+header-includes:
+  - |
+    ```{=latex}
+    \usepackage{newunicodechar}
+    \newunicodechar{𝑛}{\ensuremath{n}}
+    \newunicodechar{𝜇}{\ensuremath{\mu}}
+    ```
 editor_options: 
   markdown: 
     wrap: sentence
@@ -342,6 +353,15 @@ model_expect = brm(formula = bf(y~0,
 loo_divergence = loo(model_divergence)
 loo_expected = loo(model_expect)
 loo_compare(loo_divergence, loo_expected)
+
+#ELPD difference between two models (first minus second) and its standard error,
+#calculated from pointwise ELPD in the same way as loo_compare
+ElpdDiff = function(loo1, loo2, digits = 1)
+{
+  d = loo1$pointwise[, 'elpd_loo'] - loo2$pointwise[, 'elpd_loo']
+  paste(formatC(sum(d), format = 'f', digits = digits), '±',
+        formatC(sqrt(length(d)) * sd(d), format = 'f', digits = digits))
+}
 ```
 
 The model for a divergent mean direction has higher expected log predictive density (ELPD) than the model for the expected direction.
@@ -445,7 +465,7 @@ cd_treatment = DescriptCplot(m = 210,
 
 To model the change in direction, we need to account for potential differences in both direction and concentration between the control and treatment.
 We can combine our two sets of angles together into one vector $y$, that is aligned with the vector $x$, which specifies in Boolean logic (yes: $1$, no: $0$) whether the treatment was applied .
-*N.B.* For stability, a slightly narrower prior on `Intercept`, $\mathcal{N}(0,3\pi/2)$, is used.
+*N.B.* For stability, a slightly narrower prior on `b_Intercept`, $\mathcal{N}(0,3\pi/2)$, is used.
 This reduces the region of $50\%$ prior density from [-240°, 240°] to [-180°, 180°].
 
 ```{r Fit treatment direction model}
@@ -459,14 +479,16 @@ dt_delta = data.frame(y = rad(
                       )
 
 #formula for a circular model with predictor x
-form_delta = bf(y~x,
-                kappa~x,
+#N.B. "0 + Intercept" prevents BRMS from centring predictors,
+#so that the intercept is the control, not the average across conditions
+form_delta = bf(y ~ 0 + Intercept + x,
+                kappa ~ 0 + Intercept + x,
                 family = unwrap_von_mises)
 
-prior_delta = prior('normal(0,3*pi()/2)', class = 'Intercept', dpar = 'mu') +
-        prior('normal(0,pi()/2)', class = 'b', dpar = 'mu') +
-        prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') +
-        prior('normal(0,3)', class = 'b', dpar = 'kappa')
+prior_delta = prior('normal(0,3*pi()/2)', class = 'b', coef = 'Intercept', dpar = 'mu') +
+        prior('normal(0,pi()/2)', class = 'b', coef = 'x', dpar = 'mu') +
+        prior('normal(3,3)', class = 'b', coef = 'Intercept', dpar = 'kappa') +
+        prior('normal(0,3)', class = 'b', coef = 'x', dpar = 'kappa')
 
 
 model_delta =  brm(formula = form_delta,
@@ -480,7 +502,10 @@ model_delta =  brm(formula = form_delta,
 summary(model_delta)
 ```
 
-Because the mean direction for the control now falls precisely at the boundary of $(-\pi, \pi)$, estimates for the `Intercept` parameter with equal likelihood could appear in both positive and negative directions.
+*N.B.* `brms` warns that parts of the model have not converged (some `Rhat` > 1.05) whenever estimates of a circular parameter have wrapped around the circle in some chains but not others.
+This is expected for these models, and convergence of circular parameters should instead be checked after unwrapping (`UnwrapRhats`), as below.
+
+Because the mean direction for the control now falls precisely at the boundary of $(-\pi, \pi)$, estimates for the `b_Intercept` parameter with equal likelihood could appear in both positive and negative directions.
 The same is also possible for the coefficient `b_x` (treatment change in angle).
 If we unwrap these estimates, we can confirm that they converged towards the same angle, even if they moved in different directions.
 
@@ -488,18 +513,18 @@ If we unwrap these estimates, we can confirm that they converged towards the sam
 plot(model_delta)
 #unwrap estimates and convert to degrees
 plot(x = model_delta,
-     variable = c('Intercept','b_x'),
+     variable = c('b_Intercept','b_x'),
      transform = unwrap_circular_deg)
 #print the rhat for unwrapped estimates
 UnwrapRhats(model_delta,
-            variable = c('Intercept','b_x'),
+            variable = c('b_Intercept','b_x'),
             regex = FALSE
             )
 ```
 
 Now that we have established that the model has converged, we can inspect the model predictions.
 To do this we need to apply the model formula to the estimates.
-That means that in the control condition we use estimates of `Intercept` ($\mu$) and `Intercept_kappa`, but for the treatment we need `Intercept` + `b_x` (effect of treatment on $\mu$) and `Intercept_kappa` + `b_kappa_x` (effect of treatment on $\kappa$).
+That means that in the control condition we use estimates of `b_Intercept` ($\mu$) and `b_kappa_Intercept`, but for the treatment we need `b_Intercept` + `b_x` (effect of treatment on $\mu$) and `b_kappa_Intercept` + `b_kappa_x` (effect of treatment on $\kappa$).
 
 ```{r Inspect predictions for change in direction}
 draws_delta = as_draws_df(model_delta)
@@ -513,8 +538,8 @@ PCfun(cd_control,
       shrink = 1.25,
       plot_rho = FALSE)
 Draws2Cont(draws_delta,
-           x_string = 'sin(Intercept)*A1(softplus(Intercept_kappa))',
-           y_string = 'cos(Intercept)*A1(softplus(Intercept_kappa))',
+           x_string = 'sin(b_Intercept)*A1(softplus(b_kappa_Intercept))',
+           y_string = 'cos(b_Intercept)*A1(softplus(b_kappa_Intercept))',
 )
 arrows.circular(x = circular(180,
                              units = 'degrees',
@@ -527,11 +552,11 @@ arrows.circular(x = circular(180,
 )
 with(draws_delta,
      arrows.circular(x = median.circular(x =
-                             circular(Intercept,
+                             circular(b_Intercept,
                                   rotation = 'clock',
                                   zero = pi/2)
                                   ),
-                     y = A1(softplus(x = median(x = Intercept_kappa))),
+                     y = A1(softplus(x = median(x = b_kappa_Intercept))),
                      lwd = 2,
                      length = 0.1/1.25,
                      col = adjustcolor(col_sd, alpha.f = 200/255))
@@ -543,8 +568,8 @@ PCfun(cd_treatment,
       shrink = 1.25,
       plot_rho = FALSE)
 Draws2Cont(draws_delta,
-           x_string = 'sin(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x))',
-           y_string = 'cos(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x))',
+           x_string = 'sin(b_Intercept+b_x)*A1(softplus(b_kappa_Intercept+b_kappa_x))',
+           y_string = 'cos(b_Intercept+b_x)*A1(softplus(b_kappa_Intercept+b_kappa_x))',
 )
 arrows.circular(x = circular(205,
                              units = 'degrees',
@@ -557,26 +582,31 @@ arrows.circular(x = circular(205,
 )
 with(draws_delta,
      arrows.circular(x = median.circular(x =
-                             circular(Intercept + b_x,
+                             circular(b_Intercept + b_x,
                                   rotation = 'clock',
                                   zero = pi/2)
                                   ),
-                     y = A1(softplus(x = median(x = Intercept_kappa +
+                     y = A1(softplus(x = median(x = b_kappa_Intercept +
                                                   b_kappa_x))),
                      lwd = 2,
                      length = 0.1/1.25,
                      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
-with(draws_delta, paste0(mean(b_x > 0)*100, '%') ) #nearly all estimates suggest a rightwards turn
+#proportion of estimates suggesting a rightwards turn
+prop_right_delta = with(draws_delta, mean(mod_circular(b_x) > 0))
+paste0(prop_right_delta*100, '%')
 
-with(draws_delta, paste0( round(
-                        deg(median.circular(x =
+median_turn_delta = with(draws_delta,
+                         deg(median.circular(x =
                              circular(b_x,
                                   template = 'none')
                                   )
-                            ) ), 
-                            '°')
-     ) #the size recovered is similar to the simulated turn of 210-180
+                            ) )
+paste0(round(median_turn_delta), '°') #the size recovered is similar to the simulated turn of 210-180
+#95% CI of the turn (unwrapped, degrees)
+ci_turn_delta = with(draws_delta,
+                     quantile(unwrap_circular_deg(b_x), probs = c(0.025, 0.975)) )
+round(ci_turn_delta)
 with(draws_delta,
      VertHist(data = Mod360.180(deg(b_x)), 
               main = 'change in mean angle',
@@ -593,17 +623,17 @@ axis(2, at = -6:6*15)
 ```
 
 Uncertainty in the example data results in a wide range of posterior estimates for the treatment direction.
-Nonetheless, $\>95\%$ of estimates for change in 𝜇 are to the right of 0°, suggesting a rightwards change in direction.
+Nonetheless, `r round(100*prop_right_delta, 1)`% of estimates for change in 𝜇 are to the right of 0°, suggesting a rightwards change in direction.
 
 ## Test the direction change hypothesis
 
 We can investigate this further using model comparison, by fitting models with only treatment effects on $\kappa$, and no effects of treatment on $\mu$ or $\kappa$.
-We do this by setting the formula for $\mu$ and $\kappa$ to `~1` (estimate intercept only).
+We do this by setting the formula for $\mu$ and $\kappa$ to `~ 0 + Intercept` (estimate intercept only).
 
 ```{r LOO-CV direction change}
 #model with effects of treatment on kappa, but not mu
-model_kappadelta =  brm(formula = bf(y~1,
-                                     kappa~x),
+model_kappadelta =  brm(formula = bf(y ~ 0 + Intercept,
+                                     kappa ~ 0 + Intercept + x),
                data = dt_delta, 
                family = unwrap_von_mises,
                prior = prior_delta[c(1,3:4),], # the all kappa & 1st mu prior
@@ -612,8 +642,8 @@ model_kappadelta =  brm(formula = bf(y~1,
                backend = 'cmdstan'
 )
 #model with no effects of treatment
-model_nodelta =  brm(formula = bf(y~1,
-                                  kappa~1),
+model_nodelta =  brm(formula = bf(y ~ 0 + Intercept,
+                                  kappa ~ 0 + Intercept),
                data = dt_delta, 
                family = unwrap_von_mises,
                prior = prior_delta[c(1,3),], # intercept kappa & mu priors
@@ -627,14 +657,14 @@ print(
     summary(model_kappadelta),
     `unwrapped rhat` = 
     UnwrapRhats(model_kappadelta,
-                variable = c('Intercept'),
+                variable = c('b_Intercept'),
                 regex = FALSE
                 ),
     `no treat.` = 
     summary(model_nodelta),
     `unwrapped rhat no treat.` = 
     UnwrapRhats(model_nodelta,
-                variable = c('Intercept'),
+                variable = c('b_Intercept'),
                 regex = FALSE
                 )
     ),
@@ -644,13 +674,14 @@ print(
 loo_delta = loo(model_delta)
 loo_kappadelta = loo(model_kappadelta)
 loo_nodelta = loo(model_nodelta)
-print(loo_compare(loo_delta, loo_kappadelta, loo_nodelta))
+lc_delta = loo_compare(loo_delta, loo_kappadelta, loo_nodelta)
+print(lc_delta)
 ```
 
 In this case there is uncertainty about the effect of treatment on direction.
-Although the model with a change in direction indicates the change to be very consistent (95% CI do not overlap with 0°), these differences could also be explained well by a null model with no change.
-Since the median estimate is close to the true value of 30°, the model's estimates appear to be robust, if not conclusive.
-Conversely, we can conclude that there was no effect of treatment on concentration, since `model_kappadelta` is a much worse fit than the null model (`model_nodelta`).
+Although most estimates from the model with a change in direction indicate a rightwards turn (`r round(100*prop_right_delta, 1)`% of estimates; 95% CI: `r round(ci_turn_delta[1])`° to `r round(ci_turn_delta[2])`°), these differences could also be explained well by a null model with no change (ELPD difference: `r ElpdDiff(loo_delta, loo_nodelta)`).
+Since the median estimate (`r round(median_turn_delta)`°) is close to the true value of 30°, the model's estimates appear to be robust, if not conclusive.
+Conversely, there is no evidence for an effect of treatment on concentration, since `model_kappadelta` has lower predictive density than the null model (`model_nodelta`; ELPD difference: `r ElpdDiff(loo_kappadelta, loo_nodelta)`), although this difference is small.
 
 # Change in concentration
 
@@ -693,25 +724,28 @@ dt_conc = data.frame(y = rad( as.numeric( c(cd_3, cd_0.5) ) ),
                       x = c(rep(0, length(cd_3)), rep(1, length(cd_0.5))) )
 
 #formula for a circular model with predictor x
-form_conc = bf(y~x,
-                kappa~x,
+form_conc = bf(y ~ 0 + Intercept + x,
+                kappa ~ 0 + Intercept + x,
                 family = unwrap_von_mises)
 
-prior_conc = prior('normal(0,3*pi()/2)', class = 'Intercept', dpar = 'mu') + 
-                prior('normal(0,pi()/2)', class = 'b', dpar = 'mu') + 
-                prior('normal(3,3)', class = 'Intercept', dpar = 'kappa') + 
-                prior('normal(0,3)', class = 'b', dpar = 'kappa')
+prior_conc = prior('normal(0,3*pi()/2)', class = 'b', coef = 'Intercept', dpar = 'mu') + 
+                prior('normal(0,pi()/2)', class = 'b', coef = 'x', dpar = 'mu') + 
+                prior('normal(3,3)', class = 'b', coef = 'Intercept', dpar = 'kappa') + 
+                prior('normal(0,3)', class = 'b', coef = 'x', dpar = 'kappa')
 
 model_conc = brm(formula = form_conc, 
                   data = dt_conc,
                   family = unwrap_von_mises,
                   prior = prior_conc, # the kappa and mu priors 
                   stanvars = stan_unwrap_fun + modulo_circular_fun, 
-                  silent = 2, backend = 'cmdstan' ) 
+                  silent = 2, backend = 'cmdstan' )
 summary(model_conc)
+#proportion of estimates for change in mu to the left of 0°
+prop_left_conc = mean(mod_circular(as_draws_df(model_conc)$b_x) < 0)
+paste0(prop_left_conc*100, '%')
 ```
 
-The model successfully recovers a large change in $\kappa$ caused by the treatment, alongside only a negligible potential change in $\mu$ (approximately equal posterior density either to the left and right of 0°).
+The model successfully recovers a large change in $\kappa$ caused by the treatment, alongside only a negligible potential change in $\mu$ (similar posterior density to the left, `r round(100*prop_left_conc)`%, and right of 0°).
 Since the model formula is identical to the change in direction example, we can extract the predictions in the same way.
 
 ```{r Inspect predictions for change in kappa}
@@ -727,8 +761,8 @@ PCfun(cd_3,
       shrink = 1.25,
       plot_rho = FALSE)
 Draws2Cont(draws_conc,
-           x_string = 'sin(Intercept)*A1(softplus(Intercept_kappa))',
-           y_string = 'cos(Intercept)*A1(softplus(Intercept_kappa))',
+           x_string = 'sin(b_Intercept)*A1(softplus(b_kappa_Intercept))',
+           y_string = 'cos(b_Intercept)*A1(softplus(b_kappa_Intercept))',
 )
 arrows.circular(x = circular(0,
                              units = 'degrees',
@@ -741,11 +775,11 @@ arrows.circular(x = circular(0,
 )
 with(draws_conc,
      arrows.circular(x = median.circular(x =
-                             circular(Intercept,
+                             circular(b_Intercept,
                                   rotation = 'clock',
                                   zero = pi/2)
                                   ),
-                     y = A1(softplus(x = median(x = Intercept_kappa))),
+                     y = A1(softplus(x = median(x = b_kappa_Intercept))),
                      lwd = 2,
                      length = 0.1/1.25,
                      col = adjustcolor(col_sd, alpha.f = 200/255))
@@ -757,8 +791,8 @@ PCfun(cd_0.5,
       shrink = 1.25,
       plot_rho = FALSE)
 Draws2Cont(draws_conc,
-           x_string = 'sin(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x))',
-           y_string = 'cos(Intercept+b_x)*A1(softplus(Intercept_kappa+b_kappa_x))',
+           x_string = 'sin(b_Intercept+b_x)*A1(softplus(b_kappa_Intercept+b_kappa_x))',
+           y_string = 'cos(b_Intercept+b_x)*A1(softplus(b_kappa_Intercept+b_kappa_x))',
 )
 arrows.circular(x = circular(0,
                              units = 'degrees',
@@ -771,20 +805,22 @@ arrows.circular(x = circular(0,
 )
 with(draws_conc,
      arrows.circular(x = median.circular(x =
-                             circular(Intercept + b_x,
+                             circular(b_Intercept + b_x,
                                   rotation = 'clock',
                                   zero = pi/2)
                                   ),
-                     y = A1(softplus(x = median(x = Intercept_kappa +
+                     y = A1(softplus(x = median(x = b_kappa_Intercept +
                                                   b_kappa_x))),
                      lwd = 2,
                      length = 0.1/1.25,
                      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
-with(draws_conc, paste0(mean(b_kappa_x < 0)*100, '%') ) #nearly all estimates suggest a reduction in kappa
+#nearly all estimates suggest a reduction in kappa
+prop_decrease_conc = with(draws_conc, mean(b_kappa_x < 0))
+paste0(prop_decrease_conc*100, '%')
 #calculate contrast on true scale by softplus transforming estimates
 with(draws_conc,
-     VertHist(data = softplus(Intercept_kappa+b_kappa_x) - softplus(Intercept_kappa), 
+     VertHist(data = softplus(b_kappa_Intercept+b_kappa_x) - softplus(b_kappa_Intercept), 
               main = '\nchange in kappa',
               ylim = c(-5, 1),
               col = adjustcolor(col_kappa, alpha.f = 100/255),
@@ -799,26 +835,26 @@ axis(2, at = (-5:1))
 
 ```
 
-Although there is some uncertainty in the particular size of the change in $\kappa$, $99\%$ of posterior estimates support a treatment effect that decreases $\kappa$.
+Although there is some uncertainty in the particular size of the change in $\kappa$, `r round(100*prop_decrease_conc, 1)`% of posterior estimates support a treatment effect that decreases $\kappa$.
 *N.B.* Since $\kappa$ is estimated on the inverse-softplus scale, the estimates for the control and treatment need to be calculated and then softplus transformed before a difference in $\kappa$ can be calculated on its true scale.
 
 ## Test the concentration change hypothesis
 
 We can investigate this further with model comparison by fitting models with no effects of treatment, and effects on only kappa.
-We do this by setting the formula for $\mu$ and $\kappa$ to `~1` (estimate intercept only).
+We do this by setting the formula for $\mu$ and $\kappa$ to `~ 0 + Intercept` (estimate intercept only).
 
 ```{r LOO-CV concentration change}
 #model with effects of treatment on kappa, but not mu 
-model_conc_kappa =  brm(formula = bf(y~1,
-                                          kappa~x),                
+model_conc_kappa =  brm(formula = bf(y ~ 0 + Intercept,
+                                          kappa ~ 0 + Intercept + x),                
                              data = dt_conc,                 
                              family = unwrap_von_mises,
                              prior = prior_conc[c(1,3:4),], # the all kappa & 1st mu prior                
                              stanvars = stan_unwrap_fun + modulo_circular_fun,    
                              silent = 2,                
                              backend = 'cmdstan') #model with no effects of treatment 
-model_conc_nokappa =  brm(formula = bf(y~1,
-                                       kappa~1),
+model_conc_nokappa =  brm(formula = bf(y ~ 0 + Intercept,
+                                       kappa ~ 0 + Intercept),
                           data = dt_conc,
                           family = unwrap_von_mises,
                           prior = prior_conc[c(1,3),], # intercept kappa & mu priors                
@@ -829,13 +865,13 @@ model_conc_nokappa =  brm(formula = bf(y~1,
 print(   list(`treat. kappa` =      summary(model_conc_kappa),     
               `unwrapped rhat` =
                 UnwrapRhats(model_conc_kappa,
-                            variable = c('Intercept'),
+                            variable = c('b_Intercept'),
                             regex = FALSE
                                   ),
               `no treat.` =      summary(model_conc_nokappa),
               `unwrapped rhat no treat.` =
                 UnwrapRhats(model_conc_nokappa,
-                            variable = c('Intercept'),
+                            variable = c('b_Intercept'),
                             regex = FALSE
                             )     
               ),   digits = 3 )  
@@ -845,16 +881,16 @@ loo_conc_nokappa = loo(model_conc_nokappa)
 print(loo_compare(loo_conc, loo_conc_kappa, loo_conc_nokappa))
 ```
 
-In this case the hypothesis tests are clear, the effect of change in kappa (present in both our original model and the kappa only model) improves model predictive density.
-As we might have also expected, the effect of treatment on $\mu$, present in our original model but not the $\kappa$-only model, does not improve predictive density, so there is little evidence that the treatment affects $\mu$.
+In this case, model comparison is less conclusive than the posterior estimates.
+The model with an effect of treatment on $\kappa$ only predicts the data better than the model with no effects of treatment, but this difference is small relative to its standard error (ELPD difference: `r ElpdDiff(loo_conc_kappa, loo_conc_nokappa)`).
+With this sample size, cross-validation therefore provides only weak support for the change in concentration indicated by `r round(100*prop_decrease_conc, 1)`% of posterior estimates.
+As we might have also expected, the effect of treatment on $\mu$, present in our original model but not the $\kappa$-only model, does not improve predictive density (ELPD difference: `r ElpdDiff(loo_conc, loo_conc_kappa)`), so there is little evidence that the treatment affects $\mu$.
 
 # High inter-individual correlation
 
 ![Tethered Bogong moths can be induced to fly in "flight simulators", which allows repeated measurements of flight directions across multiple individuals simultaneously. Individual directional biases may differ somewhat, but are typically highly correlated, aligning with the population's migratory direction.](icons/moth.png)
 
 In datasets that include repeated measurements across individuals, it is necessary to account for individual differences before attempting to identify any population level trends.
-In the simplest case, the orientation behaviour of different individuals is very similar: for example, all individuals may share a common goal direction $\beta_0$, but differ in alignment with that direction by their individual offsets from that direction $\beta_i$.
-In this case $\mu$ and $\kappa$ depend on the specific values of $\beta_0$ and $\beta_i$, and the distribution across $\beta_i$ is determined by the hyperparameter $\kappa_\mu$.
 In the simplest case, the orientation behaviour of different individuals is very similar.
 One example would be where all individuals share a common goal direction $\beta_0$, but differ in alignment with that direction by their individual offsets from that direction $\beta_i$.
 In this case $\mu$ and $\kappa$ depend on the specific values of $\beta_0$ and $\beta_i$, and the distribution across $\beta_i$ is determined by the hyperparameter $\kappa_\mu$, the concentration across individual offsets.
@@ -932,7 +968,7 @@ with(mle_comb_highcorr,
 ```
 
 The high correlation is apparent, since the majority of individual heading biases are within 45° of the population mean (orange points).
-Each individual's sample is also tightly clustered around its individual mean (blue points).
+Each individual's sample is also tightly clustered around its individual mean (dark purple points).
 Pooling data across individuals (grey points), we can see a preponderance of data in the population mean direction, but a much wider spread (lower concentration) than within any one individual's headings.
 
 We can use a hierarchical model, accounting for differences and similarities between individuals, to measure concentration for the average individual ($\alpha_0$) and across individual heading biases ($\kappa_\mu$), as well as to confirm expectations about the population mean direction ($\beta_0$).
@@ -1026,10 +1062,13 @@ model_highcorr = brm(
            prior = prior_highcorr,
           cores = 4,
           silent = 2,
-          backend = 'cmdstan') 
+          backend = 'cmdstan')
+#individuals for which raw estimates appear not to have converged (before unwrapping)
+rhat_raw_highcorr = rhat(model_highcorr)[paste0('b_betai_ID', 1:length(id_highcorr))]
+wrapped_highcorr = which(rhat_raw_highcorr > 1.05)
 ```
 
-As for the previous models, for some of the circular variables estimates from different chains are separated (for individuals 7, 8 and 10), which can make it appear that the model has not converged.
+As for the previous models, for some of the circular variables estimates from different chains are separated (`r if(length(wrapped_highcorr)) paste('in this run, for individuals', knitr::combine_words(wrapped_highcorr)) else 'though not in this run'`), which can make it appear that the model has not converged.
 Each $\beta_i$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
 
 ```{r Unwrap individual biases}
@@ -1126,9 +1165,9 @@ points.circular(mu_highcorr,
 )
 Draws2Cont(draws = draws_highcorr,
            x_string = 'sin(b_beta0_Intercept)*
-             A1(softplus(kappa_mu))',
+             A1(kappa_mu)',
            y_string = 'cos(b_beta0_Intercept)*
-             A1(softplus(kappa_mu))'
+             A1(kappa_mu)'
            )
 
 with(draws_highcorr,
@@ -1137,7 +1176,7 @@ with(draws_highcorr,
                                                   rotation = 'clock',
                                                   zero = pi/2)
      )[1],
-     y = A1(softplus(median(kappa_mu))),
+     y = A1(median(kappa_mu)),
      lwd = 2,
      length = 0.1/1.25,
      col = adjustcolor(col_sd, alpha.f = 200/255))
@@ -1159,7 +1198,7 @@ axis(1)
 axis(2, at = 0:5*2)
 ```
 
-Despite the bias towards high concentration for $\kappa_\mu$, all individual biases are recovered well by this model (overlap of shaded regions with blue arrows), including those more distant from the population mean direction.
+Despite the bias towards high concentration for $\kappa_\mu$, all individual biases are recovered well by this model (overlap of shaded regions with dark purple arrows), including those more distant from the population mean direction.
 
 # Low Inter-individual correlation
 
@@ -1364,9 +1403,9 @@ points.circular(mu_lowcorr,
 )
 Draws2Cont(draws = draws_lowcorr,
            x_string = 'sin(b_beta0_Intercept)*
-             A1(softplus(kappa_mu))',
+             A1(kappa_mu)',
            y_string = 'cos(b_beta0_Intercept)*
-             A1(softplus(kappa_mu))'
+             A1(kappa_mu)'
            )
 
 with(draws_lowcorr,
@@ -1375,19 +1414,18 @@ with(draws_lowcorr,
                                                   rotation = 'clock',
                                                   zero = pi/2)
      )[1],
-     y = A1(softplus(median(kappa_mu_lowcorr))),
+     y = A1(median(kappa_mu)),
      lwd = 2,
      length = 0.1/1.25,
      col = adjustcolor(col_sd, alpha.f = 200/255))
 )
-#posterior distribution of mean direction estimates (95% CI nearly 50° wide)
-with(draws_lowcorr,
-     {
-     
-       round(quantile.circular(x = circular(deg(b_beta0_Intercept), units = 'degrees'), 
-               probs = c(0,0.5,1) + c(1,0,-1)*0.05/2) )
-     }
-)
+#posterior distribution of mean direction estimates: median and 95% CI (degrees clockwise from 0°)
+ci_beta0_lowcorr = with(draws_lowcorr,
+                        quantile(unwrap_circular_deg(b_beta0_Intercept),
+                                 probs = c(0.025, 0.5, 0.975)) )
+round(ci_beta0_lowcorr)
+#width of the 95% CI
+paste0(round(diff(ci_beta0_lowcorr[c(1, 3)])), '°')
 #posterior estimate of population kappa
 with(draws_lowcorr, paste0(mean(softplus(Intercept_kappa) > kappa_id_lowcorr)*100, '%') ) #partial pooling allows accurate estimate
 
@@ -1466,7 +1504,7 @@ Nonetheless, both models recover the concentration of the average individual's h
 In most datasets, we can reasonably expect inter-individual variation for both $\mu$ and $\kappa$: individuals may differ in perceived or genuine goal direction, accuracy and consistency.
 In this example, there is an moderate concentration across individual biases ($\kappa_\mu = 1.0$), and the average individual's headings are somewhat concentrated ($\alpha_0 = 1.5$).
 However, the concentration within each individual's headings varies ($\sigma_\kappa = 0.5$) with a standard deviation 1/3 of the mean.
-This introduces the possibility of large variations in individual concentration ($\alpha_i$), including a $\approx 1\%$ chance of completely uniform heading distributions ($\kappa = 0$) for some individuals (assuming a truncated normal distribution).
+This introduces the possibility of large variations in individual concentration ($\alpha_i$), including a $\approx 0.1\%$ chance of completely uniform heading distributions ($\kappa = 0$) for some individuals (assuming a truncated normal distribution).
 
 ```{r Simulate individuals with variable parameters}
 kappa_mu_var = 1.0 # concentration across individuals
@@ -1548,7 +1586,7 @@ mtext(text = paste0('(',paste(signif(kappa_id_var_ci, 2), collapse = ' '), ')'),
 ```
 
 Despite the modest inter-individual correlation, 4 individuals diverge from the population mean direction by $>90°$.
-Individual concentrations also vary from $\kappa = 1.14$ to $\kappa = 2.65$, indeed in a larger population we would expect $95\%$ of individual $\alpha_i$ in (0.5, 2.5), corresponding to (circular) standard deviations between 96° and 42°.
+Individual concentrations also vary from $\kappa = 1.14$ to $\kappa = 2.66$, indeed in a larger population we would expect $95\%$ of individual $\alpha_i$ in (0.5, 2.5), corresponding to (circular) standard deviations between 96° and 42°.
 
 ## Fit the model
 
@@ -1602,8 +1640,13 @@ model_var = brm(
            prior = prior_var,
            silent = 2,
           cores = 4,
-          backend = 'cmdstan') 
+          backend = 'cmdstan')
+#number of transitions that reached the maximum tree depth (default 10)
+n_treedepth_var = sum(subset(nuts_params(model_var), Parameter == 'treedepth__')$Value >= 10)
 ```
+
+If `brms` warns that some transitions reached the maximum tree depth (`r n_treedepth_var` of 4000 in this run), sampling was less efficient for those transitions.
+This does not bias the estimates, and can be avoided by increasing `max_treedepth` via the `control` argument.
 
 As for the previous models, some of the circular variable estimates are separated between different chains, which can make it appear that the model has not converged.
 Each $\beta$ estimate behaves in this way, and needs to be unwrapped before we can determine whether the chains have arrived at similar estimates.
@@ -1672,8 +1715,8 @@ points.circular(mu_var,
                 shrink = 1.25, 
                 col = col_rho ) 
 Draws2Cont(draws = draws_var, 
-           x_string = 'sin(b_beta0_Intercept) *A1(softplus(kappa_mu))',
-           y_string = 'cos(b_beta0_Intercept)* A1(softplus(kappa_mu))' )
+           x_string = 'sin(b_beta0_Intercept) *A1(kappa_mu)',
+           y_string = 'cos(b_beta0_Intercept)* A1(kappa_mu)' )
 
 with(draws_var, 
      arrows.circular(x = mean.circular(
@@ -1681,7 +1724,7 @@ with(draws_var,
                 units = 'radians', 
                 rotation = 'clock', 
                 zero = pi/2) )[1], 
-       y = A1(softplus(median(kappa_mu))), 
+       y = A1(median(kappa_mu)), 
        lwd = 2, 
        length = 0.1/1.25, 
        col = adjustcolor(col_sd, alpha.f = 200/255)) )
@@ -1926,7 +1969,7 @@ Individuals also differ greatly in the concentration of their headings, ranging 
 ## Fit the model
 
 For this model, we need to update the formula to account for effects of treatment on $\mu$, $\kappa$ and their respective hyperparameters.
-We do this by including the treatment vector $x$ as a predictor for $\beta_0$ (`beta0 ~ 1 + x`) and $\alpha_0$ (`kappa ~ 1 + x`), and as an individual-specific predictor of $\beta_i$ (`betai ~ 0 + ID + x:ID`) and $\alpha_i$ (`(1+ x|ID)`).
+We do this by including the treatment vector $x$ as a predictor for $\beta_0$ (`beta0 ~ 1 + x`) and $\alpha_0$ (`kappa ~ 0 + Intercept + x`, where `0 + Intercept` prevents `BRMS` from centring $x$, so that the intercept represents the control condition rather than the average across conditions), and as an individual-specific predictor of $\beta_i$ (`betai ~ 0 + ID + x:ID`) and $\alpha_i$ (`(1+ x|ID)`).
 
 ```{r Formula for individual heading change}
 #collect data
@@ -1943,7 +1986,7 @@ form_hd = bf(y ~ mu,
                   nlf(mu ~ beta0 + betai),#a nonlinear formula
                   beta0 ~ 1 + x,
                   betai ~ 0 + ID + x:ID,
-                  kappa ~ 1 + x +  (1 + x|ID),#a linear formula
+                  kappa ~ 0 + Intercept + x +  (1 + x|ID),#a linear formula
                   family = unwrap_von_mises)
 ```
 
@@ -1972,7 +2015,7 @@ prior_hd = prior('normal(0, 3*pi()/2)',class = 'b', nlpar = 'beta0') + #wider pr
 set_prior(prior = 'target += unwrap_von_mises_vect_lpdf(b_betai[1:N_1] + b_betai[(N_1+1):(M_1*N_1)] | 0, log1p_exp(softkappamu+softkappamux))', check = FALSE) + #prior for the treatment (2nd N_1 betai estimates)
 set_prior(prior = 'target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)', check = FALSE) + #prior to higher values, indiv differences should be small
 set_prior(prior = 'target += normal_lpdf(softkappamux | 0, 1.0)', check = FALSE) + #expect only small effect of treatment on distrib. of individuals
-  prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('normal( 3.0, 3.0)', class = 'b', dpar = 'kappa', coef = 'Intercept') + #shouldn't be too tight, want to estimate
   prior('normal( 0.0, 3.0)', class = 'b', dpar = 'kappa', coef = 'x') + #turns should not affect population accuracy
   prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa') +  #now expect substantial variation, but too much makes sampling unstable
   prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa', coef = 'x', group = 'ID') #now expect substantial variation, but too much makes sampling unstable
@@ -2007,12 +2050,12 @@ From the raw coefficients, we can already see that parameter recovery has been q
 Both the population mean $\kappa$ and the (inverse-softplus scaled) estimates of $\sigma_\kappa$ are close to their true values.
 The data for the treatment are quite different from those in the control, even though their true generative distribution differs only in population mean direction ($\mu = \beta_0 + \beta_m$).
 As a result there is some uncertainty regarding the effect of treatment $x$ on $\kappa$, $\kappa_\mu$ and $\sigma_\kappa$.
-For `kappa_x` there is substantial posterior density for both increases and decreases in concentration in the treatment condition (95% CI: -0.45–4.42), and the range of estimates for `kappa_mu_x` ($\log(\exp(k_{\mu,0} + k_{\mu,x})+1)$) almost entirely overlaps with that for `kappa_mu` in the control condition.
-Large inter-individual variation in treatment effects on concentration (`sd(kappa_x)`) are estimated, and their correlation with individual differences in concentration for the control also has substantial posterior density for both correlation and anti-correlation (95% CI `cor(kappa_Intercept,kappa_x)`: -0.67–0.99), (correctly) suggesting no relationship between variation in the two conditions.
+For `kappa_x` there is substantial posterior density for both increases and decreases in concentration in the treatment condition (95% CI: `r round(sm_hd$fixed['kappa_x', 'l-95% CI'], 2)`–`r round(sm_hd$fixed['kappa_x', 'u-95% CI'], 2)`), and the range of estimates for `kappa_mu_x` ($\log(\exp(k_{\mu,0} + k_{\mu,x})+1)$) almost entirely overlaps with that for `kappa_mu` in the control condition.
+Large inter-individual variation in treatment effects on concentration (`sd(kappa_x)`) are estimated, and their correlation with individual differences in concentration for the control also has substantial posterior density for both correlation and anti-correlation (95% CI `cor(kappa_Intercept,kappa_x)`: `r round(sm_hd$random$ID['cor(kappa_Intercept,kappa_x)', 'l-95% CI'], 2)`–`r round(sm_hd$random$ID['cor(kappa_Intercept,kappa_x)', 'u-95% CI'], 2)`), so there is no clear evidence of a relationship between variation in the two conditions (correctly, since none was simulated).
 
 ## Test hypothesis of treatment effect
 
-Despite the uncertainty in this dataset, should still be possible to test the hypothesis of a population-level change in direction.
+Despite the uncertainty in this dataset, it should still be possible to test the hypothesis of a population-level change in direction.
 We can do this in the same way as for the example without repeated measures: by fitting a model in which $x$ affects $\kappa$ ('kappa only'), but not $\mu$, and one in which there is no effect of $x$ ('null model').
 Since differences between individuals could still be present if either hypothesis is true, all individual effects ($\beta_i$ & $\alpha_i$) and hyperparameters ($\kappa_\mu$ and $\sigma_\kappa$) unrelated to the treatment effect should remain in all models.
 Due to the small sample size, individual observations can greatly affect model fit.
@@ -2023,7 +2066,7 @@ form_hd_kappa = bf(y ~ mu,
                   nlf(mu ~ beta0 + betai),#a nonlinear formula
                   beta0 ~ 1,
                   betai ~ 0 + ID,
-                  kappa ~ 1 + x +  (1 + x|ID),#a linear formula
+                  kappa ~ 0 + Intercept + x +  (1 + x|ID),#a linear formula
                   family = unwrap_von_mises)
 
 form_hd_null = bf(y ~ mu,
@@ -2037,7 +2080,7 @@ form_hd_null = bf(y ~ mu,
 prior_hd_kappa = prior('normal(0, 3*pi()/2)',class = 'b', nlpar = 'beta0') + #wider prior helps avoid bias
   set_prior(prior = 'target += unwrap_von_mises_vect_lpdf(b_betai | 0, log1p_exp(softkappamu))', check = FALSE) + #prior for the control
 set_prior(prior = 'target += lognormal_lpdf(log1p_exp(softkappamu) | log(15), 0.6)', check = FALSE) + #prior to higher values, indiv differences should be small
-  prior('normal( 3.0, 3.0)', class = 'Intercept', dpar = 'kappa') + #shouldn't be too tight, want to estimate
+  prior('normal( 3.0, 3.0)', class = 'b', dpar = 'kappa', coef = 'Intercept') + #shouldn't be too tight, want to estimate
   prior('normal( 0.0, 3.0)', class = 'b', dpar = 'kappa', coef = 'x') + #turns should not affect population accuracy
   prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa') +  #now expect substantial variation, but too much makes sampling unstable
   prior('student_t(3, 0, 3.0)', class = 'sd', dpar = 'kappa', coef = 'x', group = 'ID') #now expect substantial variation, but too much makes sampling unstable
@@ -2124,7 +2167,7 @@ lc_nulltreat = loo_compare(loo_null, loo_kappa, loo_treat)
 print(lc_nulltreat)
 ```
 
-In this case, the results of model comparison are quite clear, the model for the hypothesis of an effect of treatment on both $\mu$ and $\kappa$ predicts the data more robustly than the other two hypotheses.
+In this case, the results of model comparison are quite clear, the model for the hypothesis of an effect of treatment on both $\mu$ and $\kappa$ predicts the data more robustly than the other two hypotheses (ELPD difference from the $\kappa$ model: `r ElpdDiff(loo_treat, loo_kappa)`; from the null model: `r ElpdDiff(loo_treat, loo_null)`).
 We can plot this model comparison to get an impression of the scale of the difference in plausibility between the hypotheses.
 
 ```{r Plot the model comparison}
@@ -2227,9 +2270,9 @@ for(i in 1:length(mu_hd) )
         plot_rho = FALSE)
   Draws2Cont(draws_treat,
              x_string = 'sin(b_beta0_Intercept + get(mu_name))*
-                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+                         A1(softplus(b_kappa_Intercept+get(kappa_name)))',
              y_string = 'cos(b_beta0_Intercept + get(mu_name))*
-                         A1(softplus(Intercept_kappa+get(kappa_name)))',
+                         A1(softplus(b_kappa_Intercept+get(kappa_name)))',
              ngrid = 100, # needs higher resolution to avoid spillover
              cropc = TRUE
   )
@@ -2247,7 +2290,7 @@ for(i in 1:length(mu_hd) )
                   rotation = 'clock',
                   zero = pi/2)
        )[1],
-       y = A1(softplus(median(Intercept_kappa+get(kappa_name)))),
+       y = A1(softplus(median(b_kappa_Intercept+get(kappa_name)))),
        lwd = 2,
        length = 0.1/1.25,
        col = adjustcolor(col_sd, alpha.f = 200/255))
@@ -2267,9 +2310,9 @@ for(i in 1:length(mu_delta) )
         plot_rho = FALSE)
   Draws2Cont(draws_treat,
              x_string = 'sin(b_beta0_Intercept + b_beta0_x + get(mu_name) + get(mu_delta_name))*
-                         A1(softplus(Intercept_kappa+b_kappa_x+get(kappa_name)+get(kappa_delta_name)))',
+                         A1(softplus(b_kappa_Intercept+b_kappa_x+get(kappa_name)+get(kappa_delta_name)))',
              y_string = 'cos(b_beta0_Intercept + b_beta0_x + get(mu_name) + get(mu_delta_name))*
-                         A1(softplus(Intercept_kappa+b_kappa_x+get(kappa_name)+get(kappa_delta_name)))',
+                         A1(softplus(b_kappa_Intercept+b_kappa_x+get(kappa_name)+get(kappa_delta_name)))',
              ngrid = 100, # needs higher resolution to avoid spillover
              cropc = TRUE
             )
@@ -2287,7 +2330,7 @@ for(i in 1:length(mu_delta) )
                   rotation = 'clock',
                   zero = pi/2)
        )[1],
-       y = A1(softplus(median(Intercept_kappa + b_kappa_x + get(kappa_name) + get(kappa_delta_name)))),
+       y = A1(softplus(median(b_kappa_Intercept + b_kappa_x + get(kappa_name) + get(kappa_delta_name)))),
        lwd = 2,
        length = 0.1/1.25,
        col = adjustcolor(col_sd, alpha.f = 200/255))
@@ -2296,7 +2339,7 @@ for(i in 1:length(mu_delta) )
 ```
 
 We can also compare the model parameters with the population parameters.
-Here we see that the estimates of the population mean angle favour a right turn in $99.7\%$ of estimates, but there is a lot of uncertainty about the exact size of the turn, or even whether it was to the right or the left.
+Here we see that the estimates of the population mean angle favour a right turn in `r round(100*mean(draws_treat$b_beta0_x > 0), 1)`% of estimates, but there is a lot of uncertainty about the exact size of the turn (95% CI: `r round(quantile(unwrap_circular_deg(draws_treat$b_beta0_x), 0.025))`° to `r round(quantile(unwrap_circular_deg(draws_treat$b_beta0_x), 0.975))`°; true turn 30°).
 This is influenced by the wide spread of individual mean angles and turn angles, which the model recovered well.
 
 ```{r Plot population parameters}
@@ -2388,9 +2431,9 @@ DescriptCplot(k = kappa_hd_mean,
 )
 Draws2Cont(draws = draws_treat,
            x_string = 'sin(b_beta0_Intercept)*
-             A1(softplus(Intercept_kappa))',
+             A1(softplus(b_kappa_Intercept))',
            y_string = 'cos(b_beta0_Intercept)*
-             A1(softplus(Intercept_kappa))',
+             A1(softplus(b_kappa_Intercept))',
            ngrid = 100, # needs higher resolution to avoid spillover
            cropc = TRUE
 )
@@ -2400,7 +2443,7 @@ with(draws_treat,
                                                 rotation = 'clock',
                                                 zero = pi/2)
      )[1],
-     y = A1(softplus(median(Intercept_kappa))),
+     y = A1(softplus(median(b_kappa_Intercept))),
      lwd = 2,
      length = 0.1/1.25,
      col = adjustcolor(col_sd, alpha.f = 200/255))
