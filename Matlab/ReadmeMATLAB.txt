@@ -1,3 +1,14 @@
+Native MATLAB examples
+----------------------
+MatlabOnly.m is a small circular regression example.
+CircularDatasetStructures.m analyses the bundled circular_datasets/*.csv
+using helper functions in unwrap_functions/.
+Both require the Statistics and Machine Learning Toolbox (hmcSampler).
+They do not require Stan. Open the chosen script in MATLAB and run it.
+
+Stan example: UnwrapStan.m
+-------------------------
+The following setup instructions apply only to UnwrapStan.m.
 Before running
 make sure you have installed:
  - https://github.com/brian-lau/MatlabStan

@@ -205,8 +205,13 @@ Start with [the MATLAB setup notes](Matlab/ReadmeMATLAB.txt) and
 MatlabStan, MatlabProcessManager, and CmdStan, with paths and version settings
 adjusted for your installation.
 
-[`Matlab/MatlabOnly/`](Matlab/MatlabOnly/) contains an alternative example
-using MATLAB's `hmcSampler`.
+For native MATLAB sampling, run
+[`Matlab/MatlabOnly.m`](Matlab/MatlabOnly.m) for a small circular regression,
+or [`Matlab/CircularDatasetStructures.m`](Matlab/CircularDatasetStructures.m)
+for examples of treatment effects and individual differences using the bundled
+CSV datasets. These use `hmcSampler` from the Statistics and Machine Learning
+Toolbox and do not require Stan. The dataset analysis loads its helpers from
+[`Matlab/unwrap_functions/`](Matlab/unwrap_functions/).
 
 ## Citation
 

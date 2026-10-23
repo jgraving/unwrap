@@ -40,10 +40,26 @@ The script includes a small example dataset and plots posterior samples.
 It notes that MatlabStan does not provide tools to unwrap estimates, so inspect
 periodic chain behaviour when interpreting its output.
 
-`Matlab/MatlabOnly/` contains a separate native-sampling experiment using
-`hmcSampler` and `dlarray`/automatic-differentiation functions. It is not a tested
-drop-in replacement for the Stan route; array shapes and sampler/gradient
-behaviour need validation before it becomes a supported example.
+## MATLAB: native sampling
+
+[`Matlab/MatlabOnly.m`](https://github.com/jgraving/unwrap/blob/main/Matlab/MatlabOnly.m)
+fits a small circular regression using `hmcSampler` and finite-difference
+gradients. It includes the observations and helper functions in one script.
+
+[`Matlab/CircularDatasetStructures.m`](https://github.com/jgraving/unwrap/blob/main/Matlab/CircularDatasetStructures.m)
+provides examples of effects on direction, concentration, and individual
+differences, using analytic gradients and helpers in `Matlab/unwrap_functions/`.
+It reads the bundled CSV files in `Matlab/circular_datasets/`, exported from the
+R simulations by `R/Export Circular Datasets.R`. To run the analysis, open the
+script in MATLAB and run it; input and helper paths are resolved from the
+script's location. Set `quickTest = true` before running for short chains that
+check execution, or `saveFigures = true` to save figures.
+
+Both native examples require the Statistics and Machine Learning Toolbox and
+do not require Stan. The dataset analysis reports classic R-hat before and
+after unwrapping circular parameters and uses PSIS-LOO, with refits for high
+Pareto-k observations up to its configured limit. Short test chains are not
+sufficient to assess convergence or support scientific conclusions.
 
 ## Establishing equivalence later
 
