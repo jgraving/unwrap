@@ -37,14 +37,14 @@ class NotebookCellsTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), self.original)
 
     def test_markdown_preserves_every_other_field(self):
-        (self.workspace / 'cells/0000.md').write_text('New title: θ\n')
+        (self.workspace / 'cells/0000.md').write_text('New title: θ\n', encoding='utf-8', newline='\n')
         cells.apply(self.workspace)
         expected = self.notebook
         expected['cells'][0]['source'] = ['New title: θ\n']
         self.assertEqual(json.loads(self.path.read_bytes()), expected)
 
     def test_code_requires_opt_in_and_clears_only_edited_outputs(self):
-        (self.workspace / 'cells/0001.py').write_text('print("updated")\n')
+        (self.workspace / 'cells/0001.py').write_text('print("updated")\n', encoding='utf-8', newline='\n')
         with self.assertRaises(ValueError):
             cells.apply(self.workspace)
         self.assertEqual(self.path.read_bytes(), self.original)
