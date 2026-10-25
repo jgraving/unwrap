@@ -13,7 +13,7 @@ a fresh run succeeds with today's dependencies.
 | [Circular regression](circular_regression.ipynb) | How does a predictor affect mean direction and directional consistency? | Simulated data; executed automatically in CI |
 | [Zebra body orientation](zebra_escape.ipynb) | How do group orientation, alignment between animals, and consistency within animals change after an approach? | Bundled observations; setup cleanup under review; full rerun and prediction validation pending |
 | [Locust direction mixtures](locust_direction_mixture_model.ipynb) | Do locust headings support forward alignment or two preferred directions in virtual reality? | Bundled heading steps; data path and setup still need cleanup |
-| [Locust density and order](locust_density_order.ipynb) | How do the density and alignment of virtual neighbours relate to movement direction? | Original `XY_parquet_parts` trajectories are not bundled; the full workflow cannot run from this checkout alone |
+| [Locust density and order](locust_density_order.ipynb) | How do the density and alignment of virtual neighbours relate to movement direction? | Bundled rediscretized steps; full workflow runs from this checkout (raw `XY_parquet_parts` shards reproducible via `datasets/build_locust_density_order.py`) |
 | [Dung beetle orientation](beetles.ipynb) | How do manipulated orientation cues affect heading? | Bundled `datasets/SecurityLightBergsig.txt`; full rerun pending |
 | [Periodic and circular functions](periodic_not_circular.ipynb) | Illustrate the distinction between periodic functions and circular responses | Exploratory illustration; full rerun pending |
 | [Von Mises policy](von_mises_policy.ipynb) | Explore a von Mises directional policy | Exploratory illustration; full rerun pending |
