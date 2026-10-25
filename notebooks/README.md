@@ -11,7 +11,7 @@ a fresh run succeeds with today's dependencies.
 | Notebook | Biological question or purpose | Inputs and readiness |
 | --- | --- | --- |
 | [Circular regression](circular_regression.ipynb) | How does a predictor affect mean direction and directional consistency? | Simulated data; executed automatically in CI |
-| [Zebra body orientation](zebra_escape.ipynb) | How do group orientation, alignment between animals, and consistency within animals change after an approach? | Bundled observations; setup cleanup under review; full rerun and prediction validation pending |
+| [Zebra body orientation](zebra_escape.ipynb) | How do group orientation, alignment between animals, and consistency within animals change after an approach? | Bundled observations (`zebra_bearings_blocks.parquet`); fully rerun and validated (MCMC diagnostics pass; bootstrap-vs-posterior PPC, with the `predict(kind="response_params")` kappa workaround in place) |
 | [Locust direction mixtures](locust_direction_mixture_model.ipynb) | Do locust headings support forward alignment or two preferred directions in virtual reality? | Bundled heading steps; data path and setup still need cleanup |
 | [Locust density and order](locust_density_order.ipynb) | How do the density and alignment of virtual neighbours relate to movement direction? | Original `XY_parquet_parts` trajectories are not bundled; the full workflow cannot run from this checkout alone |
 | [Dung beetle orientation](beetles.ipynb) | How do manipulated orientation cues affect heading? | Bundled `datasets/SecurityLightBergsig.txt`; full rerun pending |
