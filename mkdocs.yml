@@ -46,6 +46,9 @@ nav:
       - 4. Mixture extensions: math/mixtures.md
   - Biological examples: examples.md
   - Circular links: links.md
+  - Circular diagnostics:
+      - API and theory: diagnostics.md
+      - Validation experiments: validation/circular_rhat.md
   - Python API guide: api.md
   - R and MATLAB: languages.md
   - Development: development.md
