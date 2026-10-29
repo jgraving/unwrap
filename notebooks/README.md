@@ -12,6 +12,7 @@ a fresh run succeeds with today's dependencies.
 | --- | --- | --- |
 | [Circular regression](circular_regression.ipynb) | How does a predictor affect mean direction and directional consistency? | Simulated data; executed automatically in CI |
 | [Zebra body orientation](zebra_escape.ipynb) | How do group orientation, alignment between animals, and consistency within animals change after an approach? | Block bearings pulled from `unwrap-data` (`load_zebra_bearings`); full rerun and prediction validation pending |
+| [Homing bats](goldshtein_bats.ipynb) | Do kilometer-scale bat flights align with the destination (goal-homing), and how strongly? | Tracks, metadata and the Agamon–Hula lake outline pulled from `unwrap-data` (`load_bats_tracks`, `load_bats_info`, `load_bats_lake_outline`); full workflow runs from this checkout |
 | [Locust direction mixtures](locust_direction_mixture_model.ipynb) | Do locust headings support forward alignment or two preferred directions in virtual reality? | Raw trajectories from `unwrap-data` (`load_directional`) + in-notebook rediscretization; full rerun pending |
 | [Locust density and order](locust_density_order.ipynb) | How do the density and alignment of virtual neighbours relate to movement direction? | Tracking parts from `unwrap-data` (`load_density_order`); full workflow rerun pending |
 | [Dung beetle orientation](beetles.ipynb) | How do manipulated orientation cues affect heading? | Security-light trials pulled from `unwrap-data` (`load_beetle_security_light`); full rerun pending |
