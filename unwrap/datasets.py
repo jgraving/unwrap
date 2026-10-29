@@ -415,3 +415,18 @@ def load_bats_lake_outline(
     f = _resolve_file("goldschtein_bats", "agamon_hula_lake_outline.geojson",
                       data_root)
     return gpd.read_file(f)
+
+
+def bats_lake_outline_path(
+    data_root: Path | None = None,
+) -> Path:
+    """Path to the Agamon (Hula) lake outline ``.geojson`` in ``unwrap-data``.
+
+    For cells that ``gpd.read_file(LAKE_GEOJSON)`` a local ``LAKE_GEOJSON``
+    path variable rather than taking a returned GeoDataFrame. Resolves the
+    file (cloning ``unwrap-data`` on first use) so the path is valid on this
+    machine.
+    """
+    return _resolve_file(
+        "goldschtein_bats", "agamon_hula_lake_outline.geojson", data_root
+    )
