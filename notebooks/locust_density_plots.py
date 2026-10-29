@@ -45,7 +45,7 @@ def set_style():
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
     })
-    print(f"Figures will be saved to: {FIG_DIR}")
+    print(f"Figures will be saved to: {FIG_DIR.relative_to(FIG_DIR.parent.parent)}")
 
 
 def _ensure_fig_dir():
