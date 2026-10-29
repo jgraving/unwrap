@@ -1,9 +1,14 @@
 """
-Locust dataset access.
+Dataset access.
 
 The raw datasets are hosted in a separate repository (``jgraving/unwrap-data``)
 so that this repo stays small. This module fetches the parts you need and
-returns the same DataFrames the notebooks always saw.
+returns the same DataFrames the notebooks always saw. It serves four
+experiments: the two locust studies (:func:`load_directional`,
+:func:`load_density_order`), the beetle security-light trials
+(:func:`load_beetle_security_light`), and the zebra escape bearings
+(:func:`load_zebra_bearings`, plus :func:`load_zebra_bearings_raw` for the
+full per-frame raw source).
 
 Layout inside ``unwrap-data``:
 
@@ -44,6 +49,14 @@ import pandas as pd
 
 DEFAULT_REPO = "jgraving/unwrap-data"
 DEFAULT_DATA_ROOT = Path(os.path.expanduser("~/.cache/unwrap-data"))
+
+# dataset kind -> subdirectory of the unwrap-data repo
+_SUBDIRS = {
+    "directional": "directional",
+    "density_order": "density_order",
+    "beetle_security_light": "beetle_security_light",
+    "zebra_bearings": "zebra_bearings",
+}
 
 
 @dataclass
@@ -132,23 +145,16 @@ def _require_dir(p: Path) -> None:
 
 
 def _resolve_dir(kind: str, data_root: Path | None) -> Path:
-    """Resolve the parquet parts directory for ``kind`` ("directional" or
-    "density_order"). ``data_root`` may be None (clone/fetch the default
-    repo), an unwrap-data repo root (containing the dataset subdir), or the
-    dataset parts directory itself (a local checkout)."""
-    subdir = "directional" if kind == "directional" else "density_order"
+    """Resolve the parquet parts directory for ``kind``. ``data_root`` may be
+    None (clone/fetch the default repo), an unwrap-data repo root (containing
+    the dataset subdir), or the dataset directory itself (a local checkout)."""
+    subdir = _SUBDIRS[kind]
     if data_root is None:
-        repo = ensure_clone()
-        d = repo.directional_dir if kind == "directional" else repo.density_order_dir
+        d = ensure_clone().root / subdir
         _require_dir(d)
         return d
     root = Path(data_root)
-    if (root / subdir).is_dir():
-        d = root / subdir
-    elif list(root.glob("*.parquet")) or list(root.glob("XY_part_*.parquet")):
-        d = root
-    else:
-        d = root / subdir
+    d = root / subdir if (root / subdir).is_dir() else root
     _require_dir(d)
     return d
 
@@ -246,4 +252,86 @@ def load_density_order(
         [pd.read_parquet(f, columns=columns_only) for f in good],
         ignore_index=True,
     )
+    return df
+
+
+def _resolve_file(kind: str, filename: str, data_root: Path | None) -> Path:
+    """Resolve a single dataset file. ``data_root`` may be None (cloned
+    repo), a repo root, or the dataset directory itself."""
+    base = _resolve_dir(kind, data_root)
+    f = (base / filename).expanduser()
+    if not f.is_file():
+        raise FileNotFoundError(f"expected {f} to exist.")
+    return f
+
+
+def load_beetle_security_light(
+    data_root: Path | None = None,
+    *,
+    sep: str = "\t",
+) -> pd.DataFrame:
+    """Load the 2019 security-light beetle experiment.
+
+    Returns the raw per-trial table (``Experiment``, ``Beetle``, ``Trial``,
+    ``Heading`` in degrees). The ``beetles.ipynb`` notebook applies its own
+    Light/HeadingRadians transforms on top, so this returns the data as-is.
+    """
+    f = _resolve_file(
+        "beetle_security_light", "SecurityLightBergsig.txt", data_root
+    )
+    return pd.read_csv(f, sep=sep)
+
+
+def load_zebra_bearings(
+    data_root: Path | None = None,
+    *,
+    columns_only: list[str] | None = None,
+) -> pd.DataFrame:
+    """Load zebra escape-bearings block data.
+
+    Returns columns ``Track, Observation, Condition, HeadingRadians,
+    PostStimulus``. ``Condition`` is the ordered categorical
+    {pre-approach, post-approach} exactly as the ``zebra_escape.ipynb``
+    notebook expects.
+    """
+    f = _resolve_file("zebra_bearings", "zebra_bearings_blocks.parquet", data_root)
+    df = pd.read_parquet(f, columns=columns_only)
+    if "Condition" in df.columns:
+        df["Condition"] = pd.Categorical(
+            df["Condition"],
+            categories=["pre-approach", "post-approach"],
+            ordered=True,
+        )
+    return df
+
+
+def load_zebra_bearings_raw(
+    data_root: Path | None = None,
+    *,
+    sort: bool = True,
+) -> pd.DataFrame:
+    """Load the raw per-frame zebra escape-bearing observations.
+
+    The raw frames are split into one small parquet file per tracked animal
+    (``zebra_bearings/raw/<track>.parquet``) so each stays within git's
+    per-file limit. Every row carries a ``row_index`` naming its row in the
+    original ``zebra_bearings.csv``; with ``sort=True`` the reassembled frame
+    is value-for-value the original CSV (verified lossless).
+
+    Returns ``observation``, ``track_number``, ``frame``,
+    ``compass_bearing``, ``pre_scare``, ``row_index`` -- 4 zebras, 59 tracks,
+    3,897,536 frames. This is the *raw* source; :func:`load_zebra_bearings`
+    (the preprocessed 300-frame block view the notebook fits) is a few
+    hundred times smaller and is what ``zebra_escape.ipynb`` actually uses.
+    Load this only when you need to reproduce that preprocessing.
+    """
+    base = _resolve_dir("zebra_bearings", data_root)
+    raw = base / "raw"
+    _require_dir(raw)
+    files = sorted(raw.glob("*.parquet"))
+    if not files:
+        raise FileNotFoundError(f"no raw zebra files under {raw}")
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    if sort:
+        df = df.sort_values("row_index", kind="mergesort").reset_index(drop=True)
     return df
