@@ -74,15 +74,12 @@ class UnwrapDataRepo:
     def density_order_dir(self) -> Path:
         return self.root / "density_order"
 
-    def _git(self, *args: str, check: bool = True) -> str:
-        out = subprocess.run(
-            ["git", *args],
-            cwd=self.root,
-            capture_output=True,
-            text=True,
-            check=check,
-        )
-        return out.stdout
+
+def _git_stream(root: Path, *args: str, check: bool = True) -> None:
+    """Run a git command inside a local checkout, with stderr inherited so
+    ``--progress`` reporting (download percentage, speed) is visible in
+    notebooks and terminals instead of being swallowed."""
+    subprocess.run(["git", *args], cwd=root, check=check)
 
 
 def ensure_clone(
@@ -91,11 +88,16 @@ def ensure_clone(
     *,
     shallow: bool = True,
     force: bool = False,
+    update: bool = False,
 ) -> UnwrapDataRepo:
     """Ensure ``data_root/unwrap-data`` is a local clone of ``repo``.
 
-    Runs ``git clone --depth 1`` on first call, ``git pull``
-    afterwards (shallow clones pull with ``--depth 1``).
+    The clone is made **once** (``git clone --depth 1``, with git's progress
+    meter streamed to the notebook) and is then reused as-is: subsequent
+    ``load_*()`` calls resolve to local files with no network round-trip and
+    no re-download. Use ``update=True`` to pull in newly published data
+    (fetch + hard reset, also shown with a progress meter); without it an
+    existing checkout is trusted in place.
 
     Parameters
     ----------
@@ -108,6 +110,9 @@ def ensure_clone(
         Keep the clone to one commit (much faster, much smaller).
     force:
         Delete any existing clone before fetching.
+    update:
+        Re-fetch the latest ``main`` and hard-reset to it (progress meter
+        shown). Default ``False`` means "use what's already here".
     """
     data_root = Path(data_root) if data_root is not None else DEFAULT_DATA_ROOT
     root = data_root / "unwrap-data"
@@ -116,24 +121,26 @@ def ensure_clone(
         shutil.rmtree(root)
     if not root.exists():
         data_root.mkdir(parents=True, exist_ok=True)
-        shallow_flag = "--depth 1" if shallow else ""
+        shallow_flags = ["--depth", "1"] if shallow else []
         subprocess.run(
-            ["git", "clone", shallow_flag, f"https://github.com/{repo}.git", root],
+            ["git", "clone", *shallow_flags, "--progress",
+             f"https://github.com/{repo}.git", root],
             check=True,
         )
         return UnwrapDataRepo(root=root, shallow=shallow)
-    if (root / ".git").is_dir():
+    if not (root / ".git").is_dir():
+        raise RuntimeError(
+            f"{root} exists but is not a git checkout. "
+            "Pass force=True to wipe and reclone."
+        )
+    if update:
         if shallow:
-            root._git("fetch", "--depth", "1", "origin", "main", check=False)
-            root._git("checkout", "main", check=False)
-            root._git("reset", "--hard", "origin/main", check=False)
+            _git_stream(root, "fetch", "--depth", "1", "--progress", "origin", "main")
+            _git_stream(root, "checkout", "main")
+            _git_stream(root, "reset", "--hard", "origin/main")
         else:
-            root._git("pull", "--ff-only", check=False)
-        return UnwrapDataRepo(root=root, shallow=shallow)
-    raise RuntimeError(
-        f"{root} exists but is not a git checkout. "
-        "Pass force=True to wipe and reclone."
-    )
+            _git_stream(root, "pull", "--progress", "--ff-only")
+    return UnwrapDataRepo(root=root, shallow=shallow)
 
 
 def _require_dir(p: Path) -> None:
