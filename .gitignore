@@ -134,6 +134,10 @@ unwrap/.DS_Store
 .notebook-work/
 
 # unwrap-data is kept outside the repo under ~/.cache/unwrap-data/
-# (~990 MB raw locust tracking), so there is nothing to ignore here;
+# (~1.1 GB raw locust/zebra/bat tracking), so there is nothing to ignore here;
 # just make sure local checkouts of the data repo are never committed.
 unwrap-data/
+
+# regenerated notebook outputs (bats figures)
+figures/
+notebooks/figures/
