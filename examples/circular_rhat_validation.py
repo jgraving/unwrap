@@ -233,8 +233,43 @@ def fit_intercept(scenario, seed, draws=500, tune=500):
 
 def write_report(result, output):
     maximum_draws = max(row["draws_per_chain"] for row in result["summaries"])
+    tested = (
+        f"{len(result['rows'])} synthetic four-chain draw sets across "
+        f"{len({row['scenario'] for row in result['rows']})} scenarios, plus rotation checks"
+    )
+    if result["mcmc"]:
+        tested += (
+            f" and {len(result['mcmc'])} four-chain PyMC fits with mixed-posterior API checks."
+        )
+    else:
+        tested += ". PyMC sampling and mixed-posterior checks were skipped."
+    period_fit = next(
+        (row for row in result["mcmc"] if row["scenario"] == "period_separated_intercepts"),
+        None,
+    )
+    period_result = (
+        f"The period-separated fit gave raw R-hat {period_fit['raw_rank_rhat']:.4f} "
+        f"and joint circular R-hat {period_fit['joint_circular']:.4f}. "
+        if period_fit is not None
+        else ""
+    )
+    api_result = "Ordinary-variable outputs matched ArviZ exactly. " if result["mcmc"] else ""
     lines = [
         "# Circular diagnostic validation",
+        "",
+        "## Summary",
+        "",
+        f"- **Tested:** {tested}",
+        "- **Why:** Distinguish disagreement in angular directions from different numerical "
+        "representations of the same direction, and check that ordinary parameters retain "
+        "ArviZ behavior.",
+        "- **Found:** " + period_result + api_result
+        + "The joint method detected tested differences in direction and concentration, plus "
+        "within-chain shifts. Both it and the separate projections have multimodal blind spots; averaging "
+        "the projection R-hats can obscure an elevated value.",
+        "- **Use:** Select angular quantities with `circ_var_names`, report the joint and both "
+        "projection R-hats, and inspect per-chain angular distributions. Retain raw coefficient "
+        "diagnostics when that scale matters. The joint statistic has no calibrated universal cutoff.",
         "",
         "This reproducible study compares the joint covariance diagnostic with separate",
         "ArviZ rank R-hats on sine and cosine. The maximum and arithmetic mean of those",

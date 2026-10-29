@@ -170,8 +170,10 @@ different numerical interval.
 The default circular `r_hat` is **not** the same statistic as the rank R-hat
 on ordinary rows or in the projection columns. Its derivation and limitations
 appear below; a universal threshold of 1.01 has not been calibrated for it.
-The [validation experiments](validation/circular_rhat.md) compare the methods
-on agreement, disagreement, and known blind spots.
+The [validation summary](validation/circular_rhat.md#summary) explains what the
+experiments imply for use: check directions modulo a full turn, report both
+projection R-hats, and inspect per-chain distributions for multimodal disagreement.
+Full results and reproduction instructions follow that summary.
 
 ## Reporting sine and cosine R-hat
 

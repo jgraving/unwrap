@@ -1,5 +1,12 @@
 # Circular diagnostic validation
 
+## Summary
+
+- **Tested:** 600 synthetic four-chain draw sets across 10 scenarios, plus rotation checks and 2 four-chain PyMC fits with mixed-posterior API checks.
+- **Why:** Distinguish disagreement in angular directions from different numerical representations of the same direction, and check that ordinary parameters retain ArviZ behavior.
+- **Found:** The period-separated fit gave raw R-hat 2.8417 and joint circular R-hat 1.0026. Ordinary-variable outputs matched ArviZ exactly. The joint method detected tested differences in direction and concentration, plus within-chain shifts. Both it and the separate projections have multimodal blind spots; averaging the projection R-hats can obscure an elevated value.
+- **Use:** Select angular quantities with `circ_var_names`, report the joint and both projection R-hats, and inspect per-chain angular distributions. Retain raw coefficient diagnostics when that scale matters. The joint statistic has no calibrated universal cutoff.
+
 This reproducible study compares the joint covariance diagnostic with separate
 ArviZ rank R-hats on sine and cosine. The maximum and arithmetic mean of those
 two R-hats are included only as exploratory comparisons; neither is a public
