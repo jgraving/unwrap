@@ -7,6 +7,10 @@
 - **Found:** The period-separated fit gave raw R-hat 2.8417 and joint circular R-hat 1.0026. Ordinary-variable outputs matched ArviZ exactly. The joint method detected tested differences in direction and concentration, plus within-chain shifts. Both it and the separate projections have multimodal blind spots; averaging the projection R-hats can obscure an elevated value.
 - **Use:** Select angular quantities with `circ_var_names`, report the joint and both projection R-hats, and inspect per-chain angular distributions. Retain raw coefficient diagnostics when that scale matters. The joint statistic has no calibrated universal cutoff.
 
+![Period-separated coefficient chains agree in direction; selected multimodal examples expose diagnostic blind spots.](circular_rhat_summary.svg)
+
+Left: one PyMC fit distinguishes real coefficient modes from directional agreement. Right: selected simulation medians show that neither approach detects every angular difference. Joint circular values and rank R-hats are different statistics.
+
 This reproducible study compares the joint covariance diagnostic with separate
 ArviZ rank R-hats on sine and cosine. The maximum and arithmetic mean of those
 two R-hats are included only as exploratory comparisons; neither is a public
@@ -128,7 +132,10 @@ comparison and every mixed summary cell, with blanks represented as null.
 
 ```bash
 python examples/circular_rhat_validation.py --output docs/validation
+python examples/plot_circular_rhat_validation.py
 ```
+
+The plotting command reads the saved JSON without sampling and requires the PyMC fit results.
 
 Use `--replicates` to change the simulation repetitions or `--skip-mcmc`
 to run only the synthetic controls. The JSON records every run and dependency

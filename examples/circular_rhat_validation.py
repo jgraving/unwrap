@@ -271,6 +271,18 @@ def write_report(result, output):
         "projection R-hats, and inspect per-chain angular distributions. Retain raw coefficient "
         "diagnostics when that scale matters. The joint statistic has no calibrated universal cutoff.",
         "",
+    ]
+    if period_fit is not None:
+        lines += [
+            "![Period-separated coefficient chains agree in direction; selected multimodal "
+            "examples expose diagnostic blind spots.](circular_rhat_summary.svg)",
+            "",
+            "Left: one PyMC fit distinguishes real coefficient modes from directional agreement. "
+            "Right: selected simulation medians show that neither approach detects every angular "
+            "difference. Joint circular values and rank R-hats are different statistics.",
+            "",
+        ]
+    lines += [
         "This reproducible study compares the joint covariance diagnostic with separate",
         "ArviZ rank R-hats on sine and cosine. The maximum and arithmetic mean of those",
         "two R-hats are included only as exploratory comparisons; neither is a public",
@@ -404,7 +416,10 @@ def write_report(result, output):
         "",
         "```bash",
         "python examples/circular_rhat_validation.py --output docs/validation",
+        "python examples/plot_circular_rhat_validation.py",
         "```",
+        "",
+        "The plotting command reads the saved JSON without sampling and requires the PyMC fit results.",
         "",
         "Use `--replicates` to change the simulation repetitions or `--skip-mcmc`",
         "to run only the synthetic controls. The JSON records every run and dependency",
