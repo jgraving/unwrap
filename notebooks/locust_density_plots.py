@@ -53,6 +53,10 @@ def _ensure_fig_dir():
     return FIG_DIR
 
 
+def _rel(p):
+    return p.relative_to(FIG_DIR.parent.parent)
+
+
 def _save(fig, name, pdf=True, png=True, transparent=False):
     """Save to FIG_DIR as .pdf and/or .png. Returns the list of paths written."""
     out = _ensure_fig_dir()
@@ -68,8 +72,9 @@ def _save(fig, name, pdf=True, png=True, transparent=False):
         fig.savefig(p, dpi=DPI)
         written.append(str(p))
     if written:
-        print("Saved figure" + ("s" if len(written) > 1 else "") + " to: " +
-              ("; ".join(written) if len(written) > 1 else written[0]))
+        shown = [str(_rel(Path(x))) for x in written]
+        print("Saved figure" + ("s" if len(shown) > 1 else "") + " to: " +
+              ("; ".join(shown) if len(shown) > 1 else shown[0]))
     return written
 
 
@@ -827,7 +832,7 @@ def plot_polar_pdfs_grid(theta, summ, order_levels, dens_levels, peak_max,
     fig.savefig(out / (fname + ".svg"), format="svg")
     fig.savefig(out / (fname + ".pdf"), bbox_inches="tight")
     fig.savefig(out / (fname + ".png"), dpi=DPI)
-    print("Saved figure to:", str(out / (fname + ".pdf")))
+    print("Saved figure to:", str(_rel(out / (fname + ".pdf"))))
     plt.show()
 
 
