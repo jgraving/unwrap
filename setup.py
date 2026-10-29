@@ -25,6 +25,9 @@ setup(
             "numba>=0.60",
             "tqdm>=4.66",
             "xarray>=2024.1.0",
+            # bats (Goldshtein) dataset loaders: legacy .xls + geojson
+            "python-calamine>=0.2",
+            "geopandas>=1.0",
         ],
     },
     classifiers=[

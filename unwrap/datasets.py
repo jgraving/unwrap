@@ -3,19 +3,21 @@ Dataset access.
 
 The raw datasets are hosted in a separate repository (``jgraving/unwrap-data``)
 so that this repo stays small. This module fetches the parts you need and
-returns the same DataFrames the notebooks always saw. It serves four
+returns the same DataFrames the notebooks always saw. It serves five
 experiments: the two locust studies (:func:`load_directional`,
 :func:`load_density_order`), the beetle security-light trials
-(:func:`load_beetle_security_light`), and the zebra escape bearings
+(:func:`load_beetle_security_light`), the zebra escape bearings
 (:func:`load_zebra_bearings`, plus :func:`load_zebra_bearings_raw` for the
-full per-frame raw source).
+full per-frame raw source), and the bat homing-tracking tracks
+(:func:`load_bats_tracks`, :func:`load_bats_info`,
+:func:`load_bats_lake_outline`).
 
 Layout inside ``unwrap-data``:
 
 * ``directional/*.parquet``       -- one file per locust from the VR
   directional experiment (Sayin et al. 2025). Columns: ``X, Y, fname``.
 * ``density_order/XY_part_*.parquet``
-                                 -- raw tracking parts from the
+                                  -- raw tracking parts from the
   density/order experiment. Columns: ``X, Y, fname, loss, order,
   density, groups``. The parts are size-capped, not logical units;
   read them all.
@@ -34,7 +36,10 @@ DataFrame with the experiment's columns (``X, Y, fname, loss, order,
 density, groups``).
 
 Either way call :func:`ensure_clone` first (or pass
-``data_root=`` to skip fetching) so the files are local.
+``data_root=`` to skip fetching) so the files are local. A clone is
+made once and then reused as-is: subsequent loader calls cost only
+local file reads, with no re-download and no network round-trip. Pass
+``update=True`` to :func:`ensure_clone` to pull newly published data.
 """
 
 from __future__ import annotations
@@ -56,6 +61,7 @@ _SUBDIRS = {
     "density_order": "density_order",
     "beetle_security_light": "beetle_security_light",
     "zebra_bearings": "zebra_bearings",
+    "goldschtein_bats": "goldschtein_bats",
 }
 
 
@@ -342,3 +348,70 @@ def load_zebra_bearings_raw(
     if sort:
         df = df.sort_values("row_index", kind="mergesort").reset_index(drop=True)
     return df
+
+
+def _read_bats_excel(filename: str, data_root: Path | None, *,
+                     columns_only: list[str] | None) -> pd.DataFrame:
+    """Read a bats ``.xls`` (legacy BIFF) from the bats dataset subdir.
+
+    These are the original tracking-export/workbook files, kept verbatim in
+    ``unwrap-data``. They are read with the ``calamine`` engine; declare
+    ``python-calamine`` (pandas >= 3 uses it by default, and it reads the
+    legacy ``.xls`` format that ``xlrd``/``openpyxl`` do not).
+    """
+    f = _resolve_file("goldschtein_bats", filename, data_root)
+    df = pd.read_excel(f, engine="calamine")
+    if columns_only is not None:
+        df = df[columns_only]
+    return df
+
+
+def load_bats_tracks(
+    data_root: Path | None = None,
+    *,
+    columns_only: list[str] | None = None,
+) -> pd.DataFrame:
+    """Load the raw post-localization bat homing tracks (Goldshtein et al.).
+
+    One row per tracking fix; each track is tagged with its destination
+    (see the ``tag`` id and ``distDest`` / ``flightAngDiffDest`` columns).
+    28,350 rows x 17 cols: ``tag, time, x, y, lon, lat, alt, si, distance,
+    speed, flightAngle, turningAngle, distDeparture, distDest,
+    flightAngDiffDest, afterLocalization, illumination``. This is the input
+    table ``goldschtein_bats.ipynb`` starts from; the notebook does its own
+    coordinate transform to web-mercator on top.
+    """
+    return _read_bats_excel("dataAll_trackDest.xls", data_root,
+                            columns_only=columns_only)
+
+
+def load_bats_info(
+    data_root: Path | None = None,
+    *,
+    columns_only: list[str] | None = None,
+) -> pd.DataFrame:
+    """Load the per-bat metadata table for the homing experiments.
+
+    67 bats x 56 cols (``tag, year, month, treatment, translocationPoint,
+    treatmentName, flyHome, flyAgamon, ...``). Join to
+    :func:`load_bats_tracks` on ``tag``.
+    """
+    return _read_bats_excel("all_bats_info.xls", data_root,
+                            columns_only=columns_only)
+
+
+def load_bats_lake_outline(
+    data_root: Path | None = None,
+) -> "object":
+    """Load the Agamon (Hula) lake shoreline as a GeoDataFrame.
+
+    The polygon used as the natural-homing destination in the harmonic-field
+    target-bearing construction. Requires ``geopandas`` (imported lazily so
+    the rest of this module works without it). Returns a
+    ``geopandas.GeoDataFrame`` with a single polygon (EPSG:4326).
+    """
+    import geopandas as gpd
+
+    f = _resolve_file("goldschtein_bats", "agamon_hula_lake_outline.geojson",
+                      data_root)
+    return gpd.read_file(f)
