@@ -43,6 +43,10 @@ def _ensure_fig_dir():
     return FIG_DIR
 
 
+def _rel(p):
+    return p.relative_to(FIG_DIR.parent.parent)
+
+
 def _save(fig, name, dpi=DPI, pad_inches=0.01, exts=("pdf",)):
     """Save to FIG_DIR with the given extensions. Returns the list of paths."""
     out = _ensure_fig_dir()
@@ -52,8 +56,9 @@ def _save(fig, name, dpi=DPI, pad_inches=0.01, exts=("pdf",)):
         fig.savefig(p, dpi=dpi, bbox_inches="tight", pad_inches=pad_inches)
         written.append(str(p))
     if written:
-        print("Saved figure" + ("s" if len(written) > 1 else "") + " to: " +
-              ("; ".join(written) if len(written) > 1 else written[0]))
+        shown = [str(_rel(Path(x))) for x in written]
+        print("Saved figure" + ("s" if len(shown) > 1 else "") + " to: " +
+              ("; ".join(shown) if len(shown) > 1 else shown[0]))
     return written
 
 
