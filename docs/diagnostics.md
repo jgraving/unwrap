@@ -95,6 +95,7 @@ variable, so select only angles in that mode. Do not combine that mode with
 For mixed data, `method` controls ordinary variables and `circ_method` controls
 the named circular variables. The latter accepts `"circular"`, `"sin"`, or
 `"cos"`; the projection choices use ArviZ's rank-normalized split R-hat.
+Each method is used only if variables of that type remain after selection.
 The wrapper does not infer angular variables or convert degrees. All angular
 inputs must be radians.
 
@@ -143,6 +144,12 @@ Projection columns are included by default for `kind="all"` and
 contains only descriptive statistics. Custom statistics retain ArviZ's behavior:
 their functions receive the original draws, and `extend=False` requests only
 those custom statistics.
+
+When diagnostics are included, custom statistic names must not duplicate the
+generated metric names. Default wide-table rounding follows ArviZ: three decimal
+places for MCSE, two for R-hat, and whole numbers for ESS, including the generated
+projection columns. Custom columns retain ArviZ's rounding. Set `round_to="none"`
+to retain full precision, or pass an integer to choose a common precision.
 
 These projection errors describe estimates of quantities such as
 $E[\sin\theta]$, not errors in the circular mean direction. Likewise, tail ESS
@@ -362,6 +369,22 @@ rank-normalized or folded, and does not claim the robustness properties of
 ArviZ's modern `method="rank"`. Ranking the two coordinates separately would
 change the joint geometry and lose the rotation invariance described below.
 
+The implementation evaluates this expression without squaring a potentially
+large ratio. Let $C$ contain the centered chain means as rows, so that
+$S=C^\mathsf{T}C/(m-1)$, and let $LL^\mathsf{T}=W$. Then
+
+$$
+\sqrt{\lambda_{\max}(S,W)}
+=\sigma_{\max}\left(L^{-1}C^\mathsf{T}/\sqrt{m-1}\right).
+$$
+
+It computes that largest singular value and combines the two contributions
+with a numerically stable hypotenuse calculation. Residual coordinates are
+scaled before covariance products to avoid underflow. Arithmetic centering
+also preserves exactly zero residuals for constant chains. These changes do
+not alter the statistic; they prevent overflow or cancellation from reporting
+apparent agreement for extremely concentrated, disagreeing chains.
+
 ## Joint method: invariance and the concentrated-angle limit
 
 Adding any integer multiple of $2\pi$ to any draw leaves $u(\theta)$
@@ -409,6 +432,10 @@ available to assess mixing. If every chain is constant but the chains represent
 different directions, the result is infinity. Other singular within-chain
 covariance matrices give NaN with a warning. Singular cases are not silently
 regularized, converted to a pseudoinverse result, or reported as convergence.
+Equivalence checks allow for the input floating-point precision only when
+removing a nonzero number of full turns; they do not erase small differences
+within one period. Numerical overflow yields an infinite or undefined result,
+never a value near one obtained by replacing a nonfinite intermediate with zero.
 
 Very concentrated draws can make the radial variance much smaller than the
 tangent variance and leave $W$ numerically singular. This is a limitation of

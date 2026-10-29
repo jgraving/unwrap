@@ -22,13 +22,13 @@ __all__ = ["rhat", "rhat_components", "summary"]
 _log = logging.getLogger("arviz")
 
 
-def _same_direction(values, reference):
+def _same_direction(values, reference, epsilon):
     """Compare constants modulo turns without erasing small within-period variation."""
     with np.errstate(over="ignore", invalid="ignore"):
         difference = values - reference
         turns = np.rint(difference / (2 * np.pi))
         residual = np.arctan2(np.sin(difference), np.cos(difference))
-        tolerance = 8 * np.finfo(float).eps * np.abs(difference)
+        tolerance = 8 * epsilon * np.abs(difference)
         # The tolerance applies only when removing a nonzero number of turns.
         # Its scale is the removed offset, not the absolute angular origin.
         return (difference == 0) | (
@@ -41,6 +41,10 @@ def _same_direction(values, reference):
 
 def _rhat_circular(ary):
     """Return the split, standard-deviation-scale multivariate PSRF for angles."""
+    ary = np.asarray(ary)
+    epsilon = np.finfo(float).eps
+    if np.issubdtype(ary.dtype, np.floating):
+        epsilon = max(epsilon, np.finfo(ary.dtype).eps)
     ary = np.asarray(ary, dtype=float)
     if not np.isfinite(ary).all():
         _log.warning("Circular R-hat requires finite angles; returning NaN.")
@@ -57,8 +61,8 @@ def _rhat_circular(ary):
     chains, draws = ary.shape
 
     # Circular constants may be stored with a different turn count at every draw.
-    if np.all(_same_direction(ary, ary[:, :1])):
-        if np.all(_same_direction(ary[:, 0], ary[0, 0])):
+    if np.all(_same_direction(ary, ary[:, :1], epsilon)):
+        if np.all(_same_direction(ary[:, 0], ary[0, 0], epsilon)):
             return np.nan
         return np.inf
 
@@ -73,33 +77,54 @@ def _rhat_circular(ary):
     # cos(phase)-1 has the same covariances as cos(phase), but this identity
     # preserves the small radial variation of highly concentrated directions.
     unit = np.stack((-2 * np.sin(phase / 2) ** 2, np.sin(phase)), axis=-1)
-    means = unit.mean(axis=1)
-    residuals = unit - means[:, None, :]
-    within = np.einsum("mni,mnj->ij", residuals, residuals) / (chains * (draws - 1))
+    # Stable arithmetic centering keeps exactly constant chains' residuals zero.
+    # The original chain origins are restored in their means, so between-chain
+    # disagreement is retained; this is not separate angular alignment.
+    local = unit - unit[:, :1, :]
+    local_means = local.mean(axis=1)
+    means = unit[:, 0, :] + local_means
+    residuals = local - local_means[:, None, :]
     centered_means = means - means.mean(axis=0)
-    between = centered_means.T @ centered_means / (chains - 1)
 
     # An invertible change of coordinate scale does not change the generalized
-    # eigenvalues. Balance the two coordinates before checking rank/whitening.
-    scales = np.sqrt(np.diag(within))
-    if np.any(scales == 0):
+    # eigenvalues. Scale BEFORE covariance products so a tiny radial variance
+    # does not underflow even when the angular deviations are representable.
+    column_scales = np.max(np.abs(residuals), axis=(0, 1))
+    if np.any(column_scales == 0):
         _log.warning("Circular R-hat has singular within-chain covariance; returning NaN.")
         return np.nan
-    scale_matrix = np.outer(scales, scales)
-    within = within / scale_matrix
-    between = between / scale_matrix
+    residuals = residuals / column_scales
+    within = np.einsum("mni,mnj->ij", residuals, residuals) / (chains * (draws - 1))
+    scales = np.sqrt(np.diag(within))
+    within = within / np.outer(scales, scales)
     if np.linalg.eigvalsh(within)[0] <= 64 * np.finfo(float).eps:
         _log.warning("Circular R-hat has singular within-chain covariance; returning NaN.")
         return np.nan
 
-    # L^-1 S L^-T is symmetric and has the generalized eigenvalues of (S, W).
+    # The squared singular values of L^-1 C.T / sqrt(m-1) are the generalized
+    # eigenvalues of (S, W). Work with their square roots throughout: S/W can
+    # overflow while R-hat itself is still finite. hypot also avoids squaring
+    # the final singular value. Never turn a nonfinite intermediate into zero.
+    with np.errstate(over="ignore"):
+        scaled_means = centered_means / np.sqrt(chains - 1) / column_scales / scales
+    if not np.isfinite(scaled_means).all():
+        _log.warning("Circular R-hat encountered numerical overflow; returning NaN.")
+        return np.nan
     lower = np.linalg.cholesky(within)
-    whitened = np.linalg.solve(lower, between)
-    whitened = np.linalg.solve(lower, whitened.T).T
-    largest = np.linalg.eigvalsh((whitened + whitened.T) / 2)[-1]
-    # S is positive semidefinite; remove only a possible negative roundoff error.
-    largest = max(0.0, largest)
-    return np.sqrt((draws - 1) / draws + (chains + 1) / chains * largest)
+    with np.errstate(over="ignore", invalid="ignore"):
+        whitened = np.linalg.solve(lower, scaled_means.T)
+    if not np.isfinite(whitened).all():
+        _log.warning("Circular R-hat encountered numerical overflow; returning NaN.")
+        return np.nan
+    magnitude = np.max(np.abs(whitened))
+    if magnitude == 0:
+        return np.sqrt((draws - 1) / draws)
+    largest = np.linalg.svd(whitened / magnitude, compute_uv=False)[0]
+    with np.errstate(over="ignore"):
+        return np.hypot(
+            np.sqrt((draws - 1) / draws),
+            (np.sqrt((chains + 1) / chains) * largest) * magnitude,
+        )
 
 
 def _apply_diagnostic(function, data, var_names, dask_kwargs):
@@ -210,7 +235,6 @@ def rhat(
                 "With circ_var_names, method selects the ordinary diagnostic; "
                 "use circ_method='circular' for angular variables."
             )
-        function = _circular_function(circ_method)
         dataset = az.convert_to_dataset(data)
         names = _circular_names(dataset, circ_var_names)
         selected = az.extract(
@@ -222,6 +246,7 @@ def rhat(
         if ordinary:
             parts.append(az.rhat(selected[ordinary], method=method, dask_kwargs=dask_kwargs))
         if circular:
+            function = _circular_function(circ_method)
             parts.append(_apply_diagnostic(function, selected[circular], None, dask_kwargs))
         if not parts:
             return az.rhat(selected, method=method, dask_kwargs=dask_kwargs)
@@ -285,7 +310,7 @@ def _summary_dataset(data, group):
     return data[group]
 
 
-def _format_summary(dataset, fmt, round_to, labeller):
+def _format_summary(dataset, fmt, round_to, labeller, projection_metrics):
     """Format computed metrics using ArviZ's public label and iteration helpers."""
     fmt = fmt.lower()
     if fmt == "xarray":
@@ -309,7 +334,7 @@ def _format_summary(dataset, fmt, round_to, labeller):
         for column in result.columns:
             # Projection diagnostics have the same precision as their ArviZ counterparts.
             metric = column
-            if fmt == "wide" and column.endswith(("_sin", "_cos")):
+            if fmt == "wide" and column in projection_metrics:
                 metric = column[:-4]
             decimals[column] = 2 if metric == "r_hat" else 0 if metric in (
                 "ess_bulk", "ess_tail"
@@ -408,6 +433,7 @@ def summary(
         result[name].loc[dict(metric="mcse_mean")] = circular_mcse[name]
         result[name].loc[dict(metric=["ess_bulk", "ess_tail", "mcse_sd"])] = np.nan
 
+    projection_metrics = []
     if include_circular_diagnostics:
         extras = []
         for suffix, projection in (("sin", np.sin), ("cos", np.cos)):
@@ -417,6 +443,7 @@ def summary(
             metrics = [f"{metric}_{suffix}" for metric in projected.metric.values]
             if set(metrics) & set(result.metric.values):
                 raise ValueError("Custom statistic names collide with circular diagnostic names.")
+            projection_metrics.extend(metrics)
             projected = projected.assign_coords(metric=metrics)
             padded = xr.Dataset({
                 name: xr.full_like(result[name].isel(metric=0, drop=True), np.nan)
@@ -427,4 +454,4 @@ def summary(
                 padded[name] = projected[name]
             extras.append(padded)
         result = xr.concat([result, *extras], dim="metric")
-    return _format_summary(result, fmt, round_to, labeller)
+    return _format_summary(result, fmt, round_to, labeller, projection_metrics)

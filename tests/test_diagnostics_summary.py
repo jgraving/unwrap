@@ -108,6 +108,41 @@ def test_mixed_rhat_rejects_ambiguous_or_unknown_circular_names(mixed_posterior)
         rhat(mixed_posterior, circ_var_names=["direction"], circ_method="missing")
 
 
+def test_mixed_rhat_ignores_methods_for_unselected_variable_types(mixed_posterior):
+    xr.testing.assert_identical(
+        rhat(
+            mixed_posterior,
+            circ_var_names=["direction"],
+            var_names=["speed"],
+            circ_method="unused",
+        ),
+        az.rhat(mixed_posterior, var_names=["speed"]),
+    )
+    xr.testing.assert_identical(
+        rhat(
+            mixed_posterior,
+            circ_var_names=["direction"],
+            var_names=["direction"],
+            method="unused",
+        ),
+        rhat(mixed_posterior, var_names=["direction"], method="circular"),
+    )
+
+
+def test_mixed_wrappers_preserve_input_and_rhat_metadata(mixed_posterior):
+    mixed_posterior.attrs["model"] = "direction and speed"
+    mixed_posterior.direction.attrs["units"] = "radians"
+    mixed_posterior.animal.attrs["description"] = "individual identifier"
+    original = mixed_posterior.copy(deep=True)
+    actual = rhat(mixed_posterior, circ_var_names=["direction"])
+    reference = az.rhat(mixed_posterior)
+    assert actual.attrs == reference.attrs
+    assert actual.direction.attrs == reference.direction.attrs
+    xr.testing.assert_identical(actual.animal, reference.animal)
+    summary(mixed_posterior, circ_var_names=["direction"])
+    xr.testing.assert_identical(mixed_posterior, original)
+
+
 def test_mixed_rhat_retains_lazy_dask_results(mixed_posterior):
     pytest.importorskip("dask.array")
     lazy = mixed_posterior.chunk({"chain": -1, "draw": -1, "animal": 1})
@@ -212,6 +247,33 @@ def test_summary_custom_statistic_is_retained_with_default_statistics(mixed_post
     assert_allclose(actual.speed.sel(metric="minimum"), mixed_posterior.speed.min(("chain", "draw")))
 
 
+@pytest.mark.parametrize("name", ["r_hat", "r_hat_sin"])
+def test_summary_rejects_custom_statistics_that_would_overwrite_diagnostics(mixed_posterior, name):
+    with pytest.raises(ValueError, match="Custom statistic names"):
+        summary(
+            mixed_posterior,
+            circ_var_names=["direction"],
+            stat_funcs={name: lambda draws: 1.234567},
+        )
+
+
+def test_summary_custom_projection_names_keep_arviz_rounding_when_projections_disabled(
+    mixed_posterior,
+):
+    stat_funcs = {
+        "r_hat_sin": lambda draws: 1.234567,
+        "ess_bulk_cos": lambda draws: 12.345678,
+    }
+    actual = summary(
+        mixed_posterior,
+        circ_var_names=["direction"],
+        stat_funcs=stat_funcs,
+        include_circular_diagnostics=False,
+    )
+    expected = az.summary(mixed_posterior, circ_var_names=["direction"], stat_funcs=stat_funcs)
+    pd.testing.assert_frame_equal(actual[list(stat_funcs)], expected[list(stat_funcs)])
+
+
 def test_summary_named_coords_filtering_and_transposed_dimensions(mixed_posterior):
     transposed = mixed_posterior.transpose("animal", "draw", "chain", missing_dims="ignore")
     actual = summary(
@@ -231,6 +293,14 @@ def test_summary_named_coords_filtering_and_transposed_dimensions(mixed_posterio
     xr.testing.assert_identical(actual, expected)
     assert_array_equal(actual.animal, ["bee"])
     assert list(actual.data_vars) == ["direction"]
+
+
+@pytest.mark.parametrize("fmt", ["wide", "long", "xarray"])
+def test_summary_scalar_coordinate_selection_matches_preselected_data(mixed_posterior, fmt):
+    kwargs = dict(circ_var_names=["direction"], fmt=fmt)
+    actual = summary(mixed_posterior, coords={"animal": "bee"}, **kwargs)
+    expected = summary(mixed_posterior.sel(animal="bee"), **kwargs)
+    assert_summary_equal(actual, expected)
 
 
 def test_summary_group_and_prior_fallback_follow_arviz(mixed_posterior):

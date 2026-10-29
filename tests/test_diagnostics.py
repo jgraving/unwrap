@@ -245,7 +245,7 @@ def test_matches_independent_multivariate_covariance_reference(angular_draws):
     assert_allclose(rhat(angular_draws, method="circular"), reference, rtol=1e-12, atol=1e-12)
 
 
-@pytest.mark.parametrize("scale", [1e-8, 1e-16, 1e-40])
+@pytest.mark.parametrize("scale", [1e-8, 1e-16, 1e-40, 1e-100, 1e-150])
 @pytest.mark.parametrize("shifted", [False, True])
 def test_tiny_angles_match_stable_small_angle_limit(scale, shifted):
     rng = np.random.default_rng(672)
@@ -271,6 +271,52 @@ def test_tiny_angles_match_stable_small_angle_limit(scale, shifted):
         assert actual > 10
     else:
         assert actual < 1.01
+
+
+@pytest.mark.parametrize("scale", [1e-78, 1e-150])
+def test_extreme_disagreement_does_not_overflow_to_apparent_agreement(scale):
+    rng = np.random.default_rng(823)
+    standardized = rng.normal(size=(2, 1000))
+    draws = np.concatenate([scale * standardized, np.full((2, 1000), np.pi)])
+
+    # Independent small-angle limit: the two noisy chains have features
+    # (-delta**2 / 2, delta), while the other two remain fixed at the antipode.
+    # After splitting, S_rr -> m/(m-1), and R * scale**2 approaches this value.
+    deviations = standardized - standardized[0, 0]
+    split = np.concatenate([deviations[:, :500], deviations[:, 500:]])
+    features = np.stack([-0.5 * split**2, split], axis=-1)
+    within = np.mean([np.cov(chain, rowvar=False) for chain in features], axis=0) / 2
+    reference = np.sqrt(9 / 7 * np.linalg.inv(within)[0, 0])
+    with np.errstate(over="raise", invalid="raise"):
+        actual = rhat(draws, method="circular")
+    assert np.isfinite(actual)
+    assert actual > 1e100
+    assert_allclose(actual * scale**2, reference, rtol=1e-12)
+
+
+@pytest.mark.parametrize("per_draw", [False, True])
+def test_float32_period_equivalent_constants_respect_input_precision(per_draw):
+    rng = np.random.default_rng(73)
+    turns = rng.integers(-5, 6, (4, 100)) if per_draw else np.arange(4)[:, None]
+    values = np.broadcast_to(0.4 + 2 * np.pi * turns, (4, 100)).astype(np.float32)
+    assert np.isnan(rhat(values, method="circular"))
+    distinct = values + np.array([0, 0, 0.8, 0.8], dtype=np.float32)[:, None]
+    assert np.isinf(rhat(distinct, method="circular"))
+
+
+def test_large_chain_count_preserves_representable_extreme_rhat():
+    standardized = np.random.default_rng(5).normal(size=(8192, 8))
+    scaled_results = []
+    for scale in (2e-150, 2e-155):
+        draws = scale * standardized
+        draws[-1] = np.pi
+        actual = rhat(draws, method="circular")
+        assert np.isfinite(actual)
+        assert actual > 1e290
+        # The small-angle covariance ratio grows as scale**-4, hence R as
+        # scale**-2. Apply the scale in stages to avoid underflow in the test.
+        scaled_results.append(actual * scale * scale)
+    assert_allclose(scaled_results[0], scaled_results[1], rtol=1e-12)
 
 
 def test_first_moment_diagnostic_can_miss_different_antipodal_mode_pairs():
