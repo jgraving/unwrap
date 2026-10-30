@@ -61,7 +61,7 @@ _SUBDIRS = {
     "density_order": "density_order",
     "beetle_security_light": "beetle_security_light",
     "zebra_bearings": "zebra_bearings",
-    "goldschtein_bats": "goldschtein_bats",
+    "goldshtein_bats": "goldshtein_bats",
 }
 
 
@@ -359,7 +359,7 @@ def _read_bats_excel(filename: str, data_root: Path | None, *,
     ``python-calamine`` (pandas >= 3 uses it by default, and it reads the
     legacy ``.xls`` format that ``xlrd``/``openpyxl`` do not).
     """
-    f = _resolve_file("goldschtein_bats", filename, data_root)
+    f = _resolve_file("goldshtein_bats", filename, data_root)
     df = pd.read_excel(f, engine="calamine")
     if columns_only is not None:
         df = df[columns_only]
@@ -378,7 +378,7 @@ def load_bats_tracks(
     28,350 rows x 17 cols: ``tag, time, x, y, lon, lat, alt, si, distance,
     speed, flightAngle, turningAngle, distDeparture, distDest,
     flightAngDiffDest, afterLocalization, illumination``. This is the input
-    table ``goldschtein_bats.ipynb`` starts from; the notebook does its own
+    table ``goldshtein_bats.ipynb`` starts from; the notebook does its own
     coordinate transform to web-mercator on top.
     """
     return _read_bats_excel("dataAll_trackDest.xls", data_root,
@@ -412,7 +412,7 @@ def load_bats_lake_outline(
     """
     import geopandas as gpd
 
-    f = _resolve_file("goldschtein_bats", "agamon_hula_lake_outline.geojson",
+    f = _resolve_file("goldshtein_bats", "agamon_hula_lake_outline.geojson",
                       data_root)
     return gpd.read_file(f)
 
@@ -428,5 +428,5 @@ def bats_lake_outline_path(
     machine.
     """
     return _resolve_file(
-        "goldschtein_bats", "agamon_hula_lake_outline.geojson", data_root
+        "goldshtein_bats", "agamon_hula_lake_outline.geojson", data_root
     )
