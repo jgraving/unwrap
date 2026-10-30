@@ -22,11 +22,38 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
 - Keep open: #43 (feat/circular-rhat), #40 (pr/fix-zebra-ppc-kappa).
 - All other PRs already CLOSED (30,33,34,35,36,37,41,42,45,46). Branches kept.
 
-## STATE — updated 2026-10-30 late (periodic #49 open; next = von_mises_policy) — NEXT CHAT STARTS HERE
-- Board: #49 (periodic, NEW, just opened), #48 (beetles, all CI green), #43 draft,
-  #40 open (user's). #44 closed (superseded by #47). #47 merged into main as merge
-  commit 3417cb7 (infra modules + tests + .gitignore + repo_rel Windows as_posix
-  fix @ db5cc15).
+## STATE — updated 2026-10-30 late (periodic #49, policy #50, circular #51 open; next = zebra) — NEXT CHAT STARTS HERE
+- Board: #51 (circular_regression, NEW), #50 (policy, NEW), #49 (periodic),
+  #48 (beetles, all CI green), #43 draft, #40 open (user's). #44 closed
+  (superseded by #47). #47 merged into main as merge commit 3417cb7 (infra
+  modules + tests + .gitignore + repo_rel Windows as_posix fix @ db5cc15).
+- NOTEBOOK circular_regression DONE → PR #51 (branch
+  notebooks-to-scripts-circular_regression @ 6798174 on main; 2 commits:
+  script 4a6758f, thin+re-baked notebook 6798174). 14 cells, 9 kept
+  verbatim; 3 figure cells thinned to plots.plot_trace /
+  plot_posterior_curves / plot_replicated_mean_resultant; re-bake 694 KB,
+  3 images (493 KB). KEY LESSON — CI CWDS: notebooks.yml runs the kernel
+  from the REPO ROOT (no metadata.path) while local bakes use notebooks/;
+  the setup cell imports the script cwd-independently:
+  sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+  unwrap.__file__)), "notebooks")). Verified with a local replication of
+  CI's exact recipe (nbclient + python3 kernelspec from repo root +
+  image/png assert). c13 md updated (baked-outputs note replaces the
+  "outputs intentionally cleared" convention). The tutorial now SAVES
+  figures (it previously only rendered) per house convention.
+  NOTE: other thin notebooks (beetles #48, periodic #49) do NOT have this
+  path anchor — they are not CI-executed and bake with cwd=notebooks, but
+  a user running them from a repo-root kernel would hit ImportError. Minor
+  follow-up: add the same 2-line anchor to their setup cells.
+- NOTEBOOK von_mises_policy DONE → PR #50 (branch
+  notebooks-to-scripts-policy @ 6d7d191 on main; 3 commits: plots-svg kwarg
+  a85d8a5, script 97c89ec, thin notebook 6d7d191). Single self-contained
+  cell (2x4 figure: von Mises policy densities radial + seeded trajectories;
+  NO data, NO model) → script-only, no preprocess module. unwrap.plots
+  gained additive svg=False kwarg (+test) because the study saves an SVG
+  for Inkscape. get_cmap deprecation (was baked into the old output) →
+  mpl.colormaps lookup. Unused goal_dir/target_top dropped. Trajectories
+  bit-identical (verified). 35 KB notebook.
 - NOTEBOOK #3 DONE: periodic_not_circular → PR #49 (branch
   notebooks-to-scripts-periodic @ 242db24 on main; 2 commits: scripts d78e06b,
   thin notebook 242db24). The real file was a 3-cell scratch (empty 3rd) — one
@@ -82,13 +109,14 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   5. Re-bake ALL 9 notebooks (PyMC 5→6 sampling defaults shift baked figures).
      Recipe reusable; ~half a day of run-and-fix total. Land the notebook PR
      series first; migration is one final focused PR.
-- NEXT: notebook #4 = von_mises_policy.ipynb (handoff says: small, expected
-  1 figure cell — verify against the real file), then circular_regression
-  (tiny; CI-executed tutorial — its PR must keep .github/workflows/notebooks.yml
-  green: it asserts an image/png output exists),
-  then zebra, locust x2, bats (heavier; bats/locust have pre-existing large
-  scripts on tmp-unified to reuse/migrate — some single-DPI ones need the
-  two-res system). Follow-on branches all off origin/main (now includes infra).
+- NEXT: notebook #5 = zebra_escape.ipynb (fits are seeded; post-hoc
+  extraction stays inline; 2x2 main summary figure + 6-panel PPC
+  bootstrap-vs-posterior — the PPC figure needs the bambi model for
+  model.predict, which does NOT joblib-pickle, so a fresh refit within one
+  script pass). Then locust_density_order, locust_direction_mixture_model,
+  bats (heavier; bats/locust have pre-existing large scripts on tmp-unified
+  to reuse/migrate — some single-DPI ones need the two-res system).
+  Follow-on branches all off origin/main (now includes infra).
   Per notebook: branch notebooks-to-scripts-<study>; <study>_preprocess.py +
   <study>_plots.py on unwrap.plots (FIG_DIR=figures/<study>); thin notebook
   (setup cell with %matplotlib inline + imports + plots.set_style(); data cell;
