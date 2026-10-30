@@ -22,12 +22,47 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
 - Keep open: #43 (feat/circular-rhat), #40 (pr/fix-zebra-ppc-kappa).
 - All other PRs already CLOSED (30,33,34,35,36,37,41,42,45,46). Branches kept.
 
-## STATE — updated 2026-10-30 (infra PR #47 OPEN; beetles in progress) — NEXT CHAT STARTS HERE
-- Board: **#47 (NEW infra PR) OPEN** (`notebooks-to-scripts-infra` @ cc497e3, from main 1e21fee):
-  the 4 modules + 2 test files + .gitignore (figures/, notebooks/figures/, unwrap-data/).
-  105 tests green in venv. setup.py bats-extras deliberately NOT included (goes in the
-  bats PR). #44 CLOSED (comment -> #47). #43 draft + #40 still open.
-  Check `gh pr checks 47` (test jobs were still pending when this was written).
+## STATE — updated 2026-10-30 late (beetles PR #48 OPEN; next = periodic_not_circular) — NEXT CHAT STARTS HERE
+- Board: #47 (infra, GREEN, awaiting merge/decision), #48 (NEW beetles, just opened),
+  #43 draft, #40 open. #44 closed (superseded by #47).
+- #47 = notebooks-to-scripts-infra @ db5cc15: 4 modules + 2 test files + .gitignore
+  + a repo_rel Windows fix (as_posix). #48 = notebooks-to-scripts-beetles @ e30517e,
+  parented ON the infra branch (2 focused commits on top: scripts, then thin
+  re-baked notebook). When #47 merges, rebase both #48 and all follow-on branches
+  onto main so each PR shows only its own delta.
+- Beetles DONE (user-approved state, 5.24 MB ipynb accepted for now):
+  - scripts: notebooks/beetles_preprocess.py (47 L, load_beetle_model_table) +
+    notebooks/beetles_plots.py (set_style, plot_data_scatter, plot_trace,
+    plot_posterior_pdfs, kappamu_individual, kappamu_per_draw, plot_summary).
+  - notebook: 43 cells = title/setup md, setup code (%matplotlib inline + all
+    imports + plots.set_style()), data cell, 3 model fits (verbatim minus imports;
+    + noncentered=False with comment — bambi>=0.17 noncentred default breaks
+    VonMises group priors), summaries, TODO quantile cell, LOO, thin plot cells.
+  - Re-bake recipe that WORKS: /tmp/opencode/rerun_beetles.py — venv kernel via
+    KernelManager.argv override, kernel cwd = notebooks (metadata.path),
+    PYTHONPATH=<worktree> in the LAUNCHING process env (kernel inherits; venv's
+    installed unwrap lacks the new modules), MPLBACKEND=Agg, OMP_NUM_THREADS=1,
+    ~200-240 s.
+  - KNOWN FOLLOW-UP (user: fix later): the 4 arviZ trace figures are 12x24 in
+    (20+ panels; vec params expand per-individual; compact=True does NOT shrink
+    them in arviz 0.23.4 — a direct az.plot_trace call gives the same figure;
+    posterior dims are named "Individual__factor_dim" by bambi). Options when
+    revisiting: scalar-only var_names, or explicit figsize, or lower inline dpi
+    for trace cells. Trace SAVE files are 300 dpi raster PNG (per user; 1-5 MB
+    each, gitignored).
+- NEXT: notebook #3 = periodic_not_circular.ipynb (small; 1 figure cell), then
+  von_mises_policy (1 figure cell), then circular_regression (tiny; CI runs it —
+  keep notebooks.yml green). For each: branch notebooks-to-scripts-<study> off
+  notebooks-to-scripts-infra (or main once #47 merged); preprocess ->
+  notebooks/<study>_preprocess.py, plots -> notebooks/<study>_plots.py on
+  unwrap.plots (FIG_DIR=<repo>/figures/<study>); thin notebook; re-bake with the
+  rerun recipe (adjust paths); verify gates; 1-2 commits; push; one PR.
+  NOTE circular_regression is the CI-executed tutorial notebook — its PR must
+  keep the CI execute job passing (it asserts an image/png output exists).
+- Helper scripts in /tmp/opencode: beetles_map.py, beetles_dump.py,
+  verify_beetles_nb.py (byte-check kept cells), build_beetles_nb.py,
+  rerun_beetles.py, debug_trace.py (fits treat model, probes arviz).
+- User's live repo /home/jake/projects/unwrap left UNTOUCHED.
 - Work repo /tmp/opencode/wt-unified (clean tree), branches:
   - notebooks-to-scripts-infra @ cc497e3 (pushed = PR #47)
   - **notebooks-to-scripts-beetles @ 09bedbc (LOCAL ONLY, not pushed)**, parented on the
@@ -41,43 +76,44 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
        kappamu_per_draw(post_hoc) -> dict(+3 posterior arrays),
        plot_summary(df, idata_treat, post_hoc). FIG_DIR=<repo>/figures/beetles;
        uses unwrap.plots set_style/save_figure (100 dpi inline / 300 dpi vector PDF).
+- **Trace-figure size (DECIDED with user, 2026-10-30):** the 4 arviZ trace
+  figures are what blows the size. Their figures are ~12in x 20-40in (arviz
+  expands vector params into per-index panels: 4 var_names -> 20+ panels;
+  rcParams['plot.max_subplots']=20 caps them). They were ALWAYS 100 dpi —
+  the size was inches, not dpi (my earlier "200 dpi" guess was wrong;
+  az.plot_trace in arviz 0.23 returns an ndarray of axes, not the fig).
+  Recipe: plot_trace uses compact=True (1 row/panel; 12x8in for 20 panels;
+  inline ~370KB vs ~1.1MB) and saves the saved file as 300dpi RASTER PNG
+  (user said "rasterize them to save space?") instead of vector PDF
+  (vector was 2-2.8 MB). The 3 non-trace figures keep vector PDF.
+  Expected notebook size after bake: ~2 MB (data_scatter 416KB + summary
+  113KB + pdfs 84KB + 4 compact traces ~1.1MB). If user wants the strict
+  <1MB gate: options = lower inline dpi for traces (72), or fewer panels.
 - REMAINING for beetles (exact plan):
-  1. Rewrite notebooks/beetles.ipynb with nbformat:
-     - NEW title md + Setup md (notebook currently opens "# Import unwrap" with a
-       pip-uninstall/reinstall cell — drop that cell entirely; setup md says
-       `pip install -e '.[notebook]'` from repo root).
-     - Setup code cell: `%matplotlib inline` + imports (np, pd, plt, bmb, az,
-       LINKS, inverse_softplus, softplus, CircularUniformPrior,
-       `import beetles_preprocess`, `import beetles_plots as plots`) + `plots.set_style()`.
-     - Data cell: `df = beetles_preprocess.load_beetle_model_table(); df.head()`.
-     - Model cells c07/c16/c22 verbatim MINUS their import blocks (imports live in
-       setup cell); keep every comment, the fit kwargs (seeds 123, target_accept).
-     - Summary cells c09/c10, c18/c19, c24/c25 verbatim (they use az from setup).
-     - Keep c14 ("#TODO delete not helpful" kappa-mu effect quantile) verbatim.
-     - Keep LOO cells c28-c30 verbatim (incl. `import pymc as pm` in c28).
-     - All markdown cells (c12, c15, c21, c27, c31, c34-c35, c37, c39, c40 etc.) kept.
-     - Thin plot cells replacing old c05/c11/c13/c20/c26/c33/c36/c38/c41:
-       plots.plot_data_scatter(df); plt.show()
-       plots.plot_trace(idata_treat, "trace_treat", circ_var_names=["Intercept","Light","1|Individual","Light|Individual"]); plt.show()
-       plots.plot_trace(idata_treat, "trace_treat_kappamu", var_names=["1|Individual_kappa","Light|Individual_kappa","kappa_Light"]); plt.show()
-       plots.plot_trace(idata_nolight_km, "trace_nolight_km", circ_var_names=["Intercept","Light","1|Individual","Light|Individual"]); plt.show()
-       plots.plot_trace(idata_nomu, "trace_nomu", circ_var_names=["Light","1|Individual","Light|Individual"]); plt.show()
-       plots.plot_posterior_pdfs(idata_treat, df); plt.show()
-       post_hoc = plots.kappamu_individual(idata_treat, df)
-       post_hoc = plots.kappamu_per_draw(post_hoc)
-       plots.plot_summary(df, idata_treat, post_hoc); plt.show()
-  2. Re-run to bake (MPLBACKEND=Agg, OMP_NUM_THREADS=1, venv python). Kernel CWD MUST BE
-     notebooks/ (else `import beetles_preprocess` fails): nbclient NotebookClient with
-     a KernelManager subclass overriding the argv property to
-     [/home/jake/.venvs/unwrap-env/bin/python, "-m", "ipykernel_launcher", "-f", conn_file]
-     and resources={"metadata": {"path": "<repo>/notebooks"}}. Prior full bake took
-     ~150-185 s (3 fits, 2000 draws each).
+  1. ~~Rewrite notebooks/beetles.ipynb~~ DONE via /tmp/opencode/build_beetles_nb.py
+     (input = /tmp/opencode/beetles_old.ipynb; 43 cells: title/setup md+code,
+     data cell, thin plot cells, 3 model fits kept verbatim EXCEPT imports
+     (moved to setup cell) + `noncentered=False` added to each bmb.Model call
+     (bambi 0.17 defaults noncentered=True which only supports Normal group
+     priors; VonMises group priors -> NotImplementedError; same fix as
+     pr/explain-beetles track). Kept cells byte-identical (+1 trailing \n from
+     nbformat normalisation; verified via /tmp/opencode/verify_beetles_nb.py).
+  2. Re-run to bake: /tmp/opencode/rerun_beetles.py — CRITICAL: kernel env needs
+     PYTHONPATH=/tmp/opencode/wt-unified (venv's installed unwrap lacks
+     datasets/plots; running from repo root shadows locally, but kernel cwd is
+     notebooks/) AND kernel cwd = notebooks (metadata.path) for the
+     beetles_preprocess/beetles_plots imports. Venv python kernel via
+     KernelManager.argv override (in the script). MPLBACKEND=Agg,
+     OMP_NUM_THREADS=1. Prior full bake ~150-185 s.
   3. Verify: 7 figure cells each have image/png output AND stdout "Saved figure to:
      figures/beetles/<name>.pdf"; ipynb < 1 MB; no `def `, plt.figure/plt.subplots,
      seaborn, scatter/fill_between left in notebook source; pytest tests/ green.
-  4. Commit (amend/replace the WIP commit into 1-2 focused commits), push, open ONE PR:
+  4. Split the WIP commit into 2 commits on top of infra (reset --soft to
+     notebooks-to-scripts-infra; commit1 = the two scripts, commit2 = the
+     re-baked notebook), push, open ONE PR:
      "refactor(beetles): move plotting/preprocessing to scripts; low-res inline figures
-     + publication PDFs" — body: based on #47 (rebase onto main once #47 merges).
+     + publication PDFs" — body draft: /tmp/opencode/pr48_beetles_body.md —
+     note-based on #47 (rebase onto main once #47 merges).
 - Flag for user (NOT fixed; kept byte-faithful): (a) old c19 calls az.summary on
   idata_treat where idata_nolight_km seems intended (upstream copy-paste bug);
   (b) old c38's first except-branch writes 100 into the LIGHT slot when the INTERCEPT
