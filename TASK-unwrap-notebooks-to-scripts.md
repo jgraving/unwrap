@@ -22,16 +22,35 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
 - Keep open: #43 (feat/circular-rhat), #40 (pr/fix-zebra-ppc-kappa).
 - All other PRs already CLOSED (30,33,34,35,36,37,41,42,45,46). Branches kept.
 
-## STATE — updated 2026-10-31 (infra #47 MERGED; beetles #48 open + green on main; next = periodic_not_circular) — NEXT CHAT STARTS HERE
-- Board: #48 (beetles, open, ALL CI green), #43 draft, #40 open (user's). #44 closed
-  (superseded by #47). #47 merged into main as merge commit 3417cb7 (infra modules +
-  tests + .gitignore + repo_rel Windows as_posix fix @ db5cc15).
-- #48 = notebooks-to-scripts-beetles @ 0b03a22, rebased DIRECTLY ON TOP OF main after
-  #47 merged (force-pushed). 2 commits: scripts (3c2bb0c), thin re-baked notebook
-  (0b03a22). Notebook 5.24 MB — user-approved as-is ("if they're just trace plots I
-  don't care. Just push it we can fix later"). Trace-figure shrink (scalar-only
-  var_names / explicit figsize / lower inline dpi) remains a noted follow-up.
-  PR body: /tmp/opencode/pr48_beetles_body.md (now documents the per-prior analysis).
+## STATE — updated 2026-10-30 late (periodic #49 open; next = von_mises_policy) — NEXT CHAT STARTS HERE
+- Board: #49 (periodic, NEW, just opened), #48 (beetles, all CI green), #43 draft,
+  #40 open (user's). #44 closed (superseded by #47). #47 merged into main as merge
+  commit 3417cb7 (infra modules + tests + .gitignore + repo_rel Windows as_posix
+  fix @ db5cc15).
+- NOTEBOOK #3 DONE: periodic_not_circular → PR #49 (branch
+  notebooks-to-scripts-periodic @ 242db24 on main; 2 commits: scripts d78e06b,
+  thin notebook 242db24). The real file was a 3-cell scratch (empty 3rd) — one
+  plain-pyMC Beta fit (sigmoid-mean/softplus-scale circadian sin-cos basis;
+  pm.sample(1000, tune=1000) + PPC), one figure cell (median + 90% HDI over the
+  activity_obs PPC, transparent PDF for an appendix). Result: 9 cells, 53 KB,
+  1 figure cell (409x230 px inline), model block byte-identical from
+  'with pm.Model() as model:' onward. Plain pm.Model — NO bambi, so no
+  noncentered issue here.
+  LESSON (FIG_DIR): anchor it ABSOLUTE —
+  FIG_DIR = Path(__file__).resolve().parent.parent / "figures" / "<study>".
+  A relative string resolves against the kernel cwd (= notebooks/), which wrote
+  the PDF into notebooks/figures/ (the printed repo_rel string still looked
+  right — misleading).
+  Dead code dropped (no output effect): unused hdi50 = az.hdi(y, 0.50) and the
+  commented-out legend. The az.hdi 2D-interpretation FutureWarning is faithful
+  to the original (lands with ArviZ 1.0 anyway). PR body:
+  /tmp/opencode/pr49_periodic_body.md.
+- #48 = notebooks-to-scripts-beetles @ 0b03a22, rebased DIRECTLY ON TOP OF main
+  after #47 merged (force-pushed). 2 commits: scripts (3c2bb0c), thin re-baked
+  notebook (0b03a22). Notebook 5.24 MB — user-approved as-is ("if they're just
+  trace plots I don't care. Just push it we can fix later"). Trace-figure shrink
+  (scalar-only var_names / explicit figsize / lower inline dpi) remains a noted
+  follow-up. PR body: /tmp/opencode/pr48_beetles_body.md (documents per-prior).
 - PER-PRIOR NONCENTERED (investigated at user request): YES, it exists —
   `Prior(..., noncentered=None)` added in bambi 0.19.0 (verified absent in 0.18.0,
   present in 0.19/0.20/0.21; backend: `effective_nc = prior.noncentered if
@@ -63,10 +82,10 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   5. Re-bake ALL 9 notebooks (PyMC 5→6 sampling defaults shift baked figures).
      Recipe reusable; ~half a day of run-and-fix total. Land the notebook PR
      series first; migration is one final focused PR.
-- NEXT: notebook #3 = periodic_not_circular.ipynb (handoff says: small, expected
-  1 figure cell — verify against the real file). Then von_mises_policy (1 figure
-  cell), circular_regression (tiny; CI-executed tutorial — its PR must keep
-  .github/workflows/notebooks.yml green: it asserts an image/png output exists),
+- NEXT: notebook #4 = von_mises_policy.ipynb (handoff says: small, expected
+  1 figure cell — verify against the real file), then circular_regression
+  (tiny; CI-executed tutorial — its PR must keep .github/workflows/notebooks.yml
+  green: it asserts an image/png output exists),
   then zebra, locust x2, bats (heavier; bats/locust have pre-existing large
   scripts on tmp-unified to reuse/migrate — some single-DPI ones need the
   two-res system). Follow-on branches all off origin/main (now includes infra).
