@@ -108,7 +108,9 @@ def repo_rel(path):
     if root is None:
         return str(p)
     try:
-        return str(p.relative_to(root))
+        # as_posix(): the reported strings are platform-independent so baked
+        # notebook output is identical on Windows/macOS/Linux.
+        return p.relative_to(root).as_posix()
     except ValueError:
         return str(p)
 
