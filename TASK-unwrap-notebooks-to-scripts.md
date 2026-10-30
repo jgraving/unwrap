@@ -22,7 +22,75 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
 - Keep open: #43 (feat/circular-rhat), #40 (pr/fix-zebra-ppc-kappa).
 - All other PRs already CLOSED (30,33,34,35,36,37,41,42,45,46). Branches kept.
 
-## STATE AT FREEZE (next chat starts here)
+## STATE — updated 2026-10-30 (infra PR #47 OPEN; beetles in progress) — NEXT CHAT STARTS HERE
+- Board: **#47 (NEW infra PR) OPEN** (`notebooks-to-scripts-infra` @ cc497e3, from main 1e21fee):
+  the 4 modules + 2 test files + .gitignore (figures/, notebooks/figures/, unwrap-data/).
+  105 tests green in venv. setup.py bats-extras deliberately NOT included (goes in the
+  bats PR). #44 CLOSED (comment -> #47). #43 draft + #40 still open.
+  Check `gh pr checks 47` (test jobs were still pending when this was written).
+- Work repo /tmp/opencode/wt-unified (clean tree), branches:
+  - notebooks-to-scripts-infra @ cc497e3 (pushed = PR #47)
+  - **notebooks-to-scripts-beetles @ 09bedbc (LOCAL ONLY, not pushed)**, parented on the
+    infra commit so it is exactly main + infra + WIP. Contains:
+    1. notebooks/beetles_preprocess.py (from ca04985 — done, 47 L)
+    2. notebooks/beetles.ipynb — the OLD pre-refactor notebook (ca04985) still in tree
+    3. notebooks/beetles_plots.py — NEW, written this session (imports OK; not yet
+       exercised with real idata). Functions: set_style(), plot_data_scatter(df),
+       plot_trace(idata, name, var_names=None, circ_var_names=None),
+       plot_posterior_pdfs(idata_treat, df), kappamu_individual(idata_treat, df) -> dict,
+       kappamu_per_draw(post_hoc) -> dict(+3 posterior arrays),
+       plot_summary(df, idata_treat, post_hoc). FIG_DIR=<repo>/figures/beetles;
+       uses unwrap.plots set_style/save_figure (100 dpi inline / 300 dpi vector PDF).
+- REMAINING for beetles (exact plan):
+  1. Rewrite notebooks/beetles.ipynb with nbformat:
+     - NEW title md + Setup md (notebook currently opens "# Import unwrap" with a
+       pip-uninstall/reinstall cell — drop that cell entirely; setup md says
+       `pip install -e '.[notebook]'` from repo root).
+     - Setup code cell: `%matplotlib inline` + imports (np, pd, plt, bmb, az,
+       LINKS, inverse_softplus, softplus, CircularUniformPrior,
+       `import beetles_preprocess`, `import beetles_plots as plots`) + `plots.set_style()`.
+     - Data cell: `df = beetles_preprocess.load_beetle_model_table(); df.head()`.
+     - Model cells c07/c16/c22 verbatim MINUS their import blocks (imports live in
+       setup cell); keep every comment, the fit kwargs (seeds 123, target_accept).
+     - Summary cells c09/c10, c18/c19, c24/c25 verbatim (they use az from setup).
+     - Keep c14 ("#TODO delete not helpful" kappa-mu effect quantile) verbatim.
+     - Keep LOO cells c28-c30 verbatim (incl. `import pymc as pm` in c28).
+     - All markdown cells (c12, c15, c21, c27, c31, c34-c35, c37, c39, c40 etc.) kept.
+     - Thin plot cells replacing old c05/c11/c13/c20/c26/c33/c36/c38/c41:
+       plots.plot_data_scatter(df); plt.show()
+       plots.plot_trace(idata_treat, "trace_treat", circ_var_names=["Intercept","Light","1|Individual","Light|Individual"]); plt.show()
+       plots.plot_trace(idata_treat, "trace_treat_kappamu", var_names=["1|Individual_kappa","Light|Individual_kappa","kappa_Light"]); plt.show()
+       plots.plot_trace(idata_nolight_km, "trace_nolight_km", circ_var_names=["Intercept","Light","1|Individual","Light|Individual"]); plt.show()
+       plots.plot_trace(idata_nomu, "trace_nomu", circ_var_names=["Light","1|Individual","Light|Individual"]); plt.show()
+       plots.plot_posterior_pdfs(idata_treat, df); plt.show()
+       post_hoc = plots.kappamu_individual(idata_treat, df)
+       post_hoc = plots.kappamu_per_draw(post_hoc)
+       plots.plot_summary(df, idata_treat, post_hoc); plt.show()
+  2. Re-run to bake (MPLBACKEND=Agg, OMP_NUM_THREADS=1, venv python). Kernel CWD MUST BE
+     notebooks/ (else `import beetles_preprocess` fails): nbclient NotebookClient with
+     a KernelManager subclass overriding the argv property to
+     [/home/jake/.venvs/unwrap-env/bin/python, "-m", "ipykernel_launcher", "-f", conn_file]
+     and resources={"metadata": {"path": "<repo>/notebooks"}}. Prior full bake took
+     ~150-185 s (3 fits, 2000 draws each).
+  3. Verify: 7 figure cells each have image/png output AND stdout "Saved figure to:
+     figures/beetles/<name>.pdf"; ipynb < 1 MB; no `def `, plt.figure/plt.subplots,
+     seaborn, scatter/fill_between left in notebook source; pytest tests/ green.
+  4. Commit (amend/replace the WIP commit into 1-2 focused commits), push, open ONE PR:
+     "refactor(beetles): move plotting/preprocessing to scripts; low-res inline figures
+     + publication PDFs" — body: based on #47 (rebase onto main once #47 merges).
+- Flag for user (NOT fixed; kept byte-faithful): (a) old c19 calls az.summary on
+  idata_treat where idata_nolight_km seems intended (upstream copy-paste bug);
+  (b) old c38's first except-branch writes 100 into the LIGHT slot when the INTERCEPT
+  fit fails (upstream bug, practically unreachable); (c) dead code dropped in the move
+  (rho_circular, df_kappamu_delta frame, unused imports; "alternative estimator"
+  alternatives kept as comments; figure title strings kept verbatim incl. unicode κ).
+- Helper scripts in /tmp/opencode: beetles_map.py (cell index map), beetles_dump.py
+  (dump cell sources by index).
+- User's live repo /home/jake/projects/unwrap left UNTOUCHED (docs/notebooks-explained
+  @ 277c7ae, 6 uncommitted WIP files).
+- After restart: first check `gh pr checks 47`; if CI red, fix #47 before continuing.
+
+## STATE AT FREEZE (superseded; kept for history)
 - Board: only #44 #43 #40 open. (10 superseded PRs closed.)
 - Next action: build & open the INFRA PR, then notebook #1 = **beetles**.
 - Work repo: use /tmp/opencode/wt-unified if it exists, else `git clone
