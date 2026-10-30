@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220" role="img" aria-labelledby="title">
-  <title id="title">unwrap</title>
-  <rect width="220" height="220" rx="48" fill="#087f7c"/>
-  <g transform="translate(0 10)"><g fill="none" stroke-linecap="butt" stroke-linejoin="miter">
-    <path d="M 139 59 C 117 37 81 37 59 59 C 37 81 37 117 59 139 C 70 150 85 156 101 156 H 182" stroke="#ffffff" stroke-width="18"/>
-    <path d="M 112 86 C 105 79 93 79 86 86 C 79 93 79 105 86 112 C 90 116 96 118 102 118 H 148" stroke="#9de9d5" stroke-width="18"/>
-  </g></g>
-</svg>

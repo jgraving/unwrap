@@ -25,14 +25,14 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
 ## STATE AT FREEZE (next chat starts here)
 - Board: only #44 #43 #40 open. (10 superseded PRs closed.)
 - Next action: build & open the INFRA PR, then notebook #1 = **beetles**.
-- Working clone: **/home/jake/projects/unwrap** (persistent; this file is committed
-
-  on branch docs/notebooks-to-scripts-handoff there). Repo state there:
-
-  origin/feat/notebooks-to-scripts = ca04985 (latest infra+work),
-
-  origin/main = 1e21fee. Stash holds the old tmp-clone notebook edits.
-  Re-verify with `git status` + `gh pr list` first.
+- Work repo: use /tmp/opencode/wt-unified if it exists, else `git clone
+  https://github.com/jgraving/unwrap.git` and `git switch -c work
+  origin/feat/notebooks-to-scripts` (= ca04985). origin/main = 1e21fee.
+  ALL committed work for this task is on origin/feat/notebooks-to-scripts
+  — nothing important exists only in a working tree. NOTE:
+  /home/jake/projects/unwrap is the user's live repo (docs/notebooks-
+  explained + uncommitted WIP) — do not commit/switch/stash in it.
+ify with `git status` + `gh pr list` first.
 - Python env: **/home/jake/.venvs/unwrap-env/bin/python**
   (unwrap installed; datasets load from the git data repo; matplotlib
   must be Agg; MCMC runs with OMP_NUM_THREADS=1, 2 chains, seeds per
