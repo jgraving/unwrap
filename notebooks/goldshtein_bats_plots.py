@@ -11,6 +11,11 @@ Saved figures go to ``figures/bats/`` at the repository root, resolved
 from the file location (this file lives in ``notebooks/``) so the output
 does not depend on the working directory (the notebook may run from
 ``notebooks/`` or from the repository root).
+
+Resolution tiering: figures are *created* at :data:`DISPLAY_DPI` so the
+inline cell embed (``plt.show()``) is a small raster, while :func:`_save`
+writes a vector PDF (crisp at any zoom) / 300dpi raster. What you see on
+screen is thus never the published artifact.
 """
 from pathlib import Path
 
@@ -19,22 +24,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from unwrap import plots as _plots
+
 FIG_DIR = Path(__file__).resolve().parent.parent / "figures" / "bats"
 
-DPI = 300
+# Inline embed resolution (fig.dpi) vs publication file resolution (savefig).
+DISPLAY_DPI = _plots.DEFAULT_DISPLAY_DPI   # 100 -> small inline PNG
+DPI = _plots.PUBLICATION_DPI               # 300 -> the written file
 
 
 def set_style():
     """The figure style these figures are drawn with (Arial, white
-    backgrounds, type-42 PDF outlines)."""
-    mpl.rcParams.update({
-        "font.family": "Arial",
-        "font.sans-serif": ["Arial"],
-        "pdf.fonttype": 42,
-        "ps.fonttype": 42,
-        "figure.facecolor": "white",
-        "axes.facecolor": "white",
-    })
+    backgrounds, type-42 PDF outlines) + the display/publication dpi tiers."""
+    mpl.rcParams.update(_plots.DEFAULT_RC)
     print(f"Figures will be saved to: {FIG_DIR.relative_to(FIG_DIR.parent.parent)}")
 
 
@@ -156,7 +158,7 @@ def plot_kappa_hat(kappa_df):
     dfp, treatments, treat_to_color, treat_label = _treatment_plot_df(kappa_df, value_col)
     lo_q, hi_q = 25, 75   # change to (5, 95) if you prefer
 
-    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=300)
+    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=DISPLAY_DPI)
     _dots_median_interval(ax, dfp, value_col, treatments, treat_to_color,
                           treat_label, lo_q, hi_q)
     ax.set_ylabel(r"Estimated $\hat{\kappa}$")
@@ -167,7 +169,7 @@ def plot_kappa_hat(kappa_df):
     # plt.yscale("log")
     plt.ylim(0, 10)
     plt.tight_layout()
-    _save(fig, "kappa_hat_by_treatment_median_percentiles", dpi=300, pad_inches=0.01)
+    _save(fig, "kappa_hat_by_treatment_median_percentiles")
     plt.show()
 
 
@@ -178,7 +180,7 @@ def plot_rbar(kappa_df):
     dfp, treatments, treat_to_color, treat_label = _treatment_plot_df(kappa_df, value_col)
     lo_q, hi_q = 25, 75   # change to (5, 95) if you prefer
 
-    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=300)
+    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=DISPLAY_DPI)
     _dots_median_interval(ax, dfp, value_col, treatments, treat_to_color,
                           treat_label, lo_q, hi_q)
     ax.set_ylabel("Mean\nresultant length")
@@ -187,7 +189,7 @@ def plot_rbar(kappa_df):
     ax.spines["right"].set_visible(False)
     plt.ylim(-0.05, 1.05)
     plt.tight_layout()
-    _save(fig, "rbar_by_treatment_median_percentiles", dpi=300, pad_inches=0.01)
+    _save(fig, "rbar_by_treatment_median_percentiles")
     plt.show()
 
 
@@ -198,7 +200,7 @@ def plot_alignment(align_df):
     dfp, treatments, treat_to_color, treat_label = _treatment_plot_df(align_df, value_col)
     lo_q, hi_q = 25, 75   # change to (5, 95) if you prefer
 
-    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=300)
+    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=DISPLAY_DPI)
     _dots_median_interval(ax, dfp, value_col, treatments, treat_to_color,
                           treat_label, lo_q, hi_q)
     ax.set_ylabel("Alignment\n$\\mathbb{E}[\\cos(y)]$")
@@ -208,7 +210,7 @@ def plot_alignment(align_df):
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     plt.tight_layout()
-    _save(fig, "alignment0_by_treatment_median_percentiles", dpi=300, pad_inches=0.01)
+    _save(fig, "alignment0_by_treatment_median_percentiles")
     plt.show()
 
 # ===================== PORTED CELLS BELOW ===============

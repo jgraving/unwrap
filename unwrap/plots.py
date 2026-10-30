@@ -20,17 +20,34 @@ from pathlib import Path
 import matplotlib as mpl
 
 
-#: Defaults shared by every study figure set.
-DEFAULT_RC = {
-    "font.family": "Arial",
-    "font.sans-serif": ["Arial"],
-    "figure.dpi": 300,
-    "savefig.dpi": 300,
-    "figure.facecolor": "white",
-    "axes.facecolor": "white",
-    "pdf.fonttype": 42,
-    "ps.fonttype": 42,
-}
+#: Two resolution tiers, so the notebook file stays small while the figure
+#: file stays publication-crisp:
+#:
+#: * :data:`DISPLAY_DPI`  -> ``figure.dpi``; the resolution of the raster that
+#:   ``plt.show()`` embeds in the cell. Kept low so a baked ``.ipynb`` is a
+#:   few hundred KB, not tens of MB, and reads fine in a browser/GitHub.
+#: * :data:`PUBLICATION_DPI` -> ``savefig.dpi``; the resolution of the written
+#:   file. PDFs are vector (resolution-independent) so they reproduce at any
+#:   zoom; the raster dpi only matters for a non-embeddable fallback.
+DEFAULT_DISPLAY_DPI = 100
+PUBLICATION_DPI = 300
+
+
+def _default_rc(display_dpi: int = DEFAULT_DISPLAY_DPI, publication_dpi: int = PUBLICATION_DPI):
+    return {
+        "font.family": "Arial",
+        "font.sans-serif": ["Arial"],
+        "figure.dpi": display_dpi,
+        "savefig.dpi": publication_dpi,
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+    }
+
+
+#: Defaults shared by every study figure set (display 100 dpi / publication 300 dpi).
+DEFAULT_RC = _default_rc()
 
 
 def set_style(figure_dir, extra_rc=None):
