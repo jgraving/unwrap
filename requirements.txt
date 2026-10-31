@@ -1,10 +1,14 @@
-# Keep PyMC 5 / ArviZ InferenceData APIs until a separate migration is tested.
-bambi>=0.15.0
-pymc>=5.18.0,<6
-arviz>=0.20.0,<1
+# PyMC 6 stack (upgraded 2026-10-31): bambi >=0.21 provides the per-prior
+# `noncentered` kwarg used to remove the divergences in the beetles and
+# zebra fits; pymc 6 / arviz 1.x / pytensor 3 ride along. All of these
+# require Python >= 3.12.
+bambi>=0.21.0
+pymc>=6.3.2,<7
+arviz>=1.3.0,<2
 numpy>=1.26.0
 pandas>=2.1.0
 scipy>=1.11.2
-pytensor>=2.25.5
-# ArviZ 0.x uses matplotlib.style.core, removed in Matplotlib 3.11.
-matplotlib>=3.8,<3.11
+pytensor>=3.3.6,<4
+# The old matplotlib <3.11 cap existed only for ArviZ 0.x (it imported
+# matplotlib.style.core, removed in Matplotlib 3.11); ArviZ 1.x does not.
+matplotlib>=3.8
