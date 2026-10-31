@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (TEMPLATE PRs #53 + #54 MERGED = main f049d60; NOW = stack upgrade PR) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-10-31 (template PRs #53+#54 merged = main f049d60; NOW = upgrade PR: package+scripts+cells DONE, prebake validation -> re-bake -> PR) - NEXT CHAT STARTS HERE
 - BOARD: main = f049d60. Open PRs: only #43 (user's draft, unrelated).
   #48-#51, #53, #54 MERGED. #54 = template polish (ppc inside
   plots.plot_ppc; uniform preprocess/posthoc/plots aliases;
@@ -231,9 +231,103 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   * Re-bake the beetles notebook after (outputs shift: sampling
     defaults; expect the divergence count to reach zero with
     noncentered normal priors).
-- VENV: /home/jake/.venvs/unwrap-env - currently the PyMC5 stack (bambi
-  0.17.2, pymc 5.28.5, arviz 0.23.4, pytensor 2.38.3); the upgrade PR
-  moves it to PyMC6; keep a backup freeze file for rollback.
+- UPGRADE PROGRESS (in flight on branch upgrade-bambi-pymc6;
+  venv backup at /home/jake/.venvs/unwrap-env-pymc5-backup + freeze at
+  /tmp/opencode/venv_frozen_pre_upgrade.txt):
+  * INSTALLED NEW STACK: bambi 0.21.0, pymc 6.3.2, pytensor 3.3.6,
+    arviz 1.3.0 (split arviz-base/plots/stats 1.3.x), py3.12. All four
+    require PYTHON >= 3.12 (pytensor <3.15) -> tests.yml matrix cut to
+    3.12-3.14 with the minimum job on 3.12 (done); setup.py
+    python_requires >=3.12 (done); requirements.txt bumped (done:
+    bambi>=0.21.0, pymc>=6.3.2,<7, arviz>=1.3.0,<2, pytensor>=3.3.6,<4,
+    mpl cap dropped - the <3.11 cap was only for arviz 0.x).
+  * PACKAGE FIXES (done, pytest 106 green): unwrap/data.py
+    sample_prior_predictive(samples=1) -> (draws=1) [pymc 6 rename];
+    unwrap/circular.py: az.hdi(hdi_prob=) -> (prob=),
+    az.circular_hdi(...) -> az.hdi(..., circular=True [returns (lo,hi),
+    (-pi,pi] for 1-D]), NEW circular_summary(idata, var_names,
+    circ_var_names, *, hdi_prob=0.94, skipna, group) reproducing arviz
+    0.23's circ_var_names rows (first 5 cols on the circle:
+    scs.circmean/circstd high=pi low=-pi, circular hdi, batched
+    circular MCSE copied from 0.23 _mc_error; columns = the 0.23 layout
+    mean/sd/<p>% lower|upper/mcse/ess_bulk/ess_tail/r_hat by
+    IdxLabeller row labels via az.xarray_var_iter).
+    tests/test_model.py uses circular_summary.
+  * NOTEBOOK CELLS SWAPPED (circular_regression c11 + its c02 import;
+    beetles c12/c13 + c02 import): az.summary(..., circ_var_names=...)
+    -> circular_summary(...). The OTHER four notebooks' circ cells
+    (zebra, locust x2, bats) are left for their own study PRs - they
+    will crash on the new stack until then (documented).
+  * ARVIZ 1.3 API MAP (for the remaining ports): summary: hdi_prob ->
+    ci_prob, kind='stats' = mean/sd/ci ONLY (mcse lives in kind='all'
+    as mcse_mean/mcse_sd), default CI is the ETI (ci_kind='hdi'
+    required for HDI), row labels "mu[0]" style (IdxLabeller).
+    rhat/ess -> DataTree (values via r[name].values; az.ess
+    method='bulk' - ess_method kwarg gone). plot_posterior REMOVED
+    (locust_density uses it). plot_trace signature (dt, ...).
+    InferenceData groups are DataTree: .values/.sizes/[var] still work
+    (proven by tests + bakes).
+  * EMPIRICAL DIVERGENCE CHECK (done; seed 42, bake-size fits, OMP=1):
+    centered kappa RE priors -> 1 divergence, rhat 1.0032;
+    noncentered=True on the two Normal kappa RE priors ONLY (mu RE
+    priors are VonMises, stay centered) -> 0 divergences, rhat 1.0020.
+    Fits saved /tmp/opencode/divfit_{centered,noncentered}_seed42.nc.
+  * NEW-STACK LANDMINES FOUND + FIXED IN THIS PR (all probed
+    empirically, not guessed):
+    - arviz 1.3 has NO InferenceData class: model.fit() and
+      az.from_netcdf() return a plain xarray DataTree (groups are
+      child nodes). [var], .values, .sizes and
+      int(idata.sample_stats.diverging.sum()) all work on it.
+      (az.from_netcdf was also the 0.23 loader name.)
+    - pymc 6: BOTH pm.compute_deterministics AND
+      pm.compute_log_likelihood need ALL free RVs of the graph in the
+      posterior. Noncentered kappa RE: bambi stores the transformed
+      centered effects + *_sigma and drops the per-group *_offset
+      factors, so both calls KeyError until the offsets are
+      reconstructed. FIX: beetles_posthoc.graph_free_rvs(idata,
+      model) returns the fit tree with a posterior group carrying the
+      reconstructed offsets - graph computes effect = sigma * offset
+      (sigma (chain,draw), offset per group (chain,draw,n_ind)), so
+      offset = effect / sigma with sigma expanded along the group
+      axis, 0 where sigma == 0 (exact in float). c10 rebinds:
+      idata_treat = pm.compute_log_likelihood(posthoc.graph_free_rvs(
+      idata_treat, model_treat), model=model_treat.backend.model).
+      NOTE: model.backend is None until AFTER .fit().
+    - az.hdi(hdi_prob=) -> az.hdi(prob=) (beetles_plots._mean_hdi);
+      az.summary(hdi_prob=) -> ci_prob= and 1.x's default CI is the
+      ETI, HDI needs ci_kind="hdi" (beetles c21, circular_summary);
+      az.plot_trace(compact=) GONE -> PlotCollection:
+      pc = az.plot_trace(...); pc.show() (circular_regression_plots);
+      az.plot_posterior REMOVED (locust_density only -> its study PR).
+    - circular_summary now matches the arviz 0.23.4 frame EXACTLY
+      (verified against the backup venv on the saved noncentered
+      fit): columns mean, sd, hdi_<p>%, hdi_<100-p>%, mcse_mean,
+      mcse_sd, ess_bulk, ess_tail, r_hat; only the first five stats
+      of a circ row (mean, sd, hdi lo/hi, mcse_mean) are
+      circularized - mcse_sd/ess/r_hat stay linear - with round(3)
+      on the circularized columns like 0.23's auto rounding.
+  * BEETLES CELLS DONE: c02 SEED=42 (mirrors circular_regression);
+    c10 = noncentered=True on the two kappa RE priors + import pymc
+    as pm + fit(draws/tune 2000, target_accept=0.9, random_seed=SEED,
+    progressbar=False) + compute_log_likelihood via
+    posthoc.graph_free_rvs (rebound) + `print("Divergences:", ...)`;
+    c09/c11 markdown document the noncentering and the
+    divergence-first R-hat rule; c21 ci_prob/ci_kind; c12/c13
+    circular_summary.
+  * REMAINING: prebake validation (short fit -> ppc_bootstrap_stats
+    -> all plot fns, incl. the 1e-10 log-likelihood cross-check)
+    running; then re-bake beetles.ipynb + circular_regression.ipynb
+    (outputs already cleared), gates (verify_bake3.py + divergence
+    print == 0 + circular notebook gate), pytest, commits
+    (package+CI / study scripts / notebooks), push + PR + CI +
+    merge; then handoff doc sync + mirror push. The other 4
+    notebooks keep az.summary(circ_var_names=...) until their own
+    study PRs.
+- VENV: /home/jake/.venvs/unwrap-env - PyMC6 stack (bambi 0.21.0,
+  pymc 6.3.2, pytensor 3.3.6, arviz 1.3.0, py3.12); unwrap is
+  EDITABLE-installed from the work repo (pip check clean). Rollback:
+  full copy /home/jake/.venvs/unwrap-env-pymc5-backup + freeze
+  /tmp/opencode/venv_frozen_pre_upgrade.txt.
 - RE-BAKE RECIPE (proven, /tmp/opencode/rerun_nb.py <nb-path>): nbclient
   NotebookClient + KernelManager.argv override to
   [/home/jake/.venvs/unwrap-env/bin/python, -m, ipykernel_launcher, -f,
