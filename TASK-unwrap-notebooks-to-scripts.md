@@ -41,62 +41,60 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (post-pivot plan locked; duplicate tracks resolved by evidence; NEXT = user confirm, then Phase 0) - NEXT CHAT STARTS HERE
-- BOARD: main = 3417cb7 (#47 infra merged). Open: #48 beetles @0b03a22
-  (5.24 MB), #49 periodic @242db24 (53 KB), #50 policy @6d7d191 (35 KB),
-  #51 circular @6798174 (694 KB) - all built on the WRONG base (un-annotated
-  main notebooks); to be CLOSED after Phase 0. Salvage from them:
-  (a) #50 commit a85d8a5 = additive save_figure svg=False kwarg + test;
-  (b) #51 cwd-independent notebook import (CI runs the kernel from repo
-  root while local bakes use notebooks/ cwd):
-      sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-          unwrap.__file__)), "notebooks"))
-  (c) #51's verified CI recipe (nbclient + python3 kernelspec, repo-root
-  cwd, image/png assert). #40 (user's zebra fix; head b5ea56e =
-  pm.compute_deterministics + own zebra_plots.py + c16 split) stays open.
-  #43 draft untouched.
-- EXPLAIN BRANCHES (all fetched locally as pr/explain-*; cells/md):
-  #33 pr/explain-circular-regression 20/13 (NOTES: duplicated step
-  headings "## Step 1 ..." + "## 1. ..." - inspect when reworking),
-  #34 pr/explain-periodic 6/3, #35 pr/explain-von-mises 3/2,
-  #36 pr/explain-beetles 25/13 (DEFINITIVE beetles base; already
-  thin+scripted: plot cells 26 B/166 B/239 B; own noncentered=False;
-  gold/grey palette; PPC figure; NO *_preprocess.py anywhere),
-  #37 pr/explain-locust- 38/12 (locust_direction annotated base).
-  #41 and #42 are absorbed (see resolved pairs below).
-  #38 pr/explain-zebra ALREADY MERGED -> main's zebra_escape.ipynb is the
-  annotated 18-cell version.
-- DUPLICATE TRACKS (resolved 2026-10-31 by diff evidence; awaiting user
-  nod then merge):
-  * BATS: #46 superset of #42. goldshtein_bats.ipynb sources IDENTICAL at
-    both heads (96 cells / 541,206 B, zero per-cell diff); #46 = #42 head
-    + 2 commits (db4db33 set_style prints figure dir relative to repo
-    root; 6429614 _save() emits figure-dir-relative paths). Both already
-    load via unwrap.datasets (commit 465eb49 is in #42 too). USE #46.
-  * LOCUST DENSITY: #45 superset of #41. Same 9 annotated md cells (3
-    updated to E2E wording: "rediscretization runs in the code cells of
-    this notebook"); 39 of 42 code cells verbatim; the 3 dropped cells
-    were the bundled-parquet load, replaced by E2E dfXY load +
-    rediscretization; bundled notebooks/datasets/*.parquet removed;
-    plots script carries the path-output fixes. USE #45.
-  * #44 (feat/locust-data-infra, closed): fully superseded by merged #47 -
-    main's datasets.py contains ALL #44 functions (plus
-    bats_lake_outline_path; 432 vs 417 L), preprocess.py byte-identical,
-    .gitignore already has unwrap-data/. DO NOT merge.
-- All six explain *_plots.py files: single DPI=300, own set_style(),
-  FIG_DIR=Path(__file__).parent/"figures"/<study> - none use
-  unwrap.plots; all need the two-res migration + save/save_path kwargs.
-- ZEBRA (annotated, on main, 18 cells): c04 reads
-  datasets/zebra_bearings_blocks.parquet (E2E -> switch to
-  load_zebra_bearings_raw); c09 model.fit(tune=2000, target_accept=0.8)
-  is UNSEEDED - reproducibility gap, RAISE WITH USER when redoing (baked
-  outputs differ every run); c13 heavy post-hoc (7.4 KB) -> moves to
-  scripts per the confirmed boundary; c15 2x2 summary + c16 6-panel PPC
-  (bootstrap seeds 123/1000+j/2000+j; B_GROUP=2000/B_INDIV=1500) are the
-  two plot cells; #40 fixes the model.predict(kind="response_params")
-  kappa bug (bambinos/bambi#1084) via pm.compute_deterministics - kept
-  verbatim. Zebra order (user): annotated first (done - #38 merged),
-  then #40, then my E2E redo.
+## STATE - updated 2026-10-31 (PHASE 0 DONE; main = annotated + E2E bases; NEXT = beetles template PR) - NEXT CHAT STARTS HERE
+- BOARD: main = 57e5b0a. Open PRs: only #43 (user's draft, unrelated).
+  #48-#51 CLOSED with comments (wrong base; machinery folded into the
+  upcoming per-study PRs). #52 and #40 MERGED (below).
+- PHASE 0 DONE:
+  * PR #52 (main e571342) landed all 7 annotated branches: #33 circular,
+    #34 periodic, #35 von_mises, #36 beetles (definitive), #37
+    locust_direction, #45 locust_density (E2E), #46 bats (E2E) - each with
+    its annotated markdown + existing *_plots.py (all still single-DPI;
+    two-res migration happens per-study). Conflict resolutions documented
+    in the merge commits (.gitignore superset x3; README E2E rows from
+    #45; datasets.py = main, the #46-side goldschtein_bats typo was NOT
+    the real data-repo dir name; keep main spelling).
+  * Data-cell fixes in #52: beetles c6 -> load_beetle_security_light()
+    (verified: 196 rows, 100 OFF/96 ON, 10 beetles); locust_direction c2
+    -> load_directional() + rediscretize_directional() (verified: 2435
+    steps / 52 animals = historical step table). Intro md updated. Baked
+    outputs predate the rewrites but are data-identical; re-baked by each
+    study PR.
+  * PR #40 MERGED (main 57e5b0a): zebra = annotated + E2E unwrap-data data
+    cell + scripted plot split (notebooks/zebra_plots.py now on main;
+    c15/c16 = statistics inline + plots.plot_summary/plot_ppc calls) +
+    predict(kind="response_params") kappa fix via pm.compute_deterministics
+    (bambinos/bambi#1084). Merge-conflict resolution: .gitignore=main;
+    README=main rows + combined zebra row ("fully rerun and validated");
+    zebra notebook = #40's version (main's was still pre-split inline).
+- GATE LEARNED: main is PUSH-PROTECTED (GH013 "changes via pull request
+  only"): direct pushes to main are REJECTED. Pattern: push a branch,
+  `gh pr create --base main --head <branch>`, then `gh pr merge N --merge`
+  (fresh PRs merge CLEAN - the stale-mergeable race only bit the long-
+  closed PRs). docs/* branches are NOT protected (push directly, as the
+  handoff mirror does).
+- JQ GOTCHA: --jq expressions with backslashes (.\(...)) get mangled in
+  this shell ("unexpected token"). Use single-quoted jq without
+  backslashes: --jq '.mergeable + " / " + .mergeStateStatus'.
+- ZEBRA STATE (post-#40): annotated md; c04 = E2E (load_zebra_bearings
+  blocks from unwrap-data; raw = load_zebra_bearings_raw, 3,897,536
+  frames, available for provenance reproductions); c09 fit UNSEEDED
+  (tune=2000, target_accept=0.8) - STILL RAISE WITH USER on the E2E redo
+  (baked outputs shift every run; propose adding an explicit random_seed).
+  zebra_plots.py = single-DPI, its own set_style(), no save/save_path.
+  Remaining zebra work = the E2E study PR: two-res migration +
+  save/save_path kwargs + raise the seeding question + full re-bake.
+- BEETLES STATE (post-#52): annotated 25-cell, already thin+scripted
+  (plot cells are one-liners); E2E data cell; beetles_plots.py is
+  single-DPI with its own set_style() (FIG_DIR under notebooks/figures).
+  Template PR = main remaining job for the first study (see work order 1).
+- All 8 *_plots.py on main: single DPI=300, own set_style(),
+  FIG_DIR=Path(__file__).parent/"figures"/<study> (beetles/zebra) or
+  parent.parent/"figures"/<study> (others) - ALL pre-date the two-res
+  unwrap.plots convention; every study PR migrates its script to
+  unwrap.plots set_style/save_figure + `save` (default on) / `save_path`
+  kwargs, with saved files .gitignored (figures/**, notebooks/figures/
+  already ignored).
 - Upstream bugs kept verbatim (do NOT silently fix): beetles old c19
   az.summary reads idata_treat (idata_nolight_km seems intended); old
   c38 per-draw loop's first except-branch writes the intercept failure
@@ -136,16 +134,13 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
 - Helper scripts in /tmp/opencode: build_beetles_nb.py (builder pattern:
   cell keep/remap), rerun_beetles.py, beetles_map.py, beetles_dump.py,
   verify_beetles_nb.py (kept-cells byte identity + residue regex),
-  pr48_beetles_body.md (PR body pattern).
-- Work repo /tmp/opencode/wt-unified (clean tree; currently on
-  notebooks-to-scripts-zebra, an old-base branch to be redone). User's
-  live repo /home/jake/projects/unwrap UNTOUCHED (docs/notebooks-
-  explained @ 277c7ae + 6 uncommitted WIP files; user confirmed the PR
-  branches, not this WIP, are authoritative).
-- Handoff mirror: this file <-> origin/docs/notebooks-to-scripts-handoff
-  (push after each update: switch the branch, copy the file, commit,
-  push, switch back).
-
+  pr48_beetles_body.md (PR body pattern - retitled since #48 closed),
+  pr_phase0_body.md (Phase 0 body).
+- Work repo /tmp/opencode/wt-unified: local `fix-zebra-ppc-kappa` branch
+  can be deleted; reset main to origin/main (57e5b0a). User's live repo
+  /home/jake/projects/unwrap UNTOUCHED (docs/notebooks-explained @
+  277c7ae + 6 uncommitted WIP files; PR branches are authoritative).
+- Handoff mirror: this file <-> origin/docs/notebooks-to-scripts-handoff.
 ## STATE AT FREEZE (superseded; kept for history)
 
 - Board: only #44 #43 #40 open. (10 superseded PRs closed.)
@@ -306,13 +301,13 @@ ify with `git status` + `gh pr list` first.
 
 ## NOTEBOOK WORK ORDER (post-pivot, annotated bases)
 
-0. PHASE 0 (once user confirms the three evidence resolutions): merge the
-   annotated branches into main one at a time, checking mergeable vs
-   current main after each (watch .gitignore / notebooks/README.md
-   cross-branch conflicts); fold the #40 merge in before the zebra redo
-   (user order: annotated first, then #40). Then close #48-#51 with
-   explanatory comments. Salvage a85d8a5 (save_figure svg kwarg + test)
-   and #51's cwd-independent import pattern into the first new PR.
+0. PHASE 0 - DONE (2026-10-31): #52 merged (7 annotated branches +
+   beetles/locust_direction data-cell E2E rewires), #40 merged (zebra
+   scripted split + predict fix), #48-#51 closed with comments. main is
+   push-protected - future main changes go via PR (pattern documented in
+   STATE). a85d8a5 (save_figure svg kwarg + test) and #51's
+   cwd-independent import pattern still to salvage into the first new PRs
+   (policy PR, circular PR respectively).
 
 1. **beetles** (TEMPLATE) - off #36 base: migrate beetles_plots.py to the
    two-res unwrap.plots (save/save_path kwargs); extract preprocessing +
@@ -327,8 +322,11 @@ ify with `git status` + `gh pr list` first.
 
 4. von_mises_policy - off #35 base.
 
-5. zebra_escape (E2E) - main's annotated 18-cell + #40 fix; raw download
-   via load_zebra_bearings_raw; RAISE the unseeded c09 fit with the user.
+5. zebra_escape (E2E) - #40 NOW MERGED: main's zebra is annotated + E2E
+   data cell + scripted plot split (zebra_plots.py on main) + predict
+   fix. Remaining: two-res migration of zebra_plots.py + save/save_path
+   kwargs, RAISE the unseeded c09 fit with the user (suggest explicit
+   random_seed), full re-bake.
 
 6. locust_direction_mixture_model (E2E) - off #37 base; raw data via
    load_directional() + preprocess.rediscretize_directional (both in
