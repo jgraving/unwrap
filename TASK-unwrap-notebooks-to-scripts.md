@@ -41,10 +41,44 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (PHASE 0 DONE; main = annotated + E2E bases; NEXT = beetles template PR) - NEXT CHAT STARTS HERE
-- BOARD: main = 57e5b0a. Open PRs: only #43 (user's draft, unrelated).
-  #48-#51 CLOSED with comments (wrong base; machinery folded into the
-  upcoming per-study PRs). #52 and #40 MERGED (below).
+## STATE - updated 2026-10-31 (BEETLES TEMPLATE MERGED = PR #53 @ 0e6e43b; NEXT = circular study PR) - NEXT CHAT STARTS HERE
+- BOARD: main = 0e6e43b (post-#53). Open PRs: only #43 (user's draft,
+  unrelated). #48-#51 CLOSED with comments (wrong base; machinery
+  folded into the per-study PRs). #52, #40, #53 MERGED (below).
+- BEETLES TEMPLATE (PR #53 MERGED = main 0e6e43b; branch
+  notebooks-to-scripts-beetles @ 1612f9b was the head). Gates were all
+  green; merged with CI fully passing (build + execute + full matrix;
+  the notebooks.yml "execute" job = circular_regression re-run, still
+  green - the #36-style cwd-import anchor in setup is the pattern for
+  CI-executed studies). 3 commits on top of old main (57e5b0a):
+  * 937bbdc unwrap/plots.py: save_figure gains additive svg=False kwarg
+    (+ test) - salvaged from closed #50 (a85d8a5); beetles saves 3 of 4
+    figures as SVG.
+  * 9213e97 study scripts: beetles_preprocess.py (load_beetle_model_table,
+    verbatim E2E data cell); beetles_posthoc.py (kappamu_individual,
+    kappamu_per_draw, ppc_bootstrap_stats - verbatim incl. upstream
+    quirks: intercept kappa_mu override via inverse_bessel_ratio, per-
+    draw intercept-failure-into-light-slot fallback; dead to_360/
+    circ_xerr_from_interval helpers + never-displayed HDI tables
+    dropped); beetles_plots.py migrated to unwrap.plots (FIG_DIR
+    re-anchored <repo>/figures/beetles/, _save() via house save_figure,
+    _restore_ticks via house tick_style, every public fn gains save=True
+    + explicit save_path; figure bodies byte-identical).
+  * 1612f9b notebook re-baked end to end (172 s, 0 errors): 25 cells,
+    16 kept byte-identical (all model/fit + az.summary diagnostics);
+    setup = %matplotlib inline + imports of the 3 sibling scripts via
+    cwd-independent path + plots.set_style(); data/post-hoc/plot cells
+    one-line + plt.show(); 4 figure cells (8,15,16,24) each 100 dpi
+    image/png + "Saved figure to: figures/beetles/<name>.svg|pdf"; saved
+    3x SVG + 1x PDF valid; cross-check line printed; 106 pytest passed;
+    nb 2750 KB -> 688 KB.
+- STASH HAZARD (bitten): beetles_plots.py is a TRACKED file (came in via
+  #36), so `git stash` on the study branch stashes the migrated version;
+  a failed `git stash pop` + `git stash drop` then LOSES the migration
+  (rebuilt it from the unreachable WIP commit via `git fsck
+  --unreachable` + `git show <sha>:<path>`). Before dropping any stash:
+  `git stash show --stat` and confirm it holds nothing current. Worktree
+  state of record right now: on notebooks-to-scripts-beetles, clean tree.
 - PHASE 0 DONE:
   * PR #52 (main e571342) landed all 7 annotated branches: #33 circular,
     #34 periodic, #35 von_mises, #36 beetles (definitive), #37
@@ -114,7 +148,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   on bambi >=0.19/pymc 6 (pin clash; an upgrade probe was rolled back).
 - VENV: /home/jake/.venvs/unwrap-env - bambi 0.17.2, pymc 5.28.5,
   arviz 0.23.4, pytensor 2.38.3, pip check clean. Leave it pinned there.
-- RE-BAKE RECIPE (proven, /tmp/opencode/rerun_beetles.py): nbclient
+- RE-BAKE RECIPE (proven, /tmp/opencode/rerun_nb.py <nb-path>): nbclient
   NotebookClient + KernelManager.argv override to
   [/home/jake/.venvs/unwrap-env/bin/python, -m, ipykernel_launcher, -f,
   conn_file]; resources={"metadata": {"path": <repo>/notebooks}} (kernel
@@ -124,21 +158,35 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   ABSOLUTE: Path(__file__).resolve().parent.parent / "figures" /
   "<study>" (a relative string resolves against kernel cwd=notebooks/
   and the file lands in notebooks/figures/ while the printed repo_rel
-  still looks right - it lied).
-- VERIFY GATES: (a) clean end-to-end run, 0 errors; (b) every figure cell
-  has image/png AND a "Saved figure... figures/<study>/..." stream line;
-  (c) no plotting/preproc residue in notebook source (no `def `/
-  plt.figure/plt.subplots/sns./contourf/fill_between); (d) pytest
-  tests/ green; (e) ipynb <~1 MB (diagnostic-only figures: user
-  discretion, documented in PR).
-- Helper scripts in /tmp/opencode: build_beetles_nb.py (builder pattern:
-  cell keep/remap), rerun_beetles.py, beetles_map.py, beetles_dump.py,
-  verify_beetles_nb.py (kept-cells byte identity + residue regex),
-  pr48_beetles_body.md (PR body pattern - retitled since #48 closed),
-  pr_phase0_body.md (Phase 0 body).
-- Work repo /tmp/opencode/wt-unified: local `fix-zebra-ppc-kappa` branch
-  can be deleted; reset main to origin/main (57e5b0a). User's live repo
-  /home/jake/projects/unwrap UNTOUCHED (docs/notebooks-explained @
+  still looks right - it lied); the setup cell MUST start with
+  `%matplotlib inline` - under Agg a bare plt.show() emits NO cell
+  output and the bake reports images=0 with zero errors (beetles bake
+  #1 hit this: 217 s, 65 KB nb, no figures in the notebook).
+- VERIFY GATES: (a) clean end-to-end run, 0 errors; (b) every figure
+  cell has image/png AND a "Saved figure... figures/<study>/..."
+  stream line; (c) no plotting/preproc residue in notebook source (no
+  `def ` / plt.figure/plt.subplots/sns./contourf/fill_between); (d)
+  pytest tests/ green; (e) ipynb <~1 MB; (f) inline images really are
+  ~100 dpi (PIL Image.open(...).info["dpi"]); (g) saved figure files
+  valid + nb size noted in the PR.
+- Helper scripts in /tmp/opencode: build_beetles_nb2.py (builder
+  pattern: KEEP list + kept(i) + SETUP magic - copy per study),
+  rerun_nb.py <nb-path> (generic re-bake runner; rerun_beetles.py is
+  the older fixed-path ancestor), check_bp.py (plots-script residue
+  scan), smoke_bp.py (Agg import + save=False/save-default smoke),
+  verify_bake3.py (bake gate checker: errors, per-figure image+save
+  pairs, cross-check line, executed-summary counts, PIL inline dpi,
+  saved-file validity; kept-cells byte-identity via the builder's KEEP
+  list against a pre-refactor snapshot), pr_beetles2_body.md (PR #53
+  body - the per-study body template), pr_phase0_body.md (Phase 0
+  body), /tmp/zebra_no_wrong/beetles_old36.ipynb (beetles snapshot;
+  per study: `git show origin/main:notebooks/<x>.ipynb > <snap>` first).
+- Work repo /tmp/opencode/wt-unified: on main (= origin/main = 0e6e43b,
+  clean tree; the beetles branch was deleted post-merge and its old
+  remote ref is replaced). The OLD origin/notebooks-to-scripts-beetles
+  (pre-Phase-0 base @ 0b03a22) was superseded by force-push; the
+  re-baselined annotated-base work is what's on main now. User's live
+  repo /home/jake/projects/unwrap UNTOUCHED (docs/notebooks-explained @
   277c7ae + 6 uncommitted WIP files; PR branches are authoritative).
 - Handoff mirror: this file <-> origin/docs/notebooks-to-scripts-handoff.
 ## STATE AT FREEZE (superseded; kept for history)
