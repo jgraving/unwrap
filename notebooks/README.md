@@ -16,7 +16,7 @@ a fresh run succeeds with today's dependencies.
 | [Locust direction mixtures](locust_direction_mixture_model.ipynb) | Do locust headings support forward alignment or two preferred directions in virtual reality? | Raw trajectories from `unwrap-data` (`load_directional`) + in-notebook rediscretization; full rerun pending |
 | [Locust density and order](locust_density_order.ipynb) | How do the density and alignment of virtual neighbours relate to movement direction? | Tracking parts from `unwrap-data` (`load_density_order`); full workflow rerun pending |
 | [Dung beetle orientation](beetles.ipynb) | How do manipulated orientation cues affect heading? | Security-light trials pulled from `unwrap-data` (`load_beetle_security_light`); full rerun pending |
-| [Periodic and circular functions](periodic_not_circular.ipynb) | Illustrate the distinction between periodic functions and circular responses | Exploratory illustration; full rerun pending |
+| [Periodic and circular functions](periodic_not_circular.ipynb) | Illustrate the distinction between periodic functions and circular responses | Simulated data; full workflow runs from this checkout |
 | [Von Mises policy](von_mises_policy.ipynb) | Explore a von Mises directional policy | Exploratory illustration; full rerun pending |
 
 ## Setup
