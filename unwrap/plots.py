@@ -64,9 +64,10 @@ def set_style(figure_dir, extra_rc=None):
     return rc
 
 
-def save_figure(fig, figure_dir, name, pdf=True, png=False, transparent=False,
-                dpi=300, pad_inches=0.01):
-    """Save ``fig`` into ``figure_dir`` as ``<name>.pdf`` and/or ``<name>.png``.
+def save_figure(fig, figure_dir, name, pdf=True, png=False, svg=False,
+                transparent=False, dpi=300, pad_inches=0.01):
+    """Save ``fig`` into ``figure_dir`` as ``<name>.pdf`` / ``<name>.png`` /
+    ``<name>.svg`` as requested.
 
     Creates ``figure_dir`` if needed and prints the repo-relative paths
     written, matching the text the notebooks' figure cells always showed.
@@ -83,6 +84,10 @@ def save_figure(fig, figure_dir, name, pdf=True, png=False, transparent=False,
     if png:
         p = out / (name + ".png")
         fig.savefig(p, dpi=dpi)
+        written.append(p)
+    if svg:
+        p = out / (name + ".svg")
+        fig.savefig(p, bbox_inches="tight", pad_inches=pad_inches)
         written.append(p)
     if written:
         shown = [str(repo_rel(p)) for p in written]
