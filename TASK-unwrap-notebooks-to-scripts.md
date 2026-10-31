@@ -41,8 +41,10 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (template PRs #53+#54 merged = main f049d60; NOW = upgrade PR: package+scripts+cells DONE, prebake validation -> re-bake -> PR) - NEXT CHAT STARTS HERE
-- BOARD: main = f049d60. Open PRs: only #43 (user's draft, unrelated).
+## STATE - updated 2026-10-31 (upgrade PR #55 OPEN, CI in flight after pandas/scipy floor fix; work repo on upgrade-bambi-pymc6, clean) - NEXT CHAT STARTS HERE
+- BOARD: main = f049d60. Open PRs: #43 (user's draft, unrelated),
+  #55 (stack upgrade - branch upgrade-bambi-pymc6, 4 commits,
+  rebakes included; see UPGRADE PROGRESS below).
   #48-#51, #53, #54 MERGED. #54 = template polish (ppc inside
   plots.plot_ppc; uniform preprocess/posthoc/plots aliases;
   circular_modulo; within/between kappa markdown; no attribution
@@ -314,15 +316,34 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     c09/c11 markdown document the noncentering and the
     divergence-first R-hat rule; c21 ci_prob/ci_kind; c12/c13
     circular_summary.
-  * REMAINING: prebake validation (short fit -> ppc_bootstrap_stats
-    -> all plot fns, incl. the 1e-10 log-likelihood cross-check)
-    running; then re-bake beetles.ipynb + circular_regression.ipynb
-    (outputs already cleared), gates (verify_bake3.py + divergence
-    print == 0 + circular notebook gate), pytest, commits
-    (package+CI / study scripts / notebooks), push + PR + CI +
-    merge; then handoff doc sync + mirror push. The other 4
-    notebooks keep az.summary(circ_var_names=...) until their own
-    study PRs.
+  * UPGRADE PR #55 (open, branch upgrade-bambi-pymc6, 4 commits):
+    1) package+CI (pins, py3.12, circular.py, data.py, test_model.py),
+    2) study scripts (graph_free_rvs, az.hdi(prob=), PlotCollection
+    plot_trace, id_data (1,n)), 3) notebooks (beetles c02/c10/c11/c12/
+    c13/c21 + circular c11/c14 + plots script), 4) requirements floors
+    pandas>=2.2.0 scipy>=1.12.0. Pre-PR local bakes PASSED: beetles
+    76 s 0 errors (Divergences: 0; c12 0.23-layout table; 4 figure
+    cells + 4 saved files 100/300 dpi; kappa_mu 5.3335 seed 42;
+    cross-check line from inside plot_ppc), circular 11 s 0 errors
+    (Divergences: 0; 3 figure cells 100 dpi). CI round 1: notebooks
+    execute PASS + all latest jobs pass; ubuntu 3.12 MINIMUM failed
+    building pandas 2.1.0 from source (no cp312 wheel) -> fixed by
+    the floors (verified cp312 manylinux wheels exist for pandas
+    2.2.0 / scipy 1.12.0 / numpy 1.26.0 / matplotlib 3.8.0).
+    EQUIVALENCE CHECK (done): circular_summary vs arviz 0.23.4 on the
+    saved noncentered fit - circularized columns identical after
+    rounding (mean/sd/hdi_3%/hdi_97%/mcse_mean/mcse_sd); only
+    ess_tail/r_hat differ (arviz 1.3's own estimators: 1.000 vs 1.002,
+    max delta 285 in ess_tail) - noted in the PR body.
+  * AFTER MERGE: next study PRs in order - circular_regression (CI-
+    executed; source already new-stack-safe), periodic,
+    von_mises_policy, then E2E zebra -> locust_direction ->
+    locust_density -> bats. Their notebooks still use az.summary(circ_var_names=...) /
+    az.plot_posterior / az.plot_trace(compact=) -> port with the API
+    map above + the graph_free_rvs pattern if they get noncentered +
+    the ci_prob/ci_kind and hdi prob= renames (all recorded in the
+    ARVIZ 1.3 API MAP bullet). zebra c09 fit is unseeded -> add
+    random_seed at its redo.
 - VENV: /home/jake/.venvs/unwrap-env - PyMC6 stack (bambi 0.21.0,
   pymc 6.3.2, pytensor 3.3.6, arviz 1.3.0, py3.12); unwrap is
   EDITABLE-installed from the work repo (pip check clean). Rollback:
