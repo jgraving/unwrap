@@ -41,10 +41,58 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (BEETLES TEMPLATE MERGED = PR #53 @ 0e6e43b; NEXT = circular study PR) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-10-31 (BEETLES TEMPLATE MERGED = PR #53 @ 0e6e43b; NOW = template-polish PR, then stack upgrade) - NEXT CHAT STARTS HERE
 - BOARD: main = 0e6e43b (post-#53). Open PRs: only #43 (user's draft,
   unrelated). #48-#51 CLOSED with comments (wrong base; machinery
   folded into the per-study PRs). #52, #40, #53 MERGED (below).
+- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
+  "we should get this right"):
+  1. plot_ppc: do NOT pass the 14 parsed dict entries - put ALL the
+     post-hoc computation INSIDE the plot function; the notebook cell is
+     one call + plt.show(). (First suggested ppc-dict arg, then: "why
+     have it in the notebook at all".) Final: plots.plot_ppc(
+     idata_treat, model_treat, df, save_path=...) computes via
+     posthoc.ppc_bootstrap_stats internally; markdown above the cell
+     explains what it is (bootstrap-of-data vs posterior-of-model
+     comparison).
+  2. Import aliases - SAME in every study notebook:
+     `import <study>_preprocess as preprocess`,
+     `import <study>_posthoc as posthoc`, `import <study>_plots as
+     plots`. All call sites use the aliases.
+  3. Terminology (get it EXACTLY right, it is the point of the beetles
+     notebook): kappa = WITHIN-individual concentration (how tightly an
+     individual's own trial headings cluster around its own mean
+     direction; model parameter, light effect + per-individual random
+     effect). kappa_mu = BETWEEN-individual concentration = "the
+     concentration of the individual means across the population" (user
+     words); the paper's change-in-dispersion test = does the stimulus
+     change kappa_mu. Markdown c00/c09/c14/c17 must state this split
+     (c00 currently muddles them; c14 maps the figure panels to it).
+  4. Naming: use `circular_modulo` (the primary name in
+     unwrap/link/numpy.py + pymc.py; `shifted_modulo` is only an alias)
+     in the notebook + all study scripts; "we'll eventually change to
+     wrap but let's switch to circular_modulo for now". Swap includes
+     the plot-fn parameter name and the model cell's LINKS["..."] key
+     (registry is built from globals() so both keys resolve to the same
+     func). The other 6 notebooks keep `shifted_modulo` until their own
+     study PR.
+  5. NO attribution lines: c23 md had "A supplementary posterior
+     predictive check (contributed by James) compares ..." - remove the
+     "(contributed by James)" and never add such lines to PR bodies /
+     commits / notebooks.
+  6. DIVERGENCES (user: "the model has divergences you need to check
+     for ... rhat is meaningless if there are divergences"): the model
+     needs a diagnostics pass that reports the divergence count FIRST
+     and only trusts Rhat when it is zero. Fixing the divergences
+     requires the stack upgrade: bambi with the PER-PRIOR `noncentered`
+     kwarg (bambi >=0.19) -> pymc 6 / pytensor 3 / arviz, and
+     noncentered=True on the NORMAL priors (the kappa random effects,
+     e.g. softplus('1|Individual_kappa'); the mu random effects are
+     VonMises). USER DECIDED ORDER: land the polish PR FIRST
+     ("push the polish first so you don't lose my comments"), THEN the
+     upgrade PR. Upgrade PR then re-bakes the beetles notebook on the
+     new stack (outputs shift) and the remaining 5 studies run on the
+     new stack.
 - BEETLES TEMPLATE (PR #53 MERGED = main 0e6e43b; branch
   notebooks-to-scripts-beetles @ 1612f9b was the head). Gates were all
   green; merged with CI fully passing (build + execute + full matrix;
@@ -135,19 +183,49 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   into the light slot.
 - Per-prior noncentered (bambi >=0.19) deferred to the PyMC 6 migration;
   model-level noncentered=False stays where needed (beetles, zebra).
-- TERMINAL TASK (final PR after the notebook series): PyMC 6 / ArviZ 1 /
-  bambi 0.19+ migration. Pin bumps (pymc>=6,<7; drop arviz <1 cap;
-  bambi>=0.19; pytensor>=3). One real in-package risk:
-  `from pymc.distributions.transforms import LogExpM1` in
-  unwrap/prior.py (path moves under pytensor 3). Per-prior
-  noncentered=False on VonMises group priors (affects ALL notebook
-  fits). Check bambi#1084 fixed upstream (then drop #40-style
-  workarounds). ArviZ 1.0 API surface used is tiny (hdi, summary, loo,
-  plot_trace, plot_posterior, compare, circular_hdi). Re-bake ALL
-  notebooks afterwards (sampling defaults shift). Do NOT leave the venv
-  on bambi >=0.19/pymc 6 (pin clash; an upgrade probe was rolled back).
-- VENV: /home/jake/.venvs/unwrap-env - bambi 0.17.2, pymc 5.28.5,
-  arviz 0.23.4, pytensor 2.38.3, pip check clean. Leave it pinned there.
+- UPGRADE PR (was the "terminal task"; PULLED FORWARD per user - it is
+  the second PR of the beetles template pair, landing right after the
+  polish PR, and BEFORE the other 5 study PRs):
+  * WHY: the beetles model has DIVERGENCES (user); Rhat is meaningless
+    while they exist. Fix = per-prior `noncentered` kwarg (bambi
+    >=0.19) with noncentered=True on the NORMAL priors (the kappa
+    random-effect group priors, e.g. softplus('1|Individual_kappa');
+    the mu random effects are VonMises and stay centered) + new stack.
+    The notebook gains a diagnostics pass that reports the divergence
+    count FIRST (sample_stats["diverging"]) and only trusts Rhat at
+    zero divergences.
+  * PINS TO BUMP (requirements.txt, read 2026-10-31): currently
+    bambi>=0.15.0, pymc>=5.18.0,<6, arviz>=0.20.0,<1,
+    pytensor>=2.25.5, numpy>=1.26, pandas>=2.1, scipy>=1.11.2,
+    matplotlib>=3.8,<3.11 (the mpl cap exists only because arviz 0.x
+    uses matplotlib.style.core, removed in mpl 3.11). Target:
+    bambi>=0.19 (or the version with per-prior noncentered - VERIFY
+    which release introduced it), pymc>=6,<7, arviz 1.x, pytensor>=3,
+    drop the matplotlib cap if arviz 1.x no longer needs style.core.
+  * VENV BEFORE UPDATING: back it up (pip freeze >
+    /tmp/opencode/venv_frozen_pre_upgrade.txt, and a full copy for
+    rollback). Current (2026-10-31): bambi 0.17.2, pymc 5.28.5,
+    arviz 0.23.4 (split arviz-base/plots/stats 0.8.x), pytensor 2.38.3,
+    numpy 2.4.6, pandas 3.1.0, scipy 1.18.1. A prior upgrade probe was
+    ROLLED BACK (pin clash) - resolve it deliberately this time.
+  * IN-PACKAGE RISK: `from pymc.distributions.transforms import
+    LogExpM1` in unwrap/prior.py - path moves under the new backend;
+    check and move. Verify the `pm.compute_deterministics` signature in
+    pymc 6 (used by beetles_posthoc.ppc_bootstrap_stats and the zebra
+    #1084 workaround). Check whether bambinos/bambi#1084 (predict
+    kind="response_params" kappa bug) is fixed upstream; if yes,
+    workarounds drop in the LATER study PRs only (keep verbatim in
+    already-merged PRs).
+  * CI: .github/workflows/notebooks.yml executes the
+    circular_regression notebook - it must stay green on the new stack
+    IN THIS PR (touch minimally if needed; its full rework comes in
+    its own study PR).
+  * Re-bake the beetles notebook after (outputs shift: sampling
+    defaults; expect the divergence count to reach zero with
+    noncentered normal priors).
+- VENV: /home/jake/.venvs/unwrap-env - currently the PyMC5 stack (bambi
+  0.17.2, pymc 5.28.5, arviz 0.23.4, pytensor 2.38.3); the upgrade PR
+  moves it to PyMC6; keep a backup freeze file for rollback.
 - RE-BAKE RECIPE (proven, /tmp/opencode/rerun_nb.py <nb-path>): nbclient
   NotebookClient + KernelManager.argv override to
   [/home/jake/.venvs/unwrap-env/bin/python, -m, ipykernel_launcher, -f,
