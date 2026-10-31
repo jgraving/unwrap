@@ -41,8 +41,11 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (upgrade PR #55 OPEN, CI in flight after pandas/scipy floor fix; work repo on upgrade-bambi-pymc6, clean) - NEXT CHAT STARTS HERE
-- BOARD: main = f049d60. Open PRs: #43 (user's draft, unrelated),
+## STATE - updated 2026-10-31 (UPGRADE PR #55 MERGED = main 5df9eb4; NEXT = circular study PR) - NEXT CHAT STARTS HERE
+- BOARD: main = 5df9eb4. Open PRs: only #43 (user's draft, unrelated).
+  #55 MERGED (stack upgrade: PyMC 6 / ArviZ 1 / bambi 0.21, non-centered
+  kappa priors -> 0 divergences, seeded fits, circular_summary,
+  py3.12+). Work repo is on main, clean.
   #55 (stack upgrade - branch upgrade-bambi-pymc6, 4 commits,
   rebakes included; see UPGRADE PROGRESS below).
   #48-#51, #53, #54 MERGED. #54 = template polish (ppc inside
