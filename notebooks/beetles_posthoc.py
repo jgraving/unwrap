@@ -293,9 +293,11 @@ def kappamu_per_draw(idata_treat, df, *, verbose=True):
     # Convert the array to an ArviZ InferenceData object for easy summary
     # We need to reshape it back to (n_chain, n_draws) for ArviZ, though it's flat now.
     # For simplicity, we'll use az.summary on the flat array directly.
-    kappamu_posterior_idata = {"kappa_mu_intercept": kappamu_intercept_posterior,
-                               "kappa_mu_light": kappamu_light_posterior,
-                               "kappa_mu_delta": kappamu_delta_posterior,
+    # (1, n) so arviz 1.x can read the flat arrays under its default
+    # sample_dims = ("chain", "draw").
+    kappamu_posterior_idata = {"kappa_mu_intercept": kappamu_intercept_posterior[None, :],
+                               "kappa_mu_light": kappamu_light_posterior[None, :],
+                               "kappa_mu_delta": kappamu_delta_posterior[None, :],
                                }
 
     if verbose:
@@ -308,6 +310,47 @@ def kappamu_per_draw(idata_treat, df, *, verbose=True):
         "kappamu_light_posterior": kappamu_light_posterior,
         "kappamu_delta_posterior": kappamu_delta_posterior,
     }
+
+
+# ---------------------------------------------------------------------------
+# PyMC-graph evaluation helpers for the non-centered fit.
+# ---------------------------------------------------------------------------
+def graph_free_rvs(idata, model):
+    """The fit result with a posterior group containing all of the model's
+    free RVs, i.e. evaluable by the PyMC graph.
+
+    The kappa random effects are fitted non-centered: in the PyMC graph the
+    free RVs are then ``*_sigma`` (scale) and ``*_offset`` (factor), but
+    bambi stores the transformed centered effects and the ``*_sigma`` scales
+    and drops the ``*_offset`` factors. ``pm.compute_deterministics`` and
+    ``pm.compute_log_likelihood`` both evaluate the graph against every free
+    RV, so the missing factors are reconstructed: the graph computes
+    ``effect = sigma * offset`` exactly (sigma scalar per draw, offset one
+    factor per group), hence ``offset = effect / sigma`` (0 where sigma is
+    0).
+    """
+    posterior = idata.posterior
+    missing = [
+        rv.name
+        for rv in model.backend.model.free_RVs
+        if rv.name not in posterior.data_vars
+    ]
+    if not missing:
+        return idata
+    aug = idata.copy(deep=False)
+    ds = posterior.to_dataset()
+    for name in missing:
+        sigma = ds[name.replace("_offset", "_sigma")]
+        effect = ds[name[: -len("_offset")]]
+        # The graph computes effect = sigma * offset (sigma scalar per
+        # draw, offset one factor per group), so the offset carries the
+        # group dimension of the centered effect.
+        e = np.asarray(effect)
+        s = np.asarray(sigma).reshape(np.asarray(sigma).shape + (1,) * (e.ndim - np.asarray(sigma).ndim))
+        offset = np.divide(e, s, out=np.zeros(e.shape), where=s != 0)
+        ds[name] = (tuple(effect.dims), offset)
+    aug["posterior"] = ds
+    return aug
 
 
 # ---------------------------------------------------------------------------
@@ -419,10 +462,11 @@ def ppc_bootstrap_stats(idata_treat, model_treat, df, *, verbose=True):
     # preds = model_treat.predict(idata_treat, kind="response_params", inplace=False)
     # mu_da, kappa_da = preds.posterior["mu"], preds.posterior["kappa"]
 
+    _model = model_treat.backend.model
     params = pm.compute_deterministics(
-        idata_treat.posterior,
+        graph_free_rvs(idata_treat, model_treat),
         var_names=["mu", "kappa"],
-        model=model_treat.backend.model,
+        model=_model,
         progressbar=False,
     )
     mu_da, kappa_da = params["mu"], params["kappa"]

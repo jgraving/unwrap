@@ -271,7 +271,7 @@ def _rho_bar(angles, axis=-1):
 
 def _mean_hdi(samples, hdi_prob=0.89):
     s = np.asarray(samples).ravel()
-    lo, hi = az.hdi(s, hdi_prob=hdi_prob)
+    lo, hi = az.hdi(s, prob=hdi_prob)  # arviz 1.x: hdi_prob -> prob
     return float(s.mean()), float(lo), float(hi)
 
 
