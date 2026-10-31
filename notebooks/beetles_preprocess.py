@@ -7,7 +7,7 @@ it via :func:`unwrap.datasets.load_beetle_security_light` (first use
 shallow-clones the data repo to ``~/.cache/unwrap-data``) and applies the
 notebook's original transforms: a binary light indicator, a
 degrees-to-radians conversion of ``Heading``, wrapping to $(-\\pi, \\pi]$
-via :func:`unwrap.link.numpy.shifted_modulo`, and the column rename /
+via :func:`unwrap.link.numpy.circular_modulo`, and the column rename /
 categorisation the models expect.
 """
 
@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from unwrap.datasets import load_beetle_security_light
-from unwrap.link.numpy import shifted_modulo
+from unwrap.link.numpy import circular_modulo
 
 
 def load_beetle_model_table():
@@ -39,7 +39,7 @@ def load_beetle_model_table():
     df['HeadingRadians'] = np.deg2rad(df['Heading'])
 
     # Normalize the heading radians to be between -pi and pi
-    df['HeadingRadians'] = df['HeadingRadians'].apply(lambda x: shifted_modulo(x) if pd.notnull(x) else x)
+    df['HeadingRadians'] = df['HeadingRadians'].apply(lambda x: circular_modulo(x) if pd.notnull(x) else x)
 
     # Keep only the relevant columns and drop rows with missing values
     df = df[['Light', 'Beetle', 'Trial', 'HeadingRadians']].dropna().copy()

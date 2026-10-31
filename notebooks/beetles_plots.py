@@ -2,10 +2,11 @@
 
 The notebook keeps the statistical work (loading the data, fitting the von Mises
 GLM with ``bambi``/``unwrap``, and the post-hoc computations in
-``beetles_posthoc``). This module holds only the matplotlib "how": the palette,
-polar grids, KDE rings, error bars, layout, and the export of the figures. Each
-``plot_*`` function takes values the notebook (or the post-hoc scripts) has
-already computed.
+``beetles_posthoc``). This module holds the matplotlib "how": the palette,
+polar grids, KDE rings, error bars, layout, and the export of the figures.
+``plot_ppc`` additionally runs the PPC post-hoc statistics (via
+``beetles_posthoc.ppc_bootstrap_stats``) internally, so its cell is a single
+call.
 
 Style and saving follow the shared house convention from ``unwrap.plots``:
 figures render at display resolution (100 dpi) in the notebook cell and are
@@ -29,6 +30,8 @@ from scipy.stats import circmean, circstd, vonmises
 from matplotlib.lines import Line2D
 
 from unwrap import plots as _plots
+
+from beetles_posthoc import ppc_bootstrap_stats
 
 #: Publication figures for this study live in <repo>/figures/beetles/, anchored
 #: on this file's location so the output does not depend on the kernel cwd
@@ -165,7 +168,7 @@ def _summary_polar(ax, angles, radial_max, color):
 # ---------------------------------------------------------------------------
 # Figure 2 (panel b): polar KDE of the population-level mu posterior.
 # ---------------------------------------------------------------------------
-def plot_polar_mu_kde(idata_treat, df, shifted_modulo, flood_dir=None,
+def plot_polar_mu_kde(idata_treat, df, circular_modulo, flood_dir=None,
                       flood_halfwidth=np.deg2rad(45), theta_grid_n=361,
                       kappa_bw=80.0, *, save=True,
                       save_path="figures/beetles/treat_polar_mu_kde_clean.svg"):
@@ -176,8 +179,8 @@ def plot_polar_mu_kde(idata_treat, df, shifted_modulo, flood_dir=None,
     _ensure_style()
 
     post = idata_treat.posterior
-    mu_off = shifted_modulo(post["Intercept"].values.reshape(-1))
-    mu_on = shifted_modulo((post["Intercept"] + post["Light"]).values.reshape(-1))
+    mu_off = circular_modulo(post["Intercept"].values.reshape(-1))
+    mu_on = circular_modulo((post["Intercept"] + post["Light"]).values.reshape(-1))
 
     theta = np.linspace(-np.pi, np.pi, theta_grid_n)
     kde_off = circular_kde(theta, mu_off, kappa_bw=kappa_bw)
@@ -227,10 +230,10 @@ def plot_polar_mu_kde(idata_treat, df, shifted_modulo, flood_dir=None,
         on_heads = sub.loc[sub["Light"] == 1, "HeadingRadians"].dropna().to_numpy()
 
         if off_heads.size:
-            ang = shifted_modulo(circmean(off_heads, high=np.pi, low=-np.pi))
+            ang = circular_modulo(circmean(off_heads, high=np.pi, low=-np.pi))
             ax.scatter([ang], [r_pts], s=100, color=OFF, edgecolor="none", alpha=0.95, zorder=3)
         if on_heads.size:
-            ang = shifted_modulo(circmean(on_heads, high=np.pi, low=-np.pi))
+            ang = circular_modulo(circmean(on_heads, high=np.pi, low=-np.pi))
             ax.scatter([ang], [r_pts], s=100, color=ON, edgecolor="none", alpha=0.95, zorder=3)
 
     ax.set_rlim(0, r_pts * 1.1)
@@ -291,7 +294,7 @@ def _vonmises_interval_mass(mu, kappa, a, b):
             + vonmises.cdf(b, kappa=kappa, loc=mu) - vonmises.cdf(-np.pi, kappa=kappa, loc=mu))
 
 
-def plot_concentration(idata_treat, df, shifted_modulo, softplus,
+def plot_concentration(idata_treat, df, circular_modulo, softplus,
                        flood_dir=np.deg2rad(-135), hdi_prob=0.89, *,
                        save=True,
                        save_path="figures/beetles/treat_concentration_plus_floodlight.svg"):
@@ -315,16 +318,16 @@ def plot_concentration(idata_treat, df, shifted_modulo, softplus,
     mu_I_rand = post["1|Individual"].values
     mu_L_rand = post["Light|Individual"].values
 
-    mu_off = shifted_modulo(mu_I_fixed[..., None] + mu_I_rand)
-    mu_on = shifted_modulo(mu_I_fixed[..., None] + mu_L_fixed[..., None] +
+    mu_off = circular_modulo(mu_I_fixed[..., None] + mu_I_rand)
+    mu_on = circular_modulo(mu_I_fixed[..., None] + mu_L_fixed[..., None] +
                            mu_I_rand + mu_L_rand)
     n_chain, n_draw, n_ind = mu_off.shape
     mrl_between_off = _rho_bar(mu_off.reshape(n_chain * n_draw, n_ind), axis=1)
     mrl_between_on = _rho_bar(mu_on.reshape(n_chain * n_draw, n_ind), axis=1)
 
     # e/f: predictive mass within +/-45 of the floodlight
-    mu_pop_off = shifted_modulo(post["Intercept"].values.reshape(-1))
-    mu_pop_on = shifted_modulo((post["Intercept"] + post["Light"]).values.reshape(-1))
+    mu_pop_off = circular_modulo(post["Intercept"].values.reshape(-1))
+    mu_pop_on = circular_modulo((post["Intercept"] + post["Light"]).values.reshape(-1))
 
     halfwidth = np.deg2rad(45)
     a = flood_dir - halfwidth
@@ -455,14 +458,53 @@ def _restore_ticks(ax):
     _plots.tick_style(ax, width=0.6, length=3)
 
 
-def plot_ppc(bootG, boot_mu_off, boot_mu_on, boot_R_off, boot_R_on, indivs,
-             mu_pop_off_draw, mu_pop_on_draw,
-             mu_off_draw, mu_on_draw, R_off_draw, R_on_draw,
-             R_group_off_draw, R_group_on_draw, *, save=True,
+def plot_ppc(idata_treat, model_treat, df, *, save=True,
              save_path="figures/beetles/beetle_posterior_predictive_check.pdf"):
     """Supplemental PPC figure comparing a nonparametric bootstrap of the data
-    against the model posterior, for group mean direction, group alignment, and
-    per-individual concentration, off (top-left/right) vs on (bottom)."""
+    against the model posterior: group mean direction (a) and group alignment
+    (b) by condition on top, per-individual mean direction (c = OFF, d = ON)
+    and per-individual concentration (e = OFF, f = ON) below; each point
+    shows the bootstrap (open marker) vs the posterior (filled), light OFF in
+    grey and ON in gold.
+
+    The post-hoc statistics are computed here (the bootstrap resampling, the
+    per-draw per-group posterior directions and concentrations, and the
+    log-likelihood cross-check of the PyMC-graph response parameters, via
+    ``beetles_posthoc.ppc_bootstrap_stats``); the notebook cell is a single
+    call.
+    """
+    ppc = ppc_bootstrap_stats(idata_treat, model_treat, df)
+    (
+        bootG,
+        boot_mu_off,
+        boot_mu_on,
+        boot_R_off,
+        boot_R_on,
+        indivs,
+        mu_pop_off_draw,
+        mu_pop_on_draw,
+        mu_off_draw,
+        mu_on_draw,
+        R_off_draw,
+        R_on_draw,
+        R_group_off_draw,
+        R_group_on_draw,
+    ) = (
+        ppc["bootG"],
+        ppc["boot_mu_off"],
+        ppc["boot_mu_on"],
+        ppc["boot_R_off"],
+        ppc["boot_R_on"],
+        ppc["indivs"],
+        ppc["mu_pop_off_draw"],
+        ppc["mu_pop_on_draw"],
+        ppc["mu_off_draw"],
+        ppc["mu_on_draw"],
+        ppc["R_off_draw"],
+        ppc["R_on_draw"],
+        ppc["R_group_off_draw"],
+        ppc["R_group_on_draw"],
+    )
     _ensure_style()
     nT = len(indivs)
 

@@ -26,7 +26,7 @@ from scipy.stats import circmean
 from scipy.stats import vonmises, directional_stats, vonmises as _vonmises
 
 from unwrap.bessel import inverse_bessel_ratio
-from unwrap.link.numpy import shifted_modulo
+from unwrap.link.numpy import circular_modulo
 
 
 # ---------------------------------------------------------------------------
@@ -156,19 +156,19 @@ def kappamu_individual(idata_treat, df, *, verbose=True):
     mu_light_random = e["mu_light_random"]
 
     # Sum the fixed and random effects for each draw and individual
-    mu_intercept_draws = shifted_modulo(mu_intercept_fixed[..., np.newaxis] + mu_intercept_random)
+    mu_intercept_draws = circular_modulo(mu_intercept_fixed[..., np.newaxis] + mu_intercept_random)
 
     # Calculate the mean posterior direction (often the circular mean or just the arithmetic mean of the posterior)
-    mu_intercept_individual_estimates = shifted_modulo(circmean(mu_intercept_draws, axis=(0, 1)))
+    mu_intercept_individual_estimates = circular_modulo(circmean(mu_intercept_draws, axis=(0, 1)))
 
     # for the light on condition
-    mu_light_draws = shifted_modulo(
+    mu_light_draws = circular_modulo(
         mu_intercept_fixed[..., np.newaxis] + mu_light_fixed[..., np.newaxis] +
         mu_intercept_random + mu_light_random
     )
 
     # Calculate the mean posterior direction (point estimate)
-    mu_light_individual_estimates = shifted_modulo(circmean(mu_light_draws, axis=(0, 1)))
+    mu_light_individual_estimates = circular_modulo(circmean(mu_light_draws, axis=(0, 1)))
 
     # Fit the von Mises distribution to the set of individual mu estimates
     # fscale=1 fixes the scale parameter to 1
@@ -256,8 +256,8 @@ def kappamu_per_draw(idata_treat, df, *, verbose=True):
         )
 
         # 2. Wrap the angles to the preferred [-pi, pi) range
-        mu_intercept_wrapped = shifted_modulo(mu_intercept_individual_draw)
-        mu_light_wrapped = shifted_modulo(mu_light_individual_draw)
+        mu_intercept_wrapped = circular_modulo(mu_intercept_individual_draw)
+        mu_light_wrapped = circular_modulo(mu_light_individual_draw)
 
         # 3. Fit the von Mises distribution to this set of wrapped individual means
         # fscale=1 fixes the scale
