@@ -1,14 +1,18 @@
 """Figure helpers for the beetles example notebook.
 
 The notebook keeps the statistical work (loading the data, fitting the von Mises
-GLM with ``bambi``/``unwrap``, and computing every directional quantity). This
-module holds only the matplotlib "how": the palette, polar grids, KDE rings,
-error bars, layout, and the export of the figures. Each ``plot_*`` function
-takes values the notebook has already computed.
+GLM with ``bambi``/``unwrap``, and the post-hoc computations in
+``beetles_posthoc``). This module holds only the matplotlib "how": the palette,
+polar grids, KDE rings, error bars, layout, and the export of the figures. Each
+``plot_*`` function takes values the notebook (or the post-hoc scripts) has
+already computed.
 
-Saved figures go to ``figures/beetles/`` next to this file, resolved from the
-file location so the output does not depend on the working directory (the
-notebook may run from ``notebooks/`` or from the repository root).
+Style and saving follow the shared house convention from ``unwrap.plots``:
+figures render at display resolution (100 dpi) in the notebook cell and are
+saved as 300 dpi vector files under ``<repo>/figures/beetles/``. Every public
+figure function accepts a ``save`` flag (on by default) and an explicit
+repo-relative ``save_path`` (the notebook always passes it); the written files
+are gitignored.
 
 Palette: light OFF is grey, light ON is gold (matching the paper figures).
 """
@@ -24,47 +28,47 @@ from scipy.special import i0, i1, ive
 from scipy.stats import circmean, circstd, vonmises
 from matplotlib.lines import Line2D
 
-FIG_DIR = Path(__file__).resolve().parent / "figures" / "beetles"
+from unwrap import plots as _plots
+
+#: Publication figures for this study live in <repo>/figures/beetles/, anchored
+#: on this file's location so the output does not depend on the kernel cwd
+#: (the notebook may run from notebooks/ or from the repository root).
+FIG_DIR = Path(__file__).resolve().parent.parent / "figures" / "beetles"
 
 # Light OFF is grey, light ON is gold (matches the paper figures).
 OFF = "#9e9e9e"
 ON = "#f4a300"
-DPI = 300
-TICK_LEN = 3
-TICK_W = 0.6
-AX_LW = 0.6
+
+#: Study-specific rcParams on top of the house style (the house style already
+#: sets Arial, the 100/300 dpi tiers, type-42 PDF outlines and hairline
+#: axes/ticks).
+_EXTRA_RC = {
+    "svg.fonttype": "none",
+    "axes.linewidth": 0.6,
+    "xtick.major.width": 0.6,
+    "ytick.major.width": 0.6,
+    "xtick.major.size": 3,
+    "ytick.major.size": 3,
+}
 
 
 def set_style():
-    """Consistent figure style across the notebook (Arial, 300 dpi, type-42
-    PDF outlines, hairline axes)."""
-    mpl.rcParams.update({
-        "font.family": "Arial",
-        "figure.dpi": DPI,
-        "savefig.dpi": DPI,
-        "pdf.fonttype": 42,
-        "ps.fonttype": 42,
-        "svg.fonttype": "none",
-        "axes.linewidth": AX_LW,
-        "xtick.major.width": TICK_W,
-        "ytick.major.width": TICK_W,
-        "xtick.major.size": TICK_LEN,
-        "ytick.major.size": TICK_LEN,
-    })
-    print(f"Figures will be saved to: {FIG_DIR}")
+    """Consistent figure style across the notebook (house style + the study's
+    SVG/hairline additions; figures under ``FIG_DIR``)."""
+    _plots.set_style(FIG_DIR, _EXTRA_RC)
 
 
-def _ensure_fig_dir():
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-    return FIG_DIR
-
-
-def _save_svg(fig, name):
-    _ensure_fig_dir()
-    path = FIG_DIR / name
-    fig.savefig(path, format="svg", bbox_inches="tight")
-    plt.close(fig)
-    return str(path)
+def _save(fig, save, save_path):
+    """Write ``fig`` to ``save_path`` (a repo-relative path such as
+    ``figures/beetles/x.svg``) through the house two-res saver. The file
+    format follows the path's suffix."""
+    if not save:
+        return
+    p = Path(save_path)
+    if p.suffix.lower() == ".svg":
+        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True)
+    else:
+        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False)
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +93,8 @@ def circular_kde(theta_grid, samples, kappa_bw=80.0):
 # ---------------------------------------------------------------------------
 # Figure 1: polar grid of raw headings per individual.
 # ---------------------------------------------------------------------------
-def plot_data_polar(df, radial_max=10):
+def plot_data_polar(df, radial_max=10, *, save=True,
+                    save_path="figures/beetles/data_individual_polar_grid.svg"):
     """Polar grid of raw headings per individual, light OFF (grey) vs light ON
     (gold), each condition summarised by its circular mean (solid), circular
     median (dashed) and +/- one circular standard deviation (shaded band)."""
@@ -133,9 +138,8 @@ def plot_data_polar(df, radial_max=10):
                fontsize="medium")
 
     plt.tight_layout()
-    plt.show()
-    _save_svg(fig, "data_individual_polar_grid.svg")
-    plt.show()
+    _save(fig, save, save_path)
+    return fig
 
 
 def _scatter_polar(ax, data, color, label):
@@ -163,7 +167,8 @@ def _summary_polar(ax, angles, radial_max, color):
 # ---------------------------------------------------------------------------
 def plot_polar_mu_kde(idata_treat, df, shifted_modulo, flood_dir=None,
                       flood_halfwidth=np.deg2rad(45), theta_grid_n=361,
-                      kappa_bw=80.0):
+                      kappa_bw=80.0, *, save=True,
+                      save_path="figures/beetles/treat_polar_mu_kde_clean.svg"):
     """Polar kernel density of the population-level posterior of mu under each
     lighting condition (grey = off, gold = on), with the floodlight direction
     marked by an arc and each individual's condition mean as a dot on the outer
@@ -231,12 +236,8 @@ def plot_polar_mu_kde(idata_treat, df, shifted_modulo, flood_dir=None,
     ax.set_rlim(0, r_pts * 1.1)
 
     fig.tight_layout(pad=0.2)
-    _ensure_fig_dir()
-    outpath = FIG_DIR / "treat_polar_mu_kde_clean.svg"
-    fig.savefig(outpath, format="svg")
-    plt.show()
-    plt.close(fig)
-    print(f"Saved: {outpath}")
+    _save(fig, save, save_path)
+    return fig
 
 
 def _ensure_style():
@@ -291,13 +292,14 @@ def _vonmises_interval_mass(mu, kappa, a, b):
 
 
 def plot_concentration(idata_treat, df, shifted_modulo, softplus,
-                       flood_dir=np.deg2rad(-135), hdi_prob=0.89):
+                       flood_dir=np.deg2rad(-135), hdi_prob=0.89, *,
+                       save=True,
+                       save_path="figures/beetles/treat_concentration_plus_floodlight.svg"):
     """Four panels: within-individual concentration (MRL), between-individual
     concentration (MRL), posterior predictive mass within +/-45 of the
     floodlight, and the on-minus-off change in that mass. Each with an
     off/on error bar (mean, 89% HDI)."""
     _ensure_style()
-    _ensure_fig_dir()
 
     post = idata_treat.posterior
 
@@ -379,11 +381,8 @@ def plot_concentration(idata_treat, df, shifted_modulo, softplus,
             ax.tick_params(axis="y", which="both", left=True, labelleft=True)
 
     fig.tight_layout()
-    outpath = FIG_DIR / "treat_concentration_plus_floodlight.svg"
-    fig.savefig(outpath, format="svg")
-    plt.show()
-    plt.close(fig)
-    print(f"Saved: {outpath}")
+    _save(fig, save, save_path)
+    return fig
 
 
 # ---------------------------------------------------------------------------
@@ -453,21 +452,18 @@ def _stack_1d(post, name):
 
 
 def _restore_ticks(ax):
-    ax.tick_params(axis="both", which="both", direction="out", bottom=True, top=False,
-                   left=True, right=False, length=TICK_LEN, width=TICK_W)
-    ax.xaxis.set_ticks_position("bottom")
-    ax.yaxis.set_ticks_position("left")
+    _plots.tick_style(ax, width=0.6, length=3)
 
 
 def plot_ppc(bootG, boot_mu_off, boot_mu_on, boot_R_off, boot_R_on, indivs,
              mu_pop_off_draw, mu_pop_on_draw,
              mu_off_draw, mu_on_draw, R_off_draw, R_on_draw,
-             R_group_off_draw, R_group_on_draw):
+             R_group_off_draw, R_group_on_draw, *, save=True,
+             save_path="figures/beetles/beetle_posterior_predictive_check.pdf"):
     """Supplemental PPC figure comparing a nonparametric bootstrap of the data
     against the model posterior, for group mean direction, group alignment, and
     per-individual concentration, off (top-left/right) vs on (bottom)."""
     _ensure_style()
-    _ensure_fig_dir()
     nT = len(indivs)
 
     # ---- group-level summaries (95% HDIs) ----
@@ -506,7 +502,7 @@ def plot_ppc(bootG, boot_mu_off, boot_mu_on, boot_R_off, boot_R_on, indivs,
     # ---- figure layout ----
     OFF_COLOR, ON_COLOR = OFF, ON
     OFF_MARK, ON_MARK = "s", "o"
-    fig = plt.figure(figsize=(8.8, max(3.4, 0.28 * nT + 2.2)), dpi=DPI)
+    fig = plt.figure(figsize=(8.8, max(3.4, 0.28 * nT + 2.2)))
     gs = fig.add_gridspec(2, 4, height_ratios=[0.55, max(1.2, 0.55 + 0.05 * nT)],
                           wspace=0.45, hspace=0.38)
 
@@ -621,7 +617,5 @@ def plot_ppc(bootG, boot_mu_off, boot_mu_on, boot_R_off, boot_R_on, indivs,
                Line2D([0], [0], color=ON_COLOR, marker=ON_MARK, label="Light ON")]
     fig.legend(handles=handles, loc="lower center", ncol=4, bbox_to_anchor=(0.5, -0.01))
 
-    out_path = FIG_DIR / "beetle_posterior_predictive_check.pdf"
-    fig.savefig(out_path, bbox_inches="tight", pad_inches=0.01)
-    plt.show()
-    print(f"Saved: {out_path}")
+    _save(fig, save, save_path)
+    return fig
