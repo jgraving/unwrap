@@ -25,6 +25,12 @@ setup(
             "numba>=0.60",
             "tqdm>=4.66",
             "xarray>=2024.1.0",
+            # bats (Goldshtein) dataset loaders + notebook: legacy .xls, geojson, map panels
+            "contextily>=1.6",
+            "geopandas>=1.0",
+            "shapely>=2.0",
+            "pyproj>=3.6",
+            "python-calamine>=0.3",
         ],
     },
     classifiers=[
