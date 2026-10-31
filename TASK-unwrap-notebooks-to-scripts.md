@@ -41,10 +41,12 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (BEETLES TEMPLATE MERGED = PR #53 @ 0e6e43b; NOW = template-polish PR, then stack upgrade) - NEXT CHAT STARTS HERE
-- BOARD: main = 0e6e43b (post-#53). Open PRs: only #43 (user's draft,
-  unrelated). #48-#51 CLOSED with comments (wrong base; machinery
-  folded into the per-study PRs). #52, #40, #53 MERGED (below).
+## STATE - updated 2026-10-31 (TEMPLATE PRs #53 + #54 MERGED = main f049d60; NOW = stack upgrade PR) - NEXT CHAT STARTS HERE
+- BOARD: main = f049d60. Open PRs: only #43 (user's draft, unrelated).
+  #48-#51, #53, #54 MERGED. #54 = template polish (ppc inside
+  plots.plot_ppc; uniform preprocess/posthoc/plots aliases;
+  circular_modulo; within/between kappa markdown; no attribution
+  lines). The work repo is on main, clean.
 - USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
   "we should get this right"):
   1. plot_ppc: do NOT pass the 14 parsed dict entries - put ALL the
