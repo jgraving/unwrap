@@ -41,8 +41,8 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (UPGRADE PR #55 + CIRCULAR STUDY PR #56 MERGED = main d8fbfde; NEXT = periodic study PR) - NEXT CHAT STARTS HERE
-- BOARD: main = d8fbfde. Open PRs: only #43 (user's draft, unrelated).
+## STATE - updated 2026-11-01 (UPGRADE #55 + CIRCULAR #56 + PERIODIC #57 STUDY PRS MERGED = main ac2858e; NEXT = von_mises_policy study PR) - NEXT CHAT STARTS HERE
+- BOARD: main = ac2858e. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
   plots.plot_ppc, uniform preprocess/posthoc/plots aliases,
@@ -51,7 +51,9 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   non-centered kappa priors -> 0 divergences, seeded fits,
   circular_summary, py3.12+; see UPGRADE PROGRESS below). #56 MERGED
   (circular_regression study PR = the CI-executed notebook, see
-  CIRCULAR STUDY PR note below). Work repo is on main, clean.
+  CIRCULAR STUDY PR note below). #57 MERGED (periodic_not_circular study
+  PR, 3 commits: script / notebook re-bake / README row,
+  see PERIODIC note below). Work repo is on main, clean.
 - USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
   "we should get this right"):
   1. plot_ppc: do NOT pass the 14 parsed dict entries - put ALL the
@@ -358,18 +360,45 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     11s 0 errors, Divergences: 0 (c09), 3 figure cells 100 dpi inline
     + 3 valid 300 dpi SVGs (trace/predictions/ppc). CI fully green
     incl. the notebooks execute job + 3.12 minimum.
-  * AFTER MERGE: next study PRs in order - periodic,
-    von_mises_policy, then E2E zebra -> locust_direction ->
-    locust_density -> bats (each on the new stack). Their notebooks
-    still use az.summary(circ_var_names=...) / az.plot_posterior /
+  * PERIODIC STUDY PR #57 (MERGED = main ac2858e; 3 commits:
+    periodic_not_circular_plots.py / notebook / README row).
+    House-convention plots: set_style() via unwrap.plots (was ad-hoc
+    rcParams), save (on) + save_path, vector PDF under
+    figures/periodic_not_circular/ (was a 300 dpi PDF next to the
+    script + plt.show() in the script), ppc draws + median/HDI moved
+    INSIDE plot_beta_fit_ppc (beetles' plot_ppc pattern; cell = one
+    call + plt.show()). KEY FINDING: this notebook had never run end
+    to end on a modern stack (README said 'full rerun pending') -
+    arviz 0.23 read a 2-D hdi array as (draw, shape) WITH A
+    FutureWarning that it would change; 1.3 reads it as (n, samples)
+    and dropped the d= kwarg -> az.hdi(y.T, prob=...) (time rows,
+    draws last) gives the across-draws-per-time-point band the figure
+    always claimed; also the doc'd 50% inner HDI band was never
+    drawn - now is (flagged in the PR body). Notebook 6 -> 11 cells
+    (uniform unwrap.__file__ setup; unused pandas import dropped;
+    SEED; version dict; Figure-style section; giant cell -> simulate/
+    model(verbatim)/fit; fit seeded + progressbar=False +
+    'Divergences: 0' printed first; empty trailing cell dropped).
+    Re-bake: 18s 0 errors, 100 dpi inline + valid 300 dpi PDF.
+    Snapshot before edit: /tmp/zebra_no_wrong/periodic_pre_studyPR.*.
+    PR body kept at /tmp/opencode/pr_periodic_body.md; gate
+    /tmp/opencode/verify_periodic.py. CI green (tests 3.12-3.14 +
+    min, build, notebooks execute).
+  * AFTER MERGE: next study PRs in order - von_mises_policy,
+    then E2E zebra -> locust_direction -> locust_density -> bats
+    (each on the new stack). Their notebooks still use
+    az.summary(circ_var_names=...) / az.plot_posterior /
     az.plot_trace(compact=) -> port with the API map above + the
     graph_free_rvs pattern if they get noncentered + the
     ci_prob/ci_kind and hdi prob= renames (all recorded in the
-    ARVIZ 1.3 API MAP bullet). zebra c09 fit is unseeded -> add
-    random_seed at its redo. E2E studies get unwrap.datasets.ensure_clone()
-    (check upstream first: bambinos/bambi#1084 predict
-    kind="response" kappa angle-wrap bug - beetles/circular
-    workarounds kept verbatim until it lands).
+    ARVIZ 1.3 API MAP bullet); ALSO the az.hdi 2-D-axis change from
+    #57 (any (draws, shape) HDI on raw arrays -> transpose / d-
+    explicit) applies to any HDI-over-draws-on-2-D-array cell.
+    zebra c09 fit is unseeded -> add random_seed at its redo. E2E
+    studies get unwrap.datasets.ensure_clone() (check upstream
+    first: bambinos/bambi#1084 predict kind="response" kappa
+    angle-wrap bug - beetles/circular workarounds kept verbatim
+    until it lands).
 - VENV: /home/jake/.venvs/unwrap-env - PyMC6 stack (bambi 0.21.0,
   pymc 6.3.2, pytensor 3.3.6, arviz 1.3.0, py3.12); unwrap is
   EDITABLE-installed from the work repo (pip check clean). Rollback:
