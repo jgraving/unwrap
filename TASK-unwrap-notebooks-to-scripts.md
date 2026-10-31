@@ -41,17 +41,17 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-10-31 (UPGRADE PR #55 MERGED = main 5df9eb4; NEXT = circular study PR) - NEXT CHAT STARTS HERE
-- BOARD: main = 5df9eb4. Open PRs: only #43 (user's draft, unrelated).
-  #55 MERGED (stack upgrade: PyMC 6 / ArviZ 1 / bambi 0.21, non-centered
-  kappa priors -> 0 divergences, seeded fits, circular_summary,
-  py3.12+). Work repo is on main, clean.
-  #55 (stack upgrade - branch upgrade-bambi-pymc6, 4 commits,
-  rebakes included; see UPGRADE PROGRESS below).
-  #48-#51, #53, #54 MERGED. #54 = template polish (ppc inside
-  plots.plot_ppc; uniform preprocess/posthoc/plots aliases;
-  circular_modulo; within/between kappa markdown; no attribution
-  lines). The work repo is on main, clean.
+## STATE - updated 2026-10-31 (UPGRADE PR #55 + CIRCULAR STUDY PR #56 MERGED = main d8fbfde; NEXT = periodic study PR) - NEXT CHAT STARTS HERE
+- BOARD: main = d8fbfde. Open PRs: only #43 (user's draft, unrelated).
+  Merged history (oldest first): #48-#51 (annotated-branch merges),
+  #52, #53 (beetles template), #54 (template polish: ppc inside
+  plots.plot_ppc, uniform preprocess/posthoc/plots aliases,
+  circular_modulo, within/between kappa markdown, no attribution
+  lines). #55 MERGED (stack upgrade: PyMC 6 / ArviZ 1 / bambi 0.21,
+  non-centered kappa priors -> 0 divergences, seeded fits,
+  circular_summary, py3.12+; see UPGRADE PROGRESS below). #56 MERGED
+  (circular_regression study PR = the CI-executed notebook, see
+  CIRCULAR STUDY PR note below). Work repo is on main, clean.
 - USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
   "we should get this right"):
   1. plot_ppc: do NOT pass the 14 parsed dict entries - put ALL the
@@ -338,15 +338,38 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     rounding (mean/sd/hdi_3%/hdi_97%/mcse_mean/mcse_sd); only
     ess_tail/r_hat differ (arviz 1.3's own estimators: 1.000 vs 1.002,
     max delta 285 in ess_tail) - noted in the PR body.
-  * AFTER MERGE: next study PRs in order - circular_regression (CI-
-    executed; source already new-stack-safe), periodic,
+  * CIRCULAR STUDY PR #56 (MERGED = main d8fbfde; 2 commits:
+    circular_regression_plots.py / notebook). circular_regression
+    plots join the house convention: set_style() (unwrap.plots
+    machinery, FIG_DIR-anchored) + save (on by default) + explicit
+    save_path on all 3 figure fns, all vector SVG under
+    figures/circular_regression/ (gitignored). Stack landmine found in
+    THIS PR: PlotCollection.savefig with a repo-relative save_path
+    resolves against the KERNEL cwd (notebooks/), not the repo root ->
+    trace save is anchored on FIG_DIR (FIG_DIR / Path(save_path).name,
+    mkdir parents, repo-relative print via _plots.repo_rel);
+    savefig.dpi=300 flows from the house rc. Notebook 20 -> 16 cells
+    (dup markdown pairs + dup H1 from the merged explain branches
+    consolidated; Figure-style section added; uniform
+    unwrap.__file__-anchored setup; Step-3 markdown gets the
+    divergence-first rule; stale "outputs cleared" sentence gone).
+    Statistical cells verbatim (verified by diff vs the pre-study
+    snapshot /tmp/zebra_no_wrong/circular_pre_studyPR.ipynb). Re-bake:
+    11s 0 errors, Divergences: 0 (c09), 3 figure cells 100 dpi inline
+    + 3 valid 300 dpi SVGs (trace/predictions/ppc). CI fully green
+    incl. the notebooks execute job + 3.12 minimum.
+  * AFTER MERGE: next study PRs in order - periodic,
     von_mises_policy, then E2E zebra -> locust_direction ->
-    locust_density -> bats. Their notebooks still use az.summary(circ_var_names=...) /
-    az.plot_posterior / az.plot_trace(compact=) -> port with the API
-    map above + the graph_free_rvs pattern if they get noncentered +
-    the ci_prob/ci_kind and hdi prob= renames (all recorded in the
+    locust_density -> bats (each on the new stack). Their notebooks
+    still use az.summary(circ_var_names=...) / az.plot_posterior /
+    az.plot_trace(compact=) -> port with the API map above + the
+    graph_free_rvs pattern if they get noncentered + the
+    ci_prob/ci_kind and hdi prob= renames (all recorded in the
     ARVIZ 1.3 API MAP bullet). zebra c09 fit is unseeded -> add
-    random_seed at its redo.
+    random_seed at its redo. E2E studies get unwrap.datasets.ensure_clone()
+    (check upstream first: bambinos/bambi#1084 predict
+    kind="response" kappa angle-wrap bug - beetles/circular
+    workarounds kept verbatim until it lands).
 - VENV: /home/jake/.venvs/unwrap-env - PyMC6 stack (bambi 0.21.0,
   pymc 6.3.2, pytensor 3.3.6, arviz 1.3.0, py3.12); unwrap is
   EDITABLE-installed from the work repo (pip check clean). Rollback:
