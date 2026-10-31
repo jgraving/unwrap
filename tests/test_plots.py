@@ -27,6 +27,15 @@ def test_save_figure_writes_vector_pdf(tmp_path):
     assert out[0].exists() and out[0].stat().st_size > 200
 
 
+def test_save_figure_pdfs_and_svg_together(tmp_path):
+    fig, ax = plt.subplots()
+    ax.plot([0.0, 1.0], [0.0, 1.0])
+    out = plots.save_figure(fig, str(tmp_path / "figures" / "study"), "f",
+                            pdf=True, svg=True)
+    assert [p.name for p in out] == ["f.pdf", "f.svg"]
+    assert all(p.exists() and p.stat().st_size > 200 for p in out)
+
+
 def test_repo_rel_for_files_and_dirs():
     import os
 
