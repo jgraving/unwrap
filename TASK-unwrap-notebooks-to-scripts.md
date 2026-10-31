@@ -93,6 +93,12 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
      upgrade PR. Upgrade PR then re-bakes the beetles notebook on the
      new stack (outputs shift) and the remaining 5 studies run on the
      new stack.
+     NOTE (found during polish): the beetles c10 fit is UNSEEDED
+     (`model_treat.fit(tune=2000, draws=2000, target_accept=0.9,
+     idata_kwargs={"log_likelihood": True})` - no random_seed): the
+     kappa_mu point estimate moved 3.39 -> 5.32 between two bakes of
+     the same code. The upgrade PR should add an explicit random_seed
+     (and raise it for zebra's c09 too, which is also unseeded).
 - BEETLES TEMPLATE (PR #53 MERGED = main 0e6e43b; branch
   notebooks-to-scripts-beetles @ 1612f9b was the head). Gates were all
   green; merged with CI fully passing (build + execute + full matrix;
