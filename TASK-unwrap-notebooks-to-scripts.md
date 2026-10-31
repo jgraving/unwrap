@@ -14,138 +14,137 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
 4. Notebook small enough to load on GitHub (few hundred KB) WITH figures.
 
 ## DECIDED (with user, do not relitigate)
-- PR strategy: **INFRA PR first**, then each notebook PR forks from main.
-- Infra PR = unwrap/{plots.py, circular.py, datasets.py, preprocess.py}
-  + their tests, from origin/main.
-- After infra PR is up, close #44 (feat/locust-data-infra; bundles the same
-  datasets.py/preprocess.py with unrelated notebook edits).
-- Keep open: #43 (feat/circular-rhat), #40 (pr/fix-zebra-ppc-kappa).
-- All other PRs already CLOSED (30,33,34,35,36,37,41,42,45,46). Branches kept.
+- Base = **annotated explain-branch notebooks** (the explanatory-markdown
+  versions), NOT plain main notebooks. "newer doesn't matter as much as
+  correct matters" (user, 2026-10-31); per-branch notebook links confirmed
+  by the user.
+- **Phase 0** = merge the annotated explain branches into main, one at a
+  time, then close #48-#51 with explanatory comments (wrong base).
+- One focused PR per notebook: `<study>_preprocess.py` +
+  `<study>_plots.py`; the notebook = explanatory markdown + data calls +
+  MODEL FIT + evaluation/LOO, inline; preprocessing transforms, ALL
+  plotting, and heavy post-hoc math (extraction loops, bootstrap, KDE) go
+  to scripts and are called as one-liners.
+- Plot functions: `save` kwarg ON by default + `save_path` kwarg; notebook
+  calls pass save_path explicitly. Two resolutions: 100 dpi inline
+  (renders on GitHub) / 300 dpi saved file. Saved figure files are
+  .gitignored so the repo doesn't bloat.
+- **E2E** for zebra, locust_density_order, locust_direction_mixture_model,
+  goldshtein_bats: raw download via `unwrap.datasets.ensure_clone()` →
+  preprocess → model → evaluate → post-hoc, all within the notebook.
+- CI (.github/workflows/notebooks.yml) stays limited to executing
+  circular_regression; E2E notebooks re-baked locally.
+- Keep open: #40 (user's zebra predict fix; zebra order = annotated PR
+  first, then #40), #43 (draft, unrelated).
+- Infra #47 MERGED (main = 3417cb7): unwrap/{plots,circular,datasets,
+  preprocess}.py + tests + .gitignore (figures/**, notebooks/figures/,
+  unwrap-data/).
 
-## STATE — updated 2026-10-30 late (periodic #49, policy #50, circular #51 open; next = zebra) — NEXT CHAT STARTS HERE
-- Board: #51 (circular_regression, NEW), #50 (policy, NEW), #49 (periodic),
-  #48 (beetles, all CI green), #43 draft, #40 open (user's). #44 closed
-  (superseded by #47). #47 merged into main as merge commit 3417cb7 (infra
-  modules + tests + .gitignore + repo_rel Windows as_posix fix @ db5cc15).
-- NOTEBOOK circular_regression DONE → PR #51 (branch
-  notebooks-to-scripts-circular_regression @ 6798174 on main; 2 commits:
-  script 4a6758f, thin+re-baked notebook 6798174). 14 cells, 9 kept
-  verbatim; 3 figure cells thinned to plots.plot_trace /
-  plot_posterior_curves / plot_replicated_mean_resultant; re-bake 694 KB,
-  3 images (493 KB). KEY LESSON — CI CWDS: notebooks.yml runs the kernel
-  from the REPO ROOT (no metadata.path) while local bakes use notebooks/;
-  the setup cell imports the script cwd-independently:
-  sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-  unwrap.__file__)), "notebooks")). Verified with a local replication of
-  CI's exact recipe (nbclient + python3 kernelspec from repo root +
-  image/png assert). c13 md updated (baked-outputs note replaces the
-  "outputs intentionally cleared" convention). The tutorial now SAVES
-  figures (it previously only rendered) per house convention.
-  NOTE: other thin notebooks (beetles #48, periodic #49) do NOT have this
-  path anchor — they are not CI-executed and bake with cwd=notebooks, but
-  a user running them from a repo-root kernel would hit ImportError. Minor
-  follow-up: add the same 2-line anchor to their setup cells.
-- NOTEBOOK von_mises_policy DONE → PR #50 (branch
-  notebooks-to-scripts-policy @ 6d7d191 on main; 3 commits: plots-svg kwarg
-  a85d8a5, script 97c89ec, thin notebook 6d7d191). Single self-contained
-  cell (2x4 figure: von Mises policy densities radial + seeded trajectories;
-  NO data, NO model) → script-only, no preprocess module. unwrap.plots
-  gained additive svg=False kwarg (+test) because the study saves an SVG
-  for Inkscape. get_cmap deprecation (was baked into the old output) →
-  mpl.colormaps lookup. Unused goal_dir/target_top dropped. Trajectories
-  bit-identical (verified). 35 KB notebook.
-- NOTEBOOK #3 DONE: periodic_not_circular → PR #49 (branch
-  notebooks-to-scripts-periodic @ 242db24 on main; 2 commits: scripts d78e06b,
-  thin notebook 242db24). The real file was a 3-cell scratch (empty 3rd) — one
-  plain-pyMC Beta fit (sigmoid-mean/softplus-scale circadian sin-cos basis;
-  pm.sample(1000, tune=1000) + PPC), one figure cell (median + 90% HDI over the
-  activity_obs PPC, transparent PDF for an appendix). Result: 9 cells, 53 KB,
-  1 figure cell (409x230 px inline), model block byte-identical from
-  'with pm.Model() as model:' onward. Plain pm.Model — NO bambi, so no
-  noncentered issue here.
-  LESSON (FIG_DIR): anchor it ABSOLUTE —
-  FIG_DIR = Path(__file__).resolve().parent.parent / "figures" / "<study>".
-  A relative string resolves against the kernel cwd (= notebooks/), which wrote
-  the PDF into notebooks/figures/ (the printed repo_rel string still looked
-  right — misleading).
-  Dead code dropped (no output effect): unused hdi50 = az.hdi(y, 0.50) and the
-  commented-out legend. The az.hdi 2D-interpretation FutureWarning is faithful
-  to the original (lands with ArviZ 1.0 anyway). PR body:
-  /tmp/opencode/pr49_periodic_body.md.
-- #48 = notebooks-to-scripts-beetles @ 0b03a22, rebased DIRECTLY ON TOP OF main
-  after #47 merged (force-pushed). 2 commits: scripts (3c2bb0c), thin re-baked
-  notebook (0b03a22). Notebook 5.24 MB — user-approved as-is ("if they're just
-  trace plots I don't care. Just push it we can fix later"). Trace-figure shrink
-  (scalar-only var_names / explicit figsize / lower inline dpi) remains a noted
-  follow-up. PR body: /tmp/opencode/pr48_beetles_body.md (documents per-prior).
-- PER-PRIOR NONCENTERED (investigated at user request): YES, it exists —
-  `Prior(..., noncentered=None)` added in bambi 0.19.0 (verified absent in 0.18.0,
-  present in 0.19/0.20/0.21; backend: `effective_nc = prior.noncentered if
-  prior.noncentered is not None else self.noncentered`). BUT every 0.19+ release
-  requires pymc>=6 + pytensor>=3, conflicting with the repo's deliberate pins
-  (pymc>=5.18.0,<6; arviz>=0.20.0,<1) → #48 KEEPS the model-level
-  `noncentered=False`; per-prior form is the natural first step of the PyMC 6
-  migration. WARNING: a probe upgraded the venv to bambi 0.21/pymc 6.3/arviz 1.3 —
-  RESTORED to the pinned stack afterwards: bambi 0.17.2, pymc 5.28.5, arviz 0.23.4,
-  pytensor 2.38.3, pip check clean. Do NOT leave it on 0.21.
-- TERMINAL TASK (agreed with user 2026-10-31, after the notebook PR series):
-  PyMC 6 / ArviZ 1 / bambi 0.19+ migration. Checklist (audit-verified surface):
-  1. Pin bumps: requirements.txt → pymc>=6,<7; arviz cap <1 dropped (1.x);
-     bambi>=0.19 (0.21); pytensor>=3. CI matrix 3.10-3.14 already fine (pymc 6
-     drops 3.9 only).
-  2. unwrap package — one real risk: `from pymc.distributions.transforms import
-     LogExpM1` in unwrap/prior.py (path moves under pytensor 3; try
-     pytensor.distributions.transforms). Everything else is stable API
-     (pm.VonMises/Mixture/Model in distributions.py, data.py; pt.* in link/pymc.py).
-     CircularUniformPrior is a bmb.Prior(...) FACTORY, not a subclass → already
-     compatible with the new noncentered kwarg. Verify via pytest.
-  3. bambi >=0.19: swap model-level noncentered for per-prior
-     `noncentered=False` on the VonMises group priors — affects ALL notebook model
-     fits (beetles 3 cells + zebra + locust x2 + bats + policy + regression). Also
-     check whether the bambi 0.17.2 predict() kappa bug (bambinos/bambi#1084) is
-     fixed upstream → then decide to drop #40 / the zebra predict workarounds.
-  4. ArviZ 1.0: API surface used is tiny (hdi x109, summary, loo, plot_trace,
-     plot_posterior, compare, circular_hdi) — one empirical pass expected enough.
-  5. Re-bake ALL 9 notebooks (PyMC 5→6 sampling defaults shift baked figures).
-     Recipe reusable; ~half a day of run-and-fix total. Land the notebook PR
-     series first; migration is one final focused PR.
-- NEXT: notebook #5 = zebra_escape.ipynb (fits are seeded; post-hoc
-  extraction stays inline; 2x2 main summary figure + 6-panel PPC
-  bootstrap-vs-posterior — the PPC figure needs the bambi model for
-  model.predict, which does NOT joblib-pickle, so a fresh refit within one
-  script pass). Then locust_density_order, locust_direction_mixture_model,
-  bats (heavier; bats/locust have pre-existing large scripts on tmp-unified
-  to reuse/migrate — some single-DPI ones need the two-res system).
-  Follow-on branches all off origin/main (now includes infra).
-  Per notebook: branch notebooks-to-scripts-<study>; <study>_preprocess.py +
-  <study>_plots.py on unwrap.plots (FIG_DIR=figures/<study>); thin notebook
-  (setup cell with %matplotlib inline + imports + plots.set_style(); data cell;
-  model fits verbatim minus imports + noncentered comment; thin one-line plot
-  cells); re-bake; verify gates; 1-2 commits; one PR (body pattern:
-  /tmp/opencode/pr48_beetles_body.md).
-- Re-bake recipe (PROVEN, /tmp/opencode/rerun_beetles.py — copy & retarget per
-  notebook): nbclient NotebookClient, KernelManager.argv override →
-  [/home/jake/.venvs/unwrap-env/bin/python, -m, ipykernel_launcher, -f, conn_file],
-  resources={"metadata": {"path": <repo>/notebooks}} (kernel cwd!), in the
-  LAUNCHING process env: PYTHONPATH=<worktree> (THE venv's installed unwrap lacks
-  the new modules — importing from repo root masks this; the kernel sees it),
-  MPLBACKEND=Agg, OMP_NUM_THREADS=1. GOTCHA: serialized stream outputs store
-  `text` as a LIST of lines — join before substring checks.
-- Verify gates: clean end-to-end run (0 errors); every figure cell has image/png
-  AND a "Saved figure to: figures/<study>/..." stream line; no plotting residue in
-  notebook source (no `def ` / plt.figure / plt.subplots / sns. / contourf /
-  fill_between); pytest tests/ green; ipynb <~1 MB (diagnostic-only figures: user
+
+## STATE - updated 2026-10-31 (post-pivot plan locked; duplicate tracks resolved by evidence; NEXT = user confirm, then Phase 0) - NEXT CHAT STARTS HERE
+- BOARD: main = 3417cb7 (#47 infra merged). Open: #48 beetles @0b03a22
+  (5.24 MB), #49 periodic @242db24 (53 KB), #50 policy @6d7d191 (35 KB),
+  #51 circular @6798174 (694 KB) - all built on the WRONG base (un-annotated
+  main notebooks); to be CLOSED after Phase 0. Salvage from them:
+  (a) #50 commit a85d8a5 = additive save_figure svg=False kwarg + test;
+  (b) #51 cwd-independent notebook import (CI runs the kernel from repo
+  root while local bakes use notebooks/ cwd):
+      sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+          unwrap.__file__)), "notebooks"))
+  (c) #51's verified CI recipe (nbclient + python3 kernelspec, repo-root
+  cwd, image/png assert). #40 (user's zebra fix; head b5ea56e =
+  pm.compute_deterministics + own zebra_plots.py + c16 split) stays open.
+  #43 draft untouched.
+- EXPLAIN BRANCHES (all fetched locally as pr/explain-*; cells/md):
+  #33 pr/explain-circular-regression 20/13 (NOTES: duplicated step
+  headings "## Step 1 ..." + "## 1. ..." - inspect when reworking),
+  #34 pr/explain-periodic 6/3, #35 pr/explain-von-mises 3/2,
+  #36 pr/explain-beetles 25/13 (DEFINITIVE beetles base; already
+  thin+scripted: plot cells 26 B/166 B/239 B; own noncentered=False;
+  gold/grey palette; PPC figure; NO *_preprocess.py anywhere),
+  #37 pr/explain-locust- 38/12 (locust_direction annotated base).
+  #41 and #42 are absorbed (see resolved pairs below).
+  #38 pr/explain-zebra ALREADY MERGED -> main's zebra_escape.ipynb is the
+  annotated 18-cell version.
+- DUPLICATE TRACKS (resolved 2026-10-31 by diff evidence; awaiting user
+  nod then merge):
+  * BATS: #46 superset of #42. goldshtein_bats.ipynb sources IDENTICAL at
+    both heads (96 cells / 541,206 B, zero per-cell diff); #46 = #42 head
+    + 2 commits (db4db33 set_style prints figure dir relative to repo
+    root; 6429614 _save() emits figure-dir-relative paths). Both already
+    load via unwrap.datasets (commit 465eb49 is in #42 too). USE #46.
+  * LOCUST DENSITY: #45 superset of #41. Same 9 annotated md cells (3
+    updated to E2E wording: "rediscretization runs in the code cells of
+    this notebook"); 39 of 42 code cells verbatim; the 3 dropped cells
+    were the bundled-parquet load, replaced by E2E dfXY load +
+    rediscretization; bundled notebooks/datasets/*.parquet removed;
+    plots script carries the path-output fixes. USE #45.
+  * #44 (feat/locust-data-infra, closed): fully superseded by merged #47 -
+    main's datasets.py contains ALL #44 functions (plus
+    bats_lake_outline_path; 432 vs 417 L), preprocess.py byte-identical,
+    .gitignore already has unwrap-data/. DO NOT merge.
+- All six explain *_plots.py files: single DPI=300, own set_style(),
+  FIG_DIR=Path(__file__).parent/"figures"/<study> - none use
+  unwrap.plots; all need the two-res migration + save/save_path kwargs.
+- ZEBRA (annotated, on main, 18 cells): c04 reads
+  datasets/zebra_bearings_blocks.parquet (E2E -> switch to
+  load_zebra_bearings_raw); c09 model.fit(tune=2000, target_accept=0.8)
+  is UNSEEDED - reproducibility gap, RAISE WITH USER when redoing (baked
+  outputs differ every run); c13 heavy post-hoc (7.4 KB) -> moves to
+  scripts per the confirmed boundary; c15 2x2 summary + c16 6-panel PPC
+  (bootstrap seeds 123/1000+j/2000+j; B_GROUP=2000/B_INDIV=1500) are the
+  two plot cells; #40 fixes the model.predict(kind="response_params")
+  kappa bug (bambinos/bambi#1084) via pm.compute_deterministics - kept
+  verbatim. Zebra order (user): annotated first (done - #38 merged),
+  then #40, then my E2E redo.
+- Upstream bugs kept verbatim (do NOT silently fix): beetles old c19
+  az.summary reads idata_treat (idata_nolight_km seems intended); old
+  c38 per-draw loop's first except-branch writes the intercept failure
+  into the light slot.
+- Per-prior noncentered (bambi >=0.19) deferred to the PyMC 6 migration;
+  model-level noncentered=False stays where needed (beetles, zebra).
+- TERMINAL TASK (final PR after the notebook series): PyMC 6 / ArviZ 1 /
+  bambi 0.19+ migration. Pin bumps (pymc>=6,<7; drop arviz <1 cap;
+  bambi>=0.19; pytensor>=3). One real in-package risk:
+  `from pymc.distributions.transforms import LogExpM1` in
+  unwrap/prior.py (path moves under pytensor 3). Per-prior
+  noncentered=False on VonMises group priors (affects ALL notebook
+  fits). Check bambi#1084 fixed upstream (then drop #40-style
+  workarounds). ArviZ 1.0 API surface used is tiny (hdi, summary, loo,
+  plot_trace, plot_posterior, compare, circular_hdi). Re-bake ALL
+  notebooks afterwards (sampling defaults shift). Do NOT leave the venv
+  on bambi >=0.19/pymc 6 (pin clash; an upgrade probe was rolled back).
+- VENV: /home/jake/.venvs/unwrap-env - bambi 0.17.2, pymc 5.28.5,
+  arviz 0.23.4, pytensor 2.38.3, pip check clean. Leave it pinned there.
+- RE-BAKE RECIPE (proven, /tmp/opencode/rerun_beetles.py): nbclient
+  NotebookClient + KernelManager.argv override to
+  [/home/jake/.venvs/unwrap-env/bin/python, -m, ipykernel_launcher, -f,
+  conn_file]; resources={"metadata": {"path": <repo>/notebooks}} (kernel
+  cwd); LAUNCH env: PYTHONPATH=<worktree>, MPLBACKEND=Agg,
+  OMP_NUM_THREADS=1. GOTCHAS: serialized stream outputs store `text` as a
+  LIST of lines (join before substring checks); FIG_DIR must be
+  ABSOLUTE: Path(__file__).resolve().parent.parent / "figures" /
+  "<study>" (a relative string resolves against kernel cwd=notebooks/
+  and the file lands in notebooks/figures/ while the printed repo_rel
+  still looks right - it lied).
+- VERIFY GATES: (a) clean end-to-end run, 0 errors; (b) every figure cell
+  has image/png AND a "Saved figure... figures/<study>/..." stream line;
+  (c) no plotting/preproc residue in notebook source (no `def `/
+  plt.figure/plt.subplots/sns./contourf/fill_between); (d) pytest
+  tests/ green; (e) ipynb <~1 MB (diagnostic-only figures: user
   discretion, documented in PR).
-- Helper scripts in /tmp/opencode: build_beetles_nb.py (builder pattern),
-  rerun_beetles.py, beetles_map.py (cell index map), beetles_dump.py (dump cell
-  sources), verify_beetles_nb.py (kept-cells byte-identity + residue regex),
-  debug_trace.py, pr48_beetles_body.md.
-- Work repo /tmp/opencode/wt-unified (clean tree, on notebooks-to-scripts-beetles).
-  User's live repo /home/jake/projects/unwrap left UNTOUCHED (docs/notebooks-
-  explained @ 277c7ae, 6 uncommitted WIP files).
-- Upstream bugs kept verbatim in beetles (not fixed): old c19 az.summary reads
-  idata_treat where idata_nolight_km seems intended; c38 per-draw loop's first
-  except-branch writes the intercept failure into the light slot.
+- Helper scripts in /tmp/opencode: build_beetles_nb.py (builder pattern:
+  cell keep/remap), rerun_beetles.py, beetles_map.py, beetles_dump.py,
+  verify_beetles_nb.py (kept-cells byte identity + residue regex),
+  pr48_beetles_body.md (PR body pattern).
+- Work repo /tmp/opencode/wt-unified (clean tree; currently on
+  notebooks-to-scripts-zebra, an old-base branch to be redone). User's
+  live repo /home/jake/projects/unwrap UNTOUCHED (docs/notebooks-
+  explained @ 277c7ae + 6 uncommitted WIP files; user confirmed the PR
+  branches, not this WIP, are authoritative).
+- Handoff mirror: this file <-> origin/docs/notebooks-to-scripts-handoff
+  (push after each update: switch the branch, copy the file, commit,
+  push, switch back).
 
 ## STATE AT FREEZE (superseded; kept for history)
 
@@ -305,26 +304,40 @@ ify with `git status` + `gh pr list` first.
 
 
 
-## NOTEBOOK WORK ORDER
+## NOTEBOOK WORK ORDER (post-pivot, annotated bases)
 
-1. INFRA PR (unwrap/plots.py circular.py datasets.py preprocess.py + tests)
+0. PHASE 0 (once user confirms the three evidence resolutions): merge the
+   annotated branches into main one at a time, checking mergeable vs
+   current main after each (watch .gitignore / notebooks/README.md
+   cross-branch conflicts); fold the #40 merge in before the zebra redo
+   (user order: annotated first, then #40). Then close #48-#51 with
+   explanatory comments. Salvage a85d8a5 (save_figure svg kwarg + test)
+   and #51's cwd-independent import pattern into the first new PR.
 
-   — from main; close #44 once infra PR is up.
+1. **beetles** (TEMPLATE) - off #36 base: migrate beetles_plots.py to the
+   two-res unwrap.plots (save/save_path kwargs); extract preprocessing +
+   kappa-mu post-hoc into beetles_preprocess.py / scripts; thin to markdown
+   + one-line calls; re-bake; verify gates; 1-2 commits; one PR.
 
-2. beetles.ipynb (smallest; preprocess script done)
+2. circular_regression - off #33 base. CI-executed tutorial: the PR must
+   keep .github/workflows/notebooks.yml green (repo-root kernel, image/png
+   assert); inspect the duplicated step headings first.
 
-3. periodic_not_circular.ipynb
+3. periodic_not_circular - off #34 base.
 
-4. von_mises_policy.ipynb
+4. von_mises_policy - off #35 base.
 
-5. circular_regression.ipynb (tutorial; tiny; CI runs it — keep CI green)
+5. zebra_escape (E2E) - main's annotated 18-cell + #40 fix; raw download
+   via load_zebra_bearings_raw; RAISE the unseeded c09 fit with the user.
 
-6. zebra_escape.ipynb
+6. locust_direction_mixture_model (E2E) - off #37 base; raw data via
+   load_directional() + preprocess.rediscretize_directional (both in
+   main via #47, ported from the closed #44 work).
 
-7. locust_direction_mixture_model.ipynb
+7. locust_density_order (E2E) - off #45 base (already annotated + E2E);
+   migrate locust_density_plots.py to the two-res system + save/save_path;
+   re-bake; verify gates.
 
-8. locust_density_order.ipynb (big; scripts exist, migrate locust_density_
-
-   plots.py to unwrap.plots two-res, thin 6 MB -> small)
-
-9. goldshtein_bats.ipynb (largest; scripts exist, biggest job)
+8. goldshtein_bats (E2E) - off #46 base (already annotated + E2E); the
+   user's ask: markdown + refactored plotting + pre/post-processing into
+   scripts; largest notebook (96 cells) - biggest job, last.
