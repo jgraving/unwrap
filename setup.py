@@ -14,7 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=requirements,
     extras_require={
-        "test": ["pytest>=8,<10"],
+        "test": ["pytest>=8,<10", "dask[array]>=2024.1"],
         "notebook": [
             "jupyterlab>=4,<5",
             "nbclient>=0.10,<1",

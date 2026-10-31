@@ -18,6 +18,36 @@ See [Circular links](links.md) for the numerical functions, backend registries,
 inputs, aliases, and boundary conventions. Source docstrings provide the same
 conventions next to each function.
 
+## Circular diagnostics: `unwrap.diagnostics`
+
+Use `rhat(idata, circ_var_names=["mu"])` or
+`summary(idata, circ_var_names=["mu"])` to diagnose a whole posterior while
+treating named variables as angular. Other variables retain ordinary ArviZ
+diagnostics. Without circular names, existing ArviZ behavior is preserved.
+
+`rhat(data, *, var_names=None, method="rank", dask_kwargs=None,
+circ_var_names=None, circ_method="circular")` uses the joint circular covariance
+diagnostic for named circular variables by default. Set `circ_method="sin"`
+or `"cos"` to select a projection's rank R-hat instead. The existing
+`method="circular"` option applies the joint method to all selected variables.
+
+`summary` mirrors `arviz.summary`, adding `circ_method="circular"` and
+`include_circular_diagnostics=True`. Circular rows contain circular descriptive
+statistics and the selected `r_hat`. Extra `_sin` and `_cos` columns report
+both projections' rank R-hat, ESS, and Monte Carlo errors. Raw-angle ESS and
+standard-deviation MCSE are left undefined on circular rows. The joint
+circular `r_hat` differs from modern rank R-hat and has no separately
+calibrated universal cutoff.
+
+`rhat_components(data, *, var_names=None, dask_kwargs=None)` reports separate
+ArviZ rank R-hats for sine and cosine, returned under the `"sin"` and `"cos"`
+dictionary keys.
+
+Select angular variables explicitly, such as mean directions or angular random
+intercepts. Ordinary diagnostics remain appropriate for concentration and
+general regression slopes. See [Circular diagnostics](diagnostics.md) for the
+API, mathematical derivation, numerical conventions, and limitations.
+
 ## Prior helpers: `unwrap.prior`
 
 - `CircularUniformPrior()` creates a Bambi prior backed by a von Mises
