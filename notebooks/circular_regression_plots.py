@@ -11,10 +11,14 @@ import arviz as az
 
 
 def plot_trace(idata, var_names):
-    """Compact ArviZ trace plot of the posterior for the named variables."""
-    az.plot_trace(idata, var_names=var_names, compact=True)
-    plt.tight_layout()
-    plt.show()
+    """ArviZ trace plot of the posterior for the named variables.
+
+    arviz 1.x: ``az.plot_trace`` returns a PlotCollection (the old grid-based
+    layout and its ``compact`` argument were removed); ``pc.show()`` renders
+    it with the active backend.
+    """
+    pc = az.plot_trace(idata, var_names=var_names)
+    pc.show()
 
 
 def plot_predictions(data, grid, mean_direction, concentration_draws):

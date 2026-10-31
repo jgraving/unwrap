@@ -21,6 +21,7 @@ exponentially-scaled ``i0e`` / ``i1e`` so that
 from __future__ import annotations
 
 import numpy as np
+from scipy import stats as scs
 
 from unwrap.bessel import bessel_ratio
 
@@ -42,6 +43,7 @@ __all__ = [
     "circ_hdi_centered",
     "circ_hdi",
     "circ_xerr_from_interval",
+    "circular_summary",
     "stack_posterior_1d",
     "bootstrap_track_condition",
     "hierarchical_bootstrap_group",
@@ -172,15 +174,19 @@ def linear_hdi_mean(x, hdi_prob=0.95):
     import arviz as az
 
     x = np.asarray(x, float)
-    h = az.hdi(x, hdi_prob=hdi_prob, skipna=True)
+    h = az.hdi(x, prob=hdi_prob, skipna=True)
     return float(np.nanmean(x)), float(h[0]), float(h[1])
 
 
 def circ_hdi(samples, prob=0.95):
-    """Circular HDI ``(lo, hi)`` in ``(-pi, pi]`` (arviz's circular_hdi)."""
+    """Circular HDI ``(lo, hi)`` in ``(-pi, pi]`` (arviz's circular hdi).
+
+    arviz 1.x removed the top-level ``circular_hdi``; the same computation
+    is ``az.hdi(..., circular=True)``.
+    """
     import arviz as az
 
-    h = az.circular_hdi(np.asarray(samples, float), hdi_prob=prob)
+    h = az.hdi(np.asarray(samples, float), prob=prob, circular=True)
     return float(h[0]), float(h[1])
 
 
@@ -210,6 +216,79 @@ def circ_xerr_from_interval(m, lo, hi):
     w_lo = abs(float(circ_mod(np.asarray(m) - np.asarray(lo))))
     w_hi = abs(float(circ_mod(np.asarray(hi) - np.asarray(m))))
     return np.degrees(w_lo), np.degrees(w_hi)
+
+
+def _circular_mcse(samples, batches=5):
+    """Batched Monte Carlo SE of a circular mean (arviz 0.23 ``_mc_error``).
+
+    The trace is split into ``batches`` equally-sized blocks; the SE is the
+    circular standard deviation of the block means divided by
+    ``sqrt(batches)`` (identical to arviz 0.23's non-numba path).
+    """
+    a = np.asarray(samples, float).ravel()
+    if a.size == 0:
+        return np.nan
+    if batches == 1:
+        return float(scs.circstd(a, high=np.pi, low=-np.pi)) / np.sqrt(a.size)
+    b = np.resize(a, (batches, int(a.size / batches)))
+    means = scs.circmean(b, high=np.pi, low=-np.pi, axis=1)
+    return float(scs.circstd(means, high=np.pi, low=-np.pi)) / np.sqrt(batches)
+
+
+def circular_summary(idata, var_names=None, circ_var_names=(), *, hdi_prob=0.94,
+                     skipna=False, group="posterior"):
+    """``az.summary`` with the circular columns arviz 1.x dropped.
+
+    arviz 0.23's ``az.summary(..., circ_var_names=[...])`` replaced the
+    first five statistics of the named variables - mean, sd, HDI
+    lower/upper, ``mcse_mean`` - with their circular equivalents (scipy
+    ``circmean``/``circstd`` on ``(-pi, pi]``, the circular HDI, and the
+    batched circular MCSE) while ``mcse_sd``, the effective sample sizes
+    and ``r_hat`` stayed linear. arviz 1.x removed both the kwarg and the
+    top-level ``circular_hdi``. This reproduces that behaviour exactly,
+    including the 0.23 frame: the base comes from
+    ``az.summary(kind="all", ci_kind="hdi")`` (``hdi_prob`` was renamed
+    ``ci_prob`` and 1.x's default CI is the ETI, not the HDI) with the
+    columns renamed to the 0.23 layout
+    (``mean, sd, hdi_<p>%/hdi_<100-p>%/mcse_mean, mcse_sd, ess_bulk,
+    ess_tail, r_hat``) and the circular columns recomputed for the named
+    rows (rounded the way 0.23's auto rounding did).
+    """
+    import arviz as az
+    from arviz_base.labels import IdxLabeller
+
+    base = az.summary(idata, var_names=var_names, ci_prob=hdi_prob,
+                      ci_kind="hdi", kind="all", skipna=skipna, group=group)
+    if not circ_var_names:
+        return base
+
+    pct_lo = f"{100 * (1 - hdi_prob) / 2:g}"
+    pct_hi = f"{100 * (1 + hdi_prob) / 2:g}"
+    lb_col = next(c for c in base.columns if c.endswith("_lb"))
+    ub_col = next(c for c in base.columns if c.endswith("_ub"))
+    out = base.rename(columns={lb_col: f"hdi_{pct_lo}%", ub_col: f"hdi_{pct_hi}%"})
+    out = out[["mean", "sd", f"hdi_{pct_lo}%", f"hdi_{pct_hi}%",
+               "mcse_mean", "mcse_sd", "ess_bulk", "ess_tail", "r_hat"]]
+
+    labeller = IdxLabeller()
+    nan_policy = "omit" if skipna else "propagate"
+    ds = getattr(idata, group)
+    for var in circ_var_names:
+        for name, sel, isel, values in az.xarray_var_iter(ds[var],
+                                                          skip_dims=("chain", "draw")):
+            label = labeller.make_label_flat(name, sel, isel)
+            if label not in out.index:
+                continue
+            a = np.asarray(values, float).ravel()
+            h_lo, h_hi = circ_hdi(a, hdi_prob)
+            out.loc[label, "mean"] = round(float(scs.circmean(a, high=np.pi, low=-np.pi,
+                                                              nan_policy=nan_policy)), 3)
+            out.loc[label, "sd"] = round(float(scs.circstd(a, high=np.pi, low=-np.pi,
+                                                           nan_policy=nan_policy)), 3)
+            out.loc[label, f"hdi_{pct_lo}%"] = round(float(h_lo), 3)
+            out.loc[label, f"hdi_{pct_hi}%"] = round(float(h_hi), 3)
+            out.loc[label, "mcse_mean"] = round(_circular_mcse(a), 3)
+    return out
 
 
 # ---------------------------------------------------------------------------

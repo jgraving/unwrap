@@ -46,7 +46,7 @@ def generate_circular_regression_data(
 
         y = pm.VonMises("y", mu=mean, kappa=concentration, shape=num_samples)
 
-        trace = pm.sample_prior_predictive(samples=1, random_seed=seed)
+        trace = pm.sample_prior_predictive(draws=1, random_seed=seed)
 
     x_samples = trace.prior["x"].values.flatten()
     y_samples = trace.prior["y"].values.flatten()

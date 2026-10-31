@@ -5,6 +5,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 from pandas.testing import assert_frame_equal
 
+from unwrap.circular import circular_summary
 from unwrap.data import generate_circular_regression_data
 from unwrap.link.bambi import LINKS
 from unwrap.prior import CircularUniformPrior
@@ -50,5 +51,5 @@ def test_bambi_fit_and_circular_summary():
     assert idata.posterior.sizes["draw"] == 20
     for name in names:
         assert np.isfinite(idata.posterior[name]).all()
-    summary = az.summary(idata, var_names=names, circ_var_names=["Intercept"], kind="stats")
+    summary = circular_summary(idata, var_names=names, circ_var_names=["Intercept"])
     assert np.isfinite(summary["mean"]).all()
