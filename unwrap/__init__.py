@@ -1,3 +1,3 @@
-from unwrap import link
+from unwrap import diagnostics, link
 
-__all__ = ["link"]
+__all__ = ["diagnostics", "link"]
