@@ -132,6 +132,44 @@ def _stack_1d(post, name):
     return post[name].stack(sample=("chain", "draw")).values.astype(float)
 
 
+def graph_free_rvs(idata, model):
+    """The fit result with a posterior group containing all of the model's
+    free RVs, i.e. evaluable by the PyMC graph.
+
+    The kappa random effects are fitted non-centered: in the PyMC graph the
+    free RVs are then ``*_sigma`` (scale) and ``*_offset`` (factor), but
+    bambi stores the transformed centered effects and the ``*_sigma`` scales
+    and drops the ``*_offset`` factors. ``pm.compute_deterministics`` and
+    ``pm.compute_log_likelihood`` both evaluate the graph against every free
+    RV, so the missing factors are reconstructed: the graph computes
+    ``effect = sigma * offset`` exactly (sigma scalar per draw, offset one
+    factor per group), hence ``offset = effect / sigma`` (0 where sigma is
+    0).
+    """
+    posterior = idata.posterior
+    missing = [
+        rv.name
+        for rv in model.backend.model.free_RVs
+        if rv.name not in posterior.data_vars
+    ]
+    if not missing:
+        return idata
+    aug = idata.copy(deep=False)
+    ds = posterior.to_dataset()
+    for name in missing:
+        sigma = ds[name.replace("_offset", "_sigma")]
+        effect = ds[name[: -len("_offset")]]
+        # The graph computes effect = sigma * offset (sigma scalar per
+        # draw, offset one factor per group), so the offset carries the
+        # group dimension of the centered effect.
+        e = np.asarray(effect)
+        s = np.asarray(sigma).reshape(np.asarray(sigma).shape + (1,) * (e.ndim - np.asarray(sigma).ndim))
+        offset = np.divide(e, s, out=np.zeros(e.shape), where=s != 0)
+        ds[name] = (tuple(effect.dims), offset)
+    aug["posterior"] = ds
+    return aug
+
+
 # ===========================================================================
 # Entry point 1: per-draw per-track directions and concentrations
 # ===========================================================================
@@ -140,11 +178,13 @@ def posterior_directions(idata, df_blocks):
 
     The fixed and random effect nodes are located in the posterior by
     pattern matching, so the extraction is robust to ``bambi``'s internal
-    naming. Hyperparameter nodes (the random-effect ``*_kappa`` and
-    ``*_sigma`` scales) are excluded by name suffix: in the current
-    ``bambi`` they sit next to the random-effect value nodes in the
-    posterior and share their factor dimension, which a pattern match on
-    ``|Track`` alone would pick up incorrectly.
+    naming. Auxiliary nodes are excluded by name suffix: the random-effect
+    ``*_kappa`` / ``*_sigma`` hyperparameter scales sit next to the
+    random-effect value nodes in the posterior and share their factor
+    dimension, and the ``*_offset`` factors of the non-centred kappa
+    random effects (the stored effect value is ``sigma * offset``) — a
+    pattern match on ``|Track`` alone would pick any of these up
+    incorrectly.
 
     The Track x Condition design grid is evaluated per posterior draw and
     the circular-modulo / softplus links are applied, recovering the
@@ -167,7 +207,7 @@ def posterior_directions(idata, df_blocks):
     mu_g_name = None
     for v in post.data_vars:
         if ("|Track" in v) and (not v.startswith("kappa_")) and ("PostStimulus|Track" not in v) \
-                and (not v.endswith(("_kappa", "_sigma"))) and any(cn not in ("chain", "draw") for cn in post[v].coords):
+                and (not v.endswith(("_kappa", "_sigma", "_offset"))) and any(cn not in ("chain", "draw") for cn in post[v].coords):
             mu_g_name = v
             break
 
@@ -175,7 +215,7 @@ def posterior_directions(idata, df_blocks):
     mu_g_post_name = None
     for v in post.data_vars:
         if ("PostStimulus|Track" in v) and (not v.startswith("kappa_")) \
-                and (not v.endswith(("_kappa", "_sigma"))) and any(cn not in ("chain", "draw") for cn in post[v].coords):
+                and (not v.endswith(("_kappa", "_sigma", "_offset"))) and any(cn not in ("chain", "draw") for cn in post[v].coords):
             mu_g_post_name = v
             break
 
@@ -187,7 +227,7 @@ def posterior_directions(idata, df_blocks):
     k_g_name = None
     for v in post.data_vars:
         if v.startswith("kappa_") and ("|Track" in v) and ("PostStimulus|Track" not in v) \
-                and (not v.endswith(("_kappa", "_sigma"))) and any(cn not in ("chain", "draw") for cn in post[v].coords):
+                and (not v.endswith(("_kappa", "_sigma", "_offset"))) and any(cn not in ("chain", "draw") for cn in post[v].coords):
             k_g_name = v
             break
 
@@ -195,7 +235,7 @@ def posterior_directions(idata, df_blocks):
     k_g_post_name = None
     for v in post.data_vars:
         if v.startswith("kappa_") and ("PostStimulus|Track" in v) \
-                and (not v.endswith(("_kappa", "_sigma"))) and any(cn not in ("chain", "draw") for cn in post[v].coords):
+                and (not v.endswith(("_kappa", "_sigma", "_offset"))) and any(cn not in ("chain", "draw") for cn in post[v].coords):
             k_g_post_name = v
             break
 
@@ -551,9 +591,13 @@ def ppc_bootstrap_stats(idata, model, df_blocks):
     Empirical side: a hierarchical bootstrap (resample tracks, resample
     windows within tracks) at the group level and per track-condition.
     Posterior side: per-observation response parameters (mean direction and
-    concentration) read straight from the PyMC graph, aggregated by
-    Track x Condition, and compared against the bootstraps. All 95% HDI
-    summaries and the per-track tables returned come from this dict.
+    concentration) read straight from the PyMC graph (via
+    :func:`graph_free_rvs`, which reconstructs the non-centered kappa
+    ``*_offset`` free RVs that bambi drops from the stored posterior),
+    cross-checked against the per-observation log-likelihood, then
+    aggregated by Track x Condition and compared against the bootstraps.
+    All 95% HDI summaries and the per-track tables returned come from this
+    dict.
     """
     # ----------------------------
     # Data
@@ -617,7 +661,7 @@ def ppc_bootstrap_stats(idata, model, df_blocks):
     # kappa_da = preds.posterior["kappa"]
 
     params = pm.compute_deterministics(
-        idata.posterior,
+        graph_free_rvs(idata, model),
         var_names=["mu", "kappa"],
         model=model.backend.model,
         progressbar=False,
@@ -626,7 +670,18 @@ def ppc_bootstrap_stats(idata, model, df_blocks):
     assert np.isfinite(mu_da.values).all()
     assert np.isfinite(kappa_da.values).all()
     assert (kappa_da.values > 0).all()
-    print("response params from PyMC graph OK (kappa all positive)")
+
+    # Cross-check the graph parameters against the per-observation
+    # log-likelihood stored in the fit result: they must agree to
+    # floating-point precision.
+    _obs_ll = idata.log_likelihood["HeadingRadians"]
+    _expected = vonmises.logpdf(
+        df_blocks["HeadingRadians"].to_numpy(),
+        kappa_da.transpose(*_obs_ll.dims).values,
+        loc=mu_da.transpose(*_obs_ll.dims).values,
+    )
+    np.testing.assert_allclose(_expected, _obs_ll.values, rtol=1e-10, atol=1e-10)
+    print("response params from PyMC graph OK; log-likelihood cross-check passed")
 
     obs_dim = [d for d in mu_da.dims if d not in ("chain", "draw")][0]
 
