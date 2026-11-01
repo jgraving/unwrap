@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-01 (#55 UPGRADE + #56 CIRCULAR + #57 PERIODIC + #58 VON_MISES_POLICY STUDY PRS MERGED = main 24c2aea; NEXT = E2E ZEBRA STUDY PR) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-01 (#55 UPGRADE + #56 CIRCULAR + #57 PERIODIC + #58 VMP + #59 ZEBRA E2E STUDY PRS MERGED = main 6beabf9; NEXT = locust_direction study PR) - NEXT CHAT STARTS HERE
 - BOARD: main = ac2858e. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
@@ -54,8 +54,9 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   CIRCULAR STUDY PR note below). #57 MERGED (periodic_not_circular study
   PR, 3 commits: script / notebook re-bake / README row,
   see PERIODIC note below). #58 MERGED (von_mises_policy study
-  PR, 3 commits, see VON MISES POLICY note below). Work repo is
-  on main, clean.- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
+  PR, 3 commits, see VON MISES POLICY note below). #59 MERGED
+  (zebra E2E study PR, see ZEBRA note below). Work repo is on
+  main, clean.  on main, clean.- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
   "we should get this right"):
   1. plot_ppc: do NOT pass the 14 parsed dict entries - put ALL the
      post-hoc computation INSIDE the plot function; the notebook cell is
@@ -405,18 +406,52 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     kappa; bottom row random walk -> straight). get_cmap (deprecated)
     still exists in mpl 3.10.9 - not a trap for now. PR body
     /tmp/opencode/pr_vmp_body.md; gate /tmp/opencode/verify_vmp.py.
-  * AFTER MERGE: next = E2E studies in order - zebra ->
-    locust_direction -> locust_density -> bats (each on the new
-    stack, with unwrap.datasets.ensure_clone()). Their notebooks
+  * ZEBRA E2E STUDY PR #59 (MERGED = main 6beabf9; 4 commits:
+    preprocess+posthoc / plots / notebook / README). THE FIRST E2E
+    STUDY: data via zebra_preprocess.load_zebra_model_table() ->
+    unwrap.datasets.load_zebra_bearings() -> ensure_clone()
+    (~/.cache/unwrap-data), first use shallow-clones, no datasets/ dir
+    in the repo (the old relative parquet path could NOT run from this
+    checkout). ~700 lines of inline post-hoc (old c13/c15/c16) ->
+    zebra_posthoc: posterior_directions / summary_stats /
+    ppc_bootstrap_stats (compute_deterministics bambi#1084 workaround
+    KEPT verbatim, prints "response params from PyMC graph OK (kappa
+    all positive)"). plots: house set_style/_save/save_path,
+    FIG_DIR=figures/zebra (repo), plot fns now take (idata [,model],
+    df_blocks, save_path=) and compute via zebra_posthoc internally
+    (one-line cells); old saves were .pdf into notebooks/figures/ +
+    plt.show() in-script + hard dpi=300 on the figure. Notebook
+    18 -> 17 cells; fit seeded (random_seed=SEED=42) +
+    "Divergences: 0" printed first; c10 az.summary(circ_var_names=)
+    -> circular_summary (0.23 layout kept, c12 ess_bulk/r_hat filter
+    unchanged). KEY SILENT-BUG FIX: bambi 0.21 posterior now carries
+    the RE HYPER nodes (1|Track_kappa, kappa_*|Track_sigma) next to
+    the RE value nodes sharing the factor dim -> the old "robust to
+    naming" |Track pattern match grabbed the kappa hyperprior
+    (mu_g_name etc.) -> all mu estimates shifted ~O(1); lookups now
+    exclude *_kappa/_sigma suffixes (documented in the posthoc
+    module). Probe/smoke before bake: /tmp/opencode/probe_zebra.py +
+    smoke_zebra.py (both green; Divergences: 0; Dataset obs_dim
+    __obs__ via compute_deterministics works on the CENTERED fit -
+    no graph_free_rvs needed here). The tight_layout polar UserWarning
+    in the summary figure cell is PRE-EXISTING (old bake c15 stderr),
+    kept verbatim. Re-bake: full 4x(2000+1000) fit on the new stack;
+    snapshot before edit /tmp/zebra_no_wrong/zebra_pre_studyPR.*.
+    PR body /tmp/opencode/pr_zebra_body.md; gate
+    /tmp/opencode/verify_zebra.py.
+  * AFTER MERGE: next = locust_direction -> locust_density -> bats
+    (each E2E on the new stack, unwrap.datasets.load_directional /
+    load_density_order / load_bats_* accessors). Their notebooks
     still use az.summary(circ_var_names=...) / az.plot_posterior /
     az.plot_trace(compact=) -> port with the API map above + the
     graph_free_rvs pattern if they get noncentered + the
-    ci_prob/ci_kind and hdi prob= renames + THE az.hdi 2-D-AXIS
-    CHANGE from #57 (any (draws, shape) HDI on raw arrays -> put the
-    sample axis last / transpose). zebra c09 fit is unseeded -> add
-    random_seed at its redo. E2E check upstream first:
-    bambinos/bambi#1084 predict kind="response" kappa angle-wrap bug
-    - beetles/circular workarounds kept verbatim until it lands.
+    ci_prob/ci_kind and hdi prob= renames + the az.hdi 2-D-AXIS
+    change from #57 + the ZEBRA RE-HYPER-PATTERN-MATCH trap (any
+    "|X" pattern matching on the posterior: exclude *_kappa/_sigma
+    nodes). E2E check upstream first: bambinos/bambi#1084 (predict
+    kind="response_params" kappa angle-wrap bug) - the
+    compute_deterministics workaround pattern is now in
+    zebra_posthog + beetles_posthoc.
 - VENV: /home/jake/.venvs/unwrap-env - PyMC6 stack (bambi 0.21.0,
   pymc 6.3.2, pytensor 3.3.6, arviz 1.3.0, py3.12); unwrap is
   EDITABLE-installed from the work repo (pip check clean). Rollback:
