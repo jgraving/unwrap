@@ -1,51 +1,78 @@
 """Figure helpers for the von_mises_policy example notebook.
 
-The notebook defines the von Mises steering policy (goal heading, the von Mises
-density, and the stepwise Monte-Carlo sampling) and produces, for each
-concentration, the radial density profile and the simulated trajectories. This
-module only draws the two-row figure from those quantities.
+The notebook defines the von Mises steering policy (goal heading, the von
+Mises density, the configuration) and produces, for each concentration,
+the radial density profile and the simulated trajectories (the Monte-Carlo
+sim *is* the analysis, so it stays inline); this module only draws the
+two-row figure from those quantities and exports it.
+
+Style and saving follow the shared house convention from ``unwrap.plots``:
+figures render at display resolution (100 dpi) in the notebook cell and are
+saved as 300 dpi vector files under ``<repo>/figures/von_mises_policy/``.
+Every public figure function accepts a ``save`` flag (on by default) and an
+explicit repo-relative ``save_path`` (the notebook always passes it); the
+written files are gitignored.
 """
 from pathlib import Path
 
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.cm import get_cmap
 
-DPI = 300
+from unwrap import plots as _plots
+
+#: Publication figures for this study live in
+#: <repo>/figures/von_mises_policy/, anchored on this file's location so
+#: the output does not depend on the kernel cwd (the notebook may run from
+#: notebooks/ or from the repository root).
+FIG_DIR = Path(__file__).resolve().parent.parent / "figures" / "von_mises_policy"
+
 FONT_SIZE = 7
 AX_LW = 0.8
 LINE_LW = 1.0
 TICK_LW = 0.8
 TICK_LEN = 2.5
 
+#: Study-specific rcParams on top of the house style (the house style
+#: already sets Arial, the 100/300 dpi tiers, the type-42 PDF outlines
+#: and white figures).
+_EXTRA_RC = {
+    "mathtext.fontset": "stix",
+    "mathtext.default": "it",
+    "font.size": FONT_SIZE,
+    "axes.labelsize": FONT_SIZE,
+    "axes.titlesize": FONT_SIZE,
+    "legend.fontsize": FONT_SIZE,
+    "xtick.labelsize": FONT_SIZE,
+    "ytick.labelsize": FONT_SIZE,
+    "axes.linewidth": AX_LW,
+    "lines.linewidth": LINE_LW,
+    "xtick.major.width": TICK_LW,
+    "ytick.major.width": TICK_LW,
+    "xtick.major.size": TICK_LEN,
+    "ytick.major.size": TICK_LEN,
+    "svg.fonttype": "path",
+}
+
 
 def set_style():
-    """Global figure style: Arial for normal text, STIX for math."""
-    mpl.rcParams.update({
-        "text.usetex": False,
-        "font.family": "Arial",
-        "mathtext.fontset": "stix",
-        "mathtext.default": "it",
-        "font.size": FONT_SIZE,
-        "axes.labelsize": FONT_SIZE,
-        "axes.titlesize": FONT_SIZE,
-        "legend.fontsize": FONT_SIZE,
-        "xtick.labelsize": FONT_SIZE,
-        "ytick.labelsize": FONT_SIZE,
-        "axes.linewidth": AX_LW,
-        "lines.linewidth": LINE_LW,
-        "xtick.major.width": TICK_LW,
-        "ytick.major.width": TICK_LW,
-        "xtick.major.size": TICK_LEN,
-        "ytick.major.size": TICK_LEN,
-        "savefig.dpi": DPI,
-        "figure.dpi": DPI,
-        "pdf.fonttype": 42,
-        "ps.fonttype": 42,
-        "svg.fonttype": "path",
-    })
+    """Consistent figure style across the notebook (house style + the
+    study's small type/line additions; figures under ``FIG_DIR``)."""
+    _plots.set_style(FIG_DIR, _EXTRA_RC)
+
+
+def _save(fig, save, save_path):
+    """Write ``fig`` to ``save_path`` (a repo-relative path such as
+    ``figures/von_mises_policy/x.svg``) through the house two-res saver.
+    The file format follows the path's suffix."""
+    if not save:
+        return
+    p = Path(save_path)
+    if p.suffix.lower() == ".svg":
+        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True)
+    else:
+        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False)
 
 
 def _clean_axis(ax):
@@ -56,7 +83,8 @@ def _clean_axis(ax):
 
 
 def plot_navigation(x_start, target, kappas, theta_grid, radials, trajectories,
-                    R_policy=1.75, amp=1.0):
+                    R_policy=1.75, amp=1.0, *, save=True,
+                    save_path="figures/von_mises_policy/vonmises_navigation.svg"):
     """Two-row figure: the exact von Mises density as a radial modulation
     (top) and 10 stepwise Monte-Carlo trajectories (bottom), one column per
     concentration in ``kappas``.
@@ -80,7 +108,7 @@ def plot_navigation(x_start, target, kappas, theta_grid, radials, trajectories,
     goal_dir = np.array([np.cos(mu0), np.sin(mu0)], dtype=np.float32)
     target_top = x_start + (Rmax + 0.22) * goal_dir  # marker just outside the curve
 
-    fig, axes = plt.subplots(2, n, figsize=(1.10 * n, 2.20), dpi=DPI, squeeze=False)
+    fig, axes = plt.subplots(2, n, figsize=(1.10 * n, 2.20), squeeze=False)
 
     # --- Row 0: exact von Mises PDF as a radial modulation ---
     for i, kappa in enumerate(kappas):
@@ -128,12 +156,5 @@ def plot_navigation(x_start, target, kappas, theta_grid, radials, trajectories,
     fig.subplots_adjust(left=0.10, right=0.995, bottom=0.06, top=0.93,
                         wspace=0.22, hspace=0.10)
 
-    out_dir = Path(__file__).resolve().parent / "figures"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    save_path = out_dir / "vonmises_navigation.pdf"
-    save_path_svg = out_dir / "vonmises_navigation.svg"
-    fig.savefig(save_path, bbox_inches="tight")
-    fig.savefig(save_path_svg, bbox_inches="tight")
-    plt.show()
-    print(f"Saved figure to: {save_path}")
-    print(f"Saved figure to: {save_path_svg}")
+    _save(fig, save, save_path)
+    return fig
