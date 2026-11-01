@@ -1,34 +1,65 @@
 """Figure helpers for the zebra_escape example notebook.
 
-The notebook keeps the statistical work (loading the block-averaged data,
-fitting the von Mises GLM, and computing the per-draw per-track directions,
-concentrations, KDEs, HDIs, and the bootstrap comparisons). This module holds
-only the matplotlib "how": the palette, marker scheme, gridspecs, panels,
-legends, and the export of the two figures. Each ``plot_*`` function takes
-values the notebook has already computed.
+The notebook keeps the statistical work (loading the block-averaged data and
+fitting the hierarchical von Mises GLM); the post-hoc computations live in
+``zebra_posthoc`` and the matplotlib "how" (palette, marker scheme, gridspecs,
+panels, legends, export) lives here. Each ``plot_*`` function takes the fit
+result (and, for the PPC figure, the model) and the modelling table, calls
+into ``zebra_posthoc`` for the quantities it draws, and is a single call from
+the notebook.
 
-Saved figures go to ``figures/zebra/`` next to this file, resolved from the
-file location so the output does not depend on the working directory (the
-notebook may run from ``notebooks/`` or from the repository root).
+Style and saving follow the shared house convention from ``unwrap.plots``:
+figures render at display resolution (100 dpi) in the notebook cell and are
+saved as 300 dpi vector files under ``<repo>/figures/zebra/``. Every public
+figure function accepts a ``save`` flag (on by default) and an explicit
+repo-relative ``save_path`` (the notebook always passes it); the written
+files are gitignored.
 
 Palette: pre-stimulus is orange, post-stimulus is purple (colorblind-safe).
 """
 from pathlib import Path
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
 from matplotlib.lines import Line2D
 
-FIG_DIR = Path(__file__).resolve().parent / "figures" / "zebra"
+from unwrap import plots as _plots
 
-DPI = 300
+from zebra_posthoc import ppc_bootstrap_stats, summary_stats
+
+#: Publication figures for this study live in
+#: <repo>/figures/zebra/, anchored on this file's location so the output does
+#: not depend on the kernel cwd (the notebook may run from notebooks/ or from
+#: the repository root).
+FIG_DIR = Path(__file__).resolve().parent.parent / "figures" / "zebra"
+
 TICK_LEN = 3
 TICK_W = 0.6
 AX_LW = 0.6
 FONT_SZ = 7
+
+_EXTRA_RC = {
+    "font.size": FONT_SZ,
+    "axes.labelsize": FONT_SZ,
+    "axes.titlesize": FONT_SZ,
+    "legend.fontsize": FONT_SZ,
+    "xtick.labelsize": FONT_SZ,
+    "ytick.labelsize": FONT_SZ,
+    "axes.linewidth": AX_LW,
+    "xtick.major.width": TICK_W,
+    "ytick.major.width": TICK_W,
+    "xtick.major.size": TICK_LEN,
+    "ytick.major.size": TICK_LEN,
+}
+
+
+def set_style():
+    """Consistent figure style across the notebook (the shared house
+    convention from ``unwrap.plots`` plus the study's small type additions;
+    figures under ``FIG_DIR``)."""
+    _plots.set_style(FIG_DIR, _EXTRA_RC)
+
 
 _CB = sns.color_palette("colorblind")
 PRE_COLOR = _CB[1]  # orange
@@ -49,33 +80,17 @@ S_INDIV_POINTS = 8 * SCALE_S
 LEGEND_MS = 5 * MARKER_SHRINK
 
 
-def set_style():
-    """Consistent figure style across the notebook (colorblind palette,
-    Arial, 300 dpi, type-42 PDF outlines, hairline axes)."""
-    mpl.rcParams.update({
-        "figure.dpi": DPI,
-        "savefig.dpi": DPI,
-        "font.size": FONT_SZ,
-        "axes.labelsize": FONT_SZ,
-        "axes.titlesize": FONT_SZ,
-        "legend.fontsize": FONT_SZ,
-        "xtick.labelsize": FONT_SZ,
-        "ytick.labelsize": FONT_SZ,
-        "font.family": "Arial",
-        "axes.linewidth": AX_LW,
-        "xtick.major.width": TICK_W,
-        "ytick.major.width": TICK_W,
-        "xtick.major.size": TICK_LEN,
-        "ytick.major.size": TICK_LEN,
-        "pdf.fonttype": 42,
-        "ps.fonttype": 42,
-    })
-    print(f"Figures will be saved to: {FIG_DIR}")
-
-
-def _ensure_fig_dir():
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-    return FIG_DIR
+def _save(fig, save, save_path):
+    """Write ``fig`` to ``save_path`` (a repo-relative path such as
+    ``figures/zebra/x.pdf``) through the house two-res saver. The file
+    format follows the path's suffix."""
+    if not save:
+        return
+    p = Path(save_path)
+    if p.suffix.lower() == ".svg":
+        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True)
+    else:
+        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False)
 
 
 def _restore_ticks(ax):
@@ -100,29 +115,26 @@ def _despine(ax):
 # ---------------------------------------------------------------------------
 # Figure 1: 2x2 posterior summary (group/individual, direction/concentration)
 # ---------------------------------------------------------------------------
-def plot_summary(theta,
-                 r_group_pre, r_group_post,
-                 r_ind_pre, r_ind_post,
-                 mu_group_pre_mean, mu_group_post_mean,
-                 R_group_pre_draw, R_group_post_draw,
-                 emp_mu_pre, emp_mu_post,
-                 R_ind_pre_mean, R_ind_post_mean,
-                 R_ind_pre_hdi, R_ind_post_hdi):
+def plot_summary(idata, df_blocks, *, save=True,
+                 save_path="figures/zebra/zebra_main_summary.pdf"):
     """Two-by-two posterior summary: group-level mean direction (polar KDE),
     group-level alignment (mean R with 95% HDI), individual-level mean
     directions (polar KDE per track plus empirical dots), and individual-level
-    concentration (paired means with 95% HDIs). Pre is orange, post is purple.
+    concentration (paired means with 95% HDIs). Pre is orange, post is
+    purple.
 
-    All geometry arrays are precomputed by the notebook; ``theta`` is the
-    angular grid, the ``r_*`` are the KDE radii (1 = baseline, 2 = max), and
-    the draws/HDI arrays index tracks by column and draws by row.
+    The per-draw per-track quantities, KDE radii, alignment, concentration
+    means and HDIs are all computed here from the fit result via
+    :func:`zebra_posthoc.summary_stats`, so the notebook cell is a single
+    call.
     """
-    _ensure_fig_dir()
-    nT = R_ind_pre_mean.shape[0]
+    prep = summary_stats(idata, df_blocks)
+    nT = prep["nT"]
+    theta = prep["theta"]
     r_dot = 2.25
     rmax = 2.5
     FIG_W, FIG_H = 3.2, 4.1
-    fig = plt.figure(figsize=(FIG_W, FIG_H), dpi=DPI)
+    fig = plt.figure(figsize=(FIG_W, FIG_H))
     gs = fig.add_gridspec(2, 2, wspace=0.7, hspace=0.70)
 
     ax_mu_group = fig.add_subplot(gs[0, 0], projection="polar")
@@ -146,20 +158,20 @@ def plot_summary(theta,
     style_polar(ax_mu_ind)
 
     # (1) Group-level mean direction (polar)
-    ax_mu_group.plot(theta, r_group_pre, color=PRE_COLOR, lw=1.6)
-    ax_mu_group.plot(theta, r_group_post, color=POST_COLOR, lw=1.6)
-    ax_mu_group.scatter(mu_group_pre_mean, r_dot, s=S_GROUP_POLAR,
+    ax_mu_group.plot(theta, prep["r_group_pre"], color=PRE_COLOR, lw=1.6)
+    ax_mu_group.plot(theta, prep["r_group_post"], color=POST_COLOR, lw=1.6)
+    ax_mu_group.scatter(prep["mu_group_pre_mean"], r_dot, s=S_GROUP_POLAR,
                         color=PRE_COLOR, marker=PRE_MARK, zorder=5)
-    ax_mu_group.scatter(mu_group_post_mean, r_dot, s=S_GROUP_POLAR,
+    ax_mu_group.scatter(prep["mu_group_post_mean"], r_dot, s=S_GROUP_POLAR,
                         color=POST_COLOR, marker=POST_MARK, zorder=5)
     ax_mu_group.set_title("Group-level\nmean direction", pad=10)
 
     # (2) Group alignment (vertical)
     x_pre, x_post = 0, 1
-    m_pre = float(np.mean(R_group_pre_draw))
-    lo_pre, hi_pre = _linear_hdi(R_group_pre_draw, prob=0.95)
-    m_post = float(np.mean(R_group_post_draw))
-    lo_post, hi_post = _linear_hdi(R_group_post_draw, prob=0.95)
+    m_pre = prep["R_group_pre_mean"]
+    lo_pre, hi_pre = prep["R_group_pre_lo"], prep["R_group_pre_hi"]
+    m_post = prep["R_group_post_mean"]
+    lo_post, hi_post = prep["R_group_post_lo"], prep["R_group_post_hi"]
 
     ax_R_group.vlines(x_pre, lo_pre, hi_pre, color=PRE_COLOR, lw=1.4, alpha=0.95, zorder=2)
     ax_R_group.vlines(x_post, lo_post, hi_post, color=POST_COLOR, lw=1.4, alpha=0.95, zorder=2)
@@ -178,9 +190,9 @@ def plot_summary(theta,
 
     # (3) Individual-level mean directions (polar)
     for j in range(nT):
-        ax_mu_ind.plot(theta, r_ind_pre[j], color=PRE_COLOR, lw=0.8, alpha=0.5)
-        ax_mu_ind.plot(theta, r_ind_post[j], color=POST_COLOR, lw=0.8, alpha=0.5)
-    for m_pre, m_post in zip(emp_mu_pre, emp_mu_post):
+        ax_mu_ind.plot(theta, prep["r_ind_pre"][j], color=PRE_COLOR, lw=0.8, alpha=0.5)
+        ax_mu_ind.plot(theta, prep["r_ind_post"][j], color=POST_COLOR, lw=0.8, alpha=0.5)
+    for m_pre, m_post in zip(prep["emp_mu_pre"], prep["emp_mu_post"]):
         if not np.isnan(m_pre):
             ax_mu_ind.scatter(m_pre, r_dot, s=S_EMP_POLAR, color=PRE_COLOR,
                               marker=PRE_MARK, alpha=1.0, zorder=5)
@@ -195,17 +207,17 @@ def plot_summary(theta,
     x_pre = 0.0 + delta
     x_post = 1.0 + delta
     for j in range(nT):
-        ax_R_ind.plot([x_pre[j], x_post[j]], [R_ind_pre_mean[j], R_ind_post_mean[j]],
+        ax_R_ind.plot([x_pre[j], x_post[j]], [prep["R_ind_pre_mean"][j], prep["R_ind_post_mean"][j]],
                       color="k", lw=0.8, alpha=1.0, zorder=0)
     for j in range(nT):
-        lo, hi = R_ind_pre_hdi[j]
+        lo, hi = prep["R_ind_pre_hdi"][j]
         ax_R_ind.vlines(x_pre[j], lo, hi, color=PRE_COLOR, lw=0.8, alpha=1.0, zorder=1)
-        ax_R_ind.scatter(x_pre[j], R_ind_pre_mean[j], s=S_INDIV_POINTS,
+        ax_R_ind.scatter(x_pre[j], prep["R_ind_pre_mean"][j], s=S_INDIV_POINTS,
                          color=PRE_COLOR, marker=PRE_MARK, zorder=2)
     for j in range(nT):
-        lo, hi = R_ind_post_hdi[j]
+        lo, hi = prep["R_ind_post_hdi"][j]
         ax_R_ind.vlines(x_post[j], lo, hi, color=POST_COLOR, lw=0.8, alpha=1.0, zorder=1)
-        ax_R_ind.scatter(x_post[j], R_ind_post_mean[j], s=S_INDIV_POINTS,
+        ax_R_ind.scatter(x_post[j], prep["R_ind_post_mean"][j], s=S_INDIV_POINTS,
                          color=POST_COLOR, marker=POST_MARK, zorder=2)
 
     ax_R_ind.set_xlim(-0.5, 1.5)
@@ -231,26 +243,12 @@ def plot_summary(theta,
                bbox_to_anchor=(0.5, 0.01), columnspacing=1.2, handletextpad=0.6)
 
     plt.tight_layout()
-
-    out_path = _ensure_fig_dir() / "zebra_main_summary.pdf"
-    fig.savefig(out_path, dpi=DPI, bbox_inches="tight", pad_inches=0.01)
-    print(f"Saved figure to: {out_path}")
-    plt.show()
-
-
-def _linear_hdi(x, prob=0.95):
-    x = np.sort(np.asarray(x, float))
-    n = x.size
-    if n == 0:
-        return np.nan, np.nan
-    k = int(np.ceil(prob * n))
-    spans = x[k - 1:] - x[:n - k + 1]
-    j = int(np.argmin(spans))
-    return float(x[j]), float(x[j + k - 1])
+    _save(fig, save, save_path)
+    return fig
 
 
 # ---------------------------------------------------------------------------
-# Figure 2: supplemental PPC — bootstrap (data) vs posterior (model).
+# Figure 2: supplemental PPC - bootstrap (data) vs posterior (model).
 # ---------------------------------------------------------------------------
 def _circ_mod(x):
     return (x + np.pi) % (2 * np.pi) - np.pi
@@ -262,27 +260,28 @@ def _circ_xerr(m, lo, hi):
     return np.degrees(w_lo), np.degrees(w_hi)
 
 
-def plot_ppc(tracks, nT,
-             muG_pre_m_b, muG_pre_lo_b, muG_pre_hi_b,
-             muG_post_m_b, muG_post_lo_b, muG_post_hi_b,
-             muG_pre_m_p, muG_pre_lo_p, muG_pre_hi_p,
-             muG_post_m_p, muG_post_lo_p, muG_post_hi_p,
-             R_pre_m_b, R_pre_lo_b, R_pre_hi_b,
-             R_post_m_b, R_post_lo_b, R_post_hi_b,
-             R_pre_m_p, R_pre_lo_p, R_pre_hi_p,
-             R_post_m_p, R_post_lo_p, R_post_hi_p,
-             mu_tbl, R_tbl):
+def plot_ppc(idata, model, df_blocks, *, save=True,
+             save_path="figures/zebra/zebra_ppc_bootstrap_vs_posterior.pdf"):
     """Supplemental PPC figure comparing a nonparametric bootstrap of the data
     against the model posterior, for group mean direction, group alignment,
-    and per-track concentration, pre vs post. The notebook precomputes every
-    summary (means, 95% HDIs) and the per-track tables; this function only
-    lays out the panels."""
-    _ensure_fig_dir()
+    and per-track mean direction and concentration, pre vs post.
+
+    The bootstrap resampling, the per-observation response parameters (read
+    from the PyMC graph, see :func:`zebra_posthoc.ppc_bootstrap_stats`) and
+    every 95% HDI summary are computed here, so the notebook cell is a
+    single call.
+    """
+    prep = ppc_bootstrap_stats(idata, model, df_blocks)
+    tracks = prep["tracks"]
+    nT = prep["nT"]
+    mu_tbl = prep["mu_tbl"]
+    R_tbl = prep["R_tbl"]
+
     fig_w = 8.8
     fig_h = max(3.4, 0.28 * nT + 2.2)
     bottom_ratio = max(1.2, 0.55 + 0.05 * nT)
 
-    fig = plt.figure(figsize=(fig_w, fig_h), dpi=DPI)
+    fig = plt.figure(figsize=(fig_w, fig_h))
     gs = fig.add_gridspec(2, 4, height_ratios=[0.55, bottom_ratio],
                           wspace=0.45, hspace=0.38)
 
@@ -331,10 +330,10 @@ def plot_ppc(tracks, nT,
                     mfc=(color if filled else "white"), mec=color, mew=0.9,
                     lw=(1.2 if filled else 1.0), zorder=3)
 
-    _plot_group_mu_point(ax_g_mu, muG_pre_m_b, muG_pre_lo_b, muG_pre_hi_b, y_boot[0], PRE_COLOR, PRE_MARK, filled=False)
-    _plot_group_mu_point(ax_g_mu, muG_pre_m_p, muG_pre_lo_p, muG_pre_hi_p, y_post[0], PRE_COLOR, PRE_MARK, filled=True)
-    _plot_group_mu_point(ax_g_mu, muG_post_m_b, muG_post_lo_b, muG_post_hi_b, y_boot[1], POST_COLOR, POST_MARK, filled=False)
-    _plot_group_mu_point(ax_g_mu, muG_post_m_p, muG_post_lo_p, muG_post_hi_p, y_post[1], POST_COLOR, POST_MARK, filled=True)
+    _plot_group_mu_point(ax_g_mu, prep["muG_pre_m_b"], prep["muG_pre_lo_b"], prep["muG_pre_hi_b"], y_boot[0], PRE_COLOR, PRE_MARK, filled=False)
+    _plot_group_mu_point(ax_g_mu, prep["muG_pre_m_p"], prep["muG_pre_lo_p"], prep["muG_pre_hi_p"], y_post[0], PRE_COLOR, PRE_MARK, filled=True)
+    _plot_group_mu_point(ax_g_mu, prep["muG_post_m_b"], prep["muG_post_lo_b"], prep["muG_post_hi_b"], y_boot[1], POST_COLOR, POST_MARK, filled=False)
+    _plot_group_mu_point(ax_g_mu, prep["muG_post_m_p"], prep["muG_post_lo_p"], prep["muG_post_hi_p"], y_post[1], POST_COLOR, POST_MARK, filled=True)
 
     ax_g_mu.set_yticks(y_base)
     ax_g_mu.set_yticklabels(["Pre", "Post"])
@@ -348,8 +347,8 @@ def plot_ppc(tracks, nT,
 
     # (2) group alignment (R): Pre/Post
     rows = [
-        ("Pre", PRE_COLOR, PRE_MARK, R_pre_m_b, R_pre_lo_b, R_pre_hi_b, R_pre_m_p, R_pre_lo_p, R_pre_hi_p),
-        ("Post", POST_COLOR, POST_MARK, R_post_m_b, R_post_lo_b, R_post_hi_b, R_post_m_p, R_post_lo_p, R_post_hi_p),
+        ("Pre", PRE_COLOR, PRE_MARK, prep["R_pre_m_b"], prep["R_pre_lo_b"], prep["R_pre_hi_b"], prep["R_pre_m_p"], prep["R_pre_lo_p"], prep["R_pre_hi_p"]),
+        ("Post", POST_COLOR, POST_MARK, prep["R_post_m_b"], prep["R_post_lo_b"], prep["R_post_hi_b"], prep["R_post_m_p"], prep["R_post_lo_p"], prep["R_post_hi_p"]),
     ]
     y_base2 = np.arange(len(rows), dtype=float)
     y_boot2 = y_base2 - 0.12
@@ -481,7 +480,5 @@ def plot_ppc(tracks, nT,
     fig.legend(handles=legend_handles, loc="lower center", ncol=4, frameon=True,
                bbox_to_anchor=(0.5, -0.01), columnspacing=1.2, handletextpad=0.6)
 
-    out_path = _ensure_fig_dir() / "zebra_ppc_bootstrap_vs_posterior.pdf"
-    fig.savefig(out_path, dpi=DPI, bbox_inches="tight", pad_inches=0.01)
-    plt.show()
-    print(f"Saved figure to: {out_path}")
+    _save(fig, save, save_path)
+    return fig
