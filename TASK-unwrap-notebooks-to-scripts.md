@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-01 (UPGRADE #55 + CIRCULAR #56 + PERIODIC #57 STUDY PRS MERGED = main ac2858e; NEXT = von_mises_policy study PR) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-01 (#55 UPGRADE + #56 CIRCULAR + #57 PERIODIC + #58 VON_MISES_POLICY STUDY PRS MERGED = main 24c2aea; NEXT = E2E ZEBRA STUDY PR) - NEXT CHAT STARTS HERE
 - BOARD: main = ac2858e. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
@@ -53,8 +53,9 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   (circular_regression study PR = the CI-executed notebook, see
   CIRCULAR STUDY PR note below). #57 MERGED (periodic_not_circular study
   PR, 3 commits: script / notebook re-bake / README row,
-  see PERIODIC note below). Work repo is on main, clean.
-- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
+  see PERIODIC note below). #58 MERGED (von_mises_policy study
+  PR, 3 commits, see VON MISES POLICY note below). Work repo is
+  on main, clean.- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
   "we should get this right"):
   1. plot_ppc: do NOT pass the 14 parsed dict entries - put ALL the
      post-hoc computation INSIDE the plot function; the notebook cell is
@@ -384,21 +385,38 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     PR body kept at /tmp/opencode/pr_periodic_body.md; gate
     /tmp/opencode/verify_periodic.py. CI green (tests 3.12-3.14 +
     min, build, notebooks execute).
-  * AFTER MERGE: next study PRs in order - von_mises_policy,
-    then E2E zebra -> locust_direction -> locust_density -> bats
-    (each on the new stack). Their notebooks still use
-    az.summary(circ_var_names=...) / az.plot_posterior /
+  * VON MISES POLICY STUDY PR #58 (MERGED = main 24c2aea; 3 commits:
+    script / notebook / README row). Lightest study: pure MC POLICY
+    DEMO - no MCMC fit, no external data, no diagnostics - so the MC
+    policy simulation IS the analysis and stays inline VERBATIM (both
+    blocks verified vs snapshot /tmp/zebra_no_wrong/vmp_pre_studyPR.*);
+    only the figure is in the script. No SEED cell (sampling already
+    seeded per column default_rng(12345+i)); no divergence print (no
+    fit). Plots: set_style() via house machinery + study extra rc
+    (STIX mathtext, font 7, hairline, svg.fonttype path); save (on) +
+    save_path; single 300 dpi SVG under figures/von_mises_policy/
+    (was BOTH .pdf and .svg into notebooks/figures/ + plt.show() in
+    the script); figure no longer hardcodes dpi=300 (would have
+    forced 300 dpi INLINE under the house tiers). Notebook
+    3 -> 11 cells (uniform unwrap.__file__ setup, cwd-walk gone;
+    version dict; Figure-style section; policy/config + simulation +
+    figure-call split). Re-bake 6s 0 errors, 100 dpi inline + valid
+    SVG; visual check OK (top-row lobes sharpen toward goal with
+    kappa; bottom row random walk -> straight). get_cmap (deprecated)
+    still exists in mpl 3.10.9 - not a trap for now. PR body
+    /tmp/opencode/pr_vmp_body.md; gate /tmp/opencode/verify_vmp.py.
+  * AFTER MERGE: next = E2E studies in order - zebra ->
+    locust_direction -> locust_density -> bats (each on the new
+    stack, with unwrap.datasets.ensure_clone()). Their notebooks
+    still use az.summary(circ_var_names=...) / az.plot_posterior /
     az.plot_trace(compact=) -> port with the API map above + the
     graph_free_rvs pattern if they get noncentered + the
-    ci_prob/ci_kind and hdi prob= renames (all recorded in the
-    ARVIZ 1.3 API MAP bullet); ALSO the az.hdi 2-D-axis change from
-    #57 (any (draws, shape) HDI on raw arrays -> transpose / d-
-    explicit) applies to any HDI-over-draws-on-2-D-array cell.
-    zebra c09 fit is unseeded -> add random_seed at its redo. E2E
-    studies get unwrap.datasets.ensure_clone() (check upstream
-    first: bambinos/bambi#1084 predict kind="response" kappa
-    angle-wrap bug - beetles/circular workarounds kept verbatim
-    until it lands).
+    ci_prob/ci_kind and hdi prob= renames + THE az.hdi 2-D-AXIS
+    CHANGE from #57 (any (draws, shape) HDI on raw arrays -> put the
+    sample axis last / transpose). zebra c09 fit is unseeded -> add
+    random_seed at its redo. E2E check upstream first:
+    bambinos/bambi#1084 predict kind="response" kappa angle-wrap bug
+    - beetles/circular workarounds kept verbatim until it lands.
 - VENV: /home/jake/.venvs/unwrap-env - PyMC6 stack (bambi 0.21.0,
   pymc 6.3.2, pytensor 3.3.6, arviz 1.3.0, py3.12); unwrap is
   EDITABLE-installed from the work repo (pip check clean). Rollback:
