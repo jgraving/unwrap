@@ -41,8 +41,8 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-01 (#55-#59 STUDY PRS + #60 ZEBRA NONCENTERED MERGED = main 734887c; NEXT = locust_direction study PR - PROBE FOUND SPARSE animal_id TRAP, see AFTER MERGE) - NEXT CHAT STARTS HERE
-- BOARD: main = ac2858e. Open PRs: only #43 (user's draft, unrelated).
+## STATE - updated 2026-11-01 (#55-#61 MERGED = main 529d364; NEXT = locust_density study PR, then bats) - NEXT CHAT STARTS HERE
+- BOARD: main = 529d364. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
   plots.plot_ppc, uniform preprocess/posthoc/plots aliases,
@@ -57,7 +57,10 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   PR, 3 commits, see VON MISES POLICY note below). #59 MERGED
   (zebra E2E study PR, see ZEBRA note below). #60 MERGED
   (zebra kappa REs non-centered + log-likelihood cross-check,
-  see ZEBRA NONCENTERED note below). Work repo is on main, clean.- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
+  see ZEBRA NONCENTERED note below). #61 MERGED
+  (locust_direction study PR: 4 commits - posthoc/plots scripts,
+  thin-cell E2E notebook, full re-bake, README row; see
+  LOCUST_DIRECTION note below). Work repo is on main, clean.- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
   "we should get this right"):
   1. plot_ppc: do NOT pass the 14 parsed dict entries - put ALL the
      post-hoc computation INSIDE the plot function; the notebook cell is
@@ -472,9 +475,42 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     cross-check passed'). Re-bake: 4x(2000+1000) 242 s, Divergences:
     0, gate PASS, 106 tests green. PR body
     /tmp/opencode/pr_zebra_nc_body.md.
-  * AFTER MERGE: next = locust_direction -> locust_density -> bats
-    (each E2E on the new stack, unwrap.datasets.load_directional /
-    load_density_order / load_bats_* accessors).
+  * MERGED #61 (locust_direction study PR), main = 529d364.
+    4 commits: posthoc+plots scripts (583b1f9) / thin-cell
+    re-template (0e927f4, nbformat-valid, kernelspec normalized) /
+    re-bake (b5fe42e) / README row (680ac53). Re-bake 376 s TOTAL
+    (bimodal fit 194.6 s, unimodal 70.8 s per iopub timestamps -
+    the fits did run full 4x(2000+1000)); Divergences: 0 first
+    for both; bimodal diag filter EMPTY, unimodal diag filter 19
+    non-empty rows (low-ESS kappa_log, same as the original bake
+    - do NOT "fix" it); 12 figures 100 dpi inline + 300 dpi PDFs
+    under figures/locust/; nb 1.8 MB; gate
+    /tmp/opencode/verify_locust.py PASS; pytest 106 passed; CI
+    green; merged --merge.
+    LOCUST ARVIZ 1.3 / PYMC 6 API FINDINGS (probe + bake):
+    (a) az.loo: NO scale= kwarg (log-scale is now the only
+    output); ELPDDataLOO attrs: elpd/se/p/pareto_k/elpd_i
+    (+n_samples, n_data_points, scale(str), warning, good_k);
+    __getitem__ = getattr; loo_i/elpd_loo/p_loo names are GONE.
+    Per-obs SE NEVER existed in any arviz (proven against the
+    0.23.4 sdist in /tmp/opencode/arviz_old/ - it only returned
+    loo_i), so the original's defensive se_i=zeros fallback was
+    always taken: zero-length per-animal ELPD bars are the
+    faithful port.
+    (b) pm.compute_log_likelihood(idata, model=<RAW pm.Model>,
+    progressbar=False) works on the locust models - the
+    log_likelihood group var is directions_obs (2435 obs);
+    this replaces idata_kwargs={"log_likelihood": True}.
+    (c) az.hdi(hdi_prob=) -> az.hdi(prob=).
+    NBFORMAT GOTCHA (study-PR rebuilds): re-emitting cells by
+    hand in JSON - every cell NEEDS a "metadata" key (a missing
+    one -> AttributeError in nbformat's strip_transient,
+    surfaced as "missing an expected key: metadata"); and
+    rerun_nb.py now FORCES kernelspec python3 (the locust nb
+    carried a stale custom kernelspec "locust" -> NoSuchKernel
+    at bake start). Rebuild script kept at
+    /tmp/opencode/locust_rebuild_nb.py (needs the original
+    restored from /tmp/zebra_no_wrong/ before re-runs).
     LOCUST_DIRECTION PROBE FINDINGS (2026-11-01,
     /tmp/opencode/probe_locust_dir.py - SEGFAULTED, exit 139):
     (1) SPARSE animal_id TRAP: rediscretize_directional(
@@ -513,6 +549,15 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     kind="response_params" kappa angle-wrap bug) - the
     compute_deterministics workaround pattern is now in
     zebra_posthog + beetles_posthoc.
+    NEXT = locust_density study PR (E2E via load_density_order),
+    then bats (load_bats_tracks / load_bats_info /
+    load_bats_lake_outline) - same recipe: probe -> posthoc +
+    plots scripts -> thin-cell rebuild -> smoke -> full re-bake ->
+    gate -> pytest -> push + PR + merge (RE-BAKE RECIPE + VERIFY
+    GATES above; helpers in /tmp/opencode are reusable:
+    rerun_nb.py (generic, now forces kernelspec python3),
+    verify_*.py gate pattern, pr body template
+    /tmp/opencode/pr_locust_dir_body.md).
 - VENV: /home/jake/.venvs/unwrap-env - PyMC6 stack (bambi 0.21.0,
   pymc 6.3.2, pytensor 3.3.6, arviz 1.3.0, py3.12); unwrap is
   EDITABLE-installed from the work repo (pip check clean). Rollback:
@@ -551,7 +596,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   body - the per-study body template), pr_phase0_body.md (Phase 0
   body), /tmp/zebra_no_wrong/beetles_old36.ipynb (beetles snapshot;
   per study: `git show origin/main:notebooks/<x>.ipynb > <snap>` first).
-- Work repo /tmp/opencode/wt-unified: on main (= origin/main = 0e6e43b,
+- Work repo /tmp/opencode/wt-unified: on main (= origin/main = 529d364,
   clean tree; the beetles branch was deleted post-merge and its old
   remote ref is replaced). The OLD origin/notebooks-to-scripts-beetles
   (pre-Phase-0 base @ 0b03a22) was superseded by force-push; the
