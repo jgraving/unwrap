@@ -1,20 +1,28 @@
-"""Plots for the locust density/order notebook (``locust_density_order.ipynb``).
+"""Figure helpers for the locust density/order notebook.
 
-The notebook keeps the statistical code (loading, model fitting, per-cell
-summaries). This module holds the matplotlib drawing. Import it from the
-notebook's header cell (which also inserts the notebook dir on ``sys.path``)::
+The notebook keeps the statistical work (loading and rediscretizing the raw
+trajectories, the per-animal screening table, the PSIS-LOO fixed-effect
+sweep, the final random-intercept hierarchical von Mises GLM and its
+per-observation log-likelihood, and the posterior predictive alignment and
+bootstrap statistics); each ``plot_*`` function takes the fit result and
+the modelling table, calls into ``locust_density_posthoc`` for the
+quantities it draws, and is a single call from the notebook, followed by
+``plt.show()``.
 
-    import locust_density_plots as plots
-    plots.set_style()
+Style and saving follow the shared house convention from ``unwrap.plots``:
+figures render at display resolution (100 dpi) in the notebook cell and are
+saved as 300 dpi vector files under ``<repo>/figures/locust/``. Every public
+figure function accepts a ``save`` flag (on by default) and an explicit
+repo-relative ``save_path`` (the notebook always passes it); the written
+files are gitignored.
 
-and call the ``plot_*`` functions in place of the old inline drawing code.
-Each function mirrors the drawing block of its source cell and is passed only
-the pre-computed values it needs.
+Palette: density series are Red, order series are Purple (as in the
+data-schematic figures and the 2D order/density key); mu coefficients are
+tab10 brown (diamonds) and kappa coefficients tab10 green (triangles).
 """
-from __future__ import annotations
-
-import math
 from pathlib import Path
+
+import textwrap
 
 import numpy as np
 import pandas as pd
@@ -24,62 +32,54 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.legend_handler import HandlerBase
 
+from unwrap import plots as _plots
+from unwrap.preprocess import STEP_LENGTH
+
+import locust_density_posthoc as posthoc
+
+#: Publication figures for this study live in
+#: <repo>/figures/locust/, anchored on this file's location so the output
+#: does not depend on the kernel cwd (the notebook may run from notebooks/
+#: or from the repository root).
 FIG_DIR = Path(__file__).resolve().parent.parent / "figures" / "locust"
-DPI = 300
+
 FONT_SZ = 8
 AX_LW = 1.0
 TICK_W = 1.0
+LINE_W = 1.0
+
+_EXTRA_RC = {
+    "font.size": FONT_SZ,
+    "axes.linewidth": AX_LW,
+    "xtick.major.width": TICK_W,
+    "ytick.major.width": TICK_W,
+    "lines.linewidth": LINE_W,
+}
 
 
 def set_style():
-    """One figure style for every figure in this notebook."""
-    mpl.rcParams.update({
-        "font.family": "Arial",
-        "font.size": FONT_SZ,
-        "figure.dpi": DPI,
-        "savefig.dpi": DPI,
-        "axes.linewidth": AX_LW,
-        "xtick.major.width": TICK_W,
-        "ytick.major.width": TICK_W,
-        "lines.linewidth": 1.0,
-        "pdf.fonttype": 42,
-        "ps.fonttype": 42,
-    })
-    print(f"Figures will be saved to: {FIG_DIR.relative_to(FIG_DIR.parent.parent)}")
+    """One figure style for every figure in this notebook (the shared house
+    convention from ``unwrap.plots`` plus the study's type size; figures are
+    saved 300 dpi under ``FIG_DIR`` while rendering 100 dpi inline)."""
+    _plots.set_style(FIG_DIR, _EXTRA_RC)
 
 
-def _ensure_fig_dir():
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-    return FIG_DIR
-
-
-def _rel(p):
-    return p.relative_to(FIG_DIR.parent.parent)
-
-
-def _save(fig, name, pdf=True, png=True, transparent=False):
-    """Save to FIG_DIR as .pdf and/or .png. Returns the list of paths written."""
-    out = _ensure_fig_dir()
-    written = []
-    if pdf:
-        p = out / (name + ".pdf")
-        p.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(p, dpi=DPI, bbox_inches="tight", pad_inches=0.01,
-                    transparent=transparent)
-        written.append(str(p))
-    if png:
-        p = out / (name + ".png")
-        fig.savefig(p, dpi=DPI)
-        written.append(str(p))
-    if written:
-        shown = [str(_rel(Path(x))) for x in written]
-        print("Saved figure" + ("s" if len(shown) > 1 else "") + " to: " +
-              ("; ".join(shown) if len(shown) > 1 else shown[0]))
-    return written
+def _save(fig, save, save_path, transparent=False):
+    """Write ``fig`` to ``save_path`` (a repo-relative path such as
+    ``figures/locust/x.pdf``) through the house two-res saver. The file
+    format follows the path's suffix."""
+    if not save:
+        return
+    p = Path(save_path)
+    if p.suffix.lower() == ".svg":
+        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True)
+    else:
+        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False,
+                           transparent=transparent)
 
 
 # ---------------------------------------------------------------------------
-# Shared helpers reused by several figure cells in this notebook.
+# Shared helpers reused by several figures in this notebook.
 # ---------------------------------------------------------------------------
 def _sorted_unique(series):
     vals = series.dropna().unique().tolist()
@@ -156,20 +156,56 @@ def _color_key_axes(fig, n_rows, n_cols, x=0.88, size=0.12, key="cell_color"):
     return key_ax
 
 
+def _style_axis(ax, ax_lw=0.8):
+    for s in ax.spines.values():
+        s.set_linewidth(ax_lw)
+
+
+def _rc_params_46_49():
+    mpl.rcParams.update({
+        "font.size": 8, "ytick.major.width": 1, "xtick.major.width": 1,
+        "axes.linewidth": 1, "font.family": "Arial",
+    })
+
+
+class _HandlerPatchOverLine(HandlerBase):
+    def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height,
+                       fontsize, trans):
+        band, line = orig_handle
+        r = Rectangle(
+            (xdescent, ydescent), width, height,
+            facecolor=band.get_facecolor(), edgecolor="none",
+            alpha=band.get_alpha(), transform=trans)
+        l = Line2D(
+            [xdescent, xdescent + width],
+            [ydescent + 0.5 * height, ydescent + 0.5 * height],
+            color=line.get_color(), lw=line.get_linewidth(), transform=trans)
+        return [r, l]
+
+
 # ---------------------------------------------------------------------------
-# Cell 12: trajectories per animal, one panel per (order, density) condition,
-# colored by the shared 2D purple map; 0° stimulus line in each panel.
+# Trajectories per animal, one panel per (order, density) condition,
+# colored by the shared 2D purple map; 0-deg stimulus line in each panel.
 # ---------------------------------------------------------------------------
-def plot_trajectory_grid(merged_df, orders, densities):
+def plot_trajectory_grid(merged_df, *, save=True,
+                         save_path="figures/locust/trajectories_order_by_density_grid.pdf"):
+    """Per-animal re-discretized paths, one panel per (order, density)
+    condition (the first data figure of the notebook)."""
     XLIM = (-8, 8)
     YLIM = (-8, 8)
+    # subplot ordering (top->bottom, left->right)
+    orders = _sorted_unique(merged_df["order"])     # low at top, high at bottom
+    densities = _sorted_unique(merged_df["density"])  # low at left, high at right
+    print("Sorted orders:", orders)
+    print("Sorted densities:", densities)
+
     n_rows = len(orders)
     n_cols = len(densities)
 
     fig, axes = plt.subplots(
         n_rows, n_cols,
         figsize=(n_cols * 1.4 + 1.0, n_rows * 1.4),
-        dpi=DPI, squeeze=False,
+        dpi=_plots.DEFAULT_DISPLAY_DPI, squeeze=False,
     )
 
     for r, o in enumerate(orders):
@@ -202,19 +238,30 @@ def plot_trajectory_grid(merged_df, orders, densities):
     fig.tight_layout(rect=[0.0, 0.0, 0.86, 1.0])
     _color_key_axes(fig, n_rows, n_cols, x=0.88, size=0.12)
 
-    _save(fig, "trajectories_order_by_density_grid")
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 13: mean displacement vector per individual, one panel per
-# (order, density) condition, in step-length units (r = 1 = one step).
+# Mean displacement vector per individual, one panel per (order, density)
+# condition, in step-length units (r = 1 = one step).
 # ---------------------------------------------------------------------------
-def plot_mean_vector_grid(means_df, step_length):
-    SCALE = 1 / step_length
+def plot_mean_vector_grid(merged_df, *, save=True,
+                          save_path="figures/locust/mean_vectors_order_by_density_grid.pdf"):
+    """Each animal's mean resultant step vector as a ray from the origin
+    inside a unit circle (the second data figure of the notebook)."""
+    SCALE = 1 / STEP_LENGTH
 
-    orders = _sorted_unique(means_df["order"])
-    densities = _sorted_unique(means_df["density"])
+    means_df = (
+        merged_df
+        .groupby(["order", "density", "fname"], as_index=False)[["dX", "dY"]]
+        .mean()
+    )
+    if means_df.empty:
+        raise RuntimeError("No mean vectors found. Check that merged_df has dX/dY and is not empty.")
+
+    orders = _sorted_unique(means_df["order"])     # ascending: low at top, high at bottom
+    densities = _sorted_unique(means_df["density"])  # ascending: low at left, high at right
     n_rows = len(orders)
     n_cols = len(densities)
 
@@ -227,7 +274,7 @@ def plot_mean_vector_grid(means_df, step_length):
     fig, axes = plt.subplots(
         n_rows, n_cols,
         figsize=(n_cols * 1.25 + 1.0, n_rows * 1.25),
-        dpi=DPI, squeeze=False,
+        dpi=_plots.DEFAULT_DISPLAY_DPI, squeeze=False,
     )
 
     theta = np.linspace(0, 2 * np.pi, 256)
@@ -270,18 +317,18 @@ def plot_mean_vector_grid(means_df, step_length):
     fig.tight_layout(rect=[0.0, 0.0, 0.86, 1.0])
     _color_key_axes(fig, n_rows, n_cols, x=0.88, size=0.12)
 
-    _save(fig, "mean_vectors_order_by_density_grid")
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 14: synthetic schematic — per row, DENSITY dots (left, Reds) and
-# ORDER trajectories (right, Purples). Self-contained illustration.
+# Synthetic schematic — per row, DENSITY dots (left, Reds) and ORDER
+# trajectories (right, Purples). Self-contained illustration.
 # ---------------------------------------------------------------------------
-def plot_order_density_trajectories(
-        order_density_pairs=None, n_traj=12, n_steps=100, step_L=0.04,
-        cmap_min=0.45, cmap_max=0.95, seed=123,
-        fname="order_density_trajectories"):
+def plot_order_density_trajectories(*, save=True,
+                                    save_path="figures/locust/order_density_trajectories.pdf"):
+    """Synthetic schematic of the two stimulus parameters: per row, the
+    density (left, Reds) and the order (right, Purples) motion field."""
     mpl.rcParams.update({
         "font.size": 7,
         "axes.linewidth": 0.8,
@@ -289,22 +336,20 @@ def plot_order_density_trajectories(
         "ytick.major.width": 0.8,
         "font.family": "Arial",
     })
-    if order_density_pairs is None:
-        # largest at the top
-        orders = np.array([1.0, 0.8, 0.6, 0.4, 0.2, 0.0])
-        densities = np.array([64, 32, 16, 8, 4, 1])
-    else:
-        orders, densities = order_density_pairs
+    # largest at the top
+    orders = np.array([1.0, 0.8, 0.6, 0.4, 0.2, 0.0])
+    densities = np.array([64, 32, 16, 8, 4, 1])
 
     n_rows = len(orders)
     n_cols = 2
 
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(123)
     cmap_density = plt.cm.Reds
     cmap_order = plt.cm.Purples
 
     dens_levels = np.sort(np.unique(densities))
     order_levels = np.sort(np.unique(orders))
+    cmap_min, cmap_max = 0.45, 0.95
     dens_pos = np.linspace(cmap_min, cmap_max, len(dens_levels))
     order_pos = np.linspace(cmap_min, cmap_max, len(order_levels))
     dens_color_map = {d: cmap_density(dens_pos[i]) for i, d in enumerate(dens_levels)}
@@ -313,11 +358,12 @@ def plot_order_density_trajectories(
     fig, axes = plt.subplots(
         n_rows, n_cols,
         figsize=(1.0, 3.0),
-        dpi=DPI, squeeze=False,
+        dpi=_plots.DEFAULT_DISPLAY_DPI, squeeze=False,
     )
 
     XLIM = (0.0, 1.0)
     YLIM = (0.0, 1.0)
+    n_traj, n_steps, step_L = 12, 100, 0.04
 
     for row, (order, dens) in enumerate(zip(orders, densities)):
         # LEFT: density dots (Reds)
@@ -377,17 +423,18 @@ def plot_order_density_trajectories(
         ax_traj.text(1.08, 0.5, f"{order:.1f}", ha="left", va="center",
                      transform=ax_traj.transAxes)
 
-    _save(fig, fname)
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 15: synthetic 6x6 grid — n_traj == density trajectories per panel,
-# colored by the shared 2D purple map; 2D key on the right.
+# Synthetic 6x6 grid — n_traj == density trajectories per panel, colored by
+# the shared 2D purple map; 2D key on the right.
 # ---------------------------------------------------------------------------
-def plot_order_density_pairwise_trajectories(
-        orders=None, densities=None, n_steps=60, step_L=0.04,
-        seed=123, fname="order_density_pairwise_trajectories_only"):
+def plot_order_density_pairwise_trajectories(*, save=True,
+                                             save_path="figures/locust/order_density_pairwise_trajectories_only.pdf"):
+    """Synthetic 6x6 order–density grid (n_traj == density per panel),
+    colored by the shared 2D purple map, with the color key on the right."""
     mpl.rcParams.update({
         "font.size": 7,
         "axes.linewidth": 0.8,
@@ -395,18 +442,17 @@ def plot_order_density_pairwise_trajectories(
         "ytick.major.width": 0.8,
         "font.family": "Arial",
     })
-    if orders is None:
-        orders = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
-    if densities is None:
-        densities = np.array([1, 4, 8, 16, 32, 64])
+    orders = np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    densities = np.array([1, 4, 8, 16, 32, 64])
 
     n_rows = len(orders)
     n_cols = len(densities)
+    n_steps, step_L, seed = 60, 0.04, 123
 
     fig, axes = plt.subplots(
         n_rows, n_cols,
         figsize=(6.0 + 1.0, 6.0),
-        dpi=DPI, squeeze=False,
+        dpi=_plots.DEFAULT_DISPLAY_DPI, squeeze=False,
     )
     XLIM = (0.0, 1.0)
     YLIM = (0.0, 1.0)
@@ -458,18 +504,29 @@ def plot_order_density_pairwise_trajectories(
     fig.text(0.07, 0.5, "Order", ha="left", va="center", rotation=90)
     _color_key_axes(fig, n_rows, n_cols, x=0.95, size=0.13)
 
-    _save(fig, fname)
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 21: two-panel predictive alignment = A(kappa)*cos(mu).
-#   Panel i: vs Order (colored by density),  Panel ii: vs Density (colored by order).
-# The notebook computes pred_i / pred_ii ({level: {mean, low, high}}) first.
+# Screening fit: two-panel predictive alignment = A(kappa)*cos(mu).
+# Panel i: vs Order (colored by density), Panel ii: vs Density (colored by
+# order). Uncentered predictors, 68% HDI, grid of 50.
 # ---------------------------------------------------------------------------
-def plot_alignment_prediction(order_grid, density_grid, dens_levels, order_levels,
-                              pred_i, pred_ii):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(5, 2), dpi=DPI)
+def plot_alignment_screening(idata, merged_df, *, save=True,
+                             save_path="figures/locust/order_density_alignment_screening.pdf"):
+    """Posterior predictive alignment of the screening fit (uncentered
+    predictors, 68 % HDI, grid of 50)."""
+    stats = posthoc.alignment_stats(idata, merged_df, hdi_prob=0.68,
+                                    centered=False, grid_size=50)
+    order_grid = stats["order_grid"]
+    density_grid = stats["density_grid"]
+    dens_levels = stats["dens_levels"]
+    order_levels = stats["order_levels"]
+    pred_i = stats["pred_i"]
+    pred_ii = stats["pred_ii"]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(5, 2), dpi=_plots.DEFAULT_DISPLAY_DPI)
 
     cmap_density = plt.cm.Reds
     cmap_order = plt.cm.Purples
@@ -509,15 +566,21 @@ def plot_alignment_prediction(order_grid, density_grid, dens_levels, order_level
                bbox_to_anchor=(1.02, 0.5), frameon=False)
 
     fig.tight_layout()
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 25: model selection -- delta ELPD for the matched model sweep, split
-# into "order included" vs "order excluded" models.
+# Model selection: delta ELPD for the matched model sweep, split into
+# "order included" vs "order excluded" models.
 # ---------------------------------------------------------------------------
-def plot_model_selection(res_df, use_se):
-    import textwrap
+def plot_model_selection(res_df, *, save=True,
+                         save_path="figures/locust/order_density_model_selection.pdf"):
+    """Delta-ELPD forest of the five-candidate sweep (order included vs
+    excluded); the standard-error flag is derived from the table."""
+    use_se = "se_delta_elpd" in res_df.columns and (
+        not res_df["se_delta_elpd"].isna().all()
+    )
 
     def _wrap_label(s, width=40):
         return textwrap.fill(str(s), width=width)
@@ -530,7 +593,7 @@ def plot_model_selection(res_df, use_se):
     g_incl["y"] = g_incl.index.to_numpy()
     g_excl["y"] = g_excl.index.to_numpy()
 
-    fig = plt.figure(figsize=(1.8, 0.33 * len(res_df)), dpi=DPI)
+    fig = plt.figure(figsize=(1.8, 0.33 * len(res_df)), dpi=_plots.DEFAULT_DISPLAY_DPI)
     if use_se:
         fig.gca().errorbar(g_incl["delta_elpd"], g_incl["y"], xerr=g_incl["se_delta_elpd"],
                            fmt="o", capsize=3, elinewidth=1, markersize=5,
@@ -548,22 +611,28 @@ def plot_model_selection(res_df, use_se):
     fig.gca().set_xlabel("ELPD difference")
     fig.legend(loc="upper left", frameon=True)
 
-    _save(fig, "order_density_model_selection")
+    _save(fig, save, save_path)
     plt.show()
 
 
-def _style_axis(ax, ax_lw=0.8):
-    for s in ax.spines.values():
-        s.set_linewidth(ax_lw)
-
-
 # ---------------------------------------------------------------------------
-# Cell 43: two-panel predictive alignment (hierarchical, centered predictors).
-#   Panel i: vs Order colored by Density; Panel ii: vs Density colored by Order.
-# The notebook computes pred_i / pred_ii first (mean / low / high per level).
+# Final fit: two-panel predictive alignment (hierarchical, centered
+# predictors). Panel i: vs Order colored by Density; Panel ii: vs Density
+# colored by Order. 90% HDI, grid of 50.
 # ---------------------------------------------------------------------------
-def plot_alignment_prediction_centered(order_grid, density_grid, dens_levels,
-                                       order_levels, pred_i, pred_ii):
+def plot_alignment(idata, df, *, save=True,
+                   save_path="figures/locust/order_density_alignment.pdf"):
+    """Posterior predictive alignment of the final hierarchical fit
+    (centered predictors, 90 % HDI, grid of 50)."""
+    stats = posthoc.alignment_stats(idata, df, hdi_prob=0.9,
+                                    centered=True, grid_size=50)
+    order_grid = stats["order_grid"]
+    density_grid = stats["density_grid"]
+    dens_levels = stats["dens_levels"]
+    order_levels = stats["order_levels"]
+    pred_i = stats["pred_i"]
+    pred_ii = stats["pred_ii"]
+
     mpl.rcParams.update({
         "font.size": 7, "axes.labelsize": 7, "axes.titlesize": 7,
         "legend.fontsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7,
@@ -573,7 +642,7 @@ def plot_alignment_prediction_centered(order_grid, density_grid, dens_levels,
     })
     fig_w = 1.8 * 2 + 0.6
     fig_h = 1.55
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(fig_w, fig_h), dpi=DPI)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(fig_w, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI)
 
     cmap_density = plt.cm.Reds
     cmap_order = plt.cm.Purples
@@ -624,17 +693,27 @@ def plot_alignment_prediction_centered(order_grid, density_grid, dens_levels,
                borderpad=0.3, labelspacing=0.25, handletextpad=0.4)
 
     fig.tight_layout()
-    _save(fig, "order_density_alignment")
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 44: two-panel posterior predictive density at y=0 (computed in log
-# space in the notebook, exponentiated to density here). Uniform reference
-# line at 1/(2*pi). Transparent axes.
+# Final fit: two-panel posterior predictive density at y=0 (computed in log
+# space, exponentiated for plotting). Uniform reference line at 1/(2*pi).
+# Transparent axes. 90% HDI, grid of 50.
 # ---------------------------------------------------------------------------
-def plot_elpd0_prediction_centered(order_grid, density_grid, dens_levels,
-                                   order_levels, pred_i, pred_ii):
+def plot_elpd0(idata, df, *, save=True,
+               save_path="figures/locust/order_density_elpd0.pdf"):
+    """Posterior predictive density at the march direction (0 deg), over
+    order (panel i) and over density (panel ii), log-space 90 % HDI."""
+    stats = posthoc.elpd0_stats(idata, df, hdi_prob=0.9, grid_size=50)
+    order_grid = stats["order_grid"]
+    density_grid = stats["density_grid"]
+    dens_levels = stats["dens_levels"]
+    order_levels = stats["order_levels"]
+    pred_i = stats["pred_i"]
+    pred_ii = stats["pred_ii"]
+
     mpl.rcParams.update({
         "font.family": "Arial",
         "font.size": 7, "axes.labelsize": 7, "axes.titlesize": 7,
@@ -645,7 +724,7 @@ def plot_elpd0_prediction_centered(order_grid, density_grid, dens_levels,
     })
     fig_w = 1.8 * 2 + 0.6
     fig_h = 1.55
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(fig_w, fig_h), dpi=DPI)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(fig_w, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI)
 
     fig.patch.set_facecolor("none")
     fig.patch.set_alpha(0)
@@ -705,18 +784,20 @@ def plot_elpd0_prediction_centered(order_grid, density_grid, dens_levels,
     ax2.set_ylim(0.0, 1.0)
 
     fig.tight_layout()
-    _save(fig, "order_density_elpd0", transparent=True)
+    _save(fig, save, save_path, transparent=True)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 45: two rows of polar small-multiples, multiple von Mises predictive
-# PDFs per panel. Row 1: columns = order, curves = density (Reds);
-# Row 2: columns = density, curves = order (Purples). The notebook computes
-# ``summ`` {(o, d): {med, lo, hi, ...}} and ``peak_max`` first.
+# Two rows of polar small-multiples, multiple von Mises predictive PDFs per
+# panel. Row 1: columns = order, curves = density (Reds);
+# Row 2: columns = density, curves = order (Purples).
 # ---------------------------------------------------------------------------
-def plot_polar_pdfs_grid(theta, summ, order_levels, dens_levels, peak_max,
-                         hdi_prob=0.90, fname="order_density_polar_pdfs_grid"):
+def plot_polar_pdfs(idata, df, *, save=True,
+                    save_path="figures/locust/order_density_polar_pdfs_grid.pdf"):
+    """Per-cell posterior predictive von Mises PDFs on a 900-point circle
+    (median + 90 % HDI band) and the 90 % mu interval as an arc reference,
+    per order (row 1) and per density (row 2)."""
     from matplotlib.patches import Circle
     from matplotlib.lines import Line2D
 
@@ -728,6 +809,15 @@ def plot_polar_pdfs_grid(theta, summ, order_levels, dens_levels, peak_max,
         "xtick.major.width": 0.8, "ytick.major.width": 0.8,
         "xtick.major.size": 2.5, "ytick.major.size": 2.5,
     })
+
+    stats = posthoc.polar_pdf_stats(idata, df, hdi_prob=0.90, max_draws=1200,
+                                    seed=123,
+                                    theta=np.linspace(-np.pi, np.pi, 900, endpoint=False))
+    theta = stats["theta"]
+    summ = stats["summ"]
+    order_levels = stats["order_levels"]
+    dens_levels = stats["dens_levels"]
+    peak_max = stats["peak_max"]
 
     EDGE_RADIUS = 1.0
     AMP = 1.0
@@ -767,7 +857,7 @@ def plot_polar_pdfs_grid(theta, summ, order_levels, dens_levels, peak_max,
     panel_w = 0.8
     fig_h = 2.0
     fig, axes = plt.subplots(
-        2, ncol, figsize=(panel_w * ncol, fig_h), dpi=DPI,
+        2, ncol, figsize=(panel_w * ncol, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI,
         subplot_kw={"projection": "polar"}, squeeze=True,
     )
     axes = np.atleast_2d(axes)
@@ -825,25 +915,18 @@ def plot_polar_pdfs_grid(theta, summ, order_levels, dens_levels, peak_max,
                bbox_to_anchor=(0.95, 0.29), frameon=True, handlelength=1.2,
                borderpad=0.3, labelspacing=0.25, handletextpad=0.4)
 
-    out = _ensure_fig_dir()
-    (out / (fname + ".svg")).unlink(missing_ok=True)
-    (out / (fname + ".pdf")).unlink(missing_ok=True)
-    (out / (fname + ".png")).unlink(missing_ok=True)
-    fig.savefig(out / (fname + ".svg"), format="svg")
-    fig.savefig(out / (fname + ".pdf"), bbox_inches="tight")
-    fig.savefig(out / (fname + ".png"), dpi=DPI)
-    print("Saved figure to:", str(_rel(out / (fname + ".pdf"))))
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 46: coefficient posteriors (fixed effects only), mu (circles) vs
-# kappa (triangles) stacked per term, with 95% HDI error bars. The notebook
-# computes the per-term means and asymmetric xerr arrays first.
+# Coefficient posteriors (fixed effects only), mu (diamonds) vs
+# kappa (triangles) stacked per term, with 95% HDI error bars.
 # ---------------------------------------------------------------------------
-def plot_coefficient_posteriors(terms_order, mu_mean, mu_xerr, k_mean, k_xerr,
-                                fname="order_density_coefficients"):
-    # This cell originally inherited the polar-cell style block (font 5).
+def plot_coefficients(idata, *, save=True,
+                      save_path="figures/locust/order_density_coefficients.pdf"):
+    """Fixed-effect posteriors for mu and kappa (pre-link scale) with 95 %
+    HDI error bars, stacked per term."""
     mpl.rcParams.update({
         "font.size": 5, "axes.labelsize": 5, "axes.titlesize": 5,
         "legend.fontsize": 5, "xtick.labelsize": 5, "ytick.labelsize": 5,
@@ -852,7 +935,14 @@ def plot_coefficient_posteriors(terms_order, mu_mean, mu_xerr, k_mean, k_xerr,
         "xtick.major.width": 0.8, "ytick.major.width": 0.8,
         "xtick.major.size": 2.5, "ytick.major.size": 2.5,
     })
-    tab10 = mpl.cm.get_cmap("tab10")
+    stats = posthoc.coefficient_stats(idata, hdi_prob=0.95)
+    terms_order = stats["terms_order"]
+    mu_mean = stats["mu_mean"]
+    mu_xerr = stats["mu_xerr"]
+    k_mean = stats["k_mean"]
+    k_xerr = stats["k_xerr"]
+
+    tab10 = mpl.colormaps["tab10"]
     mu_color = tab10(5)   # brown
     k_color = tab10(2)    # green
 
@@ -861,7 +951,7 @@ def plot_coefficient_posteriors(terms_order, mu_mean, mu_xerr, k_mean, k_xerr,
     y_mu = y_base - dy
     y_k = y_base + dy
 
-    fig = plt.figure(figsize=(1.8, 0.4 * len(terms_order)), dpi=DPI)
+    fig = plt.figure(figsize=(1.8, 0.4 * len(terms_order)), dpi=_plots.DEFAULT_DISPLAY_DPI)
     ax = fig.gca()
     ax.errorbar(mu_mean, y_mu, xerr=mu_xerr,
                 fmt="D", color=mu_color, ecolor=mu_color,
@@ -877,30 +967,29 @@ def plot_coefficient_posteriors(terms_order, mu_mean, mu_xerr, k_mean, k_xerr,
     ax.set_xlabel("Coefficient value")
     ax.legend(loc="upper right", frameon=True)
 
-    _save(fig, fname)
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 47: two-panel figure. LEFT = matched-model sweep ΔELPD,
-# RIGHT = coefficient posteriors (mu vs kappa). The notebook computes the
-# data (res_df slicing/labels, per-term means + asymmetric xerr) first.
+# Single figure with 2 subplots:
+#   LEFT  = Model comparison (ΔELPD)
+#   RIGHT = Model coefficients (μ vs κ)
 # ---------------------------------------------------------------------------
-def plot_model_selection_and_coefficients(
-        g_incl, g_excl, y_m, y_labels, use_se,
-        terms_order, y_base, y_mu, y_k,
-        mu_mean, mu_xerr, k_mean, k_xerr,
-        fname="order_density_model_selection_and_coefficients"):
+def plot_selection_and_coefficients(res_df, idata, *, save=True,
+                                    save_path="figures/locust/order_density_model_selection_and_coefficients.pdf"):
+    """Combined figure: the matched-model sweep ΔELPD forest (left) next to
+    the fixed-effect coefficient posteriors (right)."""
     FONT_SIZE = 7
-    AX_LW     = 0.8
-    TICK_LW   = 0.8
-    TICK_LEN  = 2.5
-    LINE_LW   = 1.0
-    ERR_LW    = 1.0
-    CAPSIZE   = 2.5
-    CAPTHICK  = 1.0
-    MS        = 4.5
-    MEW       = 0.8
+    AX_LW = 0.8
+    TICK_LW = 0.8
+    TICK_LEN = 2.5
+    LINE_LW = 1.0
+    ERR_LW = 1.0
+    CAPSIZE = 2.5
+    CAPTHICK = 1.0
+    MS = 4.5
+    MEW = 0.8
 
     mpl.rcParams.update({
         "font.size": FONT_SIZE, "axes.labelsize": FONT_SIZE,
@@ -909,7 +998,7 @@ def plot_model_selection_and_coefficients(
         "axes.linewidth": AX_LW, "lines.linewidth": LINE_LW,
         "xtick.major.width": TICK_LW, "ytick.major.width": TICK_LW,
         "xtick.major.size": TICK_LEN, "ytick.major.size": TICK_LEN,
-        "savefig.dpi": DPI, "figure.dpi": DPI,
+        "savefig.dpi": 300, "figure.dpi": _plots.DEFAULT_DISPLAY_DPI,
         "pdf.fonttype": 42, "ps.fonttype": 42,
     })
 
@@ -933,18 +1022,42 @@ def plot_model_selection_and_coefficients(
                             labelspacing=0.3, handletextpad=0.4)
             leg.get_frame().set_linewidth(AX_LW)
 
-    tab10 = mpl.cm.get_cmap("tab10")
+    # Model comparison data (already best-first from the sweep)
+    res_df = res_df.sort_values("delta_elpd", ascending=False).reset_index(drop=True)
+    y_m = np.arange(len(res_df))
+    y_labels = [textwrap.fill(str(s), width=40) for s in res_df["pretty_name"]]
+
+    g_incl = res_df[res_df["has_order"]].copy()
+    g_excl = res_df[~res_df["has_order"]].copy()
+    g_incl["y"] = g_incl.index.to_numpy()
+    g_excl["y"] = g_excl.index.to_numpy()
+
+    use_se = "se_delta_elpd" in res_df.columns and (not res_df["se_delta_elpd"].isna().all())
+
+    # Coefficient data
+    stats = posthoc.coefficient_stats(idata, hdi_prob=0.95)
+    terms_order = stats["terms_order"]
+    mu_mean = stats["mu_mean"]
+    mu_xerr = stats["mu_xerr"]
+    k_mean = stats["k_mean"]
+    k_xerr = stats["k_xerr"]
+    y_base = np.arange(len(terms_order), dtype=float)
+    dy = 0.16
+    y_mu = y_base - dy
+    y_k = y_base + dy
+
+    tab10 = mpl.colormaps["tab10"]
     ELPD_INCL_COLOR = tab10(0)
     ELPD_EXCL_COLOR = tab10(1)
-    MU_COLOR        = tab10(5)
-    K_COLOR         = tab10(2)
+    MU_COLOR = tab10(5)   # brown
+    K_COLOR = tab10(2)    # green
 
     ROW_H = 0.36
-    # row count mirrors the notebook: max(len(res_df), len(terms_order)); len(y_m) == len(res_df)
     n_rows = max(len(y_m), len(terms_order))
     fig_h = ROW_H * n_rows
 
-    fig, (ax_elpd, ax_coef) = plt.subplots(1, 2, figsize=(1.8 * 2 + 0.6, fig_h), dpi=DPI)
+    fig, (ax_elpd, ax_coef) = plt.subplots(
+        1, 2, figsize=(1.8 * 2 + 0.6, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI)
 
     if use_se:
         ax_elpd.errorbar(
@@ -978,39 +1091,25 @@ def plot_model_selection_and_coefficients(
                  legend_loc="upper right", vline0=True)
 
     fig.tight_layout()
-    _save(fig, fname)
+    _save(fig, save, save_path)
     plt.show()
 
 
-class _HandlerPatchOverLine(HandlerBase):
-    def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height,
-                       fontsize, trans):
-        band, line = orig_handle
-        r = Rectangle(
-            (xdescent, ydescent), width, height,
-            facecolor=band.get_facecolor(), edgecolor="none",
-            alpha=band.get_alpha(), transform=trans)
-        l = Line2D(
-            [xdescent, xdescent + width],
-            [ydescent + 0.5 * height, ydescent + 0.5 * height],
-            color=line.get_color(), lw=line.get_linewidth(), transform=trans)
-        return [r, l]
-
-
 # ---------------------------------------------------------------------------
-# Cell 48: two-column small multiples. Left: alignment vs Order, one row per
-# density. Right: alignment vs Density, one row per order. Model prediction
-# curves + HDI band (pred_i / pred_ii) overlaid with the empirical bootstrap
-# means/HDIs (emp) at the observed cells. The notebook computes pred_i,
-# pred_ii and emp first.
+# Two-column small multiples. Left: alignment vs Order, one row per density.
+# Right: alignment vs Density, one row per order. Model prediction curves +
+# HDI band overlaid with the empirical bootstrap means/HDIs at the observed
+# cells. 95% HDI, grid of 80.
 # ---------------------------------------------------------------------------
-def plot_alignment_ppc_bootstrap(dens_levels, order_levels, order_grid,
-                                 density_grid, pred_i, pred_ii, emp,
-                                 fname="order_density_alignment_ppc_bootstrap"):
+def plot_alignment_ppc_bootstrap(idata, df, *, save=True,
+                                 save_path="figures/locust/order_density_alignment_ppc_bootstrap.pdf"):
+    """Final-fit alignment curves (95 % HDI, grid of 80) with the
+    hierarchical data-bootstrap means/HDIs at the observed cells (open
+    markers, sized by the number of animals)."""
     FONT_SIZE = 7
-    AX_LW     = 0.8
-    TICK_LW   = 0.8
-    TICK_LEN  = 2.5
+    AX_LW = 0.8
+    TICK_LW = 0.8
+    TICK_LEN = 2.5
 
     mpl.rcParams.update({
         "font.size": FONT_SIZE, "axes.labelsize": FONT_SIZE,
@@ -1019,9 +1118,20 @@ def plot_alignment_ppc_bootstrap(dens_levels, order_levels, order_grid,
         "axes.linewidth": AX_LW,
         "xtick.major.width": TICK_LW, "ytick.major.width": TICK_LW,
         "xtick.major.size": TICK_LEN, "ytick.major.size": TICK_LEN,
-        "savefig.dpi": DPI, "figure.dpi": DPI,
+        "savefig.dpi": 300, "figure.dpi": _plots.DEFAULT_DISPLAY_DPI,
         "pdf.fonttype": 42, "ps.fonttype": 42,
     })
+
+    stats = posthoc.alignment_stats(idata, df, hdi_prob=0.95,
+                                    centered=True, grid_size=80)
+    order_grid = stats["order_grid"]
+    density_grid = stats["density_grid"]
+    dens_levels = stats["dens_levels"]
+    order_levels = stats["order_levels"]
+    pred_i = stats["pred_i"]
+    pred_ii = stats["pred_ii"]
+
+    emp = posthoc.data_cell_bootstrap(df, B=1000, ci=0.95, seed=123)
 
     def emp_for_density(d):
         sub = emp.loc[np.isclose(emp["density"], float(d))].sort_values("order")
@@ -1033,7 +1143,7 @@ def plot_alignment_ppc_bootstrap(dens_levels, order_levels, order_grid,
 
     n_rows = max(len(dens_levels), len(order_levels))
     fig_h = max(2.2, 1.25 * n_rows)
-    fig = plt.figure(figsize=(7.4, fig_h), dpi=DPI)
+    fig = plt.figure(figsize=(7.4, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI)
     gs = fig.add_gridspec(n_rows, 2, wspace=0.28, hspace=0.35, width_ratios=[1.0, 1.0])
 
     dens_cols = [plt.cm.Reds(v)    for v in np.linspace(0.95, 0.58, len(dens_levels))]
@@ -1131,29 +1241,32 @@ def plot_alignment_ppc_bootstrap(dens_levels, order_levels, order_grid,
                       handlelength=1.2)
 
     fig.tight_layout()
-    _save(fig, fname, png=False)
+    _save(fig, save, save_path)
     plt.show()
 
 
-def _rc_params_46_49():
-    mpl.rcParams.update({
-        "font.size": 8, "ytick.major.width": 1, "xtick.major.width": 1,
-        "axes.linewidth": 1, "font.family": "Arial",
-    })
-
-
 # ---------------------------------------------------------------------------
-# Cell 49: small multiples of dots + errorbars, model (filled) vs data (open),
-# at the observed (density, order) cells. Left: vs Order per density;
-# Right: vs Density per order. ``emp`` = data bootstrap, ``mod`` = model PPC.
+# Small multiples of dots + errorbars, model (filled) vs data (open), at the
+# observed (density, order) cells. Left: vs Order per density; Right: vs
+# Density per order. Data bootstrap vs individual-level posterior predictive.
 # ---------------------------------------------------------------------------
-def plot_cell_ppc_dots(dens_levels, order_levels, emp, mod,
-                       fname="order_density_cell_ppc_dots"):
+def plot_cell_ppc_dots(idata, df, *, save=True,
+                       save_path="figures/locust/order_density_cell_ppc_dots.pdf"):
+    """Cell-level alignment: data-bootstrap means/HDIs (open markers) vs
+    individual-level posterior predictive means/HDIs (filled markers) at
+    each observed order–density cell."""
     _rc_params_46_49()
+
+    emp = posthoc.data_cell_bootstrap(df, B=1000, ci=0.95, seed=123)
+    mod = posthoc.model_cell_ppc(df, idata, B=600, ci=0.95, seed=2025,
+                                 bootstrap_steps=True)
+
+    dens_levels = np.sort(df["density"].unique())[::-1]
+    order_levels = np.sort(df["order"].unique())[::-1]
 
     n_rows = max(len(dens_levels), len(order_levels))
     fig_h = max(2.2, 1.25 * n_rows)
-    fig = plt.figure(figsize=(7.4, fig_h), dpi=300)
+    fig = plt.figure(figsize=(7.4, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI)
     gs = fig.add_gridspec(n_rows, 2, wspace=0.28, hspace=0.35, width_ratios=[1.0, 1.0])
 
     dens_cols = [plt.cm.Reds(v) for v in np.linspace(0.90, 0.45, len(dens_levels))]
@@ -1278,18 +1391,23 @@ def plot_cell_ppc_dots(dens_levels, order_levels, emp, mod,
         ax.axhline(0, linestyle="--", color="k", zorder=0)
 
     fig.tight_layout()
-    _save(fig, fname)
+    _save(fig, save, save_path)
     plt.show()
 
 
 # ---------------------------------------------------------------------------
-# Cell 50: grid of subplots by (density, order); x = individual,
-# y = alignment. Data = open black dots + bootstrap CI; Model = filled red
-# dots + PPC CI. The notebook computes ``ppc_df`` first.
+# Grid of subplots by (density, order); x = individual, y = alignment.
+# Data = open black dots + bootstrap CI; Model = filled red dots + PPC CI.
 # ---------------------------------------------------------------------------
-def plot_individual_cell_ppc(ppc_df,
-                             fname="order_density_individual_cell_ppc"):
+def plot_individual_ppc(idata, df, *, save=True,
+                        save_path="figures/locust/order_density_individual_cell_ppc.pdf"):
+    """Individual-level PPC: per-animal alignment, within-animal data
+    bootstrap (open markers + CI) vs the individual-level posterior
+    predictive (filled markers + CI), one panel per order–density cell."""
     _rc_params_46_49()
+
+    ppc_df = posthoc.individual_ppc(df, idata, b_boot=800, s_ppc=400,
+                                    boot_seed=123, ppc_seed=2025, hdp=0.95)
 
     dens_levels = np.sort(ppc_df["density"].unique())
     order_levels = np.sort(ppc_df["order"].unique())
@@ -1297,7 +1415,8 @@ def plot_individual_cell_ppc(ppc_df,
 
     fig_w = max(6.8, 2.2 * ncols)
     fig_h = max(3.2, 1.8 * nrows)
-    fig, axs = plt.subplots(nrows, ncols, figsize=(fig_w, fig_h), dpi=300, sharey=True)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(fig_w, fig_h),
+                            dpi=_plots.DEFAULT_DISPLAY_DPI, sharey=True)
     axs = np.atleast_2d(axs).reshape(nrows, ncols)
 
     Y_LIM = (-1.05, 1.05)
@@ -1344,5 +1463,5 @@ def plot_individual_cell_ppc(ppc_df,
                        handletextpad=0.4)
 
     fig.tight_layout(rect=[0, 0, 0.97, 1])
-    _save(fig, fname)
+    _save(fig, save, save_path)
     plt.show()
