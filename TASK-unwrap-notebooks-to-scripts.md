@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-01 (#55 UPGRADE + #56 CIRCULAR + #57 PERIODIC + #58 VMP + #59 ZEBRA E2E STUDY PRS MERGED = main 6beabf9; NEXT = locust_direction study PR) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-01 (#55-#59 STUDY PRS + #60 ZEBRA NONCENTERED MERGED = main 734887c; NEXT = locust_direction study PR - PROBE FOUND SPARSE animal_id TRAP, see AFTER MERGE) - NEXT CHAT STARTS HERE
 - BOARD: main = ac2858e. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
@@ -55,8 +55,9 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   PR, 3 commits: script / notebook re-bake / README row,
   see PERIODIC note below). #58 MERGED (von_mises_policy study
   PR, 3 commits, see VON MISES POLICY note below). #59 MERGED
-  (zebra E2E study PR, see ZEBRA note below). Work repo is on
-  main, clean.  on main, clean.- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
+  (zebra E2E study PR, see ZEBRA note below). #60 MERGED
+  (zebra kappa REs non-centered + log-likelihood cross-check,
+  see ZEBRA NONCENTERED note below). Work repo is on main, clean.- USER DIRECTIVES 2026-10-31 (template polish; beetles is THE template -
   "we should get this right"):
   1. plot_ppc: do NOT pass the 14 parsed dict entries - put ALL the
      post-hoc computation INSIDE the plot function; the notebook cell is
@@ -439,9 +440,69 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     snapshot before edit /tmp/zebra_no_wrong/zebra_pre_studyPR.*.
     PR body /tmp/opencode/pr_zebra_body.md; gate
     /tmp/opencode/verify_zebra.py.
+  * ZEBRA NONCENTERED (#60, MERGED = main 734887c; 2 commits:
+    posthoc / notebook+README). User follow-up to #59: the study PR
+    kept noncentered=False everywhere (vM group priors); user wants the
+    noncentering the stack upgrade was meant to allow. bambi 0.21
+    implements non-centered RE ONLY for Normal priors with a tensor
+    sigma (VonMises RE prior would raise NotImplementedError - verified
+    in the source: priors/prior.py + backend/terms.py build()) so the
+    fix is PER-PRIOR (the beetles convention): noncentered=True on the
+    two kappa RE Normal priors, model level stays noncentered=False.
+    Key mechanics (probes /tmp/opencode/probe_zebra_nc{,2,3}.py +
+    smoke_zebra_nc.py, all green): (a) NUTS free RVs gain
+    kappa_*|Track_offset (z ~ N(0,1)); bambi's stored POSTERIOR keeps
+    the same 12 names as the centered fit - kappa_*|Track is now a
+    Deterministic(effect = sigma*offset) - offsets are NOT in it;
+    (b) pm.compute_deterministics / pm.compute_log_likelihood need
+    ALL free RVs -> posthoc.graph_free_rvs(idata, model) (ported from
+    beetles_posthoc) reconstructs offset = effect/sigma exactly;
+    (c) fit cell now: idata = pm.compute_log_likelihood(
+    posthoc.graph_free_rvs(idata, model), model=model.backend.model)
+    after model.fit(...) - the PyMC6 replacement for
+    idata_kwargs={'log_likelihood': True} - this DOES leak the two
+    offset vars into idata.posterior, so (d) c10 diagnostics cell uses
+    an explicit var_names whitelist (the beetles convention, 12 model
+    params) and (e) zebra_posthoc RE pattern lookups now also exclude
+    *_offset by suffix (stored effect value wanted, not the raw
+    factor); (f) ppc_bootstrap_stats runs compute_deterministics on
+    graph_free_rvs(idata) + NEW hard cross-check of the per-obs
+    response params against the stored log-likelihood (rtol 1e-10,
+    prints 'response params from PyMC graph OK; log-likelihood
+    cross-check passed'). Re-bake: 4x(2000+1000) 242 s, Divergences:
+    0, gate PASS, 106 tests green. PR body
+    /tmp/opencode/pr_zebra_nc_body.md.
   * AFTER MERGE: next = locust_direction -> locust_density -> bats
     (each E2E on the new stack, unwrap.datasets.load_directional /
-    load_density_order / load_bats_* accessors). Their notebooks
+    load_density_order / load_bats_* accessors).
+    LOCUST_DIRECTION PROBE FINDINGS (2026-11-01,
+    /tmp/opencode/probe_locust_dir.py - SEGFAULTED, exit 139):
+    (1) SPARSE animal_id TRAP: rediscretize_directional(
+    load_directional()) gives 52 animals but animal_id is SPARSE
+    (0..53, missing {1,44}) -> the notebook model indexes
+    mu[individuals] with RAW ids (max 53 vs num_individuals 52)
+    -> C-level out-of-bounds -> segfault 'All initialization
+    points failed'. FIX for the study PR: reindex animal_id to
+    dense 0..51 in the data cell (e.g.
+    df['animal_id'] = pd.factorize(df['animal_id'], sort=True)[0])
+    BEFORE any model (posthoc c18/c27 assume dense 0..N-1 too).
+    (2) The locust_direction data cell is ALREADY E2E (c02:
+    load_directional + rediscretize_directional) -> NO preprocess
+    script needed; migration = posthoc (~1100 lines: c18 loo-by-
+    individual, c21 population density via pm.compile, c22/23
+    bootstrap histogram+KDE with numba/joblib, c27 individual
+    PPC 52-panel, c30-c35 hypothesis tests) + plots house
+    convention (741 lines, has DUPLICATED mlines/mpatches
+    imports) + az.summary(circ_var_names=) x2 (c12/c16 ->
+    circular_summary; c12 filters _unsorted, c16 excludes _raw)
+    + az.hdi prob= rename (5 sites, all 1-D -> no axis
+    transpose) + seed fits + Divergences-first.
+    (3) API probed GREEN on this stack: pm.sample still accepts
+    return_inferencedata + idata_kwargs={'log_likelihood': True};
+    pm.compile([angles], logp) / pm.logp(dist, value).eval() /
+    pm.Mixture.dist(w=, comp_dists=) all present in pymc 6.3.2;
+    az.loo pointwise works; circular_summary on 2-D circ vars
+    (mu_pop shape (2,), mu (52,2)) needs a probe check. Their notebooks
     still use az.summary(circ_var_names=...) / az.plot_posterior /
     az.plot_trace(compact=) -> port with the API map above + the
     graph_free_rvs pattern if they get noncentered + the
