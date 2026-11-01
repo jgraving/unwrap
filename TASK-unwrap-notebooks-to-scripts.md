@@ -41,8 +41,8 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-01 (#55-#61 MERGED = main 529d364; NEXT = locust_density study PR, then bats) - NEXT CHAT STARTS HERE
-- BOARD: main = 529d364. Open PRs: only #43 (user's draft, unrelated).
+## STATE - updated 2026-11-01 (#55-#63 MERGED = main f817823; NEXT = bats study PR; recon done) - NEXT CHAT STARTS HERE
+- BOARD: main = f817823. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
   plots.plot_ppc, uniform preprocess/posthoc/plots aliases,
@@ -596,14 +596,115 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   body - the per-study body template), pr_phase0_body.md (Phase 0
   body), /tmp/zebra_no_wrong/beetles_old36.ipynb (beetles snapshot;
   per study: `git show origin/main:notebooks/<x>.ipynb > <snap>` first).
-- Work repo /tmp/opencode/wt-unified: on main (= origin/main = 529d364,
-  clean tree; the beetles branch was deleted post-merge and its old
-  remote ref is replaced). The OLD origin/notebooks-to-scripts-beetles
+- Work repo /tmp/opencode/wt-unified: on main (= origin/main = f817823,
+  clean tree after the #62/#63 merges; both PR branches deleted local +
+  remote; the wt-dirfix worktree for the #63 fix was removed after
+  merge). A bats worktree /tmp/opencode/wt-bats (tmp-stack-42) exists
+  from earlier probing. The OLD origin/notebooks-to-scripts-beetles
   (pre-Phase-0 base @ 0b03a22) was superseded by force-push; the
   re-baselined annotated-base work is what's on main now. User's live
   repo /home/jake/projects/unwrap UNTOUCHED (docs/notebooks-explained @
   277c7ae + 6 uncommitted WIP files; PR branches are authoritative).
 - Handoff mirror: this file <-> origin/docs/notebooks-to-scripts-handoff.
+
+## LOCUST DENSITY STUDY PR #62 (MERGED = part of main f817823)
+- Branch locust-density-study, 3 commits: scripts (preprocess+posthoc+
+  plots) / thin-cell notebook + full re-bake / README row. GATE PASS
+  (verify_locust_density.py: 0 errors, 14 figure cells each 1 inline
+  ~100 dpi png + "Saved figure to:" line, valid PDFs >1 kB, nunique
+  440, "Density × Order" best model, N=18641, both diagnostics
+  filters Empty). pytest 106. ipynb 1.97 MB (c30 summary-table HTML is
+  the bulk; the merged locust_direction sibling is 1.83 MB - same
+  class, accepted).
+- PREPROCESS: notebooks/locust_density_preprocess.py - rediscretize at
+  6 body lengths on the shared unwrap.preprocess arc-length primitives;
+  carries order/density through, renumbers animal_id densely 0..439.
+- POSTHOC: notebooks/locust_density_posthoc.py - 11 entry points:
+  screening_table (per-animal mean resultant heading), fit_table,
+  attach_log_likelihood (the LL path, below), model_sweep (5 seeded
+  candidate fits -> PSIS-LOO delta-ELPD + "Best model:" print),
+  alignment_stats / elpd0_stats / polar_pdf_stats / coefficient_stats /
+  data_cell_bootstrap / model_cell_ppc / individual_ppc. Magic
+  constants kept verbatim (grids 50/80, HDIs .68/.9/.95, seeds 123/2025,
+  B 1000/600/800). Bake pins: p_loo 224.56, N/p_loo 83.01, fraction
+  k>0.7 0.0021, sweep Delta-ELPD Order-only -8.86 (SE 5.85) /
+  Density -75.7.
+- **FINAL-FIT LOG-LIKELIHOOD PATH (non-obvious, validated):**
+  `pm.compute_log_likelihood` CANNOT work on the RE sigma-prior spec -
+  `transform=Softplus()` on the Normal sigma prior inserts a
+  `kappa_1|animal_id_sigma_log_exp` value variable that does NOT
+  exact-match the non-centered posterior name (bambi 0.21). Production
+  path in `attach_log_likelihood`: fit with `omit_offsets=False` (keeps
+  `kappa_1|animal_id_offset` free RV in posterior - the 2nd bambi
+  quirk), then `pm.compute_deterministics(posterior, ["mu","kappa"],
+  model=model.backend.model)` for response params straight from the PyMC
+  graph (bambi `predict(kind="response_params")` wraps kappa through the
+  mean link - broken for kappa, bambinos/bambi#1084), manual von Mises
+  logpdf with stable `logI0 = log(i0e(kappa)) + kappa`, then
+  `idata["log_likelihood"] = xr.Dataset({"y": loglik})` (fit result is
+  a DataTree - plain assignment, no `add_groups`). Then
+  `az.loo(idata, var_name="y")`. Screening/sweep models have no RE and
+  no transformed sigma prior -> plain `pm.compute_log_likelihood`
+  (PyMC6 replacement for `idata_kwargs={"log_likelihood": True}`).
+- **az.hdi 2-D AXIS GOTCHA (broke density smoke runs 3-4):** for a RAW
+  2-D numpy array, `az.hdi` treats the LAST axis as the samples axis.
+  Grid-shaped predictions (draws, n_points) must be transposed before
+  the call, else the HDI comes back transposed (fill_between ValueError:
+  'x' size 50 vs 'y1' size 40). The 3 density sites hand `align.T` /
+  `logp0.T` / `pdfs.T`; 1-D sites are fine. The direction study's 2-D
+  sites already transposed.
+- LINK IMPORT GOTCHA: `unwrap.link.bambi.<name>` exports are Bambi
+  `Link` OBJECTS (for `bmb.Model(link=...)`), not callables. NumPy link
+  functions live in `unwrap.link` (module) / `unwrap.link.numpy`.
+  Posthoc uses NumPy `circular_modulo` for evaluating draws, the
+  `BAMBI_LINKS` registry for building sweep models; calling a Link
+  object on an array is a TypeError.
+- PyMC 6.3 `pm.sample`: NO `include_transformed` kwarg (removed);
+  `idata_kwargs` still exists but the final fit drops it (LL off is the
+  default; transformed draws always stored).
+- Bake ~1 h this run (16-core box, final fit 4 chains x (2000 tune +
+  1000 draws), N=18641 / 440 animals).
+
+## DIRECTION ELDP LAYOUT FIX #63 (MERGED = main f817823)
+- One-line bug in locust_direction_plots.plot_elpd_by_individual:
+  panel b's "b." label was drawn with `transform=axA.transAxes` (a copy
+  of panel a's line). "b." rendered at panel A's top-left (stacked on
+  "a.") yet stayed a child artist of axis b. `plt.tight_layout()`
+  includes every child artist in each axis's bbox, so it saw panel b as
+  spanning x~=0.06 (where "b." rendered) to the right edge; the solver
+  collapsed panel a to the left ~22% and pinned panel b to the right
+  edge -> ~60% white space between the panels + overlapping labels.
+  Fix: `transform=axB.transAxes`; notebook re-baked (both fits seeded
+  identically, all other outputs unchanged). LESSON: an a./b. label
+  with the WRONG axis transform silently corrupts tight_layout -
+  bisect by re-adding pieces and printing `ax.get_position()`.
+
+## BATS STUDY PR (NEXT) - RECON DONE
+- Base = main (the bats notebook is ALREADY annotated + E2E - no
+  explain-branch merge needed). 96 cells (58 code + 38 md), ~12 MB
+  baked, 31 figure cells; 16171-line source dump at
+  /tmp/opencode/bats_cells.txt (gen: /tmp/opencode/dump_cells.py <nb>
+  <out>); full profile + recipe at /tmp/opencode/bats_recon.md.
+- Data loaders in unwrap/datasets.py: load_bats_tracks (L369),
+  load_bats_info (L388), load_bats_lake_outline (L403),
+  bats_lake_outline_path (L420). E2E via ensure_clone (reuses
+  ~/.cache/unwrap-data - no re-download).
+- PREPROCESS: c06 (521 L) `rediscretize_latlon_parallel` - constant
+  60 m step, haversine/Slerp + optional pyproj WGS84, gap segmentation
+  (segment_id / gap_before). NOT in unwrap/ (inline only). An old 1344
+  L version at origin/feat/notebooks-to-scripts
+  notebooks/goldshtein_bats_preprocess.py (pre-annotated era, renamed
+  from goldschtein_*) - DIFF against current c06 before reusing; the
+  inline cell is the source of truth.
+- PLOTS: existing notebooks/goldshtein_bats_plots.py (228 L) is OLD
+  style (own set_style/_save, single DPI=300) - FULL house-convention
+  rewrite (two-res unwrap.plots, save/save_path, FIG_DIR absolute) like
+  locust_density_plots.py. ~25 code cells >100 L to port (profile in
+  bats_recon.md); model cells (c08, c19-c32) stay inline.
+- Models: vMu PyMC fit (already seeded) + vM GLMM fit (random_seed=
+  20261030). Recipe: probe -> posthoc + plots scripts -> thin-cell
+  rebuild (build_density_nb.py pattern) -> smoke -> rerun_nb.py bake ->
+  verify gate -> pytest -> push + PR + merge.
 ## STATE AT FREEZE (superseded; kept for history)
 
 - Board: only #44 #43 #40 open. (10 superseded PRs closed.)
