@@ -348,7 +348,7 @@ def plot_elpd_by_individual(models, df, *, save=True,
     axB.tick_params(axis="y", left=False, labelleft=False)
     axB.spines["top"].set_visible(False)
     axB.spines["right"].set_visible(False)
-    axB.text(-0.12, 1.02, "b.", transform=axA.transAxes, fontweight="bold",
+    axB.text(-0.12, 1.02, "b.", transform=axB.transAxes, fontweight="bold",
              fontfamily="Arial", fontsize=16, va="bottom", ha="left")
 
     plt.tight_layout()
