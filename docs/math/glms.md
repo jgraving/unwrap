@@ -50,7 +50,7 @@ The circular-modulo operation wraps the predicted angle to $[-\pi,\pi)$.
 Softplus maps the concentration predictor to positive values. These are
 conventionally called inverse links; circular wrapping is many-to-one and
 has no global mathematical inverse. The [link reference](../links.md)
-describes the numerical functions and boundary behaviour.
+describes the numerical functions and boundary behavior.
 
 Including predictors for both parameters is **distributional regression**:
 the experiment can explain directional consistency as well as mean direction.

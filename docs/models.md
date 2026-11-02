@@ -14,7 +14,7 @@ Each section defines the notation alongside its biological interpretation.
 
 A **generalized linear model (GLM)** relates a measured outcome to explanatory
 variables, called **predictors**. Here the outcome is an angle, and predictors
-could include cue presence, neighbour density, or their interaction: whether
+could include cue presence, neighbor density, or their interaction: whether
 the response to the cue depends on density.
 
 The **von Mises likelihood** describes the distribution of headings around a
@@ -51,7 +51,7 @@ framework, in which mean direction and concentration can each have predictors.
 
 ## Express the model with Bambi or PyMC
 
-`unwrap` works within the Python Bayesian modelling ecosystem. **PyMC** lets
+`unwrap` works within the Python Bayesian modeling ecosystem. **PyMC** lets
 you construct models explicitly from distributions, predictors, and priors,
 then estimate their posterior distributions. **Bambi** builds PyMC models
 from regression formulas, providing a high-level API for GLMs and GLMMs.
@@ -128,7 +128,7 @@ with different mean headings. Use predictions at both animal and population
 levels to distinguish these patterns.
 
 Bayesian fitting combines priors with the observed angles to estimate a
-posterior distribution. Check sampling diagnostics, summarise angles on the
+posterior distribution. Check sampling diagnostics, summarize angles on the
 circle, and compare simulated headings from the fitted model with the data
 using **posterior predictive checks**. The
 [circular regression tutorial](notebooks/circular_regression.ipynb)

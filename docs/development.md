@@ -25,7 +25,7 @@ run. Full research analyses and R/MATLAB are not yet CI coverage targets.
 
 ## Build and preview documentation
 
-Docs dependencies are separate from the modelling environment:
+Docs dependencies are separate from the modeling environment:
 
 ```bash
 uv venv .venv-docs --python 3.12

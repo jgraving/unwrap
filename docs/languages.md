@@ -38,7 +38,7 @@ argument that must be changed to your local installation.
 
 The script includes a small example dataset and plots posterior samples.
 It notes that MatlabStan does not provide tools to unwrap estimates, so inspect
-periodic chain behaviour when interpreting its output.
+periodic chain behavior when interpreting its output.
 
 ## MATLAB: native sampling
 

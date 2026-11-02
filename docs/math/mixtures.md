@@ -54,9 +54,9 @@ P(w_n=1\mid y_n,\Theta)
 $$
 
 This **responsibility** is a probability of component membership under the
-model. Evaluate it for each posterior draw and summarise across draws to
+model. Evaluate it for each posterior draw and summarize across draws to
 include parameter uncertainty. A component's biological interpretation
-depends on the experiment; membership alone does not establish a behavioural
+depends on the experiment; membership alone does not establish a behavioral
 mechanism. If $\kappa_n$ is near zero, the directed component also becomes
 nearly uniform, making its weight difficult to distinguish from concentration.
 
@@ -99,7 +99,7 @@ can have the same partially pooled coefficients described for [GLMMs](glmms.md).
 
 Repeated observations help distinguish animals that each mix between two
 directions from animals that consistently choose different directions.
-Priors on the weight offsets matter: narrow distributions favour similar
+Priors on the weight offsets matter: narrow distributions favor similar
 weights among animals, while wider distributions allow weights close to
 zero or one. Check what those priors imply on the probability scale.
 This mixture specifies component probabilities for observations; temporal
@@ -140,7 +140,7 @@ unchanged. Fix one reference predictor, such as $\eta_{\pi,nK}=0$, or impose
 a sum-to-zero constraint to remove this redundancy. This is separate from
 the component-label issue below. For numerical stability, subtract the
 largest weight predictor before evaluating the exponentials; the weights
-are unchanged. The [locust mixture example](../examples.md#locusts-preferred-directions-and-responses-to-virtual-neighbours)
+are unchanged. The [locust mixture example](../examples.md#marching-locusts-order-and-density-optic-flow-and-vectorial-encoding)
 uses two components; additional components require more data and careful evaluation.
 
 ## Component labels and interpretation

@@ -60,7 +60,7 @@ without any adjustable shift or rotation argument.
 Both -pi and pi map to -pi under `circular_modulo`. `atan2` may give either boundary
 sign because of floating-point rounding. All circular wrappers are many-to-one,
 with discontinuities at the branch cut. They have no global mathematical inverse;
-the registries use the wrapper in both slots as a modelling convention.
+the registries use the wrapper in both slots as a modeling convention.
 
 The rectifier also has no inverse and floors at epsilon rather than zero.
 Softplus and its inverse use stable formulas, but finite-precision limits still
