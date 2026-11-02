@@ -445,7 +445,6 @@ def ppc_bootstrap_stats(idata_treat, model_treat, df, *, verbose=True):
     # ----------------------------
     post = idata_treat.posterior
     mu_intercept = _stack_1d(post, "Intercept")
-    mu_light_fx  = _stack_1d(post, "Light")
     mu_light_fx  = _stack_1d(post, "Light") if "Light" in post.data_vars else np.zeros_like(mu_intercept)
     mu_pop_off_draw = circ_mod(mu_intercept)
     mu_pop_on_draw  = circ_mod(mu_intercept + mu_light_fx)

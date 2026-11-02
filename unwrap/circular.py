@@ -23,7 +23,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import stats as scs
 
-from unwrap.bessel import bessel_ratio
+from unwrap.bessel import bessel_ratio, log_i0
 
 __all__ = [
     "wrap_pi",
@@ -33,8 +33,8 @@ __all__ = [
     "circular_mean",
     "resultant_length_angles",
     "circ_dist",
-    "circ_pdf",
     "vonmises_pdf",
+    "vonmises_logpdf",
     "von_mises_kde",
     "A_of_kappa",
     "vonmises_kappa_from_R",
@@ -58,12 +58,12 @@ TWO_PI = 2.0 * np.pi
 # ---------------------------------------------------------------------------
 
 def wrap_pi(x):
-    """Wrap angles to ``(-pi, pi]`` (alias of :func:`circ_mod`)."""
+    """Wrap angles to ``[-pi, pi)`` (alias of :func:`circ_mod`)."""
     return (np.asarray(x) + np.pi) % TWO_PI - np.pi
 
 
 def circ_mod(x):
-    """Wrap angles to ``(-pi, pi]``. Vectorised, array-safe."""
+    """Wrap angles to ``[-pi, pi)``. Vectorised, array-safe."""
     return wrap_pi(x)
 
 
@@ -118,6 +118,21 @@ def vonmises_pdf(theta, mu, kappa):
     """Von Mises pdf ``exp(kappa cos(theta-mu)) / (2pi I0(kappa))``."""
     theta = np.asarray(theta, float)
     return np.exp(kappa * np.cos(theta - mu)) / (TWO_PI * np.i0(kappa))
+
+
+def vonmises_logpdf(theta, mu, kappa):
+    """Log von Mises density, stable for any ``kappa >= 0``.
+
+    ``kappa * cos(theta - mu) - log(2 pi) - log I0(kappa)`` with
+    :func:`unwrap.bessel.log_i0`, so this stays finite far beyond the
+    kappa (~700) where :func:`vonmises_pdf`'s plain ``i0`` overflows —
+    the form the fitted studies need for per-observation
+    log-likelihoods at their actual concentrations.
+    """
+    theta = np.asarray(theta, float)
+    kappa = np.asarray(kappa, float)
+    return (kappa * np.cos(theta - np.asarray(mu, float))
+            - np.log(TWO_PI) - log_i0(kappa))
 
 
 def von_mises_kde(data: np.ndarray, points: np.ndarray, kappa: float) -> np.ndarray:

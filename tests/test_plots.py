@@ -45,3 +45,20 @@ def test_repo_rel_for_files_and_dirs():
     assert plots.repo_rel(d) == "figures/bats"
     f = os.path.join(d, "kappa_hat.pdf")
     assert plots.repo_rel(f) == "figures/bats/kappa_hat.pdf"
+
+
+def test_save_by_path_routes_by_suffix(tmp_path):
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    fig_dir = str(tmp_path / "figures" / "study")
+    out_pdf = plots.save_by_path(fig, fig_dir, "figures/study/x.pdf")
+    out_svg = plots.save_by_path(fig, fig_dir, "figures/study/y.svg")
+    plt.close(fig)
+    pdf = tmp_path / "figures" / "study" / "x.pdf"
+    svg = tmp_path / "figures" / "study" / "y.svg"
+    assert [str(p) for p in out_pdf] == [str(pdf)]
+    assert [str(p) for p in out_svg] == [str(svg)]
+    assert pdf.exists() and pdf.read_bytes()[:5] == b"%PDF-"
+    assert svg.exists() and svg.read_text()[:5] == "<?xml"
+    # nothing else in the study dir
+    assert sorted(p.name for p in (tmp_path / "figures" / "study").iterdir()) == ["x.pdf", "y.svg"]
