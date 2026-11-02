@@ -41,7 +41,76 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (DEDUP PHASE COMPLETE: the shared helper families that were duplicated across the study scripts now live ONCE in the flat `unwrap` package, and every study's scripts are rewired onto the package twins - foundation PRs #69-#71 + the 8 study rewire PRs #72-#79 all merged, main = e02c856; every rewire proved behaviour-neutral by full E2E re-bake + house gate + byte-compare of the baked notebook vs PR-base main; all rewire branches + worktrees deleted both sides; qa/ mirror + this doc refreshed below) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (DOCS PHASE COMPLETE: the mkdocs site is up to date with the repo - all 8 study notebooks now render inline on the site from their committed outputs (the docs build NEVER executes a notebook), each notebook page has an "Open in Google Colab" button, and the stale doc claims are refreshed against ground truth; PR #80 merged, main = 91ac2a0; PR branch + worktree deleted both sides; this doc refreshed below; research + docs work all merged - nothing pending) - NEXT CHAT STARTS HERE
+
+## DOCS PHASE (COMPLETE 2026-11-02; PR #80 merged, main = 91ac2a0)
+
+Goal: bring the mkdocs site up to the current repo state, display the
+study notebooks inline on the site instead of the GitHub blob links,
+and add an "Open in Google Colab" button to the notebook pages.
+
+What landed (#80, single commit cc4710d; 12 files, 107+/34-; no
+research code touched):
+- On-site rendering (mkdocs-jupyter, pinned >=0.27,<1 in
+  requirements-docs.txt): `execute: false` renders the committed
+  notebook outputs only - the docs build NEVER executes a notebook
+  (research bakes take up to ~20 min each; the tutorial has its own
+  CI execution). `markdown_cell_processor: mkdocs` runs cells through
+  the site's full MkDocs pipeline (TOC headings, code highlighting,
+  arithmatex MathJax). GOTCHA: the mkdocs.yml plugin key is
+  `- mkdocs-jupyter:` (the entry-point name), not `- jupyter:`
+  ("plugin is not installed").
+- sync_docs_notebooks.py (repo root, stdlib only): copies
+  notebooks/*.ipynb -> docs/notebooks/ (gitignored, with the .cache/
+  render cache). notebooks/ stays the single source of truth. The docs
+  workflow runs the sync step before `mkdocs build --strict`;
+  development.md documents it for local builds.
+- Colab button: custom template docs/jupyter_templates/notebook.html.
+  j2 = the plugin's default template + a .unwrap-nb-toolbar (official
+  colab-badge.svg button) above the notebook content; an inline script
+  fills the href from the page URL (colab.research.google.com/github/
+  jgraving/unwrap/blob/main/notebooks/<name>.ipynb) and removes the
+  toolbar if the /notebooks/ segment is absent. Toolbar styling in
+  brand.css.
+- Stale claims refreshed, each verified against ground truth: Python
+  3.12 minimum (setup.py python_requires + tests.yml matrix 3.12-3.14
+  linux / 3.12 macos+windows, min-deps on 3.12); observations fetched
+  on first use from jgraving/unwrap-data via the unwrap.datasets
+  accessors into ~/.cache/unwrap-data (notebooks/datasets/ was never
+  committed; local notebooks/XY_parquet_parts is a gitignored
+  symlink); seaborn is imported only by the zebra/bats plot scripts,
+  pyarrow reads the parquet; "before a change that touches one is
+  merged, that notebook is rerun end to end, and the outputs stored in
+  the repository come from that run" replaces the no-fresh-run wording
+  (getting-started, index, development, examples); examples.md links
+  the on-site pages and gains the previously missing Homing bats
+  section; nav groups the 8 notebooks under Biological examples. No
+  search plugin added (the baseline site has none - the `plugins:` key
+  existed only to carry mkdocs-jupyter).
+
+Checked: CI-mirroring build (fresh uv venv py3.12 +
+requirements-docs.txt) -> sync + `mkdocs build --strict` clean in ~6 s
+with 8x "Converting notebook (execute=False)"; playwright per-page
+checks: Colab href per page, base64-inlined figures load, MathJax
+containers typeset, notebook headings in the sidebar TOC, dark mode
+correct (the site's dark palette IS "slate" and the notebook CSS
+switches on [data-md-color-scheme=slate]; material sets the attribute
+on BOTH html and body - a manual toggle that only sets html looks
+broken; the white areas in dark mode are the baked white PNG figures,
+not the theme).
+
+Merge flow (house): worktree from origin/main e02c856 -> single commit
+-> push -> PR #80 -> CI all green (docs build 18 s, tutorial execute,
+full test matrix) -> merged as 91ac2a0 -> remote branch + worktree +
+local branch deleted. NOTE: right after the merge the local `main` ref
+lagged origin/main, so `git branch -d` refused ("not fully merged") -
+verify with `git branch --merged origin/main` then -D; `git fetch
+--prune` drops the stale remote-tracking ref.
+
+The OLDER state (DEDUP PHASE COMPLETE) is preserved below, starting
+with "STATE - updated 2026-11-02 (DEDUP PHASE COMPLETE: ...".
+
+## STATE - updated 2026-11-02 (DEDUP PHASE COMPLETE: the shared helper families that were duplicated across the study scripts now live ONCE in the flat `unwrap` package, and every study's scripts are rewired onto the package twins - foundation PRs #69-#71 + the 8 study rewire PRs #72-#79 all merged, main = e02c856; every rewire proved behaviour-neutral by full E2E re-bake + house gate + byte-compare of the baked notebook vs PR-base main; all rewire branches + worktrees deleted both sides; qa/ mirror + this doc refreshed below)
 
 ## DEDUP PHASE (COMPLETE 2026-11-02; main = e02c856)
 
