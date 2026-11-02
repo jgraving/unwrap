@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (ALL DONE: BATS PR #64 = main e4f74ae; BEETLES PR #65 MERGED = main 8a0539f; every research study on main with sibling scripts + thin cells + seeded fits + baked-and-validated outputs + house validated README rows; branch/worktree cleaned both sides; final doc + qa mirror on the docs branch) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (COMPLETE: every notebook on main has the house treatment - 5 research studies via study PRs (#64 bats = e4f74ae, #65 beetles = 8a0539f, zebra/locust x2 earlier) + periodic PR #66 + policy PR #67 + README intro PR #68; main = 3df54e4; #43 closed as superseded; all work branches + worktrees deleted both sides; this doc + qa/ final sync below) - NEXT CHAT STARTS HERE
 - BOARD: main = f817823. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
@@ -829,6 +829,35 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     hand-edits in sync (verified idempotent after the c40 change).
   * E2E data: unwrapp venv /home/jake/.venvs/unwrap-env, data from the
     user-level ~/.cache/unwrap-data clone (no re-download).
+## PERIODIC + POLICY HOUSE TREATMENT (user asked: give ALL notebooks the house treatment)
+- Both were already thin (scripts merged in the earlier template wave;
+  11 cells each; set_style + version-dict setup; single figure cell each).
+- periodic_not_circular: zero source edits needed (already saves .pdf,
+  already prints Divergences first). Re-bake 17 s, 0 errors, NUTS boot +
+  Divergences: 0 (progressbar=False suppresses the "Sampling..." line -
+  gate checks the NUTS[sampler] line instead). Gate verify_periodic.py
+  PASS. PR #66 (branch periodic-house-treatment, worktree
+  /tmp/opencode/wt-periodic-house).
+- von_mises_policy: svg->pdf (cell c09 + module default), re-bake 6 s,
+  0 errors, figure 100/300 two-res clean. Gate verify_policy.py PASS.
+  pytest 106 passed on branch. PR #67 (branch policy-house-treatment,
+  worktree /tmp/opencode/wt-policy).
+- BOTH PRs also flip their README rows to the house validated wording.
+- NOTE: /tmp/opencode/wt-periodic (pr/explain-periodic) is the user's
+  explain-series worktree - do not touch; the new one is
+  wt-periodic-house.
+- After both merged: README intro micro-PR - replaced the stale
+  "retain saved results ... not evidence that a fresh run succeeds"
+  sentence with validated wording (PR #68 -> main 3df54e4).
+  PERIODIC PR #66 -> main 6620ade; POLICY PR #67 -> main 565e81d
+  (the two README-row edits conflicted on adjacent rows; resolved by
+  merging main into the policy branch - keep both validated rows).
+- PR #43 (feat/circular-rhat, unwrap.diagnostics joint circular R-hat)
+  CLOSED as superseded: user confirmed the per-study house pattern
+  (Divergences-first + circular_summary + plain ArviZ r_hat/ESS filters)
+  is the diagnostic treatment and everything converged/mixed; the module
+  was never merged and no notebook uses it.
+
 ## BEETLES STUDY PR - MERGED (PR #65 -> main 8a0539f; branch + worktree deleted both sides)
 - 2 commits on the branch: (1) 28159df svg->pdf save paths (3 cells c08/c15/c16
   + the 3 module signature defaults; _save suffix router + svg fonttype rc
