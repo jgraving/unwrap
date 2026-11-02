@@ -2,6 +2,14 @@ site_name: unwrap
 site_url: https://jgraving.github.io/unwrap/
 site_description: Bayesian circular GLMs and GLMMs with PyMC and Bambi
 repo_url: https://github.com/jgraving/unwrap
+# Study notebooks render from their committed outputs (never executed at
+# build time; see .github/workflows/docs.yml and sync_docs_notebooks.py).
+# The custom template adds the "Open in Google Colab" button.
+plugins:
+  - mkdocs-jupyter:
+      execute: false
+      markdown_cell_processor: mkdocs
+      custom_template: docs/jupyter_templates/notebook.html.j2
 edit_uri: blob/main/docs/
 theme:
   name: material
@@ -44,7 +52,16 @@ nav:
       - 2. Circular GLMs: math/glms.md
       - 3. Circular GLMMs: math/glmms.md
       - 4. Mixture extensions: math/mixtures.md
-  - Biological examples: examples.md
+  - Biological examples:
+      - Overview: examples.md
+      - Circular regression tutorial: notebooks/circular_regression.ipynb
+      - Zebra body orientation: notebooks/zebra_escape.ipynb
+      - Homing bats: notebooks/goldshtein_bats.ipynb
+      - Locust direction mixtures: notebooks/locust_direction_mixture_model.ipynb
+      - Locust density and order: notebooks/locust_density_order.ipynb
+      - Dung beetle orientation: notebooks/beetles.ipynb
+      - Periodic and circular functions: notebooks/periodic_not_circular.ipynb
+      - Von Mises policy: notebooks/von_mises_policy.ipynb
   - Circular links: links.md
   - Python API guide: api.md
   - R and MATLAB: languages.md

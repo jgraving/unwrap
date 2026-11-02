@@ -1,6 +1,6 @@
 # Python setup
 
-Use Python 3.10 or newer and install from GitHub in a virtual environment.
+Use Python 3.12 or newer and install from GitHub in a virtual environment.
 This keeps the notebook's dependencies together.
 
 ## Install and open the tutorial
@@ -72,11 +72,21 @@ Summarise angles on the circle: the average of 179° and −179° is near 180°,
 
 ## Run a biological example
 
-The [example guide](examples.md) lists the data and extra dependencies for each
-research notebook. Zebra and locust mixture observations are bundled with the
-repository. The locust density analysis also needs original trajectory files
-that are not included.
+The [example guide](examples.md) lists each example and what its validated
+run covers. The animal-behaviour notebooks load their observations through
+the `unwrap.datasets` accessors, which fetch the raw data from the
+`jgraving/unwrap-data` repository on first use (cloned to
+`~/.cache/unwrap-data`) and then resolve to the cache without network
+access. The animal-behaviour notebooks additionally need `seaborn`
+(zebra and bat figures) and `pyarrow` (the parquet data files), installed
+in the same environment:
 
-The introductory notebook is executed automatically in CI. Research notebooks
-are not yet checked end to end. To make your own analysis reproducible, record
-the repository commit and installed package versions with your results.
+```bash
+python -m pip install seaborn pyarrow
+```
+
+The introductory notebook is executed automatically in CI. Before a change
+is merged, each research notebook it touches is rerun end to end, and the
+outputs stored in the repository come from that run. To make your own
+analysis reproducible, record the repository commit and installed package
+versions with your results.
