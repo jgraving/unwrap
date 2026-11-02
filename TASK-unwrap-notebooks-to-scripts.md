@@ -41,7 +41,130 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (COMPLETE: every notebook on main has the house treatment - 5 research studies via study PRs (#64 bats = e4f74ae, #65 beetles = 8a0539f, zebra/locust x2 earlier) + periodic PR #66 + policy PR #67 + README intro PR #68; main = 3df54e4; #43 closed as superseded; all work branches + worktrees deleted both sides; this doc + qa/ final sync below) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (DEDUP PHASE COMPLETE: the shared helper families that were duplicated across the study scripts now live ONCE in the flat `unwrap` package, and every study's scripts are rewired onto the package twins - foundation PRs #69-#71 + the 8 study rewire PRs #72-#79 all merged, main = e02c856; every rewire proved behaviour-neutral by full E2E re-bake + house gate + byte-compare of the baked notebook vs PR-base main; all rewire branches + worktrees deleted both sides; qa/ mirror + this doc refreshed below) - NEXT CHAT STARTS HERE
+
+## DEDUP PHASE (COMPLETE 2026-11-02; main = e02c856)
+
+Goal: the study scripts each carried private copies of the same
+circular-statistics / posterior bookkeeping / figure-export helpers.
+Move each EXACT family into the flat `unwrap` package (repo root, no
+sub-packages) and rewire the study scripts onto it, one focused PR per
+study. House rule: `CI` smoke-imports `unwrap.prior` / `unwrap.data`
+names - those files never move; notebook-facing modules have no api.md
+entries so no docs changes beyond this handoff.
+
+House flow per rewire PR (all 8 followed it):
+1. worktree from `origin/main` (main moves with every merge)
+2. rewire edit; `py_compile`; pyflakes vs the pre-rewire files with
+   `:line:col:` stripped (expected delta = only warnings whose import
+   was dropped)
+3. runtime identity check where numerics swap (bit-identical or
+   ulp-class max-diff vs the pre-rewire module, logged in the PR body)
+4. commit 1 (code rewire) -> clear the notebook's code outputs
+   (`json.dumps(nb, indent=1) + "\n"`) -> FULL E2E re-bake
+   (`rerun_nb.py`, background, no timeout; NEVER two bakes at once -
+   RAM) -> the study's `verify_*` gate -> BYTE-COMPARE of the baked
+   `.ipynb` vs the PR-base main copy (every remaining diff must be on
+   the accepted-transients list below, and be explained)
+5. commit 2 (`<study>: re-bake the notebook ...`), push, PR, CI checks,
+   merge, delete remote branch + worktree + local branch, `git fetch`
+
+Accepted re-bake transients (documented per PR; nothing else is
+allowed): NUTS wall-time lines; warning paths pointing at this
+worktree (incl. rewire-shifted line numbers); pandas Styler `0x...`
+addresses; saved pandas table/widget random IDs (`T_xxxxx`);
+InferenceData repr `created_at`/`sampling_time`; the wall-clock sampler
+stat arrays (`perf_counter_start`, `perf_counter_diff`,
+`process_time_diff` - differ by construction); the InferenceData var
+enumeration order (which also moves the plain repr's 12-of-18 sample_stats
+fold window); random widget element UUIDs; arviz `PlotCollection at
+0x...` repr addresses. AND (periodic only): the PPC figure's inline
+PNG churn - `plot_beta_fit_ppc` samples its posterior predictive draws
+with an UNSEEDED `pm.sample_posterior_predictive`, so the median/HDI
+bands shift a few pixels on EVERY bake; proven intrinsic by re-baking
+the untouched scripts on the same base (3893 differing px vs 3880 on
+the rewire, both of 94070, same bbox).
+
+Merged, oldest first (merge commit on main in parentheses):
+- #69 locust arrow family (9f03ab8)
+- #70 `unwrap.inference` (graph_free_rvs family) (4856395)
+- #71 core additions (b7af719; full python suite = 142 tests)
+- #72 bats (f0e1f44)
+- #73 zebra (3c444fb)
+- #74 locust-direction (56e3336)
+- #75 locust-density (6ca54fe; posthoc +10/-37, plots +1/-6). Kept
+  deliberately local: `_sorted_unique` (the package `sorted_groups`
+  twin coerces ids to str, but the call sites filter the float-typed
+  `order`/`density` columns by equality - str ids would blank every
+  panel), `_circ_dist` (signed), `circular_hdi`/`_linear_hdi_mean`/
+  `_subsample_draws` (distinct semantics). Bake 1156 s, 14/14 figs;
+  compare: 43 cells, 0 source/PNG diffs; c27 InferenceData repr diffs
+  fully accounted for (timestamps + wall-clock stats + var order +
+  widget UUIDs; the full HTML var-item multiset matches).
+- #76 beetles (85941ce; net -167 loc). Dropped the 27-line in-file
+  `rho_circular` duplicate (-> `resultant_length_angles`, bit-identical
+  50/50), the ive-ratio `_bessel_ratio_mrl` (3.3e-16 twin), the scipy
+  mean-of-pdf `circular_kde` (-> `von_mises_kde(data, points, kappa)`,
+  5.8e-16). Kept local: `circ_hdi_centered` (center-then-linear HDI;
+  the package `circ_hdi` is arviz-based), `natural_sort_key` (alive at
+  its one `sorted(key=...)` reference - grep for `(` misses bare-name
+  references), `hierarchical_bootstrap_group` (different indivs
+  signature), scipy `circmean`/`circstd` high/low idiom, `vonmises.fit`;
+  plots keep `_ensure_style` (font.size 11 + hidden top/right spines on
+  top of the house `DEFAULT_RC` - the figures depend on it),
+  `circ_median`, `_to_360`, `_circ_hdi_centered`, `_mean_hdi`,
+  `_errorbar_mean_hdi`, `_vonmises_interval_mass` (scipy cdf, no twin).
+  Bake 84 s; compare: 25 cells, 0 source/PNG/widget diffs; only diff =
+  NUTS wall-time 52 -> 50 s.
+- #77 circular_regression (f1c95e8). One-line `_save` -> `save_by_path`
+  swap (net -4 loc). `plot_trace` KEEPS its manual
+  `pc.savefig(FIG_DIR / ...)`: `save_figure`'s SVG branch passes
+  `bbox_inches="tight", pad_inches=0.01`, which would re-crop the saved
+  trace SVG - documented in the commit message. Bake 12 s; compare:
+  16 cells, 0 source/PNG/text diffs; 1 widget diff = the PlotCollection
+  repr address.
+- #78 periodic_not_circular (519d27f). Same one-line swap; see the
+  unseeded-PPC PNG note above. Bake 18 s.
+- #79 von_mises_policy (e02c856; current main). Same one-line swap.
+  Bake 6 s; compare: ZERO diffs of any kind (11 cells).
+
+Package facts the rewires relied on (verify_*.py gates + rerun_nb.py
+mirrored into qa/ above, all worktree-aware: run from the worktree cwd
+or pass the root as argv[1]): `save_by_path(fig, fig_dir, save_path,
+*, transparent=False, dpi=300)` routes by suffix into
+`save_figure(fig, fig_dir, p.stem, ...)`; `save_figure` PDF branch =
+`savefig(dpi, bbox_inches="tight", pad_inches=0.01)`, SVG branch =
+`savefig(bbox_inches="tight", pad_inches=0.01)` (no dpi); `A_of_kappa`
+= vectorized scaled bessel ratio; `wrap_pi`/`circ_mod` =
+`(x+pi)%2pi-pi`; `von_mises_kde(data, points, kappa)` wraps data via
+circ_mod, `c = 1/(2*pi*i0(kappa))`, `.mean(axis=1)`;
+`vonmises_logpdf(theta, mu, kappa)` stable via log-i0; arviz 1.3
+InferenceData DataTree; `DEFAULT_RC` = Arial/dpis/facecolor/type-42
+only.
+
+Process fixes learned (cost real time; keep them):
+- `find(lines, prefix)` in the edit scripts STRIPS each line, so
+  prefixes with leading whitespace NEVER match - write anchors
+  unprefixed (cost one full beetles re-run).
+- after a block deletion, re-normalize blank-line adjacency around the
+  survivors (`two_blanks`/`blanks_before`); a banner sits straight
+  above its first def (0 blanks).
+- recon greps for call sites must also catch BARE-NAME references
+  (`key=natural_sort_key`), not just `name(`.
+- dead-name asserts must allow the name to remain in comments (beetles
+  `directional_stats` in the N.B. comments).
+- pyflakes comparison must strip `:line:col:` (numbers shift after
+  edits) and diff on message bodies.
+- `gh pr edit --body-file` silently no-ops; use
+  `gh api -X PATCH repos/jgraving/unwrap/pulls/N -F body="$(cat f)"`.
+- NEVER a full-directory `git checkout --` in a baking worktree (it
+  once clobbered a bake); partial `git checkout -- notebooks/` before a
+  clean script re-run is the accepted restore.
+
+The OLD final state (pre-dedup) is preserved below, starting with
+"STATE - updated 2026-11-02 (COMPLETE: ...".
+
+## STATE - updated 2026-11-02 (COMPLETE: every notebook on main has the house treatment - 5 research studies via study PRs (#64 bats = e4f74ae, #65 beetles = 8a0539f, zebra/locust x2 earlier) + periodic PR #66 + policy PR #67 + README intro PR #68; main = 3df54e4; #43 closed as superseded; all work branches + worktrees deleted both sides; this doc + qa/ final sync below)
 - BOARD: main = f817823. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside

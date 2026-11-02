@@ -11,13 +11,15 @@ Source audit: the figure cell is a comment + one plots.plot_*(save_path=...)
 call + plt.show() and nothing else; no other code cell touches plt.
 """
 import base64
+import sys
 import io
 import json
 from pathlib import Path
 
 from PIL import Image
 
-ROOT = Path("/tmp/opencode/wt-policy")
+ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else next(
+    p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".git").exists())
 nb = json.load(open(ROOT / "notebooks/von_mises_policy.ipynb"))
 
 SETUP_CELLS = {2}

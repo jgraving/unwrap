@@ -11,13 +11,15 @@ c26 final fit (response params from PyMC graph OK), c27 LOO
 c35-c42 (14 figures, each 100 dpi inline + 300 dpi PDF under figures/locust/).
 """
 import base64
+import sys
 import io
 import json
 from pathlib import Path
 
 from PIL import Image
 
-ROOT = Path("/tmp/opencode/wt-unified")
+ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else next(
+    p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".git").exists())
 nb = json.load(open(ROOT / "notebooks/locust_density_order.ipynb"))
 
 FIG_CELLS = {11, 12, 13, 14, 19, 23, 35, 36, 37, 38, 39, 40, 41, 42}
