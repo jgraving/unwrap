@@ -19,7 +19,12 @@ lists all examples, their inputs, and what each validated run covers.
 
 A focal group of Grevy's zebra (*Equus grevyi*) was recorded with an overhead
 drone and automated tracking at the Mpala Conservancy in Laikipia, Kenya: the
-first flights capture baseline (grazing) body orientation, and the final
+body orientations come from the drone recordings of B. Koger, A. Deshpande,
+J. T. Kerby, J. M. Graving, B. R. Costelloe, and I. D. Couzin, "Quantifying
+the movement, behaviour and environmental context of group-living animals
+using drones and computer vision," *Journal of Animal Ecology* **92**(6),
+1415-1433 (2023); [doi:10.1111/1365-2656.13904](https://doi.org/10.1111/1365-2656.13904).
+The first flights capture baseline (grazing) body orientation, and the final
 flight contains a disturbance event in which a human observer approaches the
 group. The [zebra analysis](notebooks/zebra_escape.ipynb) compares
 body orientation in the **pre-stimulus baseline period** (pre-approach) with
@@ -30,22 +35,18 @@ mean direction, alignment between individuals (how the individual mean
 directions cluster), and within-individual consistency (how tightly each
 zebra's observations cluster around its own mean direction).
 
-The body orientations are from the drone recordings of B. Koger,
-A. Deshpande, J. T. Kerby, J. M. Graving, B. R. Costelloe, and I. D.
-Couzin, "Quantifying the movement, behaviour and environmental
-context of group-living animals using drones and computer vision,"
-*Journal of Animal Ecology* **92**(6), 1415-1433 (2023);
-[doi:10.1111/1365-2656.13904](https://doi.org/10.1111/1365-2656.13904).
-
 ## Homing bats: goal-directedness and directional precision under sensory deprivation
 
 The [homing bat analysis](notebooks/goldshtein_bats.ipynb) revisits
 kilometer-scale homing flights of echolocating bats from the experiments of
-Goldshtein et al.: free-flying bats translocated within their home range are
-tracked on their return to a known goal, the roost or the Agamon–Hula lake
-region, under a control condition or one of several sensory-deprivation
-treatments (temporary occlusion of vision, experimental disruption of
-magnetoreception and olfaction). The original study found that bats typically
+A. Goldshtein et al., "Acoustic cognitive map-based navigation in
+echolocating bats," *Science* **386**(6721), 561-567 (2024);
+[doi:10.1126/science.adn6269](https://doi.org/10.1126/science.adn6269):
+free-flying bats translocated within their home range are tracked on their
+return to a known goal, the roost or the Agamon–Hula lake region, under a
+control condition or one of several sensory-deprivation treatments (temporary
+occlusion of vision, experimental disruption of magnetoreception and
+olfaction). The original study found that bats typically
 do home successfully even under sensory deprivation; this reanalysis asks
 whether that deprivation nonetheless produces detectable changes in
 goal-relative orientation. Because the treatments could change how straight a
@@ -56,18 +57,17 @@ each step arises either from a directed von Mises component (goal-directed
 "exploitation") or an undirected uniform component (search "exploration"),
 compared with a unimodal von Mises baseline.
 
-The tracking data are from A. Goldshtein et al., "Acoustic cognitive
-map-based navigation in echolocating bats," *Science* **386**(6721),
-561-567 (2024); [doi:10.1126/science.adn6269](https://doi.org/10.1126/science.adn6269).
-
 ## Marching locusts: order and density, optic flow, and vectorial encoding
 
 The [order and density analysis](notebooks/locust_density_order.ipynb)
-revisits a virtual-reality experiment in which marching locusts walk on a
-motion-compensating ball surrounded by a panoramic projection of moving
-virtual conspecifics, parameterized by *order* (how aligned the virtual
-locusts' motion is, 0 to 1) and *density* (virtual locusts per m$^2$,
-1–64). The question is whether the focal locust's directional alignment is
+revisits a virtual-reality experiment from S. Sayin et al., "The behavioral
+mechanisms governing collective motion in swarming locusts," *Science*
+**387**(6737), 995-1000 (2025);
+[doi:10.1126/science.adq7832](https://doi.org/10.1126/science.adq7832),
+in which marching locusts walk on a motion-compensating ball surrounded by a
+panoramic projection of moving virtual conspecifics, parameterized by *order*
+(how aligned the virtual locusts' motion is, 0 to 1) and *density* (virtual
+locusts per m$^2$, 1–64). The question is whether the focal locust's directional alignment is
 driven primarily by the directional structure of the neighbor motion (order)
 or by the number of neighbors (density); a PSIS-LOO model-selection sweep
 over the order and density specifications supports an order-dominant
@@ -75,8 +75,8 @@ interpretation - order captures the bulk of the improvement in out-of-sample
 performance, and adding density provides at most a secondary gain.
 
 The [mixture analysis](notebooks/locust_direction_mixture_model.ipynb) tests
-a second virtual-reality paradigm, in which moving virtual conspecifics are
-placed symmetrically at a lateral distance of 8 or 50 cm. A hierarchical
+a second paradigm from the same experiments, in which moving virtual
+conspecifics are placed symmetrically at a lateral distance of 8 or 50 cm. A hierarchical
 bimodal von Mises mixture fitted to the full distribution of headings
 discriminates the two mechanistic accounts: optic flow (headings
 concentrated near the forward march direction, consistent with optomotor
@@ -84,30 +84,24 @@ alignment to wide-field motion) versus vectorial encoding (a choice-like
 commitment to one of the two lateral swarms, with leftward and rightward
 turns).
 
-Both virtual-reality experiments are from S. Sayin et al., "The
-behavioral mechanisms governing collective motion in swarming locusts,"
-*Science* **387**(6737), 995-1000 (2025);
-[doi:10.1126/science.adq7832](https://doi.org/10.1126/science.adq7832).
-
 ## Dung beetles: artificial light reorients orientation
 
 The [beetle analysis](notebooks/beetles.ipynb) revisits a two-condition
 arena experiment in the nocturnal ball-rolling dung beetle *Escarabaeus
-satyrus* from the experiments of Foster et al.: each beetle is placed at the
-center of a circular arena and allowed to roll to the boundary, with its exit
-bearing recorded repeatedly under natural nighttime illumination (control)
-and with an artificial floodlight switched on (treatment). The model fits the
+satyrus* from the experiments of J. J. Foster et al., "Light pollution
+forces a change in dung beetle orientation behavior," *Current Biology*
+**31**(17), 3935-3942 (2021);
+[doi:10.1016/j.cub.2021.06.038](https://doi.org/10.1016/j.cub.2021.06.038):
+each beetle is placed at the center of a circular arena and allowed to roll
+to the boundary, with its exit bearing recorded repeatedly under natural
+nighttime illumination (control) and with an artificial floodlight switched
+on (treatment). The model fits the
 treatment effect on both the mean direction and the concentration, and the
 analysis quantifies, in a single coherent fit, the group-level reorientation
 toward the floodlight, the change in within-individual concentration, the
 post-hoc change in the between-individual clustering of the individuals' mean
 directions ($\kappa_\mu$), and "floodlight attraction" as the posterior
 predictive mass within $\pm45^{\circ}$ of the floodlight direction.
-
-The arena experiments are from J. J. Foster et al., "Light pollution
-forces a change in dung beetle orientation behavior," *Current
-Biology* **31**(17), 3935-3942 (2021);
-[doi:10.1016/j.cub.2021.06.038](https://doi.org/10.1016/j.cub.2021.06.038).
 
 ## Before running one of these notebooks
 
