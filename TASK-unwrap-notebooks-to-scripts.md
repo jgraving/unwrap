@@ -41,7 +41,84 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (DOCS PHASE COMPLETE: the mkdocs site is up to date with the repo - all 8 study notebooks now render inline on the site from their committed outputs (the docs build NEVER executes a notebook), each notebook page has an "Open in Google Colab" button, and the stale doc claims are refreshed against ground truth; PR #80 merged, main = 91ac2a0; PR branch + worktree deleted both sides; this doc refreshed below; research + docs work all merged - nothing pending) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (PAPER-LANGUAGE + TOC PHASE COMPLETE: the docs study pages and the notebooks' explanatory markdown now read with the companion paper (jgraving/circstats) - paper case-study titles/framing per notebook, US spelling across all docs pages, and every notebook page's ToC is complete and consistent (the beetle page's 4 bare-# sections that the ToC widget never rendered became proper ## sections with descriptions); PR #81 (single-label Colab badge) + PR #82 (language + ToC; markdown cells only, all outputs proven unchanged) merged, main = 0f53d5f; PR branches + worktrees deleted both sides; NOTHING PENDING - research + docs work all merged) - NEXT CHAT STARTS HERE
+
+## PAPER-LANGUAGE + TOC PHASE (COMPLETE 2026-11-02; PRs #81 + #82 merged, main = 0f53d5f)
+
+Goal (user): (a) the notebook pages' "Open in Google Colab" button
+rendered the self-labeling badge AND a second text span - keep one;
+(b) docs + notebook explanatory markdown should match the companion
+paper's language (jgraving/circstats, elife-template.tex) and read
+well; (c) all 8 notebook pages' tables of contents well written and
+consistent - the beetle ToC was "lacking".
+
+#81 (single commit 1273f37; merged d84e660): colab-badge.svg is the
+official self-labeling badge (117x20, "Open in Colab" text baked into
+the SVG), so the template now renders ONLY the badge - the duplicate
+text span removed (accessible name moved to alt="Open in Google
+Colab"), the md-button class dropped (the badge carries its own
+background; the teal pill was doubling the badge styling), badge
+sized 1.5rem tall in brand.css. Verified light + dark via playwright.
+
+#82 (commits ec6e7cd docs + a022b49 notebooks; MARKDOWN CELLS ONLY -
+every code cell, output, and the notebook metadata byte-identical to
+the merge-base snapshot, verified per cell, so the stored outputs are
+still the validated run's and no re-bake was needed):
+- examples.md study sections rewritten to the paper's case-study
+  framing: zebra = Grevy's zebra escape-response pre/post-stimulus
+  decomposition (group-level mu shift, between-individual alignment,
+  within-individual consistency); bats = goal-directedness /
+  directional precision under sensory deprivation (roost or
+  Agamon-Hula lake region; vMU directed "exploitation" / undirected
+  "exploration"; avoids feature-based selection on post-treatment
+  quantities); locusts REORDERED to the paper's order (order and
+  density first - order-dominant interpretation from the PSIS-LOO
+  sweep - then optic-flow vs vectorial encoding, 8 or 50 cm lateral);
+  beetles = the two-condition floodlight arena experiment (Escarabaeus
+  satyrus exit bearings) with the key inference targets (group
+  reorientation, within-individual concentration, post-hoc
+  between-individual kappa_mu, "floodlight attraction" = posterior
+  predictive mass within +/-45 deg). The math/mixtures.md cross-link
+  updated to the renamed locusts heading; US spelling normalized
+  across all docs pages (the paper is US English).
+- Notebook markdown: study titles = the paper's ("Dung beetles:
+  artificial light reorients orientation", "Marching locusts:
+  optic-flow vs. vectorial encoding", "Periodic but not circular");
+  zebra windows labeled pre-stimulus baseline / post-stimulus escape
+  response (data values stay pre-approach/post-approach - that literal
+  is the column value in zebra_preprocess.py); bat intro states the
+  original study's finding + the roost / Agamon-Hula destinations;
+  locust-direction hypothesis section rewritten in the paper's
+  hypothesis-densities language (the attribution to "the original
+  analysis (Sayin et al.)" replaced by this reanalysis's own result);
+  periodic follows the paper's "periodic but not circular" appendix
+  (Beta likelihood; mean + precision sinusoidal); the von Mises policy
+  notebook opens with the paper's optimal-navigation-policy rationale.
+  Each research notebook's intro now links the manuscript source
+  (github.com/jgraving/circstats).
+- ToC: the Material ToC widget renders h2/h3 only, so the beetle
+  page's four bare "#" section markers ("# Read in data", "# Plot
+  data", "# Model with a treatment effect on hyperparameters", "#
+  Inspect the change in kappa_mu") never appeared in the sidebar at
+  all. They are now "## Load the data" / "## Plot the data" / "## Fit
+  the treatment model" / "## Inspect the change in group concentration"
+  (the two extraction steps as ### sub-parts; "## Inspect the fit"
+  and "## Visualize the treatment model" -spelling fixed- already
+  existed) with one-line descriptions and no TeX in any heading.
+  Locust direction: the mixed ###/#### heading levels flattened to
+  ##/### in sentence case (several entries were invisible before).
+  The beetle intro's stale "three nested models + LOO comparison"
+  analysis-flow claim (survived the dedup phase; the notebook fits
+  ONE treatment GLMM with random Individual effects) corrected to
+  match. The other six pages' ToCs were audited: complete as-is,
+  untouched.
+
+Checked: CI-mirroring strict build clean (~6 s, all 8 notebooks
+converted); ToC verified in the built HTML of all 8 pages; beetle
+page + Colab badge visually checked (playwright, light and dark); CI
+all green on #82; branch + worktree deleted both sides; local main
+clone left untouched (still on the user's docs/notebooks-explained
+branch + uncommitted work).
 
 ## DOCS PHASE (COMPLETE 2026-11-02; PR #80 merged, main = 91ac2a0)
 
