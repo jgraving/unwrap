@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-01 (#55-#63 MERGED = main f817823; NEXT = bats study PR; recon done) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (BATS: SMOKE PASS (37/37 figures, 0 errors); full re-bake RUNNING in background (rerun_nb.py, ~hours, log /tmp/opencode/bats_bake.log); branch origin/goldshtein-bats-study at 44c83e6 (9 commits)) - NEXT CHAT STARTS HERE
 - BOARD: main = f817823. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
@@ -679,32 +679,155 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   with the WRONG axis transform silently corrupts tight_layout -
   bisect by re-adding pieces and printing `ax.get_position()`.
 
-## BATS STUDY PR (NEXT) - RECON DONE
-- Base = main (the bats notebook is ALREADY annotated + E2E - no
-  explain-branch merge needed). 96 cells (58 code + 38 md), ~12 MB
-  baked, 31 figure cells; 16171-line source dump at
-  /tmp/opencode/bats_cells.txt (gen: /tmp/opencode/dump_cells.py <nb>
-  <out>); full profile + recipe at /tmp/opencode/bats_recon.md.
-- Data loaders in unwrap/datasets.py: load_bats_tracks (L369),
-  load_bats_info (L388), load_bats_lake_outline (L403),
-  bats_lake_outline_path (L420). E2E via ensure_clone (reuses
-  ~/.cache/unwrap-data - no re-download).
-- PREPROCESS: c06 (521 L) `rediscretize_latlon_parallel` - constant
-  60 m step, haversine/Slerp + optional pyproj WGS84, gap segmentation
-  (segment_id / gap_before). NOT in unwrap/ (inline only). An old 1344
-  L version at origin/feat/notebooks-to-scripts
-  notebooks/goldshtein_bats_preprocess.py (pre-annotated era, renamed
-  from goldschtein_*) - DIFF against current c06 before reusing; the
-  inline cell is the source of truth.
-- PLOTS: existing notebooks/goldshtein_bats_plots.py (228 L) is OLD
-  style (own set_style/_save, single DPI=300) - FULL house-convention
-  rewrite (two-res unwrap.plots, save/save_path, FIG_DIR absolute) like
-  locust_density_plots.py. ~25 code cells >100 L to port (profile in
-  bats_recon.md); model cells (c08, c19-c32) stay inline.
-- Models: vMu PyMC fit (already seeded) + vM GLMM fit (random_seed=
-  20261030). Recipe: probe -> posthoc + plots scripts -> thin-cell
-  rebuild (build_density_nb.py pattern) -> smoke -> rerun_nb.py bake ->
-  verify gate -> pytest -> push + PR + merge.
+## BATS STUDY PR (IN PROGRESS) - branch goldshtein-bats-study pushed (6 commits off main f817823)
+- Branch origin/goldshtein-bats-study: 2ea9fed preprocess module;
+  965c9a4 posthoc module; 47f1d7b plots module (27 plot_* figure fns,
+  two-res unwrap.plots, save/save_path, FIG_DIR=repo/figures/bats);
+  d1d85e8 slim notebook (107 cells: 38 markdown byte-identical to the
+  annotated base; data + 2 model cells + evaluation stay inline; every
+  figure cell = comment + one-line plots.plot_*(save_path=...) +
+  plt.show(); 37 figures). Then smoke/stack fixes: f1a1187 + 5db2255
+  (imports/helpers the split cells lost), 82892b2 (vM log-likelihood
+  via PyMC graph - see below), ac736dc (arviz 1.x elpd_i rename).
+- Slim cell map (new indices): c01 setup (imports + sys.path.insert +
+  pre/posthoc/plots + plots.set_style() + SEED=123 + version dict);
+  c03/c04 loaders verbatim; c06 pre.rediscretize_latlon_parallel
+  (60 m, gap_factor=10, gap_time_s=120, time_unit="days") + step checks;
+  c08 pre.merge_tag_metadata; c11 pre.add_dist_and_angle_to_destination
+  (harmonic lake field, roost point 33.112373/35.584135, METRIC_EPSG
+  32636) + df_harm2 alias; c29/c34/c38 thin posthoc compute (kappa_df /
+  align_df / df_track); c40 vM Bambi model - fit ported:
+  `model.fit(tune=2000, draws=2000, target_accept=0.9, random_seed=SEED,
+  progressbar=False)` and the per-observation log-likelihood attached
+  via `pm.compute_log_likelihood(posthoc.graph_free_rvs(idata, model),
+  model=model.backend.model, progressbar=False)` — bambi 0.21's own
+  Model.compute_log_likelihood applies the vonmises *mean* link to EVERY
+  submodel (hardcoded in ConditionalModelTerm.predict:
+  `if family.name=="vonmises": invlink = angle(exp(1j*x))`), so the
+  kappa linear predictor would be wrapped into an angle (bambinos/
+  bambi#1084; the zebra study PR used the identical workaround,
+  zebra_posthoc.graph_free_rvs + pm.compute_log_likelihood);
+  c42-c45 diagnostics verbatim (az.summary, two empty-filter checks,
+  full summary); c51 sigmoid_normal_percentiles thin compute; c52 vMU
+  PyMC model verbatim (defines fit_vmum_model_full; pm.sample with
+  idata_kwargs={"log_likelihood": True} is valid in pymc 6.3.2 and was
+  working in the base bake - do NOT port it); c54 convergence flags
+  verbatim; c56/c59/c64 PSIS-LOO via posthoc (models dict: vMU first);
+  c69/c82/c93/c98 population + taglevel + pgoal computes via posthoc;
+  c101-102 (compact pgoal) and c104-106 (faceted tag curves) REUSE
+  c98's out_dist_k/out_steps_k/df_track_with_p/resp/treat_levels (E2E
+  order matters; deterministic, no recompute).
+- Model cells {40, 52} are the ONLY cells allowed top-level `def`s;
+  the gate (below) whitelists exactly those.
+- Gate: /tmp/opencode/verify_bats.py (mirrors verify_locust_density.py,
+  house pattern): no error outputs; source audit per non-model cell
+  (banned: def / sns. / contourf / savefig / get_cmap / out_pdf /
+  out_svg / savepath / save_svg_also / az.hdi / pm.sample; figure
+  cells end with plt.show() and call only plt.show() of plt; other
+  cells no plt at all); 37 figure cells each with exactly 1 inline
+  PNG at 100 dpi + "Saved figure to: figures/bats/<stem>" line + valid
+  PDF on disk; c01 version dict (pymc+bambi) + set_style echo
+  "Figures will be saved to: figures/bats"; c06 stream "tags: 67";
+  c43/c44 diagnostic filters "Empty DataFrame"; c45 summary has r_hat;
+  c54 "RHAT > 1.01: none ✅" + "ESS bulk or tail < 400: none ✅";
+  c56 "Best model: von Mises-Uniform"; c93/c98 print the p_goal head.
+  EXPECT_SAVED has the 37 stems; the two faceted p_goal cells save one
+  plain PDF with the 4 treatments (4-per-page paging => single page),
+  per-page _p{i} suffixes tolerated but unreachable.
+- SMOKE: /tmp/opencode/smoke_bats_nb.py (clone slim nb; after c04 keep
+  2 tags per treatment; fit 200/200; all max_draws=200; N_BOOT_OBS=50;
+  N_PPC_DRAWS=200; PPC_BOOT_PER_DRAW=1; individual_ppc n_cols=4; run
+  in the venv via nbclient; purpose = shake the notebook->scripts
+  wiring across all 27 figure fns before the hours-long full bake).
+  STATUS: PASS (2026-11-02) - 37/37 figures saved, 0 errors, ~2 min.
+  Full re-bake RUNNING: rerun_nb.py on the slim nb (timeout=16200 per
+  cell, MPLBACKEND=Agg, OMP/OPENBLAS=1, PYTHONPATH=worktree), log
+  /tmp/opencode/bats_bake.log; expected ~hours (2x 2000+2000 fits,
+  PPC B=1000 obs boot + 4000 draws, individual PPC 67 tags x 8 cols,
+  pgoal curves 2000 draws x 2000 grid). Probe notes: vM fit at
+  2000+2000 ~ 7x the 200+200 probe time (~69 s at full data =>
+  ~8-15 min expected); vMU mixture likely the long pole.
+- Bugs found+fixed by smoke/stack (all pushed):
+  1. plots module lost imports when the cells were split:
+     Polygon/MultiPolygon (shapely), prep (shapely.prepared), math;
+     plot_treatment_coefficients_mu_kappa needed `post =
+     idata_treatment.posterior` (was cell-local in the base).
+  2. posthoc module lost the per-cell helper families the base
+     redefined in EVERY cell (one shared copy added): bessel_ratio
+     (robust I1/I0 + fallback), vonmises_pdf_scalar,
+     vonmises_interval_mass (+scipy-cdf guard), circ_mean, wrap_0_2pi,
+     quantile_band, format_treatment_nicely. (Lessons: pyflakes the
+     modules after the split; the base's self-contained cells hide
+     cross-cell locals.)
+  3. vM `kappa > 0` ParameterValueError at c40 — confirmed NOT a fit
+     problem (probe_vm_fit2.py: FIT OK at 200/200 on BOTH the smoke's
+     2-tags-per-treatment subset and the full 67-tag data): it was
+     bambi's Model.compute_log_likelihood applying the vonmises mean
+     link to the kappa submodel (bambinos/bambi#1084) - fixed via
+     pm.compute_log_likelihood + posthoc.graph_free_rvs on the model
+     graph (the zebra pattern), which also passes az.loo
+     (elpd -750.8, max k 0.61 on the 8-tag probe).
+  4. arviz 1.x PSIS-LOO api in _loo_pointwise_elpd: loo.loo_i ->
+     loo.elpd_i (ELPDDataLOO; pareto_k unchanged; the merged locust
+     module already did the same rename).
+  5. The delta-ELPD call sites (total-by-treatment + by-individual)
+     unpacked 2 values from _loo_pointwise_elpd; the base cells had
+     local 2-value copies but the module shares the 3-tuple
+     (loo_i, pareto_k, loo) helper - both call sites now drop the
+     loo object.
+  6. tqdm_joblib was defined twice at module level (once per section,
+     mirror of the base's self-contained cells); the PPC-section copy
+     LACKED the @contextmanager decorator so the later, undecorated
+     generator shadowed the pgoal-section copy and c87 died with
+     "'generator' object does not support the context manager
+     protocol". Duplicated-helper audit: 13 shadowed families total;
+     all pairs byte-identical EXCEPT tqdm_joblib (decorator) and
+     hdi_1d/hdi_along_samples (type hints/docstring only) - i.e. no
+     behavior changes from shadowing; the module docstring now states
+     the per-section structure instead of claiming one copy.
+- NEXT: finish the smoke (PPC/pgoal tail: bootstrap_observed,
+  posterior_predictive_summaries, individual_ppc,
+  append_pgoal_post_to_df, population/tag kernel curves + last 10
+  figure cells) -> full re-bake /tmp/opencode/rerun_nb.py
+  (2x 2000+2000 fits + PPC, hours; run with timeout=16200 per cell,
+  PYTHONPATH=worktree) -> verify_bats gate -> commit baked nb + push
+  -> gh pr create -R jgraving/unwrap --base main --head
+  goldshtein-bats-study (title per the house study-PR pattern) ->
+  checks green -> merge -> delete branch -> README row (turn the
+  "full workflow runs from this checkout" into the house "fully
+  rerun and validated from this checkout (MCMC diagnostics pass; ...)"
+  wording; draft: fixed 60 m re-discretization with gap
+  segmentation; roost-vs-lake destination assignment; vMU
+  von Mises-Uniform mixture fit vs the vM baseline on the
+  goal-relative bearings; PSIS-LOO total / by treatment / per animal
+  (best model von Mises-Uniform); population + tag-level mixture
+  summaries with the directed-component density and the +/-45deg
+  mass around the goal; hierarchical-bootstrap PPC by treatment plus
+  per-animal bootstrap-vs-posterior checks; per-step goal-component
+  responsibility with kernel-smoothed distance/progress curves; vM
+  per-observation log-likelihood from the PyMC graph working around
+  the bambi vonmises kappa link bug, bambinos/bambi#1084) -> sync
+  this doc + docs branch -> beetles.
+- Gotchas (bats-specific):
+  * Base cells are self-contained (helper redefined per cell) - a
+    def-only module build loses them; pyflakes (pip install pyflakes
+    in the venv) catches the undefined names cheaply.
+  * The shell tool `timeout` is MILLISECONDS (7200 = 7.2 s). Long
+    background jobs: omit the timeout (default none).
+  * arviz 1.3: InferenceData.groups is a TUPLE, not a method.
+  * Kappa xlabels use "Concentration " + rf"($\kappa$)" to dodge the
+    Py3.12 `\k` invalid-escape SyntaxWarning (builder audits per-cell
+    compile).
+  * figures/bats/ is gitignored (repo .gitignore has top-level
+    figures/); only the notebook (with baked 100 dpi inline) + the
+    three scripts go into the PR.
+  * Builder: /tmp/opencode/build_bats_nb.py regens the slim nb from
+    the base backup /tmp/opencode/goldshtein_bats_base.ipynb.bak
+    (12.1 MB, 96-cell annotated base; audit asserts the figure-cell
+    map, banned tokens, markdown byte-identity). Keep builder and
+    hand-edits in sync (verified idempotent after the c40 change).
+  * E2E data: unwrapp venv /home/jake/.venvs/unwrap-env, data from the
+    user-level ~/.cache/unwrap-data clone (no re-download).
 ## STATE AT FREEZE (superseded; kept for history)
 
 - Board: only #44 #43 #40 open. (10 superseded PRs closed.)
