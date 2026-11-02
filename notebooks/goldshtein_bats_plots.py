@@ -25,7 +25,7 @@ import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import geopandas as gpd
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString, Polygon, MultiPolygon
 from matplotlib import colors as mcolors
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
