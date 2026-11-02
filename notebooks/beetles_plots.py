@@ -97,7 +97,7 @@ def circular_kde(theta_grid, samples, kappa_bw=80.0):
 # Figure 1: polar grid of raw headings per individual.
 # ---------------------------------------------------------------------------
 def plot_data_polar(df, radial_max=10, *, save=True,
-                    save_path="figures/beetles/data_individual_polar_grid.svg"):
+                    save_path="figures/beetles/data_individual_polar_grid.pdf"):
     """Polar grid of raw headings per individual, light OFF (grey) vs light ON
     (gold), each condition summarised by its circular mean (solid), circular
     median (dashed) and +/- one circular standard deviation (shaded band)."""
@@ -171,7 +171,7 @@ def _summary_polar(ax, angles, radial_max, color):
 def plot_polar_mu_kde(idata_treat, df, circular_modulo, flood_dir=None,
                       flood_halfwidth=np.deg2rad(45), theta_grid_n=361,
                       kappa_bw=80.0, *, save=True,
-                      save_path="figures/beetles/treat_polar_mu_kde_clean.svg"):
+                      save_path="figures/beetles/treat_polar_mu_kde_clean.pdf"):
     """Polar kernel density of the population-level posterior of mu under each
     lighting condition (grey = off, gold = on), with the floodlight direction
     marked by an arc and each individual's condition mean as a dot on the outer
@@ -297,7 +297,7 @@ def _vonmises_interval_mass(mu, kappa, a, b):
 def plot_concentration(idata_treat, df, circular_modulo, softplus,
                        flood_dir=np.deg2rad(-135), hdi_prob=0.89, *,
                        save=True,
-                       save_path="figures/beetles/treat_concentration_plus_floodlight.svg"):
+                       save_path="figures/beetles/treat_concentration_plus_floodlight.pdf"):
     """Four panels: within-individual concentration (MRL), between-individual
     concentration (MRL), posterior predictive mass within +/-45 of the
     floodlight, and the on-minus-off change in that mass. Each with an
