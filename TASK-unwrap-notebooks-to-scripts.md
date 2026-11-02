@@ -41,7 +41,106 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (PAPER-LANGUAGE + TOC PHASE COMPLETE: the docs study pages and the notebooks' explanatory markdown now read with the companion paper (jgraving/circstats) - paper case-study titles/framing per notebook, US spelling across all docs pages, and every notebook page's ToC is complete and consistent (the beetle page's 4 bare-# sections that the ToC widget never rendered became proper ## sections with descriptions); PR #81 (single-label Colab badge) + PR #82 (language + ToC; markdown cells only, all outputs proven unchanged) + PR #83 (every reference to the paper repo removed; each dataset now cites the study it comes from) merged, main = b8f1fee; PR branches + worktrees deleted both sides; NOTHING PENDING - research + docs work all merged) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (CITATION + NAMING + COLAB PHASE COMPLETE: each dataset is now cited inline in the opening paragraph of its notebook and its examples.md section (paper style, full citation with DOI - the previously missing bats DOI recovered from Crossref); every case-study reference (notebook H1s, examples.md section headings, mkdocs nav labels, notebooks/README.md table rows) uses the paper's "Example:" section titles, with the combined locusts section split into one section per study; all 8 example notebooks start with a self-contained Colab setup cell (git+main[notebook] install via sys.executable, no-op locally); PR #84 (merged cf4974b) + PR #85 (merged 841294a) merged, main = 841294a; PR branches + worktrees deleted both sides; 10 stale worktrees from early phases + 9 stale local/remote branches verified landed and deleted; NOTHING PENDING - research + docs work all merged) - NEXT CHAT STARTS HERE
+
+## CITATION + NAMING + COLAB PHASE (COMPLETE 2026-11-02; PRs #84 + #85 merged, main = 841294a)
+
+User requests (in order, all on top of #83): (a) citations inline -
+"They should all be in the first paragraph of the notebooks/docs similar
+to the paper"; (b) "make sure references to each case study use
+consistent names both across the docs/notebooks and consistent with the
+paper sections"; (c) Colab setup at the top of all notebooks ("Currently
+just says use UV you can call pip from inside the notebook with
+sys.executable").
+
+#84 (3 stacked commits a28fc13 + fe4a3e0 + 4b1cce4; merged cf4974b;
+markdown cells + docs only - per-cell invariance vs the merge-base
+snapshot verified: code cells, outputs, metadata byte-identical, so no
+re-bake):
+- Bats DOI: the paper's references.bib Goldshtein 2024 entry has no
+  DOI; verified directly against the Crossref API = 10.1126/
+  science.adn6269 (exact title/venue/volume/pages match). (websearch is
+  cancelled by the user every time - use webfetch on
+  api.crossref.org/works?query.bibliographic=... for DOIs.)
+- Citations in the opening paragraphs (paper style: the dataset is
+  cited where its experiment is first introduced). Each full citation
+  woven into the first paragraph and the trailer citation line dropped:
+  five study notebooks + the four data-backed examples.md sections.
+  beetles = Foster 2021 Current Biology 31(17) 3935-3942,
+  doi:10.1016/j.cub.2021.06.038; zebra = Koger 2023 J. Anim. Ecol. 92(6)
+  1415-1433, doi:10.1111/1365-2656.13904 (the zebra notebook's tracking
+  sentence also co-cites DeepPoseKit, J. M. Graving et al. eLife 8 e47994
+  2019, as the paper co-cites it); bats = Goldshtein 2024 Science
+  386(6721) 561-567, doi:10.1126/science.adn6269; locust x2 = Sayin 2025
+  Science 387(6737) 995-1000, doi:10.1126/science.adq7832 (direction
+  paragraph: "a second paradigm from the same experiments"). All four
+  dataset citations now carry DOIs.
+- Canonical names = the paper's Example-subsection titles verbatim (sans
+  "Example:"), applied to notebook H1s, examples.md section headings,
+  mkdocs.yml nav labels, and notebooks/README.md table rows:
+  "Artificial light reorients nocturnal dung beetles"; "Grevy's zebra
+  body orientation during an escape response"; "Decomposing
+  goal-directedness and directional precision in sensory-deprived
+  echolocating bats during homing"; "Order and density shape locust
+  directional alignment in virtual reality"; "Testing optic-flow vs.
+  vectorial encoding in marching locusts". The combined "Marching
+  locusts" examples.md section split into the two studies (density
+  first); the nav + README locust entries swapped to density-first too.
+  "Periodic but not circular" (the paper's appendix title; the notebook
+  H1 keeps its ": a 24-hour activity rhythm" subtitle) and "Von Mises
+  navigation policy" (nav aligned to the existing H1; the paper's
+  navigation-policy featurebox). "optic-flow" is an ASCII hyphen (paper
+  has an en dash) - mkdocs slugify would break anchors on the en dash.
+  docs/math/mixtures.md: the dead combined-section anchor repointed to
+  #testing-optic-flow-vs-vectorial-encoding-in-marching-locusts (the
+  two-component study) and the two "locust mixture" mentions relabelled
+  to the study name.
+- GOTCHA: `gh pr edit 84` exits 1 with only a harmless-looking GraphQL
+  "Projects (classic) is deprecated" warning and does NOT apply the edit
+  - use REST `gh api repos/:owner/:repo/pulls/:n -X PATCH` with a JSON
+  body instead (title/body).
+
+#85 (single commit b5c100a; merged 841294a) - the Colab setup cell:
+- Problem: the Colab button (from #80/#81) opens the .ipynb straight
+  from GitHub, so the Colab runtime has no repository checkout, while
+  the Setup sections only covered the local uv flow - badge users had to
+  set up the environment by hand.
+- Fix: one new code cell as the FIRST code cell of all 8 example
+  notebooks (insertion index c01 for bats + locust x2, c02 for the
+  other five): detects Colab via `import google.colab` and, only there,
+  `get_ipython().system(f'{sys.executable} -m pip install -q ...')`
+  with `git+https://github.com/jgraving/unwrap.git@main[notebook]` (git
+  URL, not `-e .`, because there is nothing local to install from) plus
+  the geospatial extras the bats notebook's Setup line installs
+  (pandas[excel] geopandas shapely contextily osmnx pyproj xlrd). One-
+  line pointer in the five notebooks that have a Setup section (locust
+  x2 + the vmp demo have none - the cell is self-explanatory there).
+- Checked: `git+...@main[notebook]` verified in a fresh py3.12 uv venv
+  (31 s; import unwrap/bambi/pymc/seaborn/pyarrow clean); the no-op
+  path executed in a real ipykernel kernel via nbclient on the tutorial
+  (the only notebook CI executes) - zero outputs; per-notebook
+  invariance - every pre-existing cell (type, source, outputs,
+  execution_count) + metadata byte-identical to the merge base, the
+  only structural change is one inserted output-less code cell per
+  notebook; strict CI-mirroring build clean. No re-bake: the new cell
+  produces no outputs and no other outputs change.
+
+Housekeeping this phase:
+- Stale-worktree cleanup: 10 early-phase worktrees (wt-bats/beetles/
+  circ/density/deps/locust-mix/periodic/refactor/vonmises/zebra) + 9
+  local + 9 remote branches (chore/notebook-deps, pr/explain-*, pr/
+  fix-zebra-ppc-kappa) verified landed before deletion - 7 tips direct
+  ancestors of origin/main; the wt-deps commit patch-byte-identical to
+  its rebased merge twin 1e21fee; the two non-ancestor explain branches
+  are rebased twins already in main (git cherry + zero open PRs); the
+  only untracked file discarded (a throwaway bake helper in wt-bats).
+  `git ls-remote` prints full 40-char SHAs - earlier "not a valid
+  object" ancestry failures were my own truncated reads, not missing
+  objects.
+- Remaining worktrees: the user's main clone (/home/jake/projects/
+  unwrap: docs/notebooks-explained 277c7ae + uncommitted work -
+  untouched), this handoff; PR worktrees deleted after each merge.
+
 
 ## PAPER-LANGUAGE + TOC PHASE (COMPLETE 2026-11-02; PRs #81 + #82 merged, main = 0f53d5f)
 
