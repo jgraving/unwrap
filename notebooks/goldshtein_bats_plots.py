@@ -107,7 +107,7 @@ TRANS_POINTS = [(33.135136, 35.592712), (33.081932, 35.604462)]
 # radial scaling of the polar figure families (the annotated notebook
 # used slightly different constants per cell; the values below are the
 # cell-local ones of the figure they belong to, set in that function)
-DPI = 300
+DPI = _plots.DEFAULT_DISPLAY_DPI
 LINE_LW = 0.8
 
 
@@ -1825,7 +1825,7 @@ def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True
         y_k  = y_base
 
     # ---- plot ----
-    fig = plt.figure(figsize=(1.8, 0.40 * len(terms_order)), dpi=300)
+    fig = plt.figure(figsize=(1.8, 0.40 * len(terms_order)), dpi=_plots.DEFAULT_DISPLAY_DPI)
     ax = plt.gca()
 
     for i in range(n):
@@ -2102,7 +2102,7 @@ def plot_total_elpd(
     save_path=None,
     title=None,
     xlabel="PSIS-LOO ELPD",
-    dpi=300,
+    dpi=_plots.DEFAULT_DISPLAY_DPI,
     vline_at_best=True,
 ):
     out = summary_df.copy()
@@ -2169,7 +2169,7 @@ def plot_delta_total_and_by_treatment(
     save_path=None,
     title=None,
     xlabel="ELPD difference (vMU - vM)",
-    dpi=300,
+    dpi=_plots.DEFAULT_DISPLAY_DPI,
     vline_at_zero=True,
     y_step=1.35,
     y_margins=0.10,
@@ -2429,7 +2429,7 @@ def plot_psisloo_combined(res_total, delta_df, treatment_order, *, save=True, sa
     fig, (ax1, ax2) = plt.subplots(
         nrows=2,
         figsize=(3.2, fig_h),
-        dpi=300,
+        dpi=_plots.DEFAULT_DISPLAY_DPI,
         gridspec_kw={"height_ratios": [top_h, bottom_h]},
     )
 
@@ -2493,7 +2493,7 @@ def plot_delta_subplots_by_treatment(res_ind, treatment_order, *, save=True, sav
     fig_w = max(5.5, 1.6 * k)
     fig_h = max(2.0, 0.18 * max_n + 0.8)
 
-    fig, axes = plt.subplots(1, k, figsize=(fig_w, fig_h), dpi=300, sharex=True)
+    fig, axes = plt.subplots(1, k, figsize=(fig_w, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI, sharex=True)
     if k == 1:
         axes = [axes]
 
@@ -2998,7 +2998,7 @@ def plot_psisloo_plus_predictive_density_3panel(res_total, delta_df, treatment_o
     SHOW_PRED_TICKS  = not HIDE_PRED_TREATMENT_TICKS_AND_LABELS
 
     FIG_W = 3.2
-    DPI = 300
+    DPI = _plots.DEFAULT_DISPLAY_DPI
     y_step = 1.35
 
     # NEW: larger x-axis label/tick fonts (apply to all three panels)
@@ -4225,7 +4225,7 @@ def plot_tracks_pgoal_viridis(
         "axes.facecolor": "white",
     })
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=(fig_w, fig_h), dpi=300)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(fig_w, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI)
     axes = np.atleast_1d(axes).ravel()
 
     cmap = mpl.colormaps.get_cmap("viridis")
@@ -5160,7 +5160,7 @@ def plot_kappa_hat(kappa_df, *, save=True, save_path=None):
     dfp, treatments, treat_to_color, treat_label = _treatment_plot_df(kappa_df, value_col)
     lo_q, hi_q = 25, 75   # change to (5, 95) if you prefer
 
-    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=300)
+    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=_plots.DEFAULT_DISPLAY_DPI)
     _dots_median_interval(ax, dfp, value_col, treatments, treat_to_color,
                           treat_label, lo_q, hi_q)
     ax.set_ylabel(r"Estimated $\hat{\kappa}$")
@@ -5182,7 +5182,7 @@ def plot_rbar(kappa_df, *, save=True, save_path=None):
     dfp, treatments, treat_to_color, treat_label = _treatment_plot_df(kappa_df, value_col)
     lo_q, hi_q = 25, 75   # change to (5, 95) if you prefer
 
-    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=300)
+    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=_plots.DEFAULT_DISPLAY_DPI)
     _dots_median_interval(ax, dfp, value_col, treatments, treat_to_color,
                           treat_label, lo_q, hi_q)
     ax.set_ylabel("Mean\nresultant length")
@@ -5202,7 +5202,7 @@ def plot_alignment(align_df, *, save=True, save_path=None):
     dfp, treatments, treat_to_color, treat_label = _treatment_plot_df(align_df, value_col)
     lo_q, hi_q = 25, 75   # change to (5, 95) if you prefer
 
-    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=300)
+    fig, ax = plt.subplots(figsize=(2.6, 2.2), dpi=_plots.DEFAULT_DISPLAY_DPI)
     _dots_median_interval(ax, dfp, value_col, treatments, treat_to_color,
                           treat_label, lo_q, hi_q)
     ax.set_ylabel("Alignment\n$\\mathbb{E}[\\cos(y)]$")
