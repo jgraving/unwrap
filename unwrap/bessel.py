@@ -75,6 +75,19 @@ def inverse_bessel_ratio(R: float, tolerance: float = 1e-10, max_iterations: int
     raise RuntimeError("Concentration inversion did not converge within max_iterations.")
 
 
+def log_i0(kappa):
+    """Stable ``log(I0(kappa))`` for ``kappa >= 0`` (vectorised).
+
+    Uses the exponentially scaled Bessel function:
+    ``i0(k) = i0e(k) * exp(k)``, hence ``log i0(k) = log(i0e(k)) + k``.
+    The plain ``log(i0(k))`` overflows for ``kappa`` of a few hundred,
+    which matters for the von Mises log-density at the concentrations the
+    fitted studies actually reach.
+    """
+    kappa = np.asarray(kappa, float)
+    return np.log(i0e(kappa)) + kappa
+
+
 
 def test_kappa_inversion():
     """

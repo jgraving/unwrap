@@ -19,6 +19,7 @@ from unwrap.circular import (
     stack_posterior_1d,
     von_mises_kde,
     vonmises_kappa_from_R,
+    vonmises_logpdf,
     vonmises_pdf,
     wrap_0_2pi,
 )
@@ -194,3 +195,47 @@ def test_stack_posterior_1d_missing_raises():
 def test_sorted_groups_numeric_then_lexical():
     assert sorted_groups(["3", "1", "2", "10"]) == ["1", "2", "3", "10"]
     assert sorted_groups(["b", "a", "c"]) == ["a", "b", "c"]
+
+
+# ---------------------------------------------------------------------------
+# von Mises log-density
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("kappa", [0.5, 2.0, 8.0])
+def test_vonmises_logpdf_matches_scipy(kappa):
+    from scipy.stats import vonmises as sc_vm
+    th = np.linspace(-np.pi, np.pi, 9, endpoint=False)
+    got = vonmises_logpdf(th, 0.4, kappa)
+    want = sc_vm.logpdf(th, kappa=kappa, loc=0.4)
+    np.testing.assert_allclose(got, want, rtol=1e-10, atol=1e-12)
+
+
+def test_vonmises_logpdf_stable_at_large_kappa():
+    # the plain-pdf path overflows around kappa ~ 700; the log-density must
+    # stay finite at the concentrations the fitted studies actually reach
+    kappa = 1000.0
+    got = vonmises_logpdf(0.0, 0.0, kappa)
+    assert np.isfinite(got)
+    # peak log pdf = kappa - log(2 pi) - log I0(kappa); with the asymptotic
+    # log I0(k) = k - 0.5 log(2 pi k) - 1/(8k) + O(k^-2) that is
+    # 0.5 log(kappa / (2 pi)) - 1/(8 kappa) + O(k^-2)
+    expected = 0.5 * np.log(kappa / (2.0 * np.pi)) - 1.0 / (8.0 * kappa)
+    assert got == pytest.approx(expected, abs=1e-6)
+
+
+def test_vonmises_logpdf_periodic_in_angles():
+    a, m = 3 * np.pi / 2, 3 * np.pi / 2
+    assert vonmises_logpdf(a, m - 2 * np.pi, 5.0) == pytest.approx(
+        vonmises_logpdf(a, m, 5.0))
+
+
+def test_vonmises_logpdf_exponentiates_to_pdf():
+    th = np.array([0.0, 0.7, -1.9])
+    np.testing.assert_allclose(
+        np.exp(vonmises_logpdf(th, 0.0, 3.0)),
+        vonmises_pdf(th, 0.0, 3.0), rtol=1e-10, atol=1e-12)
+
+
+def test_vonmises_logpdf_vectorised_kappa():
+    got = vonmises_logpdf(0.0, 0.0, np.array([1.0, 4.0]))
+    assert got.shape == (2,)
+    assert got[0] == pytest.approx(vonmises_logpdf(0.0, 0.0, 1.0))

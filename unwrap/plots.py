@@ -96,6 +96,24 @@ def save_figure(fig, figure_dir, name, pdf=True, png=False, svg=False,
     return written
 
 
+def save_by_path(fig, fig_dir, save_path, *, transparent=False, dpi=300):
+    """Save ``fig`` to the repo-relative ``save_path``, routing by its suffix.
+
+    The shared core of the per-study ``_save`` wrappers: a ``.svg`` suffix
+    writes the SVG, anything else writes the type-42 vector PDF — in both
+    cases through :func:`save_figure` into ``fig_dir`` (which the notebook
+    passes as its ``figures/<study>`` directory, with the same stem as
+    ``save_path``), with the publication ``dpi`` of :func:`save_figure`
+    (the basemap figures pass a lower one for their raster layers).
+    """
+    p = Path(save_path)
+    if p.suffix.lower() == ".svg":
+        return save_figure(fig, fig_dir, p.stem, pdf=False, png=False, svg=True,
+                           transparent=transparent, dpi=dpi)
+    return save_figure(fig, fig_dir, p.stem, pdf=True, png=False, svg=False,
+                       transparent=transparent, dpi=dpi)
+
+
 def repo_rel(path):
     """``path`` relative to the repository root, as a plain string.
 
