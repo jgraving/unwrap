@@ -617,7 +617,9 @@ def graph_free_rvs(idata, model):
 
 def _loo_pointwise_elpd(idata, *, var_name=None):
     loo = az.loo(idata, pointwise=True, var_name=var_name)
-    loo_i = np.asarray(loo.loo_i).reshape(-1)
+    # arviz >= 1.x returns ELPDDataLOO: the pointwise ELPD is ``elpd_i``
+    # (older arviz called it ``loo_i``).
+    loo_i = np.asarray(loo.elpd_i).reshape(-1)
     k = np.asarray(loo.pareto_k).reshape(-1)
     return loo_i, k, loo
 
