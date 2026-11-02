@@ -1,8 +1,11 @@
 """Unit tests for the Colab bootstrap helper (unwrap.colab)."""
+import io
 import sys
+import tempfile
 import types
 import unittest
 from importlib.metadata import PackageNotFoundError
+from pathlib import Path
 from unittest import mock
 
 from unwrap import colab
@@ -48,6 +51,53 @@ class InstallColabTests(unittest.TestCase):
         finally:
             del sys.modules["google.colab"]
             del sys.modules["google"]
+
+
+class ScriptsDirTests(unittest.TestCase):
+    def test_targets_the_notebooks_dir_next_to_the_package(self):
+        target = colab.scripts_dir()
+        self.assertEqual(target.name, "notebooks")
+        self.assertEqual(
+            target.parent, Path(colab.__file__).resolve().parent.parent
+        )
+
+
+class ScriptFetchTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.target = Path(self.temp.name)
+        self.opened = []
+        # `import google.colab` resolves the parent package first, so
+        # both levels of the namespace need stubs.
+        self.parent = types.ModuleType("google")
+        self.fake = types.ModuleType("google.colab")
+        self.parent.colab = self.fake
+        sys.modules["google"] = self.parent
+        sys.modules["google.colab"] = self.fake
+
+    def tearDown(self):
+        del sys.modules["google.colab"]
+        del sys.modules["google"]
+
+    def fake_urlopen(self, url):
+        self.opened.append(url)
+        return io.BytesIO(b"# fetched script\n")
+
+    def test_fetches_each_script_from_ref_into_scripts_dir(self):
+        with mock.patch.object(colab, "scripts_dir", return_value=self.target), \
+                mock.patch.object(colab.urllib.request, "urlopen",
+                                  side_effect=self.fake_urlopen), \
+                mock.patch("unwrap.colab.subprocess.check_call"):
+            colab.install_colab(scripts=["a.py", "b.py"], ref="some-ref")
+        self.assertEqual(self.opened, [
+            "https://raw.githubusercontent.com/jgraving/unwrap/"
+            "some-ref/notebooks/a.py",
+            "https://raw.githubusercontent.com/jgraving/unwrap/"
+            "some-ref/notebooks/b.py",
+        ])
+        self.assertEqual((self.target / "a.py").read_bytes(), b"# fetched script\n")
+        self.assertEqual((self.target / "b.py").read_bytes(), b"# fetched script\n")
 
 
 if __name__ == "__main__":
