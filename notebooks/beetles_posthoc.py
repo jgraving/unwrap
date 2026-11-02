@@ -21,40 +21,29 @@ import re
 import numpy as np
 import pandas as pd
 import pymc as pm
-from scipy.special import i0, i1
 from scipy.stats import circmean
-from scipy.stats import vonmises, directional_stats, vonmises as _vonmises
+from scipy.stats import vonmises
 
 from unwrap.bessel import inverse_bessel_ratio
+from unwrap.circular import (
+    A_of_kappa,
+    bootstrap_track_condition as bootstrap_individual_condition,
+    circ_mod,
+    circular_mean as circ_mean,
+    linear_hdi,
+    resultant_length_angles,
+    stack_posterior_1d as _stack_1d,
+    vonmises_logpdf,
+)
+from unwrap.inference import graph_free_rvs
 from unwrap.link.numpy import circular_modulo
 
 
 # ---------------------------------------------------------------------------
 # Circular-statistics helpers.
 # ---------------------------------------------------------------------------
-def circ_mod(x):
-    # wrap to (-pi, pi]
-    return (x + np.pi) % (2 * np.pi) - np.pi
-
-
 def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', str(s))]
-
-
-def circ_mean(theta):
-    theta = np.asarray(theta, float)
-    z = np.exp(1j * theta).mean()
-    return float(circ_mod(np.angle(z)))
-
-
-def linear_hdi(x, prob=0.95):
-    x = np.sort(np.asarray(x, float))
-    n = x.size
-    if n == 0: return np.nan, np.nan
-    k = int(np.ceil(prob * n))
-    spans = x[k-1:] - x[:n-k+1]
-    j = int(np.argmin(spans))
-    return float(x[j]), float(x[j + k - 1])
 
 
 def circ_hdi_centered(samples, prob=0.95):
@@ -66,49 +55,6 @@ def circ_hdi_centered(samples, prob=0.95):
     lo = float(circ_mod(m + lo_d))
     hi = float(circ_mod(m + hi_d))
     return m, lo, hi
-
-
-def A_of_kappa(kappa):
-    kappa = np.asarray(kappa, float)
-    return i1(kappa) / i0(kappa)
-
-
-def resultant_length_angles(a, axis=-1):
-    a = np.asarray(a, float)
-    return np.sqrt(np.mean(np.cos(a), axis=axis)**2 + np.mean(np.sin(a), axis=axis)**2)
-
-
-def _stack_1d(post, name):
-    if name not in post.data_vars:
-        raise KeyError(f"Missing posterior variable '{name}'.")
-    return post[name].stack(sample=("chain", "draw")).values.astype(float)
-
-
-def rho_circular(angles):
-    """
-    Calculates the mean resultant length using sine and cosine decomposition.
-
-    Parameters:
-    angles (array-like): Input angles in radians.
-
-    Returns:
-    float: Mean resultant length (R-bar) between 0 and 1.
-    """
-    angles = np.asarray(angles)
-
-    # 1. Decompose angles into x and y components on the unit circle
-    x_coords = np.cos(angles)
-    y_coords = np.sin(angles)
-
-    # 2. Calculate the mean of the components
-    C = np.mean(x_coords)
-    S = np.mean(y_coords)
-
-    # 3. Calculate the magnitude of the mean vector (R-bar)
-    # This uses the Pythagorean theorem: sqrt(C^2 + S^2)
-    r_bar = np.sqrt(C**2 + S**2)
-
-    return r_bar
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +122,7 @@ def kappamu_individual(idata_treat, df, *, verbose=True):
         mu_intercept_individual_estimates, fscale=1
     )
     # N.B. an alternative method would be:
-    kappa_mu_intercept_fit = inverse_bessel_ratio(rho_circular(mu_intercept_individual_estimates))
+    kappa_mu_intercept_fit = inverse_bessel_ratio(resultant_length_angles(mu_intercept_individual_estimates))
     if verbose:
         print(f"\n--- Kappa_mu from the Distribution of Individual Mu (Intercept) ---")
         print(f"The Kappa_mu (concentration) of the individual mu estimates: {kappa_mu_intercept_fit:.4f}")
@@ -187,7 +133,7 @@ def kappamu_individual(idata_treat, df, *, verbose=True):
         mu_light_individual_estimates, fscale=1
     )
     # N.B. an alternative method would be:
-    # kappa_mu_light_fit = inverse_bessel_ratio(rho_circular(mu_light_individual_estimates))
+    # kappa_mu_light_fit = inverse_bessel_ratio(resultant_length_angles(mu_light_individual_estimates))
 
     if verbose:
         print(f"\n--- Kappa_mu from the Distribution of Individual Mu (Light) ---")
@@ -315,42 +261,6 @@ def kappamu_per_draw(idata_treat, df, *, verbose=True):
 # ---------------------------------------------------------------------------
 # PyMC-graph evaluation helpers for the non-centered fit.
 # ---------------------------------------------------------------------------
-def graph_free_rvs(idata, model):
-    """The fit result with a posterior group containing all of the model's
-    free RVs, i.e. evaluable by the PyMC graph.
-
-    The kappa random effects are fitted non-centered: in the PyMC graph the
-    free RVs are then ``*_sigma`` (scale) and ``*_offset`` (factor), but
-    bambi stores the transformed centered effects and the ``*_sigma`` scales
-    and drops the ``*_offset`` factors. ``pm.compute_deterministics`` and
-    ``pm.compute_log_likelihood`` both evaluate the graph against every free
-    RV, so the missing factors are reconstructed: the graph computes
-    ``effect = sigma * offset`` exactly (sigma scalar per draw, offset one
-    factor per group), hence ``offset = effect / sigma`` (0 where sigma is
-    0).
-    """
-    posterior = idata.posterior
-    missing = [
-        rv.name
-        for rv in model.backend.model.free_RVs
-        if rv.name not in posterior.data_vars
-    ]
-    if not missing:
-        return idata
-    aug = idata.copy(deep=False)
-    ds = posterior.to_dataset()
-    for name in missing:
-        sigma = ds[name.replace("_offset", "_sigma")]
-        effect = ds[name[: -len("_offset")]]
-        # The graph computes effect = sigma * offset (sigma scalar per
-        # draw, offset one factor per group), so the offset carries the
-        # group dimension of the centered effect.
-        e = np.asarray(effect)
-        s = np.asarray(sigma).reshape(np.asarray(sigma).shape + (1,) * (e.ndim - np.asarray(sigma).ndim))
-        offset = np.divide(e, s, out=np.zeros(e.shape), where=s != 0)
-        ds[name] = (tuple(effect.dims), offset)
-    aug["posterior"] = ds
-    return aug
 
 
 # ---------------------------------------------------------------------------
@@ -387,20 +297,6 @@ def hierarchical_bootstrap_group(df, indivs, B=1500, seed=123):
                 s_arr[b], r_arr[b] = np.nan, np.nan
 
     return {"mu_off": mu_off_s, "mu_on": mu_on_s, "R_off": R_off_s, "R_on": R_on_s}
-
-
-def bootstrap_individual_condition(y, B=1200, seed=0):
-    rng = np.random.default_rng(seed)
-    y = np.asarray(y, float)
-    if y.size == 0: return np.array([]), np.array([])
-    z = np.exp(1j * y)
-    n = z.size
-    mu, R = np.empty(B, float), np.empty(B, float)
-    for b in range(B):
-        idx = rng.integers(0, n, size=n)
-        zbar = z[idx].mean()
-        mu[b], R[b] = circ_mod(np.angle(zbar)), np.abs(zbar)
-    return mu, R
 
 
 def ppc_bootstrap_stats(idata_treat, model_treat, df, *, verbose=True):
@@ -476,10 +372,10 @@ def ppc_bootstrap_stats(idata_treat, model_treat, df, *, verbose=True):
     # Cross-check the graph parameters against the log-likelihood bambi stored
     # during fitting: they must agree to floating-point precision.
     _obs_ll = idata_treat.log_likelihood["HeadingRadians"]
-    _expected = _vonmises.logpdf(
+    _expected = vonmises_logpdf(
         df["HeadingRadians"].to_numpy(),
+        mu_da.transpose(*_obs_ll.dims).values,
         kappa_da.transpose(*_obs_ll.dims).values,
-        loc=mu_da.transpose(*_obs_ll.dims).values,
     )
     np.testing.assert_allclose(_expected, _obs_ll.values, rtol=1e-10, atol=1e-10)
     if verbose:

@@ -18,18 +18,25 @@ are gitignored.
 Palette: light OFF is grey, light ON is gold (matching the paper figures).
 """
 from pathlib import Path
-import re
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import arviz as az
-from scipy.special import i0, i1, ive
 from scipy.stats import circmean, circstd, vonmises
 from matplotlib.lines import Line2D
 
 from unwrap import plots as _plots
+from unwrap.circular import (
+    A_of_kappa,
+    circ_mod as _circ_mod,
+    circ_xerr_from_interval as _circ_xerr,
+    circular_mean as _circ_mean,
+    linear_hdi as _linear_hdi,
+    resultant_length_angles,
+    von_mises_kde,
+)
 
 from beetles_posthoc import ppc_bootstrap_stats
 
@@ -67,11 +74,7 @@ def _save(fig, save, save_path):
     format follows the path's suffix."""
     if not save:
         return
-    p = Path(save_path)
-    if p.suffix.lower() == ".svg":
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True)
-    else:
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False)
+    _plots.save_by_path(fig, FIG_DIR, save_path)
 
 
 # ---------------------------------------------------------------------------
@@ -85,15 +88,6 @@ def circ_median(angles):
     return angles[np.argmin(sum_diffs)]
 
 
-def circular_kde(theta_grid, samples, kappa_bw=80.0):
-    """Average von Mises KDE of the samples over ``theta_grid`` (bandwidth in
-    concentration units)."""
-    samples = np.asarray(samples).ravel()
-    return np.mean(vonmises.pdf(theta_grid[None, :], kappa=kappa_bw,
-                                loc=samples[:, None]), axis=0)
-
-
-# ---------------------------------------------------------------------------
 # Figure 1: polar grid of raw headings per individual.
 # ---------------------------------------------------------------------------
 def plot_data_polar(df, radial_max=10, *, save=True,
@@ -183,8 +177,8 @@ def plot_polar_mu_kde(idata_treat, df, circular_modulo, flood_dir=None,
     mu_on = circular_modulo((post["Intercept"] + post["Light"]).values.reshape(-1))
 
     theta = np.linspace(-np.pi, np.pi, theta_grid_n)
-    kde_off = circular_kde(theta, mu_off, kappa_bw=kappa_bw)
-    kde_on = circular_kde(theta, mu_on, kappa_bw=kappa_bw)
+    kde_off = von_mises_kde(mu_off, theta, kappa_bw)
+    kde_on = von_mises_kde(mu_on, theta, kappa_bw)
 
     max_kde = max(kde_off.max(), kde_on.max())
     ring_base, ring_amp = 0.5, 0.5
@@ -257,16 +251,6 @@ def _ensure_style():
 # ---------------------------------------------------------------------------
 # Figure 3 (panels c-f): within/between concentration + floodlight attraction.
 # ---------------------------------------------------------------------------
-def _bessel_ratio_mrl(kappa):
-    kappa = np.asarray(kappa)
-    return ive(1, kappa) / ive(0, kappa)
-
-
-def _rho_bar(angles, axis=-1):
-    angles = np.asarray(angles)
-    C = np.mean(np.cos(angles), axis=axis)
-    S = np.mean(np.sin(angles), axis=axis)
-    return np.sqrt(C**2 + S**2)
 
 
 def _mean_hdi(samples, hdi_prob=0.89):
@@ -309,8 +293,8 @@ def plot_concentration(idata_treat, df, circular_modulo, softplus,
     # c: within-individual concentration (MRL)
     kappa_off = softplus(post["kappa_Intercept"].values.reshape(-1))
     kappa_on = softplus((post["kappa_Intercept"] + post["kappa_Light"]).values.reshape(-1))
-    mrl_within_off = _bessel_ratio_mrl(kappa_off)
-    mrl_within_on = _bessel_ratio_mrl(kappa_on)
+    mrl_within_off = A_of_kappa(kappa_off)
+    mrl_within_on = A_of_kappa(kappa_on)
 
     # d: between-individual concentration (MRL)
     mu_I_fixed = post["Intercept"].values
@@ -322,8 +306,8 @@ def plot_concentration(idata_treat, df, circular_modulo, softplus,
     mu_on = circular_modulo(mu_I_fixed[..., None] + mu_L_fixed[..., None] +
                            mu_I_rand + mu_L_rand)
     n_chain, n_draw, n_ind = mu_off.shape
-    mrl_between_off = _rho_bar(mu_off.reshape(n_chain * n_draw, n_ind), axis=1)
-    mrl_between_on = _rho_bar(mu_on.reshape(n_chain * n_draw, n_ind), axis=1)
+    mrl_between_off = resultant_length_angles(mu_off.reshape(n_chain * n_draw, n_ind), axis=1)
+    mrl_between_on = resultant_length_angles(mu_on.reshape(n_chain * n_draw, n_ind), axis=1)
 
     # e/f: predictive mass within +/-45 of the floodlight
     mu_pop_off = circular_modulo(post["Intercept"].values.reshape(-1))
@@ -391,33 +375,8 @@ def plot_concentration(idata_treat, df, circular_modulo, softplus,
 # ---------------------------------------------------------------------------
 # Figure 4: supplemental PPC — bootstrap (data) vs posterior (model).
 # ---------------------------------------------------------------------------
-def _circ_mod(x):
-    return (x + np.pi) % (2 * np.pi) - np.pi
-
-
-def _natural_sort_key(s):
-    return [int(t) if t.isdigit() else t.lower() for t in re.split("([0-9]+)", str(s))]
-
-
 def _to_360(rad):
     return (np.degrees(rad) + 360) % 360
-
-
-def _circ_mean(theta):
-    theta = np.asarray(theta, float)
-    z = np.exp(1j * theta).mean()
-    return float(_circ_mod(np.angle(z)))
-
-
-def _linear_hdi(x, prob=0.95):
-    x = np.sort(np.asarray(x, float))
-    n = x.size
-    if n == 0:
-        return np.nan, np.nan
-    k = int(np.ceil(prob * n))
-    spans = x[k - 1:] - x[:n - k + 1]
-    j = int(np.argmin(spans))
-    return float(x[j]), float(x[j + k - 1])
 
 
 def _circ_hdi_centered(samples, prob=0.95):
@@ -430,28 +389,6 @@ def _circ_hdi_centered(samples, prob=0.95):
     lo = float(_circ_mod(m + lo_d))
     hi = float(_circ_mod(m + hi_d))
     return m, lo, hi
-
-
-def _circ_xerr(m, lo, hi):
-    w_lo = abs(float(_circ_mod(m - lo)))
-    w_hi = abs(float(_circ_mod(hi - m)))
-    return np.degrees(w_lo), np.degrees(w_hi)
-
-
-def _A_of_kappa(kappa):
-    kappa = np.asarray(kappa, float)
-    return i1(kappa) / i0(kappa)
-
-
-def _resultant_length_angles(a, axis=-1):
-    a = np.asarray(a, float)
-    return np.sqrt(np.mean(np.cos(a), axis=axis)**2 + np.mean(np.sin(a), axis=axis)**2)
-
-
-def _stack_1d(post, name):
-    if name not in post.data_vars:
-        raise KeyError(f"Missing posterior variable '{name}'.")
-    return post[name].stack(sample=("chain", "draw")).values.astype(float)
 
 
 def _restore_ticks(ax):
