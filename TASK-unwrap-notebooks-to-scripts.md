@@ -41,9 +41,9 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (CITATION + NAMING + COLAB PHASE COMPLETE: each dataset is now cited inline in the opening paragraph of its notebook and its examples.md section (paper style, full citation with DOI - the previously missing bats DOI recovered from Crossref); every case-study reference (notebook H1s, examples.md section headings, mkdocs nav labels, notebooks/README.md table rows) uses the paper's "Example:" section titles, with the combined locusts section split into one section per study; all 8 example notebooks start with a self-contained Colab setup cell (pip-bootstraps the bare git URL, then the package's own unwrap.colab.install_colab installs the [notebook] stack, no-op locally); PR #84 (merged cf4974b) + PR #85 (merged 841294a) + PR #86 (merged c26880d, supersedes the install mechanism of #85 - see the lesson in that entry) merged, main = c26880d; PR branches + worktrees deleted both sides; 10 stale worktrees from early phases + 9 stale local/remote branches verified landed and deleted; NOTHING PENDING - research + docs work all merged) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (CITATION + NAMING + COLAB PHASE COMPLETE: each dataset is now cited inline in the opening paragraph of its notebook and its examples.md section (paper style, full citation with DOI - the previously missing bats DOI recovered from Crossref); every case-study reference (notebook H1s, examples.md section headings, mkdocs nav labels, notebooks/README.md table rows) uses the paper's "Example:" section titles, with the combined locusts section split into one section per study; all 8 example notebooks start with a self-contained Colab setup cell (pip-bootstraps the bare git URL, then the package's own unwrap.colab.install_colab installs the [notebook] stack AND fetches the notebook's sibling <study>_preprocess/_posthoc/_plots scripts next to the package, no-op locally); PR #84 (merged cf4974b) + PR #85 (merged 841294a, install mechanism superseded by #86) + PR #86 (merged c26880d) + PR #87 (merged 45218cf, sibling-script fetch) merged, main = 45218cf; 0 open PRs; PR branches + worktrees deleted both sides; INCIDENT + RESTORE logged in the phase section (a sweep command wrote into the user's main clone - fully restored to the exact branch tip; scratch-worktrees-only guardrail recorded); NOTHING PENDING in this doc's scope - the last mile is the user's real-Colab smoke run of the beetles notebook (if anything still trips, fix via a fresh scratch worktree from origin/main, same validation battery)) - NEXT CHAT STARTS HERE
 
-## CITATION + NAMING + COLAB PHASE (COMPLETE 2026-11-02; PRs #84 + #85 + #86 merged, main = c26880d)
+## CITATION + NAMING + COLAB PHASE (COMPLETE 2026-11-02; PRs #84 + #85 + #86 + #87 merged, main = 45218cf)
 
 User requests (in order, all on top of #83): (a) citations inline -
 "They should all be in the first paragraph of the notebooks/docs similar
@@ -167,6 +167,86 @@ notebook, in the unwrap package") - the package-owned Colab helper:
   source changed (byte-identical otherwise, no re-bake); strict
   CI-mirroring build clean, install_colab verified in the rendered pages.
 
+#87 (single commit d156bcf; merged 45218cf) - fetch each notebook's
+sibling scripts in the Colab setup cell:
+- Problem: the #86 cell installs the package, but the notebook body
+  then runs its own sys.path.insert(0, os.path.join(os.path.dirname(
+  os.path.dirname(unwrap.__file__)), "notebooks")) and imports its
+  sibling scripts - on Colab only the .ipynb was delivered (no repo
+  checkout), so `import beetles_preprocess` raised
+  ModuleNotFoundError (hit on the real beetles notebook; the cell
+  itself had completed fine).
+- Fix: install_colab() now takes scripts= and, after the stack
+  install, fetches exactly those files from
+  raw.githubusercontent.com/jgraving/unwrap/{ref}/notebooks/{name}
+  (same ref the cell's pip bootstrap used, default "main") into
+  scripts_dir() = Path(unwrap/colab.py).resolve().parent.parent /
+  "notebooks" - literally the directory every notebook's sys.path
+  line targets, so no notebook body line changed. Each colab-setup
+  cell just grew its script list (bats keeps extras=). The per-
+  notebook lists mirror the cell imports and are closed under the
+  scripts' own sibling imports (sweep-verified: *plots ->
+  *_posthoc; bats plots additionally -> *_preprocess): beetles 3
+  (beetles_plots/posthoc/preprocess), circular_regression 1
+  (circular_regression_plots), zebra 3, bats 3 (goldshtein_bats_*),
+  locust density 3 (locust_density_*), locust direction 2
+  (locust_direction_plots + locust_posthoc), periodic 1 (
+  periodic_not_circular_plots), vmp 1 (von_mises_policy_plots).
+- unwrap.plots.save_figure already does out.mkdir(parents=True,
+  exist_ok=True), so the notebooks' relative figures/... save paths
+  work from Colab's empty CWD - no change needed there.
+- The new fetch unit test caught a REAL first-draft bug: the draft
+  wrote the fetched bytes to the directory instead of
+  directory/name (IsADirectoryError at write time) - only the test
+  could see it; fixed before push.
+- Sim gotchas this round (both sim bugs, not product bugs): (1) run
+  the pre-merge simulation only AFTER the branch is pushed - the
+  first attempt died in pip's own git step (`pathspec
+  'colab-scripts' did not match any file(s)`), the #86 timing
+  invariant (bootstrap ref = the PR branch) only helps when GitHub
+  actually has the ref; (2) the post-cell import check must
+  replicate the notebook's own sys.path.insert line - a bare
+  `import zebra_preprocess` fails by design (the files live OUT of
+  the default path, reachable only through that line), which cost
+  one false-alarm sim round before the corrected check printed
+  SIM-CORE-OK.
+- Checked: 6 unit tests green (fetch URL-per-ref, one file per script
+  with the fetched bytes, scripts_dir location); two full Colab
+  simulations (fresh py3.12 venv + stub google.colab + the literal
+  cell source, bootstrap ref = the PR branch) end with the full
+  [notebook] stack AND the notebooks' sibling scripts importing
+  (core sim via zebra: zebra_preprocess/_posthoc/_plots -> SIM-
+  CORE-OK; bats: goldshtein_bats_* + osmnx/xlrd -> SIM-BATS-OK);
+  no-op path re-verified in a real ipykernel kernel (zero outputs);
+  per notebook only the colab-setup cell changed vs main (byte-
+  identical otherwise, no re-bake); strict CI-mirroring build clean
+  (the cells' install_colab calls render into the notebook pages);
+  full CI green (all OS/Python legs).
+
+INCIDENT (during the #87 sweep; disclosed to the user; restored):
+the first sweep script began with `git checkout origin/main -- .`
+EXECUTED IN THE USER'S MAIN CLONE (/home/jake/projects/unwrap) where
+it should have only read git objects - it overwrote every tracked
+file of the working tree (branch docs/notebooks-explained 277c7ae)
+with origin/main content. Restored exactly: `git checkout HEAD -- .`
+to revert the overwrite, then unstaged + removed the 30 files the
+checkout had staged in (present on main, absent from 277c7ae);
+status back to exactly the 3 pre-existing untracked entries
+(notebooks/XY_parquet_parts symlink, notebooks/figures/, the sweep
+parquet). Branch, commit, history, stashes, untracked files were
+never at risk. Uncommitted edits, IF any existed, are unrecoverable
+from git (user: everything important is on GitHub already, so it
+stands; VSCode local history was offered as the recovery path).
+fsck shows 2 old dangling notebook blobs (one 8.4 MB carrying
+<<<<<<< ours markers) + 14 dangling commit/tree pairs in that clone
+- remnants of an abandoned local merge, pre-dating the session.
+GUARDRAIL (standing, added because of this): /home/jake/projects/
+unwrap is READ-ONLY for agent work - anything touching origin/main
+state happens in scratch worktrees only (git worktree add
+/tmp/opencode/wt-... -b ... origin/main, using the main clone as a
+repo, never as a working tree), and pre-merge simulations use a
+snapshot taken from the worktree, never the clone.
+
 Housekeeping this phase:
 - Stale-worktree cleanup: 10 early-phase worktrees (wt-bats/beetles/
   circ/density/deps/locust-mix/periodic/refactor/vonmises/zebra) + 9
@@ -180,8 +260,10 @@ Housekeeping this phase:
   object" ancestry failures were my own truncated reads, not missing
   objects.
 - Remaining worktrees: the user's main clone (/home/jake/projects/
-  unwrap: docs/notebooks-explained 277c7ae + uncommitted work -
-  untouched), this handoff; PR worktrees deleted after each merge.
+  unwrap: docs/notebooks-explained 277c7ae; working tree restored to
+  the exact branch tip after the INCIDENT above - only the 3
+  pre-existing untracked entries remain), this handoff; PR
+  worktrees deleted after each merge.
 
 
 ## PAPER-LANGUAGE + TOC PHASE (COMPLETE 2026-11-02; PRs #81 + #82 merged, main = 0f53d5f)
