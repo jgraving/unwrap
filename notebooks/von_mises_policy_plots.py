@@ -84,7 +84,7 @@ def _clean_axis(ax):
 
 def plot_navigation(x_start, target, kappas, theta_grid, radials, trajectories,
                     R_policy=1.75, amp=1.0, *, save=True,
-                    save_path="figures/von_mises_policy/vonmises_navigation.svg"):
+                    save_path="figures/von_mises_policy/vonmises_navigation.pdf"):
     """Two-row figure: the exact von Mises density as a radial modulation
     (top) and 10 stepwise Monte-Carlo trajectories (bottom), one column per
     concentration in ``kappas``.
