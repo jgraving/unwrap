@@ -46,6 +46,7 @@ markdown_extensions:
 nav:
   - Overview: index.md
   - Python setup: getting-started.md
+  - R setup: getting-started-r.md
   - Circular GLMs and GLMMs: models.md
   - Mathematical guide:
       - 1. Von Mises distribution: math/von-mises.md
@@ -54,7 +55,9 @@ nav:
       - 4. Mixture extensions: math/mixtures.md
   - Biological examples:
       - Overview: examples.md
-      - Circular regression tutorial: notebooks/circular_regression.ipynb
+      - Circular regression tutorial:
+          - Python: notebooks/circular_regression.ipynb
+          - R: notebooks_r/circular_regression.ipynb
       - Grevy's zebra body orientation during an escape response: notebooks/zebra_escape.ipynb
       - Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing: notebooks/goldshtein_bats.ipynb
       - Order and density shape locust directional alignment in virtual reality: notebooks/locust_density_order.ipynb

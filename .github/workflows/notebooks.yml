@@ -47,3 +47,48 @@ jobs:
           name: executed-circular-regression
           path: executed/circular_regression.ipynb
           retention-days: 7
+  execute-r:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      UNWRAP_R_CI: '1'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v4
+      - name: Install R packages
+        run: |
+          Rscript -e 'install.packages("pak", repos = "https://cloud.r-project.org")'
+          Rscript -e 'pak::pak(
+            c("brms", "cmdstanr", "posterior", "loo", "circular",
+              "ggplot2", "IRkernel"),
+            binary = TRUE,
+            repos = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+          )'
+      - name: Install CmdStan
+        run: Rscript -e 'cmdstanr::install_cmdstan()'
+      - name: Register the R kernel
+        run: Rscript -e 'IRkernel::installspec()'
+      - name: Execute every tutorial cell (R kernel, shortened sampling)
+        env:
+          UNWRAP_R_CI: '1'
+        run: |
+          python3 -m pip install --quiet jupyter-client nbclient nbformat
+          python3 - <<'PY'
+          from pathlib import Path
+          import nbformat
+          from nbclient import NotebookClient
+          path = Path("notebooks_r/circular_regression.ipynb")
+          notebook = nbformat.read(path, as_version=4)
+          NotebookClient(notebook, timeout=3600, kernel_name="ir").execute()
+          assert any("image/png" in output.get("data", {})
+                     for cell in notebook.cells for output in cell.get("outputs", [])), "No rendered figures"
+          Path("executed").mkdir(exist_ok=True)
+          nbformat.write(notebook, "executed/circular_regression_r.ipynb")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: executed-circular-regression-r
+          path: executed/circular_regression_r.ipynb
+          retention-days: 7
