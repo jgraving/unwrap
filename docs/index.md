@@ -13,7 +13,7 @@ consistent? Do individuals respond differently?
 
 These questions can be addressed with **Bayesian generalized linear models
 (GLMs)**, which relate an outcome such as heading to predictors such as
-treatment or neighbour density. The circular GLMs here use a von Mises
+treatment or neighbor density. The circular GLMs here use a von Mises
 distribution, a circular counterpart of the normal distribution, so that 359° and 1° are
 treated as nearby directions. Predictors can explain **mean direction** and
 **directional concentration** together: where animals point and how tightly
@@ -58,7 +58,7 @@ describing parameter uncertainty given the data and model. The examples show
 predicted directions and differences between conditions, together with uncertainty
 intervals. Before interpreting a result, check both the sampling diagnostics
 and whether observations simulated from the fitted model resemble the measured
-behaviour. This comparison is a **posterior predictive check**.
+behavior. This comparison is a **posterior predictive check**.
 
 A GLMM can also account for repeated measurements within animals. This helps
 separate consistency within an animal from alignment between animals: animals

@@ -47,7 +47,7 @@ $$
 $$
 
 The covariance matrices $\Sigma_\beta$ and $\Sigma_\alpha$ describe the spread
-of animal effects and any modelled association among their intercepts and
+of animal effects and any modeled association among their intercepts and
 slopes. Their unknown scales receive **hyperpriors**, priors on the parameters
 of these shared distributions. Learning the spread from all animals induces
 **partial pooling**: individual estimates share information while retaining
@@ -84,7 +84,7 @@ $\kappa_{in}$:
 
 Thus, animals can each hold a steady heading (high observation concentration)
 while pointing in different directions (low between-animal alignment).
-Angular treatment offsets can be modelled similarly when supported by the
+Angular treatment offsets can be modeled similarly when supported by the
 experimental design.
 
 Bambi's standard group-effect formulas, such as `(1 + cue | animal)`, specify

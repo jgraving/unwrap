@@ -66,18 +66,18 @@ Python model inputs use **radians**. Convert degrees with `np.deg2rad` and keep
 the reference direction and clockwise or anticlockwise convention consistent.
 For the von Mises examples here, `circular_modulo` wraps angles to `[-pi, pi)`.
 
-Summarise angles on the circle: the average of 179° and −179° is near 180°, not
+Summarize angles on the circle: the average of 179° and −179° is near 180°, not
 0°. The tutorial demonstrates circular summaries and plots. The
 [link guide](links.md) explains the mathematical conventions.
 
 ## Run a biological example
 
 The [example guide](examples.md) lists each example and what its validated
-run covers. The animal-behaviour notebooks load their observations through
+run covers. The animal-behavior notebooks load their observations through
 the `unwrap.datasets` accessors, which fetch the raw data from the
 `jgraving/unwrap-data` repository on first use (cloned to
 `~/.cache/unwrap-data`) and then resolve to the cache without network
-access. The animal-behaviour notebooks additionally need `seaborn`
+access. The animal-behavior notebooks additionally need `seaborn`
 (zebra and bat figures) and `pyarrow` (the parquet data files), installed
 in the same environment:
 
