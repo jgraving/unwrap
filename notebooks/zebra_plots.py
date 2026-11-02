@@ -25,6 +25,7 @@ import seaborn as sns
 from matplotlib.lines import Line2D
 
 from unwrap import plots as _plots
+from unwrap.circular import circ_xerr_from_interval as _circ_xerr
 
 from zebra_posthoc import ppc_bootstrap_stats, summary_stats
 
@@ -86,22 +87,12 @@ def _save(fig, save, save_path):
     format follows the path's suffix."""
     if not save:
         return
-    p = Path(save_path)
-    if p.suffix.lower() == ".svg":
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True)
-    else:
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False)
+    _plots.save_by_path(fig, FIG_DIR, save_path)
+
 
 
 def _restore_ticks(ax):
-    ax.tick_params(
-        axis="both", which="both",
-        direction="out",
-        bottom=True, top=False, left=True, right=False,
-        length=TICK_LEN, width=TICK_W,
-    )
-    ax.xaxis.set_ticks_position("bottom")
-    ax.yaxis.set_ticks_position("left")
+    _plots.tick_style(ax, width=TICK_W, length=TICK_LEN)
 
 
 def _despine(ax):
@@ -250,14 +241,6 @@ def plot_summary(idata, df_blocks, *, save=True,
 # ---------------------------------------------------------------------------
 # Figure 2: supplemental PPC - bootstrap (data) vs posterior (model).
 # ---------------------------------------------------------------------------
-def _circ_mod(x):
-    return (x + np.pi) % (2 * np.pi) - np.pi
-
-
-def _circ_xerr(m, lo, hi):
-    w_lo = abs(float(_circ_mod(m - lo)))
-    w_hi = abs(float(_circ_mod(hi - m)))
-    return np.degrees(w_lo), np.degrees(w_hi)
 
 
 def plot_ppc(idata, model, df_blocks, *, save=True,

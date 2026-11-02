@@ -16,37 +16,30 @@ the notebook cells stay one call):
 import numpy as np
 import pandas as pd
 import pymc as pm
-from scipy.special import i0, i1
-from scipy.stats import circmean, vonmises
+from scipy.stats import circmean
+
+from unwrap.inference import graph_free_rvs
+from unwrap.link import softplus as _softplus
+from unwrap.circular import (
+    A_of_kappa as _A_of_kappa,
+    bootstrap_track_condition as _bootstrap_track_condition,
+    circ_mean as _circ_mean,
+    circ_mod as _circ_mod,
+    circular_mean as _circ_mean_centered,
+    hierarchical_bootstrap_group as _hierarchical_bootstrap_group,
+    linear_hdi as _linear_hdi,
+    resultant_length_angles as _resultant_length,
+    sorted_groups as _sorted_tracks,
+    stack_posterior_1d as _stack_1d,
+    vonmises_logpdf,
+    vonmises_pdf,
+    wrap_0_2pi as _wrap_0_2pi,
+)
 
 
 # ===========================================================================
 # Circular helpers (shared by the entry points below)
 # ===========================================================================
-def _softplus(x):
-    return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.0)
-
-
-def _circ_mod(x):
-    # wrap to (-pi, pi]
-    return (x + np.pi) % (2 * np.pi) - np.pi
-
-
-def _wrap_0_2pi(x):
-    return x % (2 * np.pi)
-
-
-def _circ_mean(a, axis=None):
-    a = np.asarray(a)
-    s = np.sin(a).mean(axis=axis)
-    c = np.cos(a).mean(axis=axis)
-    return (np.arctan2(s, c)) % (2 * np.pi)
-
-
-def _circ_mean_centered(theta):
-    theta = np.asarray(theta, float)
-    z = np.exp(1j * theta).mean()
-    return float(_circ_mod(np.angle(z)))
 
 
 def _circ_hdi(samples, prob=0.95):
@@ -88,23 +81,6 @@ def _arc_width(a, b):
     return (b - a) % (2 * np.pi)
 
 
-def _linear_hdi(samples, prob=0.95):
-    s = np.sort(np.asarray(samples, float))
-    n = s.size
-    if n == 0:
-        return np.nan, np.nan
-    k = int(np.ceil(prob * n))
-    spans = s[k - 1:] - s[:n - k + 1]
-    j = int(np.argmin(spans))
-    return float(s[j]), float(s[j + k - 1])
-
-
-def _resultant_length(a, axis=-1):
-    a = np.asarray(a)
-    return np.sqrt(np.mean(np.cos(a), axis=axis) ** 2 +
-                   np.mean(np.sin(a), axis=axis) ** 2)
-
-
 def _circ_hdi_centered(samples, prob=0.95):
     a = np.asarray(samples, float)
     m = _circ_mean_centered(a)
@@ -115,64 +91,6 @@ def _circ_hdi_centered(samples, prob=0.95):
     return m, lo, hi
 
 
-def _circ_xerr_from_interval(m, lo, hi):
-    w_lo = abs(float(_circ_mod(m - lo)))
-    w_hi = abs(float(_circ_mod(hi - m)))
-    return np.degrees(w_lo), np.degrees(w_hi)
-
-
-def _A_of_kappa(kappa):
-    kappa = np.asarray(kappa, float)
-    return i1(kappa) / i0(kappa)
-
-
-def _stack_1d(post, name):
-    if name not in post.data_vars:
-        raise KeyError(f"Missing posterior variable '{name}'.")
-    return post[name].stack(sample=("chain", "draw")).values.astype(float)
-
-
-def graph_free_rvs(idata, model):
-    """The fit result with a posterior group containing all of the model's
-    free RVs, i.e. evaluable by the PyMC graph.
-
-    The kappa random effects are fitted non-centered: in the PyMC graph the
-    free RVs are then ``*_sigma`` (scale) and ``*_offset`` (factor), but
-    bambi stores the transformed centered effects and the ``*_sigma`` scales
-    and drops the ``*_offset`` factors. ``pm.compute_deterministics`` and
-    ``pm.compute_log_likelihood`` both evaluate the graph against every free
-    RV, so the missing factors are reconstructed: the graph computes
-    ``effect = sigma * offset`` exactly (sigma scalar per draw, offset one
-    factor per group), hence ``offset = effect / sigma`` (0 where sigma is
-    0).
-    """
-    posterior = idata.posterior
-    missing = [
-        rv.name
-        for rv in model.backend.model.free_RVs
-        if rv.name not in posterior.data_vars
-    ]
-    if not missing:
-        return idata
-    aug = idata.copy(deep=False)
-    ds = posterior.to_dataset()
-    for name in missing:
-        sigma = ds[name.replace("_offset", "_sigma")]
-        effect = ds[name[: -len("_offset")]]
-        # The graph computes effect = sigma * offset (sigma scalar per
-        # draw, offset one factor per group), so the offset carries the
-        # group dimension of the centered effect.
-        e = np.asarray(effect)
-        s = np.asarray(sigma).reshape(np.asarray(sigma).shape + (1,) * (e.ndim - np.asarray(sigma).ndim))
-        offset = np.divide(e, s, out=np.zeros(e.shape), where=s != 0)
-        ds[name] = (tuple(effect.dims), offset)
-    aug["posterior"] = ds
-    return aug
-
-
-# ===========================================================================
-# Entry point 1: per-draw per-track directions and concentrations
-# ===========================================================================
 def posterior_directions(idata, df_blocks):
     """Per-draw per-track mean directions and concentrations from the fit.
 
@@ -377,11 +295,11 @@ def summary_stats(idata, df_blocks):
     kappa_bw_group = 500
 
     kde_mu_group_pre = np.mean(
-        vonmises.pdf(theta[None, :], kappa=kappa_bw_group, loc=mu_group_pre[:, None]),
+        vonmises_pdf(theta[None, :], mu_group_pre[:, None], kappa_bw_group),
         axis=0
     )
     kde_mu_group_post = np.mean(
-        vonmises.pdf(theta[None, :], kappa=kappa_bw_group, loc=mu_group_post[:, None]),
+        vonmises_pdf(theta[None, :], mu_group_post[:, None], kappa_bw_group),
         axis=0
     )
 
@@ -401,8 +319,8 @@ def summary_stats(idata, df_blocks):
     kappa_pre  = kappa[:, idx_pre]   # (S, nT)
     kappa_post = kappa[:, idx_post]  # (S, nT)
 
-    R_ind_pre_samples  = i1(kappa_pre)  / i0(kappa_pre)   # (S, nT)
-    R_ind_post_samples = i1(kappa_post) / i0(kappa_post)  # (S, nT)
+    R_ind_pre_samples  = _A_of_kappa(kappa_pre)   # (S, nT)
+    R_ind_post_samples = _A_of_kappa(kappa_post)  # (S, nT)
 
     R_ind_pre_mean  = R_ind_pre_samples.mean(axis=0)
     R_ind_post_mean = R_ind_post_samples.mean(axis=0)
@@ -430,11 +348,11 @@ def summary_stats(idata, df_blocks):
     kde_mu_ind_post = np.zeros((nT, theta.size))
     for j in range(nT):
         kde_mu_ind_pre[j] = np.mean(
-            vonmises.pdf(theta[None, :], kappa=kappa_bw_ind, loc=mu_ind_pre[:, j][:, None]),
+            vonmises_pdf(theta[None, :], mu_ind_pre[:, j][:, None], kappa_bw_ind),
             axis=0
         )
         kde_mu_ind_post[j] = np.mean(
-            vonmises.pdf(theta[None, :], kappa=kappa_bw_ind, loc=mu_ind_post[:, j][:, None]),
+            vonmises_pdf(theta[None, :], mu_ind_post[:, j][:, None], kappa_bw_ind),
             axis=0
         )
 
@@ -483,105 +401,6 @@ def summary_stats(idata, df_blocks):
 # ===========================================================================
 # Entry point 3: bootstrap (data) vs posterior (model) for the PPC figure
 # ===========================================================================
-def _sorted_tracks(x):
-    vals = pd.Series(x).dropna().astype(str).unique().tolist()
-    try:
-        return sorted(vals, key=lambda v: float(v))
-    except Exception:
-        return sorted(vals)
-
-
-def _hierarchical_bootstrap_group(df, B=1500, seed=123):
-    """Hierarchical bootstrap (Individuals -> steps) for group-level stats.
-
-    Returns:
-      mu_pre, mu_post : group mean directions (angles from individual mean directions)
-      R_pre, R_post   : alignment of individual mean directions within condition (Pre/Post)
-    """
-    rng = np.random.default_rng(seed)
-    df = df.copy()
-    df["Track"] = df["Track"].astype(str)
-
-    tracks = _sorted_tracks(df["Track"])
-    nT = len(tracks)
-
-    pre = {}
-    post = {}
-    for t in tracks:
-        y_pre  = df.loc[(df["Track"] == t) & (df["PostStimulus"] == 0), "HeadingRadians"].dropna().to_numpy(float)
-        y_post = df.loc[(df["Track"] == t) & (df["PostStimulus"] == 1), "HeadingRadians"].dropna().to_numpy(float)
-        pre[t]  = np.exp(1j * y_pre)  if y_pre.size  else None
-        post[t] = np.exp(1j * y_post) if y_post.size else None
-
-    mu_pre_s  = np.empty(B, float)
-    mu_post_s = np.empty(B, float)
-    R_pre_s   = np.empty(B, float)
-    R_post_s  = np.empty(B, float)
-
-    for b in range(B):
-        samp_tracks = rng.choice(tracks, size=nT, replace=True)
-
-        u_pre  = []
-        u_post = []
-
-        for t in samp_tracks:
-            z = pre[t]
-            if z is not None:
-                idx = rng.integers(0, z.size, size=z.size)
-                zbar = z[idx].mean()
-                if np.abs(zbar) > 0:
-                    u_pre.append(zbar / np.abs(zbar))
-
-            z = post[t]
-            if z is not None:
-                idx = rng.integers(0, z.size, size=z.size)
-                zbar = z[idx].mean()
-                if np.abs(zbar) > 0:
-                    u_post.append(zbar / np.abs(zbar))
-
-        if len(u_pre) > 0:
-            zG = np.mean(u_pre)
-            mu_pre_s[b] = _circ_mod(np.angle(zG))
-            R_pre_s[b]  = np.abs(zG)
-        else:
-            mu_pre_s[b] = np.nan
-            R_pre_s[b]  = np.nan
-
-        if len(u_post) > 0:
-            zG = np.mean(u_post)
-            mu_post_s[b] = _circ_mod(np.angle(zG))
-            R_post_s[b]  = np.abs(zG)
-        else:
-            mu_post_s[b] = np.nan
-            R_post_s[b]  = np.nan
-
-    return {
-        "mu_pre": mu_pre_s,
-        "mu_post": mu_post_s,
-        "R_pre": R_pre_s,
-        "R_post": R_post_s,
-        "tracks": tracks,
-    }
-
-
-def _bootstrap_track_condition(y, B=1200, seed=0):
-    rng = np.random.default_rng(seed)
-    y = np.asarray(y, float)
-    if y.size == 0:
-        return np.array([]), np.array([])
-    z = np.exp(1j * y)
-    n = z.size
-
-    mu = np.empty(B, float)
-    R  = np.empty(B, float)
-
-    for b in range(B):
-        idx = rng.integers(0, n, size=n)
-        zbar = z[idx].mean()
-        mu[b] = _circ_mod(np.angle(zbar))
-        R[b]  = np.abs(zbar)
-
-    return mu, R
 
 
 def ppc_bootstrap_stats(idata, model, df_blocks):
@@ -675,10 +494,10 @@ def ppc_bootstrap_stats(idata, model, df_blocks):
     # log-likelihood stored in the fit result: they must agree to
     # floating-point precision.
     _obs_ll = idata.log_likelihood["HeadingRadians"]
-    _expected = vonmises.logpdf(
+    _expected = vonmises_logpdf(
         df_blocks["HeadingRadians"].to_numpy(),
+        mu_da.transpose(*_obs_ll.dims).values,
         kappa_da.transpose(*_obs_ll.dims).values,
-        loc=mu_da.transpose(*_obs_ll.dims).values,
     )
     np.testing.assert_allclose(_expected, _obs_ll.values, rtol=1e-10, atol=1e-10)
     print("response params from PyMC graph OK; log-likelihood cross-check passed")
