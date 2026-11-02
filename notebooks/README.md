@@ -4,9 +4,10 @@ Start with **[circular regression](circular_regression.ipynb)**. It generates
 its own data and walks through estimating mean direction and directional
 concentration, displaying uncertainty, and checking model predictions.
 
-The research notebooks apply these ideas to animal behaviour. They retain
-saved results from the research workflow; those outputs are not evidence that
-a fresh run succeeds with today's dependencies.
+The research notebooks apply these ideas to animal behaviour. Each has
+been rerun end to end from this checkout on the current stack, and
+their saved outputs come from that validated run; each row above says
+what that run validated.
 
 | Notebook | Biological question or purpose | Inputs and readiness |
 | --- | --- | --- |
