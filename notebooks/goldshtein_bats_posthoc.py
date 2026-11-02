@@ -10,9 +10,11 @@ tag); and the per-step posterior responsibility of the goal component
 with its distance-to-destination kernel curves.
 
 The heavy implementations are the annotated notebook cells moved here
-verbatim (one copy per duplicated helper family); the statistical odd
-choices of the annotated study (e.g. the logit-space p_goal summary)
-are preserved.
+verbatim (the base cells are self-contained and redefine a shared
+helper family per cell, so a few families appear once per section; the
+section-local copies are identical, and the later copy of a family is
+the effective one). The statistical odd choices of the annotated study
+(e.g. the logit-space p_goal summary) are preserved.
 """
 
 from __future__ import annotations
@@ -1670,30 +1672,6 @@ def hdi_along_samples(arr: np.ndarray, prob: float = 0.95) -> Tuple[np.ndarray, 
 
 
 # ============================================================
-# Helpers: tqdm + joblib
-# ============================================================
-
-@contextmanager
-def tqdm_joblib(tqdm_object):
-    """
-    Context manager to patch joblib to report into tqdm progress bar.
-    """
-    import joblib
-    class TqdmBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
-        def __call__(self, *args, **kwargs):
-            tqdm_object.update(n=self.batch_size)
-            return super().__call__(*args, **kwargs)
-
-    old = joblib.parallel.BatchCompletionCallBack
-    joblib.parallel.BatchCompletionCallBack = TqdmBatchCompletionCallback
-    try:
-        yield tqdm_object
-    finally:
-        joblib.parallel.BatchCompletionCallBack = old
-        tqdm_object.close()
-
-
-# ============================================================
 # Grouping utilities
 # ============================================================
 
@@ -2061,6 +2039,7 @@ def hist_density(data: np.ndarray, bin_edges: np.ndarray) -> Tuple[np.ndarray, n
     return centers, h
 
 
+@contextmanager
 def tqdm_joblib(tqdm_object):
     """
     Context manager to patch joblib to report into tqdm progress bar.
