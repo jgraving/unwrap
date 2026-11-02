@@ -577,6 +577,42 @@ def sigmoid_normal_percentiles(mu, sigma, qs=(0.01, 0.05, 0.10, 0.25, 0.50, 0.75
 # ---------------------------------------------------------------------------
 # PSIS-LOO model comparison (vMU mixture vs the von Mises baseline)
 # ---------------------------------------------------------------------------
+def graph_free_rvs(idata, model):
+    """The fit result with a posterior group containing all of the model's
+    free RVs, i.e. evaluable by the PyMC graph.
+
+    The kappa random effects are fitted non-centered: in the PyMC graph the
+    free RVs are then ``*_sigma`` (scale) and ``*_offset`` (factor), but
+    bambi stores the transformed centered effects and the ``*_sigma`` scales
+    and drops the ``*_offset`` factors. ``pm.compute_deterministics`` and
+    ``pm.compute_log_likelihood`` both evaluate the graph against every free
+    RV, so the missing factors are reconstructed: the graph computes
+    ``effect = sigma * offset`` exactly (sigma scalar per draw, offset one
+    factor per group), hence ``offset = effect / sigma`` (0 where sigma is
+    0).
+    """
+    posterior = idata.posterior
+    missing = [
+        rv.name
+        for rv in model.backend.model.free_RVs
+        if rv.name not in posterior.data_vars
+    ]
+    if not missing:
+        return idata
+    aug = idata.copy(deep=False)
+    ds = posterior.to_dataset()
+    for name in missing:
+        sigma = ds[name.replace("_offset", "_sigma")]
+        effect = ds[name[: -len("_offset")]]
+        # The graph computes effect = sigma * offset (sigma scalar per
+        # draw, offset one factor per group), so the offset carries the
+        # group dimension of the centered effect.
+        e = np.asarray(effect)
+        s = np.asarray(sigma).reshape(np.asarray(sigma).shape + (1,) * (e.ndim - np.asarray(sigma).ndim))
+        offset = np.divide(e, s, out=np.zeros(e.shape), where=s != 0)
+        ds[name] = (tuple(effect.dims), offset)
+    aug["posterior"] = ds
+    return aug
 
 
 def _loo_pointwise_elpd(idata, *, var_name=None):
