@@ -68,9 +68,15 @@ import bambi as bmb
 import pymc as pm
 import xarray as xr
 from joblib import Parallel, delayed
-from scipy.special import i0, i0e, i1
+from scipy.special import i0e
 
-from unwrap.link import BAMBI_LINKS, circular_modulo, inverse_softplus
+from unwrap.circular import (
+    A_of_kappa as _A_of_kappa,
+    circular_mean as _circular_mean,
+    vonmises_logpdf,
+    vonmises_pdf,
+)
+from unwrap.link import BAMBI_LINKS, circular_modulo, inverse_softplus, softplus as _softplus_np
 from unwrap.prior import CircularUniformPrior
 
 # ----------------------------------------------------------------------
@@ -87,22 +93,6 @@ def normalize(x):
 def log2_scale(x, min_size=DENS_MIN, max_size=DENS_MAX):
     x = np.asarray(x, float)
     return np.log2(x / min_size) / np.log2(max_size / min_size)
-
-
-def _softplus_np(x):
-    """Numerically stable softplus for numpy arrays (the link evaluated
-    on posterior draws)."""
-    x = np.asarray(x)
-    return np.where(x > 20, x, np.log1p(np.exp(x)))
-
-
-def _circular_mean(theta):
-    z = np.exp(1j * np.asarray(theta, float))
-    return float(circular_modulo(np.angle(z.mean())))
-
-
-def _A_of_kappa(kappa):
-    return i1(kappa) / i0(kappa)
 
 
 # ----------------------------------------------------------------------
@@ -488,7 +478,7 @@ def elpd0_stats(idata, df, hdi_prob=0.9, grid_size=50):
         kappa = _softplus_np(eta_kappa)
 
         # log predictive density at y=0 for each posterior draw
-        logp0 = vonmises_logpdf(0.0, kappa, loc=mu)  # (S, n_points)
+        logp0 = vonmises_logpdf(0.0, mu, kappa)  # (S, n_points)
 
         mean_log = np.mean(logp0, axis=0)
         # az.hdi treats the LAST axis of a raw 2D array as the samples axis.
@@ -520,16 +510,6 @@ def elpd0_stats(idata, df, hdi_prob=0.9, grid_size=50):
         "dens_levels": dens_levels,
         "order_levels": order_levels,
     }
-
-
-def _vonmises_logpdf_scalar(y, kappa, loc):
-    """von Mises logpdf with stable log I0, numpy broadcasting."""
-    logI0 = np.log(i0e(kappa)) + kappa
-    return kappa * np.cos(y - loc) - np.log(2 * np.pi) - logI0
-
-
-def vonmises_logpdf(y, kappa, loc):
-    return _vonmises_logpdf_scalar(y, np.asarray(kappa, float), np.asarray(loc, float))
 
 
 # ----------------------------------------------------------------------
@@ -585,13 +565,6 @@ def polar_pdf_stats(idata, df, hdi_prob=0.90, max_draws=1200, seed=123,
         "dens_levels": dens_levels,
         "peak_max": peak_max,
     }
-
-
-def vonmises_pdf(theta, mu, kappa):
-    return (
-        np.exp(kappa * np.cos(theta - mu))
-        / (2 * np.pi * np.i0(kappa))
-    )
 
 
 def _subsample_draws(mu, kappa, max_draws, rng):
