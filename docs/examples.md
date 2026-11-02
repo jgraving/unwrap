@@ -30,6 +30,13 @@ mean direction, alignment between individuals (how the individual mean
 directions cluster), and within-individual consistency (how tightly each
 zebra's observations cluster around its own mean direction).
 
+The body orientations are from the drone recordings of B. Koger,
+A. Deshpande, J. T. Kerby, J. M. Graving, B. R. Costelloe, and I. D.
+Couzin, "Quantifying the movement, behaviour and environmental
+context of group-living animals using drones and computer vision,"
+*Journal of Animal Ecology* **92**(6), 1415-1433 (2023);
+[doi:10.1111/1365-2656.13904](https://doi.org/10.1111/1365-2656.13904).
+
 ## Homing bats: goal-directedness and directional precision under sensory deprivation
 
 The [homing bat analysis](notebooks/goldshtein_bats.ipynb) revisits
@@ -48,6 +55,10 @@ Mises–uniform mixture to the full set of goal-relative bearings, in which
 each step arises either from a directed von Mises component (goal-directed
 "exploitation") or an undirected uniform component (search "exploration"),
 compared with a unimodal von Mises baseline.
+
+The tracking data are from A. Goldshtein et al., "Acoustic cognitive
+map-based navigation in echolocating bats," *Science* **386**(6721),
+561-567 (2024).
 
 ## Marching locusts: order and density, optic flow, and vectorial encoding
 
@@ -73,6 +84,11 @@ alignment to wide-field motion) versus vectorial encoding (a choice-like
 commitment to one of the two lateral swarms, with leftward and rightward
 turns).
 
+Both virtual-reality experiments are from S. Sayin et al., "The
+behavioral mechanisms governing collective motion in swarming locusts,"
+*Science* **387**(6737), 995-1000 (2025);
+[doi:10.1126/science.adq7832](https://doi.org/10.1126/science.adq7832).
+
 ## Dung beetles: artificial light reorients orientation
 
 The [beetle analysis](notebooks/beetles.ipynb) revisits a two-condition
@@ -87,6 +103,11 @@ toward the floodlight, the change in within-individual concentration, the
 post-hoc change in the between-individual clustering of the individuals' mean
 directions ($\kappa_\mu$), and "floodlight attraction" as the posterior
 predictive mass within $\pm45^{\circ}$ of the floodlight direction.
+
+The arena experiments are from J. J. Foster et al., "Light pollution
+forces a change in dung beetle orientation behavior," *Current
+Biology* **31**(17), 3935-3942 (2021);
+[doi:10.1016/j.cub.2021.06.038](https://doi.org/10.1016/j.cub.2021.06.038).
 
 ## Before running one of these notebooks
 
