@@ -59,9 +59,12 @@ jobs:
       - uses: r-lib/actions/setup-r@v4
       - name: Install R packages
         run: |
+          # cmdstanr is distributed by the Stan team on r-universe
+          # (it is no longer on CRAN).
+          Rscript -e 'install.packages("cmdstanr", repos = "https://stan-dev.r-universe.dev")'
           Rscript -e 'install.packages("pak", repos = "https://cloud.r-project.org")'
           Rscript -e 'pak::pak(
-            c("brms", "cmdstanr", "posterior", "loo", "circular",
+            c("brms", "posterior", "loo", "circular",
               "ggplot2", "IRkernel"),
             binary = TRUE,
             repos = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
