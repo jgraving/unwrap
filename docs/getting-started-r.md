@@ -17,8 +17,12 @@ install.packages(
   repos = "https://cloud.r-project.org",
 )
 # As of 2026, cmdstanr is distributed by the Stan team on r-universe
-# (it is no longer on CRAN).
-install.packages("cmdstanr", repos = "https://stan-dev.r-universe.dev")
+# (it is no longer on CRAN); the second repo lets its CRAN dependencies
+# resolve.
+install.packages(
+  "cmdstanr",
+  repos = c("https://stan-dev.r-universe.dev", "https://cloud.r-project.org"),
+)
 cmdstanr::install_cmdstan()  # downloads CmdStan once (~50 MB)
 ```
 
