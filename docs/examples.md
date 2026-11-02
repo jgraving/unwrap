@@ -15,7 +15,7 @@ questions and model formulas.
 The [notebook guide](https://github.com/jgraving/unwrap/blob/main/notebooks/README.md)
 lists all examples, their inputs, and what each validated run covers.
 
-## Grevy's zebra: escape response to an approaching human observer
+## Grevy's zebra body orientation during an escape response
 
 A focal group of Grevy's zebra (*Equus grevyi*) was recorded with an overhead
 drone and automated tracking at the Mpala Conservancy in Laikipia, Kenya: the
@@ -35,7 +35,7 @@ mean direction, alignment between individuals (how the individual mean
 directions cluster), and within-individual consistency (how tightly each
 zebra's observations cluster around its own mean direction).
 
-## Homing bats: goal-directedness and directional precision under sensory deprivation
+## Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
 
 The [homing bat analysis](notebooks/goldshtein_bats.ipynb) revisits
 kilometer-scale homing flights of echolocating bats from the experiments of
@@ -57,7 +57,7 @@ each step arises either from a directed von Mises component (goal-directed
 "exploitation") or an undirected uniform component (search "exploration"),
 compared with a unimodal von Mises baseline.
 
-## Marching locusts: order and density, optic flow, and vectorial encoding
+## Order and density shape locust directional alignment in virtual reality
 
 The [order and density analysis](notebooks/locust_density_order.ipynb)
 revisits a virtual-reality experiment from S. Sayin et al., "The behavioral
@@ -74,6 +74,8 @@ over the order and density specifications supports an order-dominant
 interpretation - order captures the bulk of the improvement in out-of-sample
 performance, and adding density provides at most a secondary gain.
 
+## Testing optic-flow vs. vectorial encoding in marching locusts
+
 The [mixture analysis](notebooks/locust_direction_mixture_model.ipynb) tests
 a second paradigm from the same experiments, in which moving virtual
 conspecifics are placed symmetrically at a lateral distance of 8 or 50 cm. A hierarchical
@@ -84,7 +86,7 @@ alignment to wide-field motion) versus vectorial encoding (a choice-like
 commitment to one of the two lateral swarms, with leftward and rightward
 turns).
 
-## Dung beetles: artificial light reorients orientation
+## Artificial light reorients nocturnal dung beetles
 
 The [beetle analysis](notebooks/beetles.ipynb) revisits a two-condition
 arena experiment in the nocturnal ball-rolling dung beetle *Escarabaeus

@@ -140,7 +140,8 @@ unchanged. Fix one reference predictor, such as $\eta_{\pi,nK}=0$, or impose
 a sum-to-zero constraint to remove this redundancy. This is separate from
 the component-label issue below. For numerical stability, subtract the
 largest weight predictor before evaluating the exponentials; the weights
-are unchanged. The [locust mixture example](../examples.md#marching-locusts-order-and-density-optic-flow-and-vectorial-encoding)
+are unchanged. The [optic-flow vs. vectorial encoding analysis in
+marching locusts](../examples.md#testing-optic-flow-vs-vectorial-encoding-in-marching-locusts)
 uses two components; additional components require more data and careful evaluation.
 
 ## Component labels and interpretation
@@ -165,5 +166,6 @@ identifying structure belong in the model specification. The vMU equation
 also requires a uniform component. These mixture equations are not selected
 by Bambi's single-component `family="vonmises"` setting.
 
-See the [biological examples](../examples.md) for the locust mixture analysis
-and its data and execution requirements.
+See the [biological examples](../examples.md) for the optic-flow vs.
+vectorial encoding analysis in marching locusts, along with its data and
+execution requirements.
