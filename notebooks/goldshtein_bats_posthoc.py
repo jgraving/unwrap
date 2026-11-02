@@ -97,6 +97,107 @@ def hdi_along_samples_2col(arr, prob=0.95):
     return out
 
 
+def circ_mean(x):
+    """Circular mean (radians) for samples x."""
+    x = np.asarray(x, float)
+    return np.arctan2(np.mean(np.sin(x)), np.mean(np.cos(x)))
+
+
+def wrap_0_2pi(x):
+    return np.mod(x, 2.0 * np.pi)
+
+
+def quantile_band(arr, prob=0.95):
+    arr = np.asarray(arr, float)
+    qlo = (1.0 - prob) / 2.0
+    qhi = 1.0 - qlo
+    med = np.nanmedian(arr, axis=0)
+    lo  = np.nanquantile(arr, qlo, axis=0)
+    hi  = np.nanquantile(arr, qhi, axis=0)
+    return med, lo, hi
+
+
+# --- Bessel ratio A(kappa) = I1/I0 (robust) ---
+try:
+    from scipy.special import i0 as _i0, i1 as _i1
+
+    def bessel_ratio(kappa):
+        kappa = np.asarray(kappa, float)
+        return _i1(kappa) / _i0(kappa)
+except Exception:
+    # fallback approximation (good enough for plotting/summary)
+    def bessel_ratio(kappa):
+        k = np.asarray(kappa, float)
+        out = np.empty_like(k)
+
+        small = k < 1e-3
+        mid   = (k >= 1e-3) & (k <= 50.0)
+        large = k > 50.0
+
+        out[small] = 0.5 * k[small] - (k[small] ** 3) / 16.0
+        km = k[mid]
+        out[mid] = km / (2.0 + km)
+        kl = k[large]
+        out[large] = 1.0 - 1.0/(2.0*kl) - 1.0/(8.0*kl*kl)
+        return out
+
+
+def vonmises_pdf_scalar(theta, mu, kappa):
+    # theta, mu can be arrays; uses numpy i0
+    theta = np.asarray(theta, float)
+    mu = np.asarray(mu, float)
+    kappa = np.asarray(kappa, float)
+    return np.exp(kappa * np.cos(theta - mu)) / (2 * np.pi * np.i0(kappa))
+
+
+# --- Optional SciPy CDF for circular interval mass ---
+try:
+    from scipy.stats import vonmises as _sp_vonmises
+    _HAS_SCIPY_VONMISES_CDF = True
+except Exception:
+    _HAS_SCIPY_VONMISES_CDF = False
+
+
+def vonmises_interval_mass(theta_lo, theta_hi, mu, kappa, *, grid_n=721):
+    """
+    P(theta_lo <= Theta <= theta_hi) for Von Mises(mu, kappa).
+
+    Uses SciPy CDF when available; falls back to vectorized numerical integration.
+    """
+    mu = np.asarray(mu, float).reshape(-1)
+    kappa = np.asarray(kappa, float).reshape(-1)
+
+    if _HAS_SCIPY_VONMISES_CDF:
+        # SciPy's circular cdf can jump by 1 depending on branch; correct by wrapping.
+        c_hi = _sp_vonmises.cdf(theta_hi, kappa, loc=mu)
+        c_lo = _sp_vonmises.cdf(theta_lo, kappa, loc=mu)
+        mass = np.asarray(c_hi - c_lo, float)
+
+        # Bring to [0, 1] for interval length < 2π (our ±45° interval is π/2).
+        mass = np.where(mass < 0.0, mass + 1.0, mass)
+        mass = np.where(mass > 1.0, mass - 1.0, mass)
+        return np.clip(mass, 0.0, 1.0)
+
+    # Fallback: direct integration of pdf over the interval (vectorized across draws)
+    theta = np.linspace(theta_lo, theta_hi, int(grid_n), dtype=float)[:, None]  # (G,1)
+    mu2 = mu[None, :]       # (1,S)
+    k2  = kappa[None, :]    # (1,S)
+    pdf = np.exp(k2 * np.cos(theta - mu2)) / (2 * np.pi * np.i0(k2))
+    mass = np.trapz(pdf, theta[:, 0], axis=0)
+    return np.clip(np.asarray(mass, float), 0.0, 1.0)
+
+
+def format_treatment_nicely(name: str) -> str:
+    s = str(name).strip()
+    if not s:
+        return "Control"
+    parts = [p.strip() for p in s.split(",") if p.strip()]
+    def titleish(x):
+        return " ".join([w[:1].upper() + w[1:] if w else "" for w in x.lower().split(" ")])
+    parts = [titleish(p) for p in parts]
+    return ", ".join(parts)
+
+
 def _format_treatment_name(name: str) -> str:
     if name is None or (isinstance(name, float) and np.isnan(name)):
         return "Unknown"

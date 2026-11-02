@@ -18,6 +18,7 @@ gitignored.
 """
 from pathlib import Path
 
+import math
 import os
 
 import numpy as np
@@ -26,6 +27,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import Point, LineString, Polygon, MultiPolygon
+from shapely.prepared import prep
 from matplotlib import colors as mcolors
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
@@ -1647,6 +1649,8 @@ def plot_per_tag_polar_kde(
 
 def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True, save_path=None):
     """Population mu/kappa coefficients of the Bambi von Mises model (intercept + treatment effects) with circular/linear mean + 95% HDI."""
+    post = idata_treatment.posterior
+
     def _has(varname: str) -> bool:
         return varname in post.data_vars
 
