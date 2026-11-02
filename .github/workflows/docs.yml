@@ -24,6 +24,8 @@ jobs:
           python-version: '3.12'
       - run: uv venv
       - run: uv pip install -r requirements-docs.txt
+      - name: Sync study notebooks into the docs tree
+        run: uv run --no-project python sync_docs_notebooks.py
       - run: uv run --no-project mkdocs build --strict
       - uses: actions/upload-artifact@v4
         with:

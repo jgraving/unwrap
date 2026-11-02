@@ -17,6 +17,25 @@
   display: inline-block;
 }
 
+/* Rendered study notebooks (mkdocs-jupyter custom template): the toolbar in
+   the top-right corner of every notebook page. The "Open in Google Colab"
+   button's link to the repository notebook is filled in by the template's
+   inline script from the page's own URL. */
+.unwrap-nb-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.5rem 0 1rem;
+}
+.unwrap-colab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.unwrap-colab-button img {
+  height: 1.1em;
+  width: auto;
+}
+
 /* The overview already has a wordmark. Keep its generated title accessible
    without displaying a second brand heading above the logo. */
 .md-content:has(.unwrap-brand) h1 {

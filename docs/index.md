@@ -38,7 +38,7 @@ inference, and **Bambi** for a high-level formula interface to GLMs and GLMMs.
 | Are there two preferred directions? | A mixture of directional distributions |
 
 [Install `unwrap`](getting-started.md), then follow the
-[circular regression tutorial](https://github.com/jgraving/unwrap/blob/main/notebooks/circular_regression.ipynb).
+[circular regression tutorial](notebooks/circular_regression.ipynb).
 It generates its own observations and shows how to fit a model, interpret its
 predictions, and check how well it describes the data.
 The [model guide](models.md) explains how these questions become GLM and GLMM
@@ -73,8 +73,9 @@ can each hold a steady heading while pointing in different directions.
 - [Python API guide](api.md): components for Bambi and PyMC models.
 - [R and MATLAB](languages.md): setup and examples for the other implementations.
 
-The introductory tutorial is checked automatically. Research notebooks have
-additional data and validation requirements, described in the example guide.
+The introductory tutorial is executed automatically in CI, and every
+notebook is rerun end to end before a change that touches it is merged.
+The example guide describes each analysis and its inputs.
 
 ## Citation
 

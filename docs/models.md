@@ -131,6 +131,6 @@ Bayesian fitting combines priors with the observed angles to estimate a
 posterior distribution. Check sampling diagnostics, summarise angles on the
 circle, and compare simulated headings from the fitted model with the data
 using **posterior predictive checks**. The
-[circular regression tutorial](https://github.com/jgraving/unwrap/blob/main/notebooks/circular_regression.ipynb)
+[circular regression tutorial](notebooks/circular_regression.ipynb)
 demonstrates fitting and checking a GLM; the [biological examples](examples.md)
 explore repeated observations and richer directional patterns.
