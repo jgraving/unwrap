@@ -27,7 +27,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import numpy as np
-from scipy.stats import vonmises
+from unwrap.circular import vonmises_logpdf
 
 from unwrap import plots as _plots
 from unwrap.bessel import bessel_ratio
@@ -76,11 +76,8 @@ def _save(fig, save, save_path):
     format follows the path's suffix."""
     if not save:
         return
-    p = Path(save_path)
-    if p.suffix.lower() == ".svg":
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True)
-    else:
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False)
+    _plots.save_by_path(fig, FIG_DIR, save_path)
+
 
 
 def _despine(ax):
@@ -569,15 +566,15 @@ def plot_individual_ppc_grid(trace_bimodal, df, *, save=True,
             weights_ind = np.clip(weights_mean[idx], EPS_local, 1.0)
             weights_ind = weights_ind / weights_ind.sum()
 
-            log_c1_mean = np.log(weights_ind[0]) + vonmises.logpdf(angles, kappa_ind[0], loc=mu_ind[0])
-            log_c2_mean = np.log(weights_ind[1]) + vonmises.logpdf(angles, kappa_ind[1], loc=mu_ind[1])
+            log_c1_mean = np.log(weights_ind[0]) + vonmises_logpdf(angles, mu_ind[0], kappa_ind[0])
+            log_c2_mean = np.log(weights_ind[1]) + vonmises_logpdf(angles, mu_ind[1], kappa_ind[1])
             log_pdf_mean_grid = np.logaddexp(log_c1_mean, log_c2_mean)
             inv_pdf_grid = np.exp(-log_pdf_mean_grid)
             norm = (np.trapezoid if hasattr(np, "trapezoid") else np.trapz)(inv_pdf_grid, angles)
 
             for ang in individual_data:
-                log_pdf_c1 = np.log(weights_ind[0]) + vonmises.logpdf(ang, kappa_ind[0], loc=mu_ind[0])
-                log_pdf_c2 = np.log(weights_ind[1]) + vonmises.logpdf(ang, kappa_ind[1], loc=mu_ind[1])
+                log_pdf_c1 = np.log(weights_ind[0]) + vonmises_logpdf(ang, mu_ind[0], kappa_ind[0])
+                log_pdf_c2 = np.log(weights_ind[1]) + vonmises_logpdf(ang, mu_ind[1], kappa_ind[1])
                 log_pdf_val = np.logaddexp(log_pdf_c1, log_pdf_c2)
                 inv_val = np.exp(-log_pdf_val)
                 residual = -(inv_val / (norm + EPS_local))

@@ -36,8 +36,13 @@ import pymc as pm
 import pytensor.tensor as pt
 from joblib import Parallel, delayed
 from numba import jit
-from scipy.special import i0
-from scipy.stats import vonmises
+
+from unwrap.circular import (
+    von_mises_kde as _von_mises_kde,
+    vonmises_logpdf,
+    wrap_pi as wrap_pm_pi,
+)
+
 
 # Magic constants from the original analysis (kept verbatim).
 N_BINS = 16           # histogram bins over the full circle
@@ -62,10 +67,6 @@ N_JOBS = max(1, (os.cpu_count() or 2) - 1)
 # ===========================================================================
 # Shared helpers
 # ===========================================================================
-def wrap_pm_pi(x):
-    """Wrap angles to (-pi, pi]."""
-    x = np.asarray(x, float)
-    return (x + np.pi) % (2 * np.pi) - np.pi
 
 
 def _norm_w(w):
@@ -96,18 +97,9 @@ def _mixture_logpdf(theta, mu, kappa, w):
     mu = wrap_pm_pi(mu)
     kappa = np.asarray(kappa, float)
     w = _norm_w(w)
-    logc0 = np.log(w[..., 0]) + vonmises.logpdf(theta, kappa[..., 0], loc=mu[..., 0])
-    logc1 = np.log(w[..., 1]) + vonmises.logpdf(theta, kappa[..., 1], loc=mu[..., 1])
+    logc0 = np.log(w[..., 0]) + vonmises_logpdf(theta, mu[..., 0], kappa[..., 0])
+    logc1 = np.log(w[..., 1]) + vonmises_logpdf(theta, mu[..., 1], kappa[..., 1])
     return np.logaddexp(logc0, logc1)
-
-
-def _von_mises_kde(data, points, kappa):
-    """Von Mises kernel density estimate of `data` at `points` (kernel
-    concentration fixed at `kappa`). Returns an array of len(points)."""
-    data = wrap_pm_pi(np.asarray(data, float))
-    c = 1.0 / (2.0 * np.pi * i0(kappa))
-    cos_diffs = np.cos(points[:, None] - data[None, :])
-    return c * np.exp(kappa * cos_diffs).mean(axis=1)
 
 
 # ===========================================================================
@@ -476,8 +468,8 @@ def individual_ppc_stats(trace_bimodal, df):
         w1 = w1 / ws
 
         # Vectorized mixture PDF over (S, A).
-        log_c1 = np.log(w0) + vonmises.logpdf(theta, k0, loc=mu0)
-        log_c2 = np.log(w1) + vonmises.logpdf(theta, k1, loc=mu1)
+        log_c1 = np.log(w0) + vonmises_logpdf(theta, mu0, k0)
+        log_c2 = np.log(w1) + vonmises_logpdf(theta, mu1, k1)
         log_pdf_samples = np.logaddexp(log_c1, log_c2).astype(np.float32)
         pdf_samples = np.exp(log_pdf_samples).astype(np.float32)
 
@@ -490,10 +482,10 @@ def individual_ppc_stats(trace_bimodal, df):
         weights_ind = np.clip(weights_mean[idx], EPS, 1.0)
         weights_ind = weights_ind / weights_ind.sum()
 
-        log_c1_mean = np.log(weights_ind[0]) + vonmises.logpdf(
-            angles, kappa_ind[0], loc=mu_ind[0])
-        log_c2_mean = np.log(weights_ind[1]) + vonmises.logpdf(
-            angles, kappa_ind[1], loc=mu_ind[1])
+        log_c1_mean = np.log(weights_ind[0]) + vonmises_logpdf(
+            angles, mu_ind[0], kappa_ind[0])
+        log_c2_mean = np.log(weights_ind[1]) + vonmises_logpdf(
+            angles, mu_ind[1], kappa_ind[1])
         pdf_mean_vals[idx] = np.exp(np.logaddexp(log_c1_mean, log_c2_mean))
 
         max_pdf_global = max(max_pdf_global, float(np.nanmax(pdf_upper[idx])))
