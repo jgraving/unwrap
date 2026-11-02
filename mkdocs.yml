@@ -55,13 +55,13 @@ nav:
   - Biological examples:
       - Overview: examples.md
       - Circular regression tutorial: notebooks/circular_regression.ipynb
-      - Zebra body orientation: notebooks/zebra_escape.ipynb
-      - Homing bats: notebooks/goldshtein_bats.ipynb
-      - Locust direction mixtures: notebooks/locust_direction_mixture_model.ipynb
-      - Locust density and order: notebooks/locust_density_order.ipynb
-      - Dung beetle orientation: notebooks/beetles.ipynb
-      - Periodic and circular functions: notebooks/periodic_not_circular.ipynb
-      - Von Mises policy: notebooks/von_mises_policy.ipynb
+      - Grevy's zebra body orientation during an escape response: notebooks/zebra_escape.ipynb
+      - Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing: notebooks/goldshtein_bats.ipynb
+      - Order and density shape locust directional alignment in virtual reality: notebooks/locust_density_order.ipynb
+      - Testing optic-flow vs. vectorial encoding in marching locusts: notebooks/locust_direction_mixture_model.ipynb
+      - Artificial light reorients nocturnal dung beetles: notebooks/beetles.ipynb
+      - Periodic but not circular: notebooks/periodic_not_circular.ipynb
+      - Von Mises navigation policy: notebooks/von_mises_policy.ipynb
   - Circular links: links.md
   - Python API guide: api.md
   - R and MATLAB: languages.md
