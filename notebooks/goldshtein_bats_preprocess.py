@@ -802,6 +802,21 @@ def solve_laplace_dirichlet(mask_lake, *, max_iter=20_000, tol=1e-5):
 
         return u_old
 
+
+def bilinear(F, ix0, ix1, iy0, iy1, wx, wy):
+    """Bilinear resample of grid field F at the fractional indices."""
+    f00 = F[iy0, ix0]
+    f10 = F[iy0, ix1]
+    f01 = F[iy1, ix0]
+    f11 = F[iy1, ix1]
+    return (
+        (1 - wx) * (1 - wy) * f00 +
+        (wx) * (1 - wy) * f10 +
+        (1 - wx) * (wy) * f01 +
+        (wx) * (wy) * f11
+    )
+
+
 # -------------------------
 # Harmonic target vector at points (bearing + unit tx/ty)
 # -------------------------
@@ -893,20 +908,8 @@ def harmonic_target_vector_to_polygon(
     wx = fxv - ix0
     wy = fyv - iy0
 
-    def bilinear(F):
-        f00 = F[iy0, ix0]
-        f10 = F[iy0, ix1]
-        f01 = F[iy1, ix0]
-        f11 = F[iy1, ix1]
-        return (
-            (1 - wx) * (1 - wy) * f00 +
-            (wx) * (1 - wy) * f10 +
-            (1 - wx) * (wy) * f01 +
-            (wx) * (wy) * f11
-        )
-
-    tx_s = bilinear(tx)
-    ty_s = bilinear(ty)
+    tx_s = bilinear(tx, ix0, ix1, iy0, iy1, wx, wy)
+    ty_s = bilinear(ty, ix0, ix1, iy0, iy1, wx, wy)
 
     nn = np.hypot(tx_s, ty_s)
     ok = np.isfinite(nn) & (nn > 0)
@@ -1025,20 +1028,8 @@ def smoothed_distance_target_vector_to_polygon(
     wx = fxv - ix0
     wy = fyv - iy0
 
-    def bilinear(F):
-        f00 = F[iy0, ix0]
-        f10 = F[iy0, ix1]
-        f01 = F[iy1, ix0]
-        f11 = F[iy1, ix1]
-        return (
-            (1 - wx) * (1 - wy) * f00 +
-            (wx) * (1 - wy) * f10 +
-            (1 - wx) * (wy) * f01 +
-            (wx) * (wy) * f11
-        )
-
-    tx_s = bilinear(tx)
-    ty_s = bilinear(ty)
+    tx_s = bilinear(tx, ix0, ix1, iy0, iy1, wx, wy)
+    ty_s = bilinear(ty, ix0, ix1, iy0, iy1, wx, wy)
 
     nn = np.hypot(tx_s, ty_s)
     ok = np.isfinite(nn) & (nn > 0)

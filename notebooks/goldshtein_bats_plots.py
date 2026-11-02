@@ -27,7 +27,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import Point, LineString, Polygon, MultiPolygon
-from shapely.prepared import prep
 from matplotlib import colors as mcolors
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
@@ -65,6 +64,10 @@ from goldshtein_bats_posthoc import (
     format_polar,
     format_treatment_title,
 )
+from goldshtein_bats_preprocess import (
+    polygon_mask_on_grid,
+    solve_laplace_dirichlet,
+)
 
 #: Publication figures for this study live in
 #: <repo>/figures/bats/, anchored on this file's location so the output
@@ -88,13 +91,8 @@ def _save(fig, save, save_path, transparent=False, dpi=300):
     format follows the path's suffix."""
     if not save:
         return
-    p = Path(save_path)
-    if p.suffix.lower() == ".svg":
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True,
-                           transparent=transparent, dpi=dpi)
-    else:
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False,
-                           transparent=transparent, dpi=dpi)
+    _plots.save_by_path(fig, FIG_DIR, save_path,
+                        transparent=transparent, dpi=dpi)
 
 
 # ------------------------------------------------------------------ anchors
@@ -1134,24 +1132,6 @@ def lake_outer_polygon_largest(geom):
 
     return Polygon(main.exterior.coords)  # drop interiors/holes
 
-def polygon_mask_on_grid(poly, x_centers, y_centers, chunk=200_000):
-    X, Y = np.meshgrid(x_centers, y_centers)
-    xx, yy = X.ravel(), Y.ravel()
-
-    try:
-        import shapely
-        pts = shapely.points(xx, yy)
-        inside = shapely.contains(poly, pts)
-        return np.asarray(inside, dtype=bool).reshape(Y.shape)
-    except Exception:
-        pass
-
-    poly_p = prep(poly)
-    inside = np.zeros(xx.size, dtype=bool)
-    for a in range(0, xx.size, int(chunk)):
-        b = min(xx.size, a + int(chunk))
-        inside[a:b] = [poly_p.contains(Point(x, y)) for x, y in zip(xx[a:b], yy[a:b])]
-    return inside.reshape(Y.shape)
 
 def _adaptive_grid_res(xlim, ylim, base_res_m, max_n=420):
     x0, x1 = xlim
@@ -1164,62 +1144,6 @@ def _adaptive_grid_res(xlim, ylim, base_res_m, max_n=420):
     res = max(res, w / max_n if w > 0 else res, h / max_n if h > 0 else res)
     return res
 
-def solve_laplace_dirichlet(mask_lake, *, tol=1e-5, max_iter=20000):
-    ny, nx = mask_lake.shape
-    u = np.ones((ny, nx), float)
-    u[mask_lake] = 0.0
-    u[0, :] = u[-1, :] = u[:, 0] = u[:, -1] = 1.0
-
-    free = (~mask_lake).copy()
-    free[0, :] = free[-1, :] = free[:, 0] = free[:, -1] = False
-    free_flat = np.flatnonzero(free.ravel())
-
-    try:
-        import scipy.sparse as sp
-        import scipy.sparse.linalg as spla
-
-        idx = -np.ones((ny, nx), int)
-        idx.ravel()[free_flat] = np.arange(free_flat.size)
-        n = free_flat.size
-        if n == 0:
-            return u
-
-        A = sp.lil_matrix((n, n), float)
-        b = np.zeros(n, float)
-
-        def add(eq, r, c):
-            j = idx[r, c]
-            if j >= 0:
-                A[eq, j] -= 1.0
-            else:
-                b[eq] += u[r, c]
-
-        rr, cc = np.where(free)
-        for r, c in zip(rr, cc):
-            eq = idx[r, c]
-            A[eq, eq] = 4.0
-            add(eq, r - 1, c)
-            add(eq, r + 1, c)
-            add(eq, r, c - 1)
-            add(eq, r, c + 1)
-
-        sol, _ = spla.cg(A.tocsr(), b, atol=0.0, rtol=1e-8, maxiter=3000)
-        u2 = u.ravel()
-        u2[free_flat] = sol
-        return u2.reshape((ny, nx))
-    except Exception:
-        u_old = u.copy()
-        for _ in range(int(max_iter)):
-            u_new = u_old.copy()
-            u_new[1:-1, 1:-1] = 0.25 * (
-                u_old[:-2, 1:-1] + u_old[2:, 1:-1] + u_old[1:-1, :-2] + u_old[1:-1, 2:]
-            )
-            u_new[mask_lake] = 0.0
-            u_new[0, :] = u_new[-1, :] = u_new[:, 0] = u_new[:, -1] = 1.0
-            if np.nanmax(np.abs(u_new - u_old)) < tol:
-                return u_new
-            u_old = u_new
-        return u_old
 
 def harmonic_field_on_extent(xlim, ylim, lake_poly_calc_3857, *, grid_res_m=160.0, tol=1e-5, max_grid_n=420):
     grid_res_m = _adaptive_grid_res(xlim, ylim, grid_res_m, max_n=max_grid_n)
@@ -1902,13 +1826,6 @@ def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=
     # ----------------------
     def _has(varname: str) -> bool:
         return varname in post.data_vars
-
-    def circular_modulo(x):
-        return (x + np.pi) % (2 * np.pi) - np.pi
-
-    def softplus(x):
-        x = np.asarray(x, float)
-        return np.where(x > 30, x, np.log1p(np.exp(x)))
 
     def vonmises_pdf(theta, mu, kappa):
         # pdf(theta | mu, kappa) = exp(kappa cos(theta-mu)) / (2π I0(kappa))

@@ -34,7 +34,21 @@ from scipy.stats import norm
 from joblib import Parallel, delayed
 from tqdm.auto import tqdm
 
-from unwrap.link import circular_modulo
+from unwrap.link import circular_modulo, softplus
+from unwrap.bessel import log_i0 as _log_i0
+from unwrap.circular import (
+    A_of_kappa,
+    von_mises_kde,
+    vonmises_pdf as vonmises_pdf_scalar,
+    wrap_0_2pi,
+    wrap_pi as wrap_angle,
+)
+from unwrap.inference import (
+    graph_free_rvs,
+    loo_pointwise as _loo_pointwise_elpd,
+    pareto_k_report as _pareto_report,
+    se_of_sum as _se_sum,
+)
 
 # ---------------------------------------------------------------------------
 # Shared numerics (one copy of the per-cell util families; the cells in the
@@ -45,10 +59,6 @@ from unwrap.link import circular_modulo
 KAPPA_UNIFORM = 1e-6
 #: half-width of the "predictive mass around the destination" statistic, deg.
 MASS_HALF_WIDTH_DEG = 45.0
-
-def softplus(x):
-    x = np.asarray(x, float)
-    return np.where(x > 30, x, np.log1p(np.exp(x)))
 
 
 def sigmoid(x):
@@ -61,32 +71,6 @@ def _stack_samples_first(da):
     other = [d for d in da2.dims if d != "sample"]
     da2 = da2.transpose("sample", *other)
     return da2.values.astype(float)
-
-
-def hdi_1d(x, prob=0.95):
-    x = np.asarray(x, float)
-    x = x[np.isfinite(x)]
-    n = x.size
-    if n == 0:
-        return np.nan, np.nan
-    x = np.sort(x)
-    m = int(np.floor(prob * n))
-    if m < 1:
-        return np.nan, np.nan
-    widths = x[m:] - x[: n - m]
-    j = int(np.argmin(widths))
-    return float(x[j]), float(x[j + m])
-
-
-def hdi_along_samples(arr, prob=0.95):
-    arr = np.asarray(arr, float)
-    S, T = arr.shape
-    lo = np.empty(T, dtype=float)
-    hi = np.empty(T, dtype=float)
-    for t in range(T):
-        lo[t], hi[t] = hdi_1d(arr[:, t], prob=prob)
-    return lo, hi
-
 
 
 def hdi_along_samples_2col(arr, prob=0.95):
@@ -105,10 +89,6 @@ def circ_mean(x):
     return np.arctan2(np.mean(np.sin(x)), np.mean(np.cos(x)))
 
 
-def wrap_0_2pi(x):
-    return np.mod(x, 2.0 * np.pi)
-
-
 def quantile_band(arr, prob=0.95):
     arr = np.asarray(arr, float)
     qlo = (1.0 - prob) / 2.0
@@ -117,39 +97,6 @@ def quantile_band(arr, prob=0.95):
     lo  = np.nanquantile(arr, qlo, axis=0)
     hi  = np.nanquantile(arr, qhi, axis=0)
     return med, lo, hi
-
-
-# --- Bessel ratio A(kappa) = I1/I0 (robust) ---
-try:
-    from scipy.special import i0 as _i0, i1 as _i1
-
-    def bessel_ratio(kappa):
-        kappa = np.asarray(kappa, float)
-        return _i1(kappa) / _i0(kappa)
-except Exception:
-    # fallback approximation (good enough for plotting/summary)
-    def bessel_ratio(kappa):
-        k = np.asarray(kappa, float)
-        out = np.empty_like(k)
-
-        small = k < 1e-3
-        mid   = (k >= 1e-3) & (k <= 50.0)
-        large = k > 50.0
-
-        out[small] = 0.5 * k[small] - (k[small] ** 3) / 16.0
-        km = k[mid]
-        out[mid] = km / (2.0 + km)
-        kl = k[large]
-        out[large] = 1.0 - 1.0/(2.0*kl) - 1.0/(8.0*kl*kl)
-        return out
-
-
-def vonmises_pdf_scalar(theta, mu, kappa):
-    # theta, mu can be arrays; uses numpy i0
-    theta = np.asarray(theta, float)
-    mu = np.asarray(mu, float)
-    kappa = np.asarray(kappa, float)
-    return np.exp(kappa * np.cos(theta - mu)) / (2 * np.pi * np.i0(kappa))
 
 
 # --- Optional SciPy CDF for circular interval mass ---
@@ -311,21 +258,6 @@ def _as_sample_obs(arr_da, n_obs, *, want_components=False):
         raise ValueError(f"Variable has extra non-singleton dims beyond obs: shape={x2.shape} dims={da.dims}")
 
     raise ValueError(f"Could not find obs dim size {n_obs} in dims={da.dims} sizes={sizes}")
-
-
-def _softplus(x):
-    x = np.asarray(x, float)
-    return np.where(x > 30, x, np.log1p(np.exp(x)))
-
-
-def _log_i0(kappa):
-    """
-    Stable log(I0(kappa)) for kappa >= 0 using i0e:
-      i0(k) = i0e(k) * exp(k)  => log i0(k) = log i0e(k) + k
-    """
-    kappa = np.asarray(kappa, float)
-    # i0e is defined for all real; VM expects kappa >= 0 anyway
-    return np.log(sps.i0e(kappa)) + kappa
 
 
 # ---------------------------------------------------------------------------
@@ -579,91 +511,6 @@ def sigmoid_normal_percentiles(mu, sigma, qs=(0.01, 0.05, 0.10, 0.25, 0.50, 0.75
 # ---------------------------------------------------------------------------
 # PSIS-LOO model comparison (vMU mixture vs the von Mises baseline)
 # ---------------------------------------------------------------------------
-def graph_free_rvs(idata, model):
-    """The fit result with a posterior group containing all of the model's
-    free RVs, i.e. evaluable by the PyMC graph.
-
-    The kappa random effects are fitted non-centered: in the PyMC graph the
-    free RVs are then ``*_sigma`` (scale) and ``*_offset`` (factor), but
-    bambi stores the transformed centered effects and the ``*_sigma`` scales
-    and drops the ``*_offset`` factors. ``pm.compute_deterministics`` and
-    ``pm.compute_log_likelihood`` both evaluate the graph against every free
-    RV, so the missing factors are reconstructed: the graph computes
-    ``effect = sigma * offset`` exactly (sigma scalar per draw, offset one
-    factor per group), hence ``offset = effect / sigma`` (0 where sigma is
-    0).
-    """
-    posterior = idata.posterior
-    missing = [
-        rv.name
-        for rv in model.backend.model.free_RVs
-        if rv.name not in posterior.data_vars
-    ]
-    if not missing:
-        return idata
-    aug = idata.copy(deep=False)
-    ds = posterior.to_dataset()
-    for name in missing:
-        sigma = ds[name.replace("_offset", "_sigma")]
-        effect = ds[name[: -len("_offset")]]
-        # The graph computes effect = sigma * offset (sigma scalar per
-        # draw, offset one factor per group), so the offset carries the
-        # group dimension of the centered effect.
-        e = np.asarray(effect)
-        s = np.asarray(sigma).reshape(np.asarray(sigma).shape + (1,) * (e.ndim - np.asarray(sigma).ndim))
-        offset = np.divide(e, s, out=np.zeros(e.shape), where=s != 0)
-        ds[name] = (tuple(effect.dims), offset)
-    aug["posterior"] = ds
-    return aug
-
-
-def _loo_pointwise_elpd(idata, *, var_name=None):
-    loo = az.loo(idata, pointwise=True, var_name=var_name)
-    # arviz >= 1.x returns ELPDDataLOO: the pointwise ELPD is ``elpd_i``
-    # (older arviz called it ``loo_i``).
-    loo_i = np.asarray(loo.elpd_i).reshape(-1)
-    k = np.asarray(loo.pareto_k).reshape(-1)
-    return loo_i, k, loo
-
-
-def _se_sum(v: np.ndarray) -> float:
-    """Rough SE for a SUM: sqrt(n * var(v))."""
-    v = np.asarray(v, float)
-    v = v[np.isfinite(v)]
-    n = v.size
-    if n <= 1:
-        return np.nan
-    return float(np.sqrt(n * np.var(v, ddof=1)))
-
-
-def _pareto_report(k: np.ndarray, threshold: float = 0.7) -> dict:
-    k = np.asarray(k, float)
-    k = k[np.isfinite(k)]
-    if k.size == 0:
-        return {"n": 0, "n_gt": 0, "max_k": np.nan, "mean_excess": np.nan, "max_excess": np.nan}
-
-    excess = k - threshold
-    gt = excess > 0
-    n_gt = int(np.sum(gt))
-
-    if n_gt == 0:
-        return {
-            "n": int(k.size),
-            "n_gt": 0,
-            "max_k": float(np.max(k)),
-            "mean_excess": 0.0,
-            "max_excess": 0.0,
-        }
-
-    return {
-        "n": int(k.size),
-        "n_gt": n_gt,
-        "max_k": float(np.max(k)),
-        "mean_excess": float(np.mean(excess[gt])),
-        "max_excess": float(np.max(excess[gt])),
-    }
-
-
 def compute_psisloo_elpd_summary(
     models,          # dict: {name: idata}  (insertion order matters)
     df_fit,          # EXACT df used in all fits (same rows/order)
@@ -960,7 +807,7 @@ def summarize_pop_p_kappa_mu_density0_mass45_alignment0_by_treatment(
     theta_lo, theta_hi = -theta_half, theta_half
 
     f0_unif = float(vonmises_pdf_scalar(0.0, 0.0, kappa_uniform))  # ~ 1/(2π)
-    A_unif  = float(bessel_ratio(kappa_uniform))
+    A_unif  = float(A_of_kappa(kappa_uniform))
     mass_unif = float((theta_hi - theta_lo) / (2.0 * np.pi))        # exact uniform mass in interval
 
     rows = []
@@ -999,7 +846,7 @@ def summarize_pop_p_kappa_mu_density0_mass45_alignment0_by_treatment(
         mass_pm = p * mass_goal + (1.0 - p) * mass_unif
 
         # Alignment to 0 (full mixture)
-        A_goal = bessel_ratio(kappa)
+        A_goal = A_of_kappa(kappa)
         align0 = p * (A_goal * np.cos(mu)) + (1.0 - p) * A_unif
 
         # Summaries
@@ -1140,7 +987,7 @@ def summarize_pop_params_for_2x2_by_treatment(
             j = nonref.index(t)
             ek = ek + kt[:, j]
         kappa = softplus(ek)
-        mrl = bessel_ratio(kappa)
+        mrl = A_of_kappa(kappa)
 
         # mu (radians)
         mu = mu0.copy()
@@ -1203,13 +1050,6 @@ def build_res_treat_from_vonmises_idata(
     # ---------- helpers ----------
     def _has(varname: str) -> bool:
         return varname in post.data_vars
-
-    def circular_modulo(x):
-        return (x + np.pi) % (2 * np.pi) - np.pi
-
-    def softplus(x):
-        x = np.asarray(x, float)
-        return np.where(x > 30, x, np.log1p(np.exp(x)))
 
     def vonmises_pdf(theta, mu, kappa):
         # pdf(theta | mu, kappa) = exp(kappa cos(theta-mu)) / (2π I0(kappa))
@@ -1436,7 +1276,7 @@ def summarize_taglevel_from_model_terms(
 
     # constants for uniform component
     f0_unif = float(vonmises_pdf_scalar(0.0, 0.0, kappa_uniform))
-    A_unif  = float(bessel_ratio(kappa_uniform))
+    A_unif  = float(A_of_kappa(kappa_uniform))
 
     # tag index lookup in model order
     tag_to_index = {tag_codes_model[i]: i for i in range(len(tag_codes_model))}
@@ -1476,7 +1316,7 @@ def summarize_taglevel_from_model_terms(
         f0_goal = vonmises_pdf_scalar(0.0, mu_s, kappa_s)
         dens0_s = p_s * f0_goal + (1.0 - p_s) * f0_unif
 
-        A_goal = bessel_ratio(kappa_s)
+        A_goal = A_of_kappa(kappa_s)
         align0_s = p_s * (A_goal * np.cos(mu_s)) + (1.0 - p_s) * A_unif
 
         # summarize helper
@@ -1555,7 +1395,7 @@ def pop_summary_by_treatment_from_model_terms(
         S = max_draws
 
     f0_unif = float(vonmises_pdf_scalar(0.0, 0.0, kappa_uniform))
-    A_unif  = float(bessel_ratio(kappa_uniform))
+    A_unif  = float(A_of_kappa(kappa_uniform))
 
     def _summ(x):
         lo, hi = hdi_1d(x, prob=hdi_prob)
@@ -1582,7 +1422,7 @@ def pop_summary_by_treatment_from_model_terms(
         f0_goal = vonmises_pdf_scalar(0.0, mu_s, kappa_s)
         dens0_s = p_s * f0_goal + (1.0 - p_s) * f0_unif
 
-        A_goal = bessel_ratio(kappa_s)
+        A_goal = A_of_kappa(kappa_s)
         align0_s = p_s * (A_goal * np.cos(mu_s)) + (1.0 - p_s) * A_unif
 
         p_m, p_lo, p_hi = _summ(p_s)
@@ -1610,36 +1450,6 @@ def pop_summary_by_treatment_from_model_terms(
 # observed vs simulated per-treatment angle densities)
 # ---------------------------------------------------------------------------
 
-
-@dataclass
-class GroupData:
-    treat_level: str
-    tag_values: np.ndarray
-    y_by_tag: List[np.ndarray]
-
-
-
-def wrap_angle(x: np.ndarray) -> np.ndarray:
-    """Wrap to (-pi, pi]."""
-    return (x + np.pi) % (2 * np.pi) - np.pi
-
-def von_mises_kde(data: np.ndarray, points: np.ndarray, kappa: float) -> np.ndarray:
-    """
-    Von Mises KDE (density per radian). Kernel is VM with concentration kappa.
-    """
-    data = wrap_angle(np.asarray(data, float))
-    points = np.asarray(points, float)
-    c = 1.0 / (2.0 * np.pi * np.i0(kappa))
-    cos_diffs = np.cos(points[:, None] - data[None, :])
-    return c * np.exp(kappa * cos_diffs).mean(axis=1)
-
-def hist_density(data: np.ndarray, bin_edges: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Histogram density (per radian) + bin centers.
-    """
-    h, _ = np.histogram(data, bins=bin_edges, density=True)
-    centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-    return centers, h
 
 def hdi_1d(x: np.ndarray, prob: float = 0.95) -> Tuple[float, float]:
     """
@@ -1680,295 +1490,6 @@ class GroupData:
     treat_level: str
     tag_values: np.ndarray
     y_by_tag: List[np.ndarray]
-
-def build_groups(
-    df: pd.DataFrame,
-    y_col: str = "HeadingRadians",
-    tag_col: str = "tag",
-    treat_col: str = "treatment",
-) -> Tuple[List[str], Dict[str, GroupData]]:
-    """
-    Build per-treatment lists of per-tag y arrays for fast hierarchical bootstrap.
-    """
-    df = df.copy()
-
-    # ensure treatment categorical (stable ordering)
-    treat_cat = pd.Categorical(df[treat_col])
-    df[treat_col] = treat_cat
-    treat_levels = list(treat_cat.categories)
-
-    groups: Dict[str, GroupData] = {}
-    for t in treat_levels:
-        sub = df[df[treat_col] == t]
-        tags = sub[tag_col].to_numpy()
-        y = wrap_angle(sub[y_col].to_numpy())
-
-        uniq_tags = np.unique(tags)
-        y_by_tag = []
-        for tg in uniq_tags:
-            y_by_tag.append(y[tags == tg])
-        groups[t] = GroupData(treat_level=str(t), tag_values=uniq_tags, y_by_tag=y_by_tag)
-
-    return treat_levels, groups
-
-def hier_boot_resample_y(y_by_tag: List[np.ndarray], rng: np.random.Generator) -> np.ndarray:
-    """
-    Hierarchical bootstrap:
-      - resample tags with replacement
-      - within each selected tag, resample observations with replacement (same count as original tag)
-    Returns a pooled y* array.
-    """
-    n_tags = len(y_by_tag)
-    tag_idx_star = rng.integers(0, n_tags, size=n_tags)
-    out = []
-    for j in tag_idx_star:
-        yj = y_by_tag[j]
-        if yj.size == 0:
-            continue
-        out.append(rng.choice(yj, size=yj.size, replace=True))
-    if not out:
-        return np.array([], float)
-    return wrap_angle(np.concatenate(out))
-
-
-# ============================================================
-# Observed bootstrap summaries
-# ============================================================
-
-def one_obs_boot_rep(
-    y_by_tag: List[np.ndarray],
-    angles: np.ndarray,
-    bin_edges: np.ndarray,
-    kde_kappa: float,
-    seed: int,
-) -> Tuple[np.ndarray, np.ndarray]:
-    rng = np.random.default_rng(seed)
-    y_star = hier_boot_resample_y(y_by_tag, rng)
-    kde = von_mises_kde(y_star, angles, kappa=kde_kappa)
-    _, h = hist_density(y_star, bin_edges)
-    return kde, h
-
-def bootstrap_observed(
-    groups: Dict[str, GroupData],
-    angles: np.ndarray,
-    bin_edges: np.ndarray,
-    n_boot: int,
-    kde_kappa: float,
-    n_jobs: int,
-    seed: int,
-) -> Dict[str, Dict[str, np.ndarray]]:
-    """
-    Returns dict:
-      obs_boot[treat]["kde"]  shape (B, P)
-      obs_boot[treat]["hist"] shape (B, BINS)
-    """
-    obs_boot: Dict[str, Dict[str, np.ndarray]] = {}
-    base_rng = np.random.default_rng(seed)
-
-    for t, gd in groups.items():
-        seeds = base_rng.integers(1, 2**31 - 1, size=n_boot, dtype=np.int64)
-
-        with tqdm_joblib(tqdm(total=n_boot, desc=f"Observed bootstrap ({t})", leave=False)):
-            reps = Parallel(n_jobs=n_jobs)(
-                delayed(one_obs_boot_rep)(gd.y_by_tag, angles, bin_edges, kde_kappa, int(s))
-                for s in seeds
-            )
-
-        kde_mat = np.stack([r[0] for r in reps], axis=0)
-        hist_mat = np.stack([r[1] for r in reps], axis=0)
-        obs_boot[t] = {"kde": kde_mat, "hist": hist_mat}
-
-    return obs_boot
-
-
-# ============================================================
-# Posterior extraction + simulation from fitted model (includes tag REs)
-# ============================================================
-
-def _stack_posterior(da) -> np.ndarray:
-    """
-    Stack chain/draw -> sample and return numpy array.
-    """
-    da2 = da.stack(sample=("chain", "draw"))
-    other = [d for d in da2.dims if d != "sample"]
-    da2 = da2.transpose("sample", *other)
-    return np.asarray(da2.values)
-
-def extract_simulation_arrays(idata, n_draws: int, seed: int = 123):
-    """
-    Extract mu, kappa, p from idata.posterior for simulation.
-
-    Expects:
-      - mu: shape (S, N)
-      - kappa: shape (S, N)
-      - p_goal: shape (S, N, 2) or equivalent; we take component 0 as p(directed)
-    """
-    post = idata.posterior
-
-    if "mu" not in post.data_vars or "kappa" not in post.data_vars or "p_goal" not in post.data_vars:
-        raise KeyError(
-            "Need posterior vars 'mu', 'kappa', and 'p_goal' in idata. "
-            f"Available: {list(post.data_vars)[:80]} ..."
-        )
-
-    mu = _stack_posterior(post["mu"])
-    kappa = _stack_posterior(post["kappa"])
-    p_goal = _stack_posterior(post["p_goal"])
-
-    mu = mu.reshape(mu.shape[0], -1)
-    kappa = kappa.reshape(kappa.shape[0], -1)
-
-    if p_goal.ndim == 2:
-        p_dir = p_goal.reshape(p_goal.shape[0], -1)
-    elif p_goal.ndim == 3:
-        if p_goal.shape[-1] == 2:
-            p_dir = p_goal[..., 0].reshape(p_goal.shape[0], -1)
-        elif p_goal.shape[1] == 2:
-            p_dir = p_goal[:, 0, :].reshape(p_goal.shape[0], -1)
-        elif p_goal.shape[2] == 2:
-            p_dir = p_goal[:, :, 0].reshape(p_goal.shape[0], -1)
-        else:
-            raise ValueError(f"Unexpected p_goal shape: {p_goal.shape} (need a length-2 axis).")
-    else:
-        raise ValueError(f"Unexpected p_goal ndim={p_goal.ndim}, shape={p_goal.shape}")
-
-    S = mu.shape[0]
-    rng = np.random.default_rng(seed)
-
-    if n_draws is not None and S > n_draws:
-        idx = rng.choice(S, size=n_draws, replace=False)
-        mu = mu[idx]
-        kappa = kappa[idx]
-        p_dir = p_dir[idx]
-
-    return mu, kappa, p_dir
-
-def simulate_one_draw(
-    mu_s: np.ndarray,
-    kappa_s: np.ndarray,
-    p_s: np.ndarray,
-    rng: np.random.Generator,
-    kappa_uniform: float = 1e-6,
-) -> np.ndarray:
-    """
-    Simulate y_rep for ONE posterior draw, for all observations (length N).
-    Uses numpy's vonmises sampler.
-    """
-    N = mu_s.size
-    u = rng.random(N)
-    is_goal = u < p_s
-
-    y_rep = np.empty(N, float)
-    if is_goal.any():
-        y_rep[is_goal] = rng.vonmises(mu_s[is_goal], kappa_s[is_goal])
-    if (~is_goal).any():
-        y_rep[~is_goal] = rng.vonmises(0.0, kappa_uniform, size=(~is_goal).sum())
-
-    return wrap_angle(y_rep)
-
-
-# ============================================================
-# Posterior predictive summaries (simulate -> hierarchical bootstrap summaries)
-# ============================================================
-
-def one_ppc_rep_for_treatment(
-    y_rep: np.ndarray,
-    df: pd.DataFrame,
-    treat_level: str,
-    angles: np.ndarray,
-    bin_edges: np.ndarray,
-    kde_kappa: float,
-    seed: int,
-    n_boot_within: int = 1,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    For a fixed simulated dataset y_rep (length N), compute *n_boot_within* hierarchical-bootstrap
-    summaries within one treatment. Returns the average over within-draw boot replicates.
-    """
-    rng = np.random.default_rng(seed)
-
-    sub = df[df["treatment"] == treat_level]
-    idx = sub.index.to_numpy()
-    tags = sub["tag"].to_numpy()
-    y_t = y_rep[idx]
-
-    uniq_tags = np.unique(tags)
-    y_by_tag = [y_t[tags == tg] for tg in uniq_tags]
-
-    kde_acc = []
-    hist_acc = []
-    for _ in range(n_boot_within):
-        y_star = hier_boot_resample_y(y_by_tag, rng)
-        kde_acc.append(von_mises_kde(y_star, angles, kappa=kde_kappa))
-        _, h = hist_density(y_star, bin_edges)
-        hist_acc.append(h)
-
-    return np.mean(np.stack(kde_acc, axis=0), axis=0), np.mean(np.stack(hist_acc, axis=0), axis=0)
-
-def posterior_predictive_summaries(
-    idata,
-    df: pd.DataFrame,
-    treat_levels: List[str],
-    angles: np.ndarray,
-    bin_edges: np.ndarray,
-    kde_kappa: float,
-    n_draws: int,
-    n_boot_within_draw: int,
-    n_jobs: int,
-    seed: int,
-) -> Dict[str, Dict[str, np.ndarray]]:
-    """
-    Returns dict:
-      ppc[treat]["kde"]  shape (S, P)
-      ppc[treat]["hist"] shape (S, BINS)
-    where S = n_draws used.
-    """
-    mu, kappa, p_dir = extract_simulation_arrays(idata, n_draws=n_draws, seed=seed)
-    S, N = mu.shape
-
-    if N != len(df):
-        raise ValueError(f"Posterior N={N} does not match df length={len(df)}. Check indexing/order.")
-
-    base_rng = np.random.default_rng(seed)
-    draw_seeds = base_rng.integers(1, 2**31 - 1, size=S, dtype=np.int64)
-
-    def work_one_draw(s: int):
-        rng = np.random.default_rng(int(draw_seeds[s]))
-        y_rep = simulate_one_draw(mu[s], kappa[s], p_dir[s], rng, kappa_uniform=KAPPA_UNIFORM)
-
-        out = {}
-        treat_seeds = rng.integers(1, 2**31 - 1, size=len(treat_levels), dtype=np.int64)
-        for j, t in enumerate(treat_levels):
-            kde_j, hist_j = one_ppc_rep_for_treatment(
-                y_rep=y_rep,
-                df=df,
-                treat_level=t,
-                angles=angles,
-                bin_edges=bin_edges,
-                kde_kappa=kde_kappa,
-                seed=int(treat_seeds[j]),
-                n_boot_within=n_boot_within_draw,
-            )
-            out[t] = (kde_j, hist_j)
-        return out
-
-    with tqdm_joblib(tqdm(total=S, desc="Posterior predictive (draws)", leave=False)):
-        draw_results = Parallel(n_jobs=n_jobs)(
-            delayed(work_one_draw)(s) for s in range(S)
-        )
-
-    ppc: Dict[str, Dict[str, np.ndarray]] = {t: {"kde": [], "hist": []} for t in treat_levels}
-    for out in draw_results:
-        for t in treat_levels:
-            kde_j, hist_j = out[t]
-            ppc[t]["kde"].append(kde_j)
-            ppc[t]["hist"].append(hist_j)
-
-    for t in treat_levels:
-        ppc[t]["kde"] = np.stack(ppc[t]["kde"], axis=0)
-        ppc[t]["hist"] = np.stack(ppc[t]["hist"], axis=0)
-
-    return ppc
 
 
 # ============================================================
@@ -2017,17 +1538,6 @@ def format_polar(ax, edge_radius: float, outer_radius: float):
     # Reference ray at 0°
     ax.plot([0, 0], [edge_radius, outer_radius],
             color="0.85", lw=0.8, zorder=0)
-
-
-def von_mises_kde(data: np.ndarray, points: np.ndarray, kappa: float) -> np.ndarray:
-    """
-    Von Mises KDE (density per radian). Kernel is VM with concentration kappa.
-    """
-    data = wrap_angle(np.asarray(data, float))
-    points = np.asarray(points, float)
-    c = 1.0 / (2.0 * np.pi * np.i0(kappa))
-    cos_diffs = np.cos(points[:, None] - data[None, :])
-    return c * np.exp(kappa * cos_diffs).mean(axis=1)
 
 
 def hist_density(data: np.ndarray, bin_edges: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -2110,6 +1620,10 @@ def hier_boot_resample_y(y_by_tag: List[np.ndarray], rng: np.random.Generator) -
     return wrap_angle(np.concatenate(out))
 
 
+# ============================================================
+# Observed bootstrap summaries
+# ============================================================
+
 def one_obs_boot_rep(
     y_by_tag: List[np.ndarray],
     angles: np.ndarray,
@@ -2156,6 +1670,10 @@ def bootstrap_observed(
 
     return obs_boot
 
+
+# ============================================================
+# Posterior extraction + simulation from fitted model (includes tag REs)
+# ============================================================
 
 def _stack_posterior(da) -> np.ndarray:
     """
@@ -2240,6 +1758,10 @@ def simulate_one_draw(
 
     return wrap_angle(y_rep)
 
+
+# ============================================================
+# Posterior predictive summaries (simulate -> hierarchical bootstrap summaries)
+# ============================================================
 
 def one_ppc_rep_for_treatment(
     y_rep: np.ndarray,
@@ -2646,7 +2168,7 @@ def posterior_prob_goal_per_step(
         kappa = _as_sample_obs(post["kappa"], n_obs, want_components=False)
     elif "eta_kappa0" in post.data_vars:
         ek0 = _stack_samples_first(post["eta_kappa0"]).values.astype(float).reshape(-1)  # (S,)
-        k0 = _softplus(ek0)
+        k0 = softplus(ek0)
         kappa = np.broadcast_to(k0[:, None], (k0.size, n_obs))
     else:
         raise KeyError("Need posterior var 'kappa' or 'eta_kappa0'.")
