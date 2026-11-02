@@ -41,9 +41,9 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (CITATION + NAMING + COLAB PHASE COMPLETE: each dataset is now cited inline in the opening paragraph of its notebook and its examples.md section (paper style, full citation with DOI - the previously missing bats DOI recovered from Crossref); every case-study reference (notebook H1s, examples.md section headings, mkdocs nav labels, notebooks/README.md table rows) uses the paper's "Example:" section titles, with the combined locusts section split into one section per study; all 8 example notebooks start with a self-contained Colab setup cell (git+main[notebook] install via sys.executable, no-op locally); PR #84 (merged cf4974b) + PR #85 (merged 841294a) merged, main = 841294a; PR branches + worktrees deleted both sides; 10 stale worktrees from early phases + 9 stale local/remote branches verified landed and deleted; NOTHING PENDING - research + docs work all merged) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (CITATION + NAMING + COLAB PHASE COMPLETE: each dataset is now cited inline in the opening paragraph of its notebook and its examples.md section (paper style, full citation with DOI - the previously missing bats DOI recovered from Crossref); every case-study reference (notebook H1s, examples.md section headings, mkdocs nav labels, notebooks/README.md table rows) uses the paper's "Example:" section titles, with the combined locusts section split into one section per study; all 8 example notebooks start with a self-contained Colab setup cell (pip-bootstraps the bare git URL, then the package's own unwrap.colab.install_colab installs the [notebook] stack, no-op locally); PR #84 (merged cf4974b) + PR #85 (merged 841294a) + PR #86 (merged c26880d, supersedes the install mechanism of #85 - see the lesson in that entry) merged, main = c26880d; PR branches + worktrees deleted both sides; 10 stale worktrees from early phases + 9 stale local/remote branches verified landed and deleted; NOTHING PENDING - research + docs work all merged) - NEXT CHAT STARTS HERE
 
-## CITATION + NAMING + COLAB PHASE (COMPLETE 2026-11-02; PRs #84 + #85 merged, main = 841294a)
+## CITATION + NAMING + COLAB PHASE (COMPLETE 2026-11-02; PRs #84 + #85 + #86 merged, main = c26880d)
 
 User requests (in order, all on top of #83): (a) citations inline -
 "They should all be in the first paragraph of the notebooks/docs similar
@@ -100,30 +100,72 @@ re-bake):
   - use REST `gh api repos/:owner/:repo/pulls/:n -X PATCH` with a JSON
   body instead (title/body).
 
-#85 (single commit b5c100a; merged 841294a) - the Colab setup cell:
+#85 (single commit b5c100a; merged 841294a; INSTALL MECHANISM SUPERSEDED
+by #86 after a real Colab failure - see there) - the Colab setup cell:
 - Problem: the Colab button (from #80/#81) opens the .ipynb straight
   from GitHub, so the Colab runtime has no repository checkout, while
   the Setup sections only covered the local uv flow - badge users had to
   set up the environment by hand.
-- Fix: one new code cell as the FIRST code cell of all 8 example
-  notebooks (insertion index c01 for bats + locust x2, c02 for the
-  other five): detects Colab via `import google.colab` and, only there,
-  `get_ipython().system(f'{sys.executable} -m pip install -q ...')`
-  with `git+https://github.com/jgraving/unwrap.git@main[notebook]` (git
-  URL, not `-e .`, because there is nothing local to install from) plus
-  the geospatial extras the bats notebook's Setup line installs
-  (pandas[excel] geopandas shapely contextily osmnx pyproj xlrd). One-
-  line pointer in the five notebooks that have a Setup section (locust
-  x2 + the vmp demo have none - the cell is self-explanatory there).
-- Checked: `git+...@main[notebook]` verified in a fresh py3.12 uv venv
-  (31 s; import unwrap/bambi/pymc/seaborn/pyarrow clean); the no-op
-  path executed in a real ipykernel kernel via nbclient on the tutorial
-  (the only notebook CI executes) - zero outputs; per-notebook
-  invariance - every pre-existing cell (type, source, outputs,
-  execution_count) + metadata byte-identical to the merge base, the
-  only structural change is one inserted output-less code cell per
-  notebook; strict CI-mirroring build clean. No re-bake: the new cell
-  produces no outputs and no other outputs change.
+- What it shipped: one new code cell as the FIRST code cell of all 8
+  example notebooks (insertion index c01 for bats + locust x2, c02 for
+  the other five): detects Colab via `import google.colab` and, only
+  there, pip-installed `git+https://github.com/jgraving/unwrap.git@
+  main[notebook]` plus the geospatial extras the bats notebook's Setup
+  line installs. One-line pointer in the five notebooks that have a
+  Setup section (locust x2 + the vmp demo have none - the cell is
+  self-explanatory there).
+- LESSON (why it broke on real Colab): pip does NOT strip an extras
+  suffix from a VCS URL ref - it runs `git checkout -q 'main[notebook]'`
+  and fails; reproduced exactly with pip 26.2.2 (same as Colab). The
+  pre-merge verification had used UV, which parses that form correctly,
+  so the bug was masked. HOUSE RULE: when a mechanism targets a specific
+  environment, verify it with that environment's own tools (Colab = its
+  pip), or in a form faithful to it - "verified in a fresh venv" is not
+  the same as "verified with the target's toolchain". Also: `pip
+  install uv` + `python -m uv pip install --system
+  --break-system-packages --python {sys.executable}` was explored as a
+  uv-in-Colab route (all forms proven against a uv-managed base
+  interpreter, with/without an EXTERNALLY-MANAGED marker) before the
+  user's better idea - put the complexity in the package.
+
+#86 (single commit 6bb8246; merged c26880d; user: "put the complexity
+in a script with a function like install_colab ... import it into the
+notebook, in the unwrap package") - the package-owned Colab helper:
+- New module unwrap/colab.py (stdlib only): notebook_extra_requirements()
+  resolves the installed distribution's [notebook] extra from its own
+  metadata (importlib.metadata.requires, marker-stripped; both quote
+  styles normalized; PackageNotFoundError -> []), and
+  install_colab(extras=()) = the Colab entry point: detects Colab
+  (no-op everywhere else, so the cell is safe to run anywhere), then
+  sys.executable -m pip install -q <[notebook] extras> + extras.
+  tests/test_colab.py: marker-free parsing, missing-distribution case,
+  no-op outside Colab, and the exact installed argv (note: when stubbing
+  google.colab in a test, stub the parent `google` namespace too -
+  `import google.colab` resolves the parent first).
+- The colab-setup cell (all 8 notebooks) is now: detect Colab ->
+  subprocess check_call pip install -q "git+...@main" (BARE ref - pip
+  handles refs, only extras-on-refs break) -> from unwrap.colab import
+  install_colab; install_colab(). Bats passes extras=["pandas[excel]",
+  "osmnx", "xlrd"] - the DELTA: the geospatial stack (geopandas,
+  shapely, contextily, pyproj, python-calamine) is already part of the
+  [notebook] extra in setup.py.
+- Timing invariant (worth one line in any future review): the cell and
+  unwrap/colab ship in the same merge, so @main always has the module
+  when the cell runs; a pre-merge simulation must point the bootstrap
+  at the branch (observed: main-only simulation fails with
+  ModuleNotFoundError: unwrap.colab, which is the expected pre-merge
+  artifact, not a bug).
+- Checked: pip cannot install the old URL form (reproduced) and now
+  never meets a git URL with extras; two full Colab simulations (fresh
+  py3.12 venv + stub google.colab + the literal cell source, bootstrap
+  ref = the PR branch) end with the full [notebook] stack importing
+  (core: unwrap/seaborn/pyarrow/jupyterlab/nbclient/ipykernel/numba/
+  xarray) and the bats stack (osmnx, xlrd, contextily, geopandas,
+  shapely, pandas.read_excel); the no-op path executed in a real
+  ipykernel kernel via nbclient - zero outputs (the CI-executed tutorial
+  runs it as its first cell); per notebook only the colab-setup cell
+  source changed (byte-identical otherwise, no re-bake); strict
+  CI-mirroring build clean, install_colab verified in the rendered pages.
 
 Housekeeping this phase:
 - Stale-worktree cleanup: 10 early-phase worktrees (wt-bats/beetles/
