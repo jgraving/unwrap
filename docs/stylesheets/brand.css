@@ -19,20 +19,19 @@
 
 /* Rendered study notebooks (mkdocs-jupyter custom template): the toolbar in
    the top-right corner of every notebook page. The "Open in Google Colab"
-   button's link to the repository notebook is filled in by the template's
-   inline script from the page's own URL. */
+   button is the official Colab badge (self-labeling, with its own
+   background); its link to the repository notebook is filled in by the
+   template's inline script from the page's own URL. */
 .unwrap-nb-toolbar {
   display: flex;
   justify-content: flex-end;
   margin: -0.5rem 0 1rem;
 }
 .unwrap-colab-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+  display: inline-block;
 }
 .unwrap-colab-button img {
-  height: 1.1em;
+  height: 1.5rem;
   width: auto;
 }
 
