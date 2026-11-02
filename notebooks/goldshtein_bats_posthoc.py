@@ -761,8 +761,8 @@ def elpd_diff_total_and_by_treatment(
       - stratified by treatment group
     df_fit MUST be the exact rows/order used in both fits.
     """
-    vmu_i, vmu_k = _loo_pointwise_elpd(idata_vmu, var_name=var_name)
-    vm_i,  vm_k  = _loo_pointwise_elpd(idata_vm,  var_name=var_name)
+    vmu_i, vmu_k, _loo_vmu = _loo_pointwise_elpd(idata_vmu, var_name=var_name)
+    vm_i,  vm_k,  _loo_vm  = _loo_pointwise_elpd(idata_vm,  var_name=var_name)
 
     n = len(df_fit)
     if vmu_i.size != n or vm_i.size != n:
@@ -840,8 +840,8 @@ def delta_by_individual_treatment(
                 f"Available columns: {list(df_fit.columns)}"
             )
 
-    vmu_i, vmu_k = _loo_pointwise_elpd(idata_vmu, var_name=var_name)
-    vm_i,  vm_k  = _loo_pointwise_elpd(idata_vm,  var_name=var_name)
+    vmu_i, vmu_k, _loo_vmu = _loo_pointwise_elpd(idata_vmu, var_name=var_name)
+    vm_i,  vm_k,  _loo_vm  = _loo_pointwise_elpd(idata_vm,  var_name=var_name)
 
     n = len(df_fit)
     if vmu_i.size != n or vm_i.size != n:
