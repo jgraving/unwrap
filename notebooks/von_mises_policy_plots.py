@@ -68,11 +68,7 @@ def _save(fig, save, save_path):
     The file format follows the path's suffix."""
     if not save:
         return
-    p = Path(save_path)
-    if p.suffix.lower() == ".svg":
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=False, png=False, svg=True)
-    else:
-        _plots.save_figure(fig, FIG_DIR, p.stem, pdf=True, png=False, svg=False)
+    _plots.save_by_path(fig, FIG_DIR, save_path)
 
 
 def _clean_axis(ax):
