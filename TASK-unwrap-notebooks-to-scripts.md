@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (PAPER-LANGUAGE + TOC PHASE COMPLETE: the docs study pages and the notebooks' explanatory markdown now read with the companion paper (jgraving/circstats) - paper case-study titles/framing per notebook, US spelling across all docs pages, and every notebook page's ToC is complete and consistent (the beetle page's 4 bare-# sections that the ToC widget never rendered became proper ## sections with descriptions); PR #81 (single-label Colab badge) + PR #82 (language + ToC; markdown cells only, all outputs proven unchanged) merged, main = 0f53d5f; PR branches + worktrees deleted both sides; NOTHING PENDING - research + docs work all merged) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (PAPER-LANGUAGE + TOC PHASE COMPLETE: the docs study pages and the notebooks' explanatory markdown now read with the companion paper (jgraving/circstats) - paper case-study titles/framing per notebook, US spelling across all docs pages, and every notebook page's ToC is complete and consistent (the beetle page's 4 bare-# sections that the ToC widget never rendered became proper ## sections with descriptions); PR #81 (single-label Colab badge) + PR #82 (language + ToC; markdown cells only, all outputs proven unchanged) + PR #83 (every reference to the paper repo removed; each dataset now cites the study it comes from) merged, main = b8f1fee; PR branches + worktrees deleted both sides; NOTHING PENDING - research + docs work all merged) - NEXT CHAT STARTS HERE
 
 ## PAPER-LANGUAGE + TOC PHASE (COMPLETE 2026-11-02; PRs #81 + #82 merged, main = 0f53d5f)
 
@@ -119,6 +119,25 @@ page + Colab badge visually checked (playwright, light and dark); CI
 all green on #82; branch + worktree deleted both sides; local main
 clone left untouched (still on the user's docs/notebooks-explained
 branch + uncommitted work).
+
+Follow-up #83 (merged b8f1fee, user request): remove every reference
+to the manuscript source repo (github.com/jgraving/circstats) and make
+each dataset cite its own study. The six pointer lines from #82 (five
+study notebooks + the von Mises policy navigation-policy pointer) were
+replaced with the dataset's own citation, verified against the
+paper's references.bib: beetles = J. J. Foster et al., Current
+Biology 31(17) 3935-3942 (2021), doi:10.1016/j.cub.2021.06.038; zebra
+= B. Koger et al., Journal of Animal Ecology 92(6) 1415-1433 (2023),
+doi:10.1111/1365-2656.13904; bats = A. Goldshtein et al., Science
+386(6721) 561-567 (2024; no DOI in the bib); locust direction +
+order/density = S. Sayin et al., Science 387(6737) 995-1000 (2025),
+doi:10.1126/science.adq7832. The four data-backed examples.md sections
+got the same citations; synthetic notebooks (tutorial/periodic/policy)
+need none; index.md's citation block (authors + title, no repo link)
+untouched; the "circstats" comment in goldshtein_bats_posthoc.py is
+about general circular-statistics tooling, not the repo. Markdown
+cells only, all outputs proven unchanged; zero repo references in the
+repo or the built site.
 
 ## DOCS PHASE (COMPLETE 2026-11-02; PR #80 merged, main = 91ac2a0)
 
