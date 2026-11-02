@@ -27,10 +27,10 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import numpy as np
-from scipy.special import i0, iv
 from scipy.stats import vonmises
 
 from unwrap import plots as _plots
+from unwrap.bessel import bessel_ratio
 
 import locust_posthoc as posthoc
 
@@ -588,8 +588,10 @@ def plot_individual_ppc_grid(trace_bimodal, df, *, save=True,
         kappa_ind = kappa_mean[idx]
         weights_ind = np.clip(weights_mean[idx], EPS_local, 1.0)
         weights_ind = weights_ind / weights_ind.sum()
-        R1 = iv(1, kappa_ind[0]) / i0(kappa_ind[0])
-        R2 = iv(1, kappa_ind[1]) / i0(kappa_ind[1])
+        # Each arrow's length is the component's weight times its mean
+        # resultant length A(kappa) = I1/I0 (the unscaled Bessel ratio).
+        R1 = bessel_ratio(float(kappa_ind[0]))
+        R2 = bessel_ratio(float(kappa_ind[1]))
         arrow_length_1 = edge_radius * float(R1) * float(weights_ind[0])
         arrow_length_2 = edge_radius * float(R2) * float(weights_ind[1])
 
