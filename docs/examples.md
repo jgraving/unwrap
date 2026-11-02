@@ -58,7 +58,7 @@ compared with a unimodal von Mises baseline.
 
 The tracking data are from A. Goldshtein et al., "Acoustic cognitive
 map-based navigation in echolocating bats," *Science* **386**(6721),
-561-567 (2024).
+561-567 (2024); [doi:10.1126/science.adn6269](https://doi.org/10.1126/science.adn6269).
 
 ## Marching locusts: order and density, optic flow, and vectorial encoding
 
