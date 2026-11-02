@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (BATS: first full re-bake DONE + audited (1228 s, 0 errors, 37/37 figs, full data 67 tags/5072 rows, vM 2000+2000 @321 s, Best model vMU, convergence clean) but inline figs came out 300 dpi -> module dpi fix committed (6604e99) + clean rebuild + RE-BAKE RUNNING (log /tmp/opencode/bats_bake2.log); branch origin/goldshtein-bats-study at 6604e99 (11 commits)) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (ALL DONE: BATS PR #64 = main e4f74ae; BEETLES PR #65 MERGED = main 8a0539f; every research study on main with sibling scripts + thin cells + seeded fits + baked-and-validated outputs + house validated README rows; branch/worktree cleaned both sides; final doc + qa mirror on the docs branch) - NEXT CHAT STARTS HERE
 - BOARD: main = f817823. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
@@ -829,7 +829,25 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     hand-edits in sync (verified idempotent after the c40 change).
   * E2E data: unwrapp venv /home/jake/.venvs/unwrap-env, data from the
     user-level ~/.cache/unwrap-data clone (no re-download).
-## BEETLES STUDY PR (next after bats) - RECON DONE
+## BEETLES STUDY PR - MERGED (PR #65 -> main 8a0539f; branch + worktree deleted both sides)
+- 2 commits on the branch: (1) 28159df svg->pdf save paths (3 cells c08/c15/c16
+  + the 3 module signature defaults; _save suffix router + svg fonttype rc
+  untouched) + cleared the stale pre-upgrade outputs; (2) 0d42d14 the re-bake
+  + README row (house validated wording) + fixed the stale "zebra and beetle
+  read preprocessed tables" sentence -> zebra only.
+- Re-bake: 77 s total, 0 errors, fit 4x(2000+2000)/accept 0.9 seeded in 52 s,
+  Divergences: 0. SCIENCE BIT-IDENTICAL to the prior bake: kappa_mu
+  intercept concentration 0.5927, and the per-draw kappa_mu_* summary table
+  matches cell-for-cell (seeded determinism confirmed). PPC cross-check
+  "response params from PyMC graph OK" passes. 4/4 figures 100 dpi inline +
+  300 dpi PDF under figures/beetles/, no svg. pytest 106 passed locally.
+- Gate: /tmp/opencode/verify_beetles.py (mirrors verify_bats.py; 4 figure
+  cells {8,15,16,24}, EXPECT_SAVED stems, model cell {10} white-list, c02
+  version dict, c04 set_style echo, c06 head columns, c10 fit+Divergences,
+  c12/c13 r_hat, c19/c21 kappa_mu, c24 cross-check, stray pdf/svg audit).
+  BEETLES GATE: PASS.
+- PR #65 title: "beetles: land the study on the house template (E2E
+  re-bake, two-res PDF figures)"; body /tmp/opencode/beetles_pr_body.md.
 - Already largely templated on main (via #53/#54 + #55 stack):
   25 cells (setup c02 house-style + SEED=42; c06 E2E data cell =
   preprocess.load_beetle_model_table() from

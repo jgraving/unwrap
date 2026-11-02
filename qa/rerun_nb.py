@@ -12,7 +12,21 @@ import time
 os.environ.setdefault("MPLBACKEND", "Agg")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-_WORKTREE = "/tmp/opencode/wt-unified"
+
+
+def _repo_root(nb_path: str) -> str:
+    """The worktree containing the notebook (nearest ancestor with .git),
+    so the in-tree `unwrap` (with the study's new modules) wins over
+    whatever the venv has installed."""
+    d = os.path.abspath(os.path.dirname(nb_path))
+    while d != os.path.dirname(d):
+        if os.path.exists(os.path.join(d, ".git")):
+            return d
+        d = os.path.dirname(d)
+    raise RuntimeError(f"no git worktree ancestor of {nb_path}")
+
+
+_WORKTREE = _repo_root(sys.argv[1])
 os.environ["PYTHONPATH"] = (
     _WORKTREE + os.pathsep + os.environ["PYTHONPATH"]
     if os.environ.get("PYTHONPATH") else _WORKTREE
