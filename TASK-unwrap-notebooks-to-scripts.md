@@ -41,7 +41,7 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   unwrap-data/).
 
 
-## STATE - updated 2026-11-02 (BATS: SMOKE PASS (37/37 figures, 0 errors); full re-bake RUNNING in background (rerun_nb.py, ~hours, log /tmp/opencode/bats_bake.log); branch origin/goldshtein-bats-study at 44c83e6 (9 commits)) - NEXT CHAT STARTS HERE
+## STATE - updated 2026-11-02 (BATS: first full re-bake DONE + audited (1228 s, 0 errors, 37/37 figs, full data 67 tags/5072 rows, vM 2000+2000 @321 s, Best model vMU, convergence clean) but inline figs came out 300 dpi -> module dpi fix committed (6604e99) + clean rebuild + RE-BAKE RUNNING (log /tmp/opencode/bats_bake2.log); branch origin/goldshtein-bats-study at 6604e99 (11 commits)) - NEXT CHAT STARTS HERE
 - BOARD: main = f817823. Open PRs: only #43 (user's draft, unrelated).
   Merged history (oldest first): #48-#51 (annotated-branch merges),
   #52, #53 (beetles template), #54 (template polish: ppc inside
@@ -796,8 +796,8 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   checks green -> merge -> delete branch -> README row (turn the
   "full workflow runs from this checkout" into the house "fully
   rerun and validated from this checkout (MCMC diagnostics pass; ...)"
-  wording; draft: fixed 60 m re-discretization with gap
-  segmentation; roost-vs-lake destination assignment; vMU
+  wording; draft in the PR-body scratch: fixed 60 m re-discretization
+  with gap segmentation; roost-vs-lake destination assignment; vMU
   von Mises-Uniform mixture fit vs the vM baseline on the
   goal-relative bearings; PSIS-LOO total / by treatment / per animal
   (best model von Mises-Uniform); population + tag-level mixture
@@ -807,7 +807,8 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
   responsibility with kernel-smoothed distance/progress curves; vM
   per-observation log-likelihood from the PyMC graph working around
   the bambi vonmises kappa link bug, bambinos/bambi#1084) -> sync
-  this doc + docs branch -> beetles.
+  this doc + docs branch -> BEETLES (see section below; remaining =
+  svg->pdf save paths, re-bake, gate, README row).
 - Gotchas (bats-specific):
   * Base cells are self-contained (helper redefined per cell) - a
     def-only module build loses them; pyflakes (pip install pyflakes
@@ -828,6 +829,31 @@ Focused PRs, ONE PER NOTEBOOK. For each notebook:
     hand-edits in sync (verified idempotent after the c40 change).
   * E2E data: unwrapp venv /home/jake/.venvs/unwrap-env, data from the
     user-level ~/.cache/unwrap-data clone (no re-download).
+## BEETLES STUDY PR (next after bats) - RECON DONE
+- Already largely templated on main (via #53/#54 + #55 stack):
+  25 cells (setup c02 house-style + SEED=42; c06 E2E data cell =
+  preprocess.load_beetle_model_table() from
+  unwrap.datasets.load_beetle_security_light; c10 vM Bambi fit verbatim
+  house style: seeded 2000+2000/accept 0.9, non-centered kappa REs,
+  per-obs log-likelihood via
+  pm.compute_log_likelihood(posthoc.graph_free_rvs(...)) (the
+  bambi#1084 workaround is ALREADY in), "Divergences:" printed first);
+  c12/c13 circular_summary diagnostics; 4 figure cells c08/c15/c16/c24.
+- REMAINING: (1) figure save paths are .svg in c08/c15/c16 (c24 is
+  .pdf) - align to the current house gates which check 300 dpi
+  %-PDF- under figures/beetles/ (density/direction pattern); the
+  module _save already routes by suffix, so it is a 3-line cell edit;
+  (2) full re-bake on the current stack (the 24 baked outputs are from
+  pre-upgrade bakes) + verify gate (write verify_beetles.py mirroring
+  verify_locust_density.py: 4 figure cells, Divergences: 0, summary
+  filters, PDF heads) + README row ("full rerun pending" -> "fully
+  rerun and validated from this checkout (...)"). Much lighter than
+  bats: one 2000+2000 fit (no mixture, no PPC-heavy section beyond the
+  single PPC figure).
+- Data facts: load_beetle_model_table() adds binary Light, wraps
+  Heading deg->rad to (-pi, pi] via circular_modulo, category columns
+  the model expects; E2E via the user-level ~/.cache/unwrap-data clone.
+
 ## STATE AT FREEZE (superseded; kept for history)
 
 - Board: only #44 #43 #40 open. (10 superseded PRs closed.)
