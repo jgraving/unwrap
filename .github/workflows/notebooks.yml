@@ -63,12 +63,20 @@ jobs:
           # the 'cmake' python module)
           python3 -m pip install --quiet --break-system-packages cmake || true
           Rscript -e '
+            if (!requireNamespace("pak", quietly = TRUE))
+              install.packages("pak", repos = "https://cloud.r-project.org")
             library(pak)
-            # cmdstanr is on the Stan team r-universe (no longer CRAN); the
-            # rest come from PPM binaries when available, source otherwise.
+            # The PPM binary repo for the runner distro, resolved from
+            # os-release (ubuntu-latest migrated off noble in 2026).
+            os <- readLines("/etc/os-release", warn = FALSE)
+            codename <- sub("^VERSION_CODENAME=\"?([^\" ]+).*$", "\\1",
+                            grep("^VERSION_CODENAME", os, value = TRUE))
+            # cmdstanr is on the Stan team r-universe (no longer CRAN);
+            # the rest come from PPM binaries when available, source otherwise.
             repo_add(
               universe = "https://stan-dev.r-universe.dev",
-              ppm = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+              ppm = paste0("https://packagemanager.posit.co/cran/__linux__/",
+                           codename, "/latest"),
             )
             pkg_install(c("cmdstanr", "brms", "posterior", "loo", "circular",
                           "ggplot2", "ragg", "IRkernel"))
