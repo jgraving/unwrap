@@ -89,7 +89,7 @@ jobs:
             repo_add(
               universe = "https://stan-dev.r-universe.dev",
               ppm = paste0("https://packagemanager.posit.co/cran/__linux__/",
-                           codename, "/latest"),
+                           codename, "/latest")
             )
             pkg_install(c("cmdstanr", "brms", "posterior", "loo", "circular",
                           "ggplot2", "ragg", "IRkernel"))
