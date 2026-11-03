@@ -13,7 +13,7 @@ In an R session:
 
 ```r
 install.packages(
-  c("brms", "posterior", "loo", "circular", "ggplot2"),
+  c("brms", "posterior", "loo", "circular", "ggplot2", "ragg"),
   repos = "https://cloud.r-project.org",
 )
 # As of 2026, cmdstanr is distributed by the Stan team on r-universe
