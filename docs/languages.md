@@ -2,8 +2,10 @@
 
 Keep the language implementations together while their interfaces and scope are
 being clarified. Python installation does not install the other language stacks.
-The setup notes here are based on the checked-in scripts; R and MATLAB execution
-is not yet covered by this repository's CI.
+The setup notes here are based on the checked-in scripts. The R
+notebooks are executed locally with the
+[notebook test](development.md#notebook-execution-local-only) (not by
+this repository's CI); MATLAB execution is not covered.
 
 ## R: brms and Stan
 
