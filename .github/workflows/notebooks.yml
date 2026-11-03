@@ -96,13 +96,18 @@ jobs:
           '
       - name: Install CmdStan
         run: Rscript -e 'cmdstanr::install_cmdstan()'
+      - name: Install python notebook tooling
+        run: |
+          # the jupyter CLI is needed for installspec; nbclient/nbformat
+          # for the execution step below
+          python3 -m pip install --quiet --break-system-packages \
+            jupyter jupyter-client jupyter-core nbclient nbformat
       - name: Register the R kernel
         run: Rscript -e 'IRkernel::installspec()'
       - name: Execute every tutorial cell (R kernel, shortened sampling)
         env:
           UNWRAP_R_CI: '1'
         run: |
-          python3 -m pip install --quiet jupyter-client nbclient nbformat
           python3 - <<'PY'
           from pathlib import Path
           import nbformat
