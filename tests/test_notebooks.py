@@ -54,12 +54,21 @@ def _selected(path):
     wanted = os.environ.get("UNWRAP_NOTEBOOKS", "").strip()
     if not wanted:
         return True
-    stems = {part.strip() for part in wanted.split(",") if part.strip()}
-    return path.name in stems or path.stem in stems
+    names = {part.strip() for part in wanted.split(",") if part.strip()}
+    # A plain stem matches BOTH its Python twin and its R port (they
+    # share the file name), so directory-qualified forms are accepted
+    # to select one side only: notebooks_r/beetles or
+    # notebooks_r/beetles.ipynb.
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    candidates = {path.name, path.stem, os.path.splitext(rel)[0], rel}
+    return bool(candidates & names)
 
 
 def _kernel_installed(kernel_name):
-    from jupyter_client import KernelSpecManager
+    try:
+        from jupyter_client import KernelSpecManager
+    except ImportError:  # older jupyter_client keeps it one level down
+        from jupyter_client.kernelspec import KernelSpecManager
 
     try:
         KernelSpecManager().get_kernel_spec(kernel_name)
