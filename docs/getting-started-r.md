@@ -13,15 +13,15 @@ In an R session:
 
 ```r
 install.packages(
-  c("brms", "posterior", "loo", "circular", "ggplot2", "ragg"),
-  repos = "https://cloud.r-project.org",
+  c("brms", "posterior", "loo", "circular", "ggplot2", "ragg", "arrow"),
+  repos = "https://cloud.r-project.org"
 )
 # As of 2026, cmdstanr is distributed by the Stan team on r-universe
 # (it is no longer on CRAN); the second repo lets its CRAN dependencies
 # resolve.
 install.packages(
   "cmdstanr",
-  repos = c("https://stan-dev.r-universe.dev", "https://cloud.r-project.org"),
+  repos = c("https://stan-dev.r-universe.dev", "https://cloud.r-project.org")
 )
 cmdstanr::install_cmdstan()  # downloads CmdStan once (~50 MB)
 ```
@@ -29,6 +29,11 @@ cmdstanr::install_cmdstan()  # downloads CmdStan once (~50 MB)
 `brms` pulls in the rest of the Bayesian toolchain (the Stan interface,
 `posterior`, ...). `cmdstanr` is the Stan backend the models use, and
 `circular` provides the von Mises sampling and angle utilities.
+`ragg` renders inline PNG figures on headless machines; `arrow` reads
+the published Parquet data used by the locust-density and zebra examples.
+The data-loading cells require Git and fetch each study's data on first
+use into a repository-relative `unwrap-data/` checkout. Set
+`UNWRAP_DATA_ROOT` to an existing data checkout to reuse local files.
 
 To run the notebooks in a Jupyter frontend (JupyterLab, VS Code, or
 Positron), register the R kernel once:
@@ -64,7 +69,29 @@ animals or groups. The [R and MATLAB](languages.md) page covers the
 standalone R scripts (the tutorial notebook runs the same machinery as
 `R/brms_example.R`, in notebook form) and the MATLAB examples.
 
-Figures render inline and are saved as vector files under
-`figures/circular_regression/` (gitignored). The tutorial is also the
-only R notebook executed by the CI pipeline
-(`.github/workflows/notebooks.yml`), with shortened sampling.
+## Research examples
+
+After the tutorial, open `notebooks_r/beetles.ipynb`,
+`notebooks_r/locust_density_order.ipynb`, or
+`notebooks_r/zebra_escape.ipynb` with the R kernel. Their study titles
+and biological questions match the [biological examples](examples.md).
+These use the same observations, formulas, and prior scales as their
+Python counterparts, with circular individual effects represented using
+the repository's nonlinear brms machinery where needed.
+
+The beetle notebook loads per-trial exit bearings. The zebra notebook
+loads the published 10-second block averages. The locust-density
+notebook downloads approximately 870 MB of tracking parts, reproduces
+the trajectory rediscretization, fits five individual-level screening
+models, and fits the final step-level hierarchy; allow substantial time
+and memory for that complete workflow. No research notebook is executed
+while building the documentation site.
+
+Figures render inline as PNGs and are saved as vector PDFs under
+`figures/<notebook_stem>/` (gitignored). Every `notebooks_r/*.ipynb`
+is executed by the R CI job with `UNWRAP_R_CI=1`; grouped models use
+longer adaptation and retained-draw budgets than the introductory GLM.
+CI retains the full datasets and model structures. It checks execution
+and figure production; review R-hat, bulk ESS, the divergence report,
+and predictive checks locally before interpreting or publishing results.
+

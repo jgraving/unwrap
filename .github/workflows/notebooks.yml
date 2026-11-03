@@ -49,7 +49,9 @@ jobs:
           retention-days: 7
   execute-r:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Full locust data preprocessing, six screening fits, three study
+    # hierarchies, and the tutorial compile and execute sequentially.
+    timeout-minutes: 240
     env:
       UNWRAP_R_CI: '1'
       OMP_NUM_THREADS: '1'
@@ -68,16 +70,16 @@ jobs:
             # rest come from PPM binaries when available, source otherwise.
             repo_add(
               universe = "https://stan-dev.r-universe.dev",
-              ppm = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+              ppm = "https://packagemanager.posit.co/cran/__linux__/noble/latest"
             )
             pkg_install(c("cmdstanr", "brms", "posterior", "loo", "circular",
-                          "ggplot2", "ragg", "IRkernel"))
+                          "ggplot2", "ragg", "arrow", "IRkernel"))
           '
       - name: Install CmdStan
         run: Rscript -e 'cmdstanr::install_cmdstan()'
       - name: Register the R kernel
         run: Rscript -e 'IRkernel::installspec()'
-      - name: Execute every tutorial cell (R kernel, shortened sampling)
+      - name: Execute every R notebook (R kernel, per-model CI budgets)
         env:
           UNWRAP_R_CI: '1'
         run: |
@@ -86,16 +88,26 @@ jobs:
           from pathlib import Path
           import nbformat
           from nbclient import NotebookClient
-          path = Path("notebooks_r/circular_regression.ipynb")
-          notebook = nbformat.read(path, as_version=4)
-          NotebookClient(notebook, timeout=3600, kernel_name="ir").execute()
-          assert any("image/png" in output.get("data", {})
-                     for cell in notebook.cells for output in cell.get("outputs", [])), "No rendered figures"
-          Path("executed").mkdir(exist_ok=True)
-          nbformat.write(notebook, "executed/circular_regression_r.ipynb")
+          output_dir = Path("executed/r")
+          output_dir.mkdir(parents=True, exist_ok=True)
+          paths = sorted(Path("notebooks_r").glob("*.ipynb"))
+          assert paths, "No R notebooks found"
+          for path in paths:
+              print(f"Executing {path}", flush=True)
+              notebook = nbformat.read(path, as_version=4)
+              # Run from notebooks_r/ to exercise the repo_root resolver.
+              # Grouped fits/preprocessing may exceed the tutorial's timeout.
+              NotebookClient(
+                  notebook, timeout=7200, kernel_name="ir",
+                  resources={"metadata": {"path": str(path.parent.resolve())}},
+              ).execute()
+              assert any("image/png" in output.get("data", {})
+                         for cell in notebook.cells for output in cell.get("outputs", [])), f"No rendered figures: {path}"
+              nbformat.write(notebook, output_dir / path.name)
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: executed-circular-regression-r
-          path: executed/circular_regression_r.ipynb
+          name: executed-r-notebooks
+          path: executed/r/*.ipynb
           retention-days: 7
+
