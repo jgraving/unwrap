@@ -71,8 +71,9 @@ instance/
 docs/_build/
 
 # mkdocs study-notebook copies (sync_docs_notebooks.py; the notebooks in
-# notebooks/ are the source of truth) and its render cache
+# notebooks/ and notebooks_r/ are the source of truth) and its render cache
 docs/notebooks/
+docs/notebooks_r/
 .cache/
 
 # PyBuilder
