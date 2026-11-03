@@ -59,12 +59,18 @@ nav:
           - Python: notebooks/circular_regression.ipynb
           - R: notebooks_r/circular_regression.ipynb
       - Grevy's zebra body orientation during an escape response: notebooks/zebra_escape.ipynb
-      - Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing: notebooks/goldshtein_bats.ipynb
+      - Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing:
+          - Python: notebooks/goldshtein_bats.ipynb
+          - R: notebooks_r/goldshtein_bats.ipynb
       - Order and density shape locust directional alignment in virtual reality: notebooks/locust_density_order.ipynb
       - Testing optic-flow vs. vectorial encoding in marching locusts: notebooks/locust_direction_mixture_model.ipynb
       - Artificial light reorients nocturnal dung beetles: notebooks/beetles.ipynb
-      - Periodic but not circular: notebooks/periodic_not_circular.ipynb
-      - Von Mises navigation policy: notebooks/von_mises_policy.ipynb
+      - Periodic but not circular:
+          - Python: notebooks/periodic_not_circular.ipynb
+          - R: notebooks_r/periodic_not_circular.ipynb
+      - Von Mises navigation policy:
+          - Python: notebooks/von_mises_policy.ipynb
+          - R: notebooks_r/von_mises_policy.ipynb
   - Circular links: links.md
   - Python API guide: api.md
   - R and MATLAB: languages.md
