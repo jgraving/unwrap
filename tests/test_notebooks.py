@@ -55,7 +55,7 @@ def _selected(path):
     if not wanted:
         return True
     stems = {part.strip() for part in wanted.split(",") if part.strip()}
-    return path.name in stems
+    return path.name in stems or path.stem in stems
 
 
 def _kernel_installed(kernel_name):
