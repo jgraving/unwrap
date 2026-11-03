@@ -88,10 +88,18 @@ and memory for that complete workflow. No research notebook is executed
 while building the documentation site.
 
 Figures render inline as PNGs and are saved as vector PDFs under
-`figures/<notebook_stem>/` (gitignored). Every `notebooks_r/*.ipynb`
-is executed by the R CI job with `UNWRAP_R_CI=1`; grouped models use
-longer adaptation and retained-draw budgets than the introductory GLM.
-CI retains the full datasets and model structures. It checks execution
-and figure production; review R-hat, bulk ESS, the divergence report,
-and predictive checks locally before interpreting or publishing results.
+`figures/<notebook_stem>/` (gitignored). No GitHub workflow executes
+these notebooks; they are verified end to end by the local notebook
+test (see the [development](development.md) page):
+
+```bash
+UNWRAP_TEST_NOTEBOOKS=1 uv run --no-project python -m pytest tests/test_notebooks.py -v
+```
+
+Set `UNWRAP_R_QUICK=1` for the short two-chain smoke budget; unset it
+for full sampling. The grouped models use longer adaptation and
+retained-draw budgets than the introductory GLM in both modes, and
+always keep the full datasets and model structures. Review R-hat, bulk
+ESS, the divergence report, and predictive checks before interpreting
+or publishing results.
 

@@ -17,11 +17,29 @@ The test suite checks numerical properties and backend agreement as well as a
 short Bambi fit. That short fit tests execution, not convergence or parameter
 recovery. Exact resolved dependencies are recorded in CI logs.
 
-The separate notebook workflow executes the introductory notebook and uploads
-its executed copy for review. Research notebooks are not executed in CI;
-before a change that touches one is merged, that notebook is rerun end to end
-from the checkout, and the outputs stored in the repository come from that
-run. Full research analyses and R/MATLAB are not yet CI coverage targets.
+## Notebook execution (local only)
+
+No GitHub workflow executes a notebook: the fits are too long for CI and
+the results need a real machine anyway. `tests/test_notebooks.py`
+executes every committed notebook (Python and R) end to end and checks
+that each one still renders its inline figures. It is skipped under
+`GITHUB_ACTIONS` and additionally requires a local opt-in flag, so the
+unit suite above never triggers it:
+
+```bash
+uv pip install -e ".[notebook]"  # nbclient/nbformat + notebook stack
+# everything (hours; research notebooks download data and fit full models):
+UNWRAP_TEST_NOTEBOOKS=1 uv run --no-project python -m pytest tests/test_notebooks.py -v
+# a subset, by notebook stem:
+UNWRAP_TEST_NOTEBOOKS=1 UNWRAP_NOTEBOOKS=circular_regression,beetles \
+    uv run --no-project python -m pytest tests/test_notebooks.py -v
+```
+
+The R notebooks need the `ir` kernelspec (see the
+[R setup](getting-started-r.md)); set `UNWRAP_R_QUICK=1` for the short
+two-chain budget while iterating. Before a change that touches a
+notebook is merged, that notebook is rerun end to end from the checkout
+this way, and the outputs stored in the repository come from that run.
 
 ## Build and preview documentation
 
