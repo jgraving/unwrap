@@ -533,6 +533,17 @@ Branch `r-examples-p1-local` in /tmp/opencode/wt-r-p1:
    - After green: same finish sequence (pr ready -> checks -> merge
      --delete-branch -> worktree/branch cleanup), then hand off the
      P3 acceptance evidence and note the phase (P0-P3) is COMPLETE.
+   VECTORIZATION PR SCOPED (2026-11-04, plan in
+   /tmp/opencode/vectorization-plan.md): only two changes - bats c29
+   kde_vm (361-iteration vapply -> matrix colMeans, algebraically
+   identical, ~100x) and bats c81 sim_one_tag (per-row scalar
+   rvonmises(1,..) vapply -> two rvonmises(n, scalar, ..) calls;
+   PROBED: n-draws call == scalar stream identical, 371x faster for
+   n=2000; new y vector same distribution, different stream -> PPC
+   bands shift by MC noise, disclosed in PR; gates/LOO untouched).
+   Everything else (c48/c86/c90, zebra PPC) already vectorized or
+   negligible. PR = bats notebook only, base = post-P3 main, rebake
+   bats only. Queue it AFTER P3 merges (machine serializes bakes).
    (3) deferred: R post-fit vectorization follow-up PR.
   NOTE: bats c48 LOO cell untouched; reference values in
   /tmp/opencode/bats_reference_elpd.txt.
