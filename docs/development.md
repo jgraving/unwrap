@@ -43,7 +43,7 @@ this way, and the outputs stored in the repository come from that run.
 
 ### Maintaining the R environment
 
-The R package versions (and checksums) are pinned in `renv.lock`. After
+The R package versions and sources are recorded in `renv.lock`. After
 a deliberate upgrade, from an activated project (see the
 [R setup](getting-started-r.md) page):
 
@@ -52,18 +52,18 @@ Rscript -e 'renv::snapshot()'   # updates renv.lock from the project library
 ```
 
 Commit the updated `renv.lock`, but not the machine-local state under
-`renv/` (see `renv/.gitignore`) or the generated `.Rprofile`. R package
-tarballs carry version-pinned checksums in the lockfile; after changing
-pinned versions, re-verify a fresh `renv::restore()` from the updated
-lockfile in a clean project.
+`renv/` (see `renv/.gitignore`) or the generated `.Rprofile`. The lockfile's `Hash` fields identify packages for renv's cache, rather
+than checksumming downloaded archives. After changing pinned versions,
+re-verify a fresh `renv::restore()` from the updated lockfile in a clean
+project.
 
 The install one-liner on the [R setup](getting-started-r.md) page and
 the environment check job in `.github/workflows/r-env.yml` both pin the
 restore to a dated [RSPM](https://packagemanager.posit.co/cran) CRAN
-snapshot (a frozen mirror of CRAN dated when the lockfile was cut), so
-the prebuilt-binary versions match the lockfile exactly. When you update
-`renv.lock`, update that snapshot date in **both** places to the date of
-the new lockfile:
+snapshot, currently **2026-11-03**. The green three-OS CI run restored
+the locked versions, with some source builds. When updating `renv.lock`,
+verify a new snapshot's package availability and update its date in
+**both** places and this note:
 
 ```bash
 grep -rn "packagemanager.posit.co/cran/" docs/getting-started-r.md .github/workflows/r-env.yml

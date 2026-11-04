@@ -191,8 +191,9 @@ formulas, and prior scales (see the [examples](docs/examples.md)).
 The full R study notebooks live under
 [`notebooks_r/`](notebooks_r/) — runnable end to end with a pinned, one-time
 package environment (see the [R setup](docs/getting-started-r.md) page;
-`renv.lock` is the R equivalent of `requirements.txt`, and the install is a
-no-compile download on Linux and Windows). Each example exists both as a
+`renv.lock` is the R equivalent of `requirements.txt`). The pinned CRAN
+packages install as binaries on the tested Linux and Windows runners; CmdStan
+still requires a C++ toolchain. Each example exists both as a
 Jupyter notebook (`.ipynb`, R kernel) and as a Quarto twin (`.qmd`, plain R
 with no Jupyter kernel) for RStudio.
 

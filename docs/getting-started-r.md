@@ -9,14 +9,13 @@ one-time environment:
   selected. The documentation site renders from these.
 
 The environment itself is pinned in `renv.lock`, which plays the role
-`requirements.txt` plays for Python: every package version is fixed
-(checksummed) to exactly what the examples were verified against. And
+`requirements.txt` plays for Python: package versions and sources are
+recorded for the environment used to verify the examples. And
 `renv::restore()` plays the role `uv sync` plays: one command installs
 exactly those versions, into a project-local library, so you do not
 have to install anything by hand and hope.
 
-Developed on R 4.5 (anything from 4.2 up should work); the lockfile
-records R 4.5.3.
+Use R 4.5.3, the version recorded in `renv.lock` and tested by CI.
 
 ## One-time environment
 
@@ -24,35 +23,36 @@ records R 4.5.3.
 
 The pinned R packages link against a handful of native libraries
 (GDAL/PROJ/GEOS for `sf`, freetype/fontconfig for `ragg`, ICU for
-`stringi`, libuv for `fs`, zmq for the Jupyter R kernel). On Linux and
-Windows the restore in step 2 uses **prebuilt binaries**, so these are
-runtime libraries (the `-dev` headers are only needed if a package ever
-builds from source). On macOS the compiled packages build from source,
-so they are build dependencies.
+`stringi`, libuv for `fs`, zmq for the Jupyter R kernel). The tested Ubuntu and Windows restores use
+prebuilt binaries for the pinned CRAN packages; Ubuntu also builds the
+four r-universe packages from source. On macOS the restore uses a mix of
+binaries and source builds, so the listed headers and libraries support
+packages that compile locally.
 
-**Linux (Ubuntu/Debian):**
+**Linux (Ubuntu 24.04, the tested runner):**
 
 ```bash
+sudo apt-get update
 sudo apt-get install -y build-essential gfortran \
   libgdal-dev libproj-dev libgeos-dev libudunits2-dev \
   libfreetype-dev libfontconfig1-dev libpng-dev libicu-dev \
   libuv1-dev libzmq3-dev
 ```
 
-**macOS** (Homebrew; `r` installs R itself):
+**macOS:** install R 4.5.3 from CRAN ([Apple silicon](https://cran.r-project.org/bin/macosx/big-sur-arm64/base/R-4.5.3-arm64.pkg)
+or [Intel](https://cran.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.5.3-x86_64.pkg)),
+then install the system libraries with Homebrew:
 
 ```bash
 xcode-select --install
-brew install r gdal proj geos udunits freetype icu4c fontconfig libpng libuv
+brew install gdal proj geos udunits freetype icu4c fontconfig libpng libuv
 ```
 
-**Windows:** install a current R release from
-<https://cloud.r-project.org>. That is all you need up front: every
-pinned package ships a prebuilt Windows binary at the repositories the
-step-2 command uses, so the restore is plain downloads and no compiler
-is required. If a package ever falls back to a source build, install
-Rtools ([Rtools 40](https://cloud.r-project.org/utils/Rtools-40/),
-or in R: `install.packages("rtools40"); rtools40::install_rtools()`).
+**Windows:** install [R 4.5.3](https://cran.r-project.org/bin/windows/base/old/4.5.3/)
+and
+[Rtools 4.5](https://cran.r-project.org/bin/windows/Rtools/). The tested
+package restore used prebuilt Windows binaries, but the CmdStan step below
+builds C++ code and needs the toolchain.
 
 ### 2. The pinned R packages (identical on every OS)
 
@@ -64,33 +64,23 @@ Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://
 
 Both URLs need to be in the same command (not just in `renv.lock`):
 passing `repos` to `renv::restore()` replaces the repositories recorded
-in the lockfile, and four of the pinned packages (`cmdstanr`, `loo`,
-`posterior`, `bayesplot`) are dev versions that only exist on the Stan
-teams r-universe, while the `CRAN` entry is what routes the other 129
-packages to the RSPM snapshot above.
+in the lockfile, and four pinned entries (`cmdstanr`, `loo`, `posterior`, `bayesplot`)
+record the Stan r-universe repository URL as their repository ID. The
+`CRAN` entry routes the other 129 entries to the RSPM snapshot above.
 
-- `renv::restore()` installs the 133 pinned packages — the rest of the
-  stack from the `CRAN` repository in the command, and `cmdstanr`,
-  `loo`, `bayesplot`, and `posterior` from the Stan team's
-  `stan-dev.r-universe.dev` — into a project-local library under `renv/`.
-  The `CRAN` entry is Posit's free **RSPM** mirror of CRAN, pinned to a
-  snapshot verified to carry prebuilt binaries for exactly the locked
-  versions: on Linux and Windows that makes the restore a download-only,
-  compile-free install (a few minutes). Every package the lockfile
-  resolves is integrity-checked — source tarballs against the SHA-256
-  hashes recorded in `renv.lock`, prebuilt binaries against the hashes
-  the repositories publish for them. On macOS there is no free binary
-  source, so the compiled packages build from source — allow roughly
-  20–60 minutes on a typical laptop for the first run; later re-runs are
-  fast everywhere.
+- `renv::restore()` restores the 133 package records — 129 from the
+  `CRAN` entry and four from `stan-dev.r-universe.dev` — into a
+  project-local library under `renv/`. The `CRAN` entry points to Posit's
+  dated **RSPM** snapshot. CI installed its pinned CRAN packages as
+  binaries on Ubuntu 24.04, Windows, and macOS; Ubuntu built the four
+  r-universe packages from source, and macOS built `pbdZMQ` and `IRkernel`
+  from source. The `Hash` fields in `renv.lock` identify packages for
+  renv's cache; they are not archive checksums. Allow more time when
+  source builds are needed; later re-runs can reuse cached packages.
 - `renv::activate()` writes a machine-local `.Rprofile` (gitignored)
   that puts any R session started in the repository — including the
   Jupyter R kernel — on that project library. RStudio also activates
   the project automatically when you open `unwrap.Rproj`.
-- If the snapshot URL above ever 404s (it is a permanent snapshot, so
-  it normally will not), use any RSPM snapshot dated on or after the
-  latest package `Date` field in `renv.lock` (for example, the date the
-  lockfile was last changed in this repository's history).
 
 ### 3. CmdStan (one-time, ~50 MB)
 
