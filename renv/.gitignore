@@ -1,0 +1,9 @@
+# Project-local package library, populated by `renv::restore()`
+library/
+# Local download cache and activation state
+cache/
+activation/
+user/
+python/
+# Note: renv.lock and renv/activate.R ARE versioned (see
+# docs/getting-started-r.md); this file only ignores machine-local state.
