@@ -12,6 +12,14 @@ Repeated observations can be represented with generalized linear mixed models
 effects. The [model guide](models.md) connects these terms to biological
 questions and model formulas.
 
+**Every study below is available in Python and in R.** The R notebooks live
+under `notebooks_r/` next to their Python counterparts and use the same
+observations, formulas, and prior scales, fitted with
+[brms](https://paulbuerkner.com/brms/) on CmdStan. The [R setup
+page](getting-started-r.md) covers the one-time environment;
+[R and MATLAB](languages.md) covers the standalone R scripts and the MATLAB
+examples.
+
 The [notebook guide](https://github.com/jgraving/unwrap/blob/main/notebooks/README.md)
 lists all examples, their inputs, and what each validated run covers.
 
@@ -26,7 +34,8 @@ using drones and computer vision," *Journal of Animal Ecology* **92**(6),
 1415-1433 (2023); [doi:10.1111/1365-2656.13904](https://doi.org/10.1111/1365-2656.13904).
 The first flights capture baseline (grazing) body orientation, and the final
 flight contains a disturbance event in which a human observer approaches the
-group. The [zebra analysis](notebooks/zebra_escape.ipynb) compares
+group. The [zebra analysis](notebooks/zebra_escape.ipynb)
+([R](notebooks_r/zebra_escape.ipynb)) compares
 body orientation in the **pre-stimulus baseline period** (pre-approach) with
 the **post-stimulus period** (post-approach), using circularly averaged
 orientation over 10 s windows. The hierarchical model separates three
@@ -37,7 +46,8 @@ zebra's observations cluster around its own mean direction).
 
 ## Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
 
-The [homing bat analysis](notebooks/goldshtein_bats.ipynb) revisits
+The [homing bat analysis](notebooks/goldshtein_bats.ipynb)
+([R](notebooks_r/goldshtein_bats.ipynb)) revisits
 kilometer-scale homing flights of echolocating bats from the experiments of
 A. Goldshtein et al., "Acoustic cognitive map-based navigation in
 echolocating bats," *Science* **386**(6721), 561-567 (2024);
@@ -60,7 +70,8 @@ compared with a unimodal von Mises baseline.
 ## Order and density shape locust directional alignment in virtual reality
 
 The [order and density analysis](notebooks/locust_density_order.ipynb)
-revisits a virtual-reality experiment from S. Sayin et al., "The behavioral
+([R](notebooks_r/locust_density_order.ipynb)) revisits
+a virtual-reality experiment from S. Sayin et al., "The behavioral
 mechanisms governing collective motion in swarming locusts," *Science*
 **387**(6737), 995-1000 (2025);
 [doi:10.1126/science.adq7832](https://doi.org/10.1126/science.adq7832),
@@ -76,7 +87,8 @@ performance, and adding density provides at most a secondary gain.
 
 ## Testing optic-flow vs. vectorial encoding in marching locusts
 
-The [mixture analysis](notebooks/locust_direction_mixture_model.ipynb) tests
+The [mixture analysis](notebooks/locust_direction_mixture_model.ipynb)
+([R](notebooks_r/locust_direction_mixture_model.ipynb)) tests
 a second paradigm from the same experiments, in which moving virtual
 conspecifics are placed symmetrically at a lateral distance of 8 or 50 cm. A hierarchical
 bimodal von Mises mixture fitted to the full distribution of headings
@@ -88,7 +100,8 @@ turns).
 
 ## Artificial light reorients nocturnal dung beetles
 
-The [beetle analysis](notebooks/beetles.ipynb) revisits a two-condition
+The [beetle analysis](notebooks/beetles.ipynb)
+([R](notebooks_r/beetles.ipynb)) revisits a two-condition
 arena experiment in the nocturnal ball-rolling dung beetle *Escarabaeus
 satyrus* from the experiments of J. J. Foster et al., "Light pollution
 forces a change in dung beetle orientation behavior," *Current Biology*
@@ -105,11 +118,50 @@ post-hoc change in the between-individual clustering of the individuals' mean
 directions ($\kappa_\mu$), and "floodlight attraction" as the posterior
 predictive mass within $\pm45^{\circ}$ of the floodlight direction.
 
+## Method examples
+
+Two further notebooks round out the framework: one shows when a circular
+model is *not* the right tool, and one works the von Mises distribution
+backwards from likelihood to behavior.
+
+### Periodic but not circular: a 24-hour activity rhythm
+
+The [periodicity example](notebooks/periodic_not_circular.ipynb)
+([R](notebooks_r/periodic_not_circular.ipynb)) draws the line between
+*periodic* and *circular*: time of day repeats every 24 hours, but the
+quantity of interest - activity - is a level bounded in (0, 1), not an angle.
+The periodicity belongs to the *predictor*, so the model is a Beta GLM whose
+mean (logit-linked) and precision (softplus-linked) each vary sinusoidally
+across the day, rather than a von Mises likelihood on a circle: the wrap at
+midnight is a periodic continuity, not the angular equivalence that makes
+bearings circular. The notebook re-simulates a seeded 24-hour rhythm, fits
+the model, and recovers the injected daily mean and precision curves with
+posterior-predictive uncertainty bands.
+
+### Von Mises navigation policy
+
+The [policy example](notebooks/von_mises_policy.ipynb)
+([R](notebooks_r/von_mises_policy.ipynb)) reads the von Mises distribution in
+the opposite direction - as a *navigation policy* rather than a likelihood.
+With utility defined as the negated distance to a goal, the heading
+distribution that maximizes utility in constant-length steps is exactly a von
+Mises distribution centered on the goal direction, with the concentration
+setting how strongly each step concentrates toward it. The notebook evaluates
+the policy density at each concentration and samples trajectories under it:
+at zero concentration the policy is uniform and the walk is a
+constant-step random walk with no net progress, while rising concentration
+progressively aligns the trajectories with the goal. It is the visual
+companion to the likelihood use in the [beetle](notebooks/beetles.ipynb) and
+[zebra](notebooks/zebra_escape.ipynb) analyses, where fitted mean direction
+and concentration describe observed directional control.
+
 ## Before running one of these notebooks
 
 Each notebook on this page was rerun end to end from this checkout on the
 current stack, and the outputs shown come from that validated run. The
-[Python setup guide](getting-started.md) covers the environment. The
+[Python setup guide](getting-started.md) covers the environment; the R
+notebooks follow the [R setup guide](getting-started-r.md) and load the same
+published data through a Git-managed local checkout. The
 animal-behavior notebooks load their observations through the
 `unwrap.datasets` accessors, which fetch the raw data from the
 [`jgraving/unwrap-data`](https://github.com/jgraving/unwrap-data) repository

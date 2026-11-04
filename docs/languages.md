@@ -1,72 +1,113 @@
-# R and MATLAB implementations
+# R and MATLAB
 
-Keep the language implementations together while their interfaces and scope are
-being clarified. Python installation does not install the other language stacks.
-The setup notes here are based on the checked-in scripts. The R
-notebooks are executed locally with the
-[notebook test](development.md#notebook-execution-local-only) (not by
-this repository's CI); MATLAB execution is not covered.
+The Python notebooks are the reference implementations, but they are not the
+only way to run these analyses. Every study in the
+[biological examples](examples.md) exists as a Python/R pair - the R notebook
+lives next to it under `notebooks_r/` - and the repository ships MATLAB
+examples of the same models. Python installation does not install the other
+language stacks, and each setup below is self-contained.
 
-## R: brms and Stan
+## R: brms and CmdStan
 
-Start with [`R/brms_example.R`](https://github.com/jgraving/unwrap/blob/main/R/brms_example.R).
-It loads `circular` and `brms`, sources `unwrap_family.R`, and reads the included
-`vonmises_data.csv`. Follow the [brms installation instructions](https://paulbuerkner.com/brms/)
-for the Stan/C++ toolchain, then from an R session in the repository root:
+The R examples fit circular observations with
+[brms](https://paulbuerkner.com/brms/) using the repository's custom von
+Mises family
+([`R/unwrap_family.R`](https://github.com/jgraving/unwrap/blob/main/R/unwrap_family.R)),
+with **cmdstanr** and CmdStan as the Stan backend. The circular structure is
+carried by the same links as in the Python models: the modulo link wraps the
+mean predictor onto the circle *inside* the Stan log-density, and softplus
+keeps the concentration positive. Circular coefficients take von Mises
+priors, which can be nearly uniform (small concentration) where no prior
+direction is intended; individual angular offsets use the same construction.
+"Uninformed" is therefore never a flat uniform over an interval - it is a
+von Mises prior with a near-zero concentration.
 
-```r
-install.packages(c("brms", "circular"))  # one-time package setup
-setwd("R")
-source("brms_example.R")
-```
+[`notebooks_r/circular_regression.ipynb`](notebooks_r/circular_regression.ipynb)
+is the R twin of the
+[Python tutorial](notebooks/circular_regression.ipynb), and the seven
+research notebooks mirror the
+[biological examples](examples.md) and the method examples one for one.
+They use the same observations, formulas, and prior scales as their Python
+counterparts, with circular individual effects represented through brms'
+nonlinear machinery where needed.
 
-The example fits `y ~ x` and `kappa ~ x` using a custom von Mises family. Its
-relative paths require `R/` as the working directory. `unwrap_functions.R`
-contains additional circular summaries and analysis helpers and also loads
-`cmdstanr`; it is not required by the small `brms_example.R` script.
+To use one, install the one-time environment from the
+[R setup page](getting-started-r.md) (CRAN packages, CmdStan, and the Jupyter
+R kernel), select the **R (`ir`)** kernel, and run the cells in order. The
+first cell of each notebook re-checks the environment and restores missing
+pieces, so on a set-up machine it is a no-op. As with the Python research
+notebooks, the fits are too long for CI, so the notebooks are not executed on
+every build; a change to a notebook is verified end to end by the local
+[notebook test](development.md#notebook-execution-local-only) before it is
+merged, and the committed outputs come from that run.
 
-The longer analysis is in
-[`Circular Dataset Structures.Rmd`](https://github.com/jgraving/unwrap/blob/main/R/Circular%20Dataset%20Structures.Rmd).
-Those analysis dependencies and paths still need a dedicated reproducibility pass.
+### Standalone scripts
 
-## MATLAB: Stan example
+- [`R/brms_example.R`](https://github.com/jgraving/unwrap/blob/main/R/brms_example.R)
+  is a small self-contained brms fit: it loads `circular` and `brms`,
+  sources `unwrap_family.R`, reads the included `vonmises_data.csv`, and fits
+  `y ~ x` and `kappa ~ x` with the custom von Mises family. Its relative
+  paths require `R/` as the working directory:
+
+  ```r
+  install.packages(c("brms", "circular"))  # one-time package setup
+  setwd("R")
+  source("brms_example.R")
+  ```
+
+- [`R/unwrap_functions.R`](https://github.com/jgraving/unwrap/blob/main/R/unwrap_functions.R)
+  adds circular summaries and analysis helpers on top of the family (it also
+  loads `cmdstanr`); it is not required by the small example script.
+- [`R/Circular Dataset Structures.Rmd`](https://github.com/jgraving/unwrap/blob/main/R/Circular%20Dataset%20Structures.Rmd)
+  is the longer early analysis of circular dataset structures. Its
+  dependencies and paths still need a reproducibility pass, so treat it as a
+  reference for the intended approach rather than a ready-to-run script.
+
+## MATLAB
+
+MATLAB support covers the same models by two routes; neither is integrated
+with the Python or R environments.
+
+### Route 1: MATLAB + Stan (MatlabStan)
 
 Read [`Matlab/ReadmeMATLAB.txt`](https://github.com/jgraving/unwrap/blob/main/Matlab/ReadmeMATLAB.txt)
 and [`Matlab/UnwrapStan.m`](https://github.com/jgraving/unwrap/blob/main/Matlab/UnwrapStan.m).
-The current route needs MatlabStan, MatlabProcessManager, and CmdStan.
-The setup notes describe matching the configured CmdStan path and version in
-the integration files. `UnwrapStan.m` itself also has a hard-coded `stan_home`
-argument that must be changed to your local installation.
+This route needs MatlabStan, MatlabProcessManager, and CmdStan, with the
+configured CmdStan path and version matched in the integration files.
+`UnwrapStan.m` also carries a hard-coded `stan_home` argument; point it at
+your local CmdStan installation before running. The script includes a small
+example dataset and plots posterior samples. Because MatlabStan provides no
+tools to unwrap circular estimates, inspect the periodic-chain behavior when
+interpreting its output.
 
-The script includes a small example dataset and plots posterior samples.
-It notes that MatlabStan does not provide tools to unwrap estimates, so inspect
-periodic chain behavior when interpreting its output.
-
-## MATLAB: native sampling
+### Route 2: native MATLAB sampling
 
 [`Matlab/MatlabOnly.m`](https://github.com/jgraving/unwrap/blob/main/Matlab/MatlabOnly.m)
-fits a small circular regression using `hmcSampler` and finite-difference
-gradients. It includes the observations and helper functions in one script.
+fits a small circular regression with `hmcSampler` and finite-difference
+gradients; observations and helpers live in the one script.
 
 [`Matlab/CircularDatasetStructures.m`](https://github.com/jgraving/unwrap/blob/main/Matlab/CircularDatasetStructures.m)
-provides examples of effects on direction, concentration, and individual
-differences, using analytic gradients and helpers in `Matlab/unwrap_functions/`.
-It reads the bundled CSV files in `Matlab/circular_datasets/`, exported from the
-R simulations by `R/Export Circular Datasets.R`. To run the analysis, open the
-script in MATLAB and run it; input and helper paths are resolved from the
-script's location. Set `quickTest = true` before running for short chains that
-check execution, or `saveFigures = true` to save figures.
+is the full dataset analysis: effects on direction, concentration, and
+individual differences, with analytic gradients and helpers in
+`Matlab/unwrap_functions/`. It reads the bundled CSV files in
+`Matlab/circular_datasets/` (exported from the R simulations by
+`R/Export Circular Datasets.R`), and resolves input and helper paths from the
+script's location, so run it from MATLAB as-is. Set `quickTest = true`
+before running for short chains that check execution, or `saveFigures = true`
+to save figures.
 
 Both native examples require the Statistics and Machine Learning Toolbox and
 do not require Stan. The dataset analysis reports classic R-hat before and
-after unwrapping circular parameters and uses PSIS-LOO, with refits for high
+after unwrapping circular parameters and uses PSIS-LOO, refitting for high
 Pareto-k observations up to its configured limit. Short test chains are not
 sufficient to assess convergence or support scientific conclusions.
 
-## Establishing equivalence later
+## Checking that two implementations agree
 
-A shared example should specify the same individual observations, angular units,
-reference direction, design matrices, centering, likelihood, links, and priors.
-Compare log densities and predictions at fixed parameters before comparing
-posterior summaries within Monte Carlo uncertainty. Matching names or similar
-plots do not establish that the implementations fit the same model.
+If you extend these models in another language - or port an existing
+analysis - pin down what "the same model" means before comparing outputs:
+the same individual observations, angular units, reference direction, design
+matrices, centering, likelihood, links, and priors. Compare log densities and
+predictions at fixed parameter values first, and only then compare posterior
+summaries, within Monte Carlo uncertainty. Matching names or similar plots do
+not establish that two implementations fit the same model.

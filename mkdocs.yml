@@ -1,6 +1,6 @@
 site_name: unwrap
 site_url: https://jgraving.github.io/unwrap/
-site_description: Bayesian circular GLMs and GLMMs with PyMC and Bambi
+site_description: "Bayesian circular GLMs and GLMMs: von Mises regression in Python (PyMC, Bambi) and R (brms), with animal-behavior examples and a mathematical guide"
 repo_url: https://github.com/jgraving/unwrap
 # Study notebooks render from their committed outputs (never executed at
 # build time; see .github/workflows/docs.yml and sync_docs_notebooks.py).

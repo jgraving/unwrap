@@ -36,6 +36,8 @@ inference, and **Bambi** for a high-level formula interface to GLMs and GLMMs.
 | Are headings more consistent under one condition? | A change in directional concentration |
 | Do individuals differ in their responses? | Animal-specific intercepts or treatment effects in a GLMM |
 | Are there two preferred directions? | A mixture of directional distributions |
+| Does behavior follow a daily rhythm rather than a compass heading? | A periodic (not circular) regression on time of day |
+| What should optimal goal-directed steering do? | The von Mises navigation policy |
 
 [Install `unwrap`](getting-started.md), then follow the
 [circular regression tutorial](notebooks/circular_regression.ipynb).
@@ -43,6 +45,12 @@ It generates its own observations and shows how to fit a model, interpret its
 predictions, and check how well it describes the data.
 The [model guide](models.md) explains how these questions become GLM and GLMM
 formulas, with biological interpretations alongside the statistical terms.
+
+Every analysis on this site - the tutorial and all the
+[biological examples](examples.md) - runs in both **Python** (PyMC and
+Bambi) and **R** (brms on CmdStan); the notebooks are Python/R pairs that
+use the same observations, formulas, and prior scales. The
+[R setup page](getting-started-r.md) covers the one-time R environment.
 
 ## Read a fitted model
 
@@ -71,7 +79,7 @@ can each hold a steady heading while pointing in different directions.
 - [Mathematical guide](math/von-mises.md): build from the von Mises likelihood to GLMs, GLMMs, and mixtures.
 - [Circular links](links.md): how predictors map to directions and concentration.
 - [Python API guide](api.md): components for Bambi and PyMC models.
-- [R and MATLAB](languages.md): setup and examples for the other implementations.
+- [R and MATLAB](languages.md): the R versions of the tutorial and every study, the standalone R scripts, and the MATLAB examples.
 
 The introductory tutorial is executed automatically in CI, and every
 notebook is rerun end to end before a change that touches it is merged.
