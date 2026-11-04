@@ -67,7 +67,9 @@ nav:
       - Order and density shape locust directional alignment in virtual reality:
           - Python: notebooks/locust_density_order.ipynb
           - R: notebooks_r/locust_density_order.ipynb
-      - Testing optic-flow vs. vectorial encoding in marching locusts: notebooks/locust_direction_mixture_model.ipynb
+      - Testing optic-flow vs. vectorial encoding in marching locusts:
+          - Python: notebooks/locust_direction_mixture_model.ipynb
+          - R: notebooks_r/locust_direction_mixture_model.ipynb
       - Artificial light reorients nocturnal dung beetles:
           - Python: notebooks/beetles.ipynb
           - R: notebooks_r/beetles.ipynb
