@@ -87,7 +87,7 @@ jobs:
         run: |
           Rscript -e 'cmdstanr::install_cmdstan()'
 
-      - name: Smoke test: load the stack and fit a real model
+      - name: Smoke test - load the stack and fit a real model
         run: |
           Rscript -e '
             suppressMessages({ library(brms); library(rmarkdown) })
