@@ -488,8 +488,9 @@ Branch `r-examples-p1-local` in /tmp/opencode/wt-r-p1:
    e1e5539 merge #93 <- 3fd38e8 P1). Cleanup DONE: wt-r-p2b removed,
    r-examples-p2-bake branch deleted, remote r-examples-p2 deleted
    (verified 404). REMAINING: (1) fold this file into the repo per the
-   runbook (wt-handoff branch docs/notebooks-to-scripts-handoff,
-   byte-identical cp, commit+push);
+   runbook - DONE: folded to the log branch
+   docs/notebooks-to-scripts-handoff as handoff-r-phase.md
+   (fold commit 266fedf, byte-identical verified with cmp);
    (2) tell the user the exact phrase "P3 ready - send now" and ship
    codex-p3-brief.md VERBATIM (it assumes all P0-P2 templates on main -
    now TRUE). DISCOVERY (2026-11-04, pre-phrase): DRAFT PR #91 ALREADY
