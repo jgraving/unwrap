@@ -32,10 +32,12 @@ counterparts, with circular individual effects represented through brms'
 nonlinear machinery where needed.
 
 To use one, install the one-time environment from the
-[R setup page](getting-started-r.md) (pinned package environment, CmdStan,
-and the Jupyter R kernel), select the **R (`ir`)** kernel, and run the cells
-in order. The
-first cell of each notebook re-checks the environment and restores missing
+[R setup page](getting-started-r.md) (the pinned package environment,
+CmdStan, and, for the Jupyter route, the R kernel). RStudio/Quarto users
+open the example's `.qmd` version (each R example's documentation page
+has a "Download Quarto" button); Jupyter users select the **R (`ir`)**
+kernel; then run the cells in order either way.
+The first cell of each notebook re-checks the environment and restores missing
 pieces, so on a set-up machine it is a no-op. As with the Python research
 notebooks, the fits are too long for CI, so the notebooks are not executed on
 every build; a change to a notebook is verified end to end by the local

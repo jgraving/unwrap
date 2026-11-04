@@ -40,9 +40,30 @@ The R notebooks need the `ir` kernelspec (see the
 smoke budget (reduced draws) while iterating. Before a change that touches a
 notebook is merged, that notebook is rerun end to end from the checkout
 this way, and the outputs stored in the repository come from that run.
-R package versions (and checksums) are pinned in `renv.lock`: after a
-deliberate upgrade, regenerate it with `Rscript -e 'renv::snapshot()'`
-(see the [R setup](getting-started-r.md) page).
+
+### Maintaining the R environment
+
+The R package versions (and checksums) are pinned in `renv.lock`. After
+a deliberate upgrade, from an activated project (see the
+[R setup](getting-started-r.md) page):
+
+```bash
+Rscript -e 'renv::snapshot()'   # updates renv.lock from the project library
+```
+
+Commit the updated `renv.lock`, but not the machine-local state under
+`renv/` (see `renv/.gitignore`) or the generated `.Rprofile`. R package
+tarballs carry version-pinned checksums in the lockfile; after changing
+pinned versions, re-verify a fresh `renv::restore()` from the updated
+lockfile in a clean project.
+
+The Quarto twins `notebooks_r/*.qmd` are generated from the `.ipynb`
+source of truth. After any R notebook change, regenerate and commit
+them:
+
+```bash
+python tools/ipynb_to_qmd.py
+```
 
 ## Build and preview documentation
 
