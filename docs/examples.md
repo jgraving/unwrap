@@ -17,10 +17,9 @@ The [circular regression tutorial](notebooks/circular_regression.ipynb)
 ([R](notebooks_r/circular_regression.ipynb)) is a complete introduction
 using simulated observations: a math example on toy data, not a
 biological study, and the cheapest way to see the whole workflow. It
-fits a circular generalized linear model (GLM) with predictors for both
-mean direction and concentration, using Bambi's formula interface and
-PyMC for inference. The tutorial creates its own data, so no download
-is needed.
+fits a circular generalized linear model (GLM) with a formula for both
+the mean direction and the concentration. The tutorial creates its own
+data, so no download is needed.
 
 ## Biological examples
 

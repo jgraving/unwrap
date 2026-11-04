@@ -191,7 +191,7 @@ formulas, and prior scales (see the [examples](docs/examples.md)).
 The full R study notebooks live under
 [`notebooks_r/`](notebooks_r/) — runnable end to end with a pinned, one-time
 package environment (see the [R setup](docs/getting-started-r.md) page;
-`renv.lock` is the R equivalent of `requirements.txt`). Each example can be
+`renv.lock` pins the exact recorded versions). Each example can be
 run in RStudio/Quarto (the `.qmd` file, plain R) or in Jupyter (the
 `.ipynb` file, R kernel).
 

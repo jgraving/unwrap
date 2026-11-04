@@ -7,11 +7,12 @@ one-time environment:
   *Run All*. It runs with plain R — no Jupyter at all.
 - **Jupyter**: the same example as an `.ipynb` with the **R** kernel.
 
-The environment is pinned in `renv.lock`, the R equivalent of
-`requirements.txt`: the short R script in step 3 installs exactly the
-recorded versions into a project-local library, like `uv sync` does
-for Python. Use R **4.5.3**, the version recorded in `renv.lock` and
-tested by CI.
+The environment is pinned in `renv.lock`: it records the exact version
+of every package this project uses, and the short R script in step 3
+installs precisely those versions into a project-local library,
+separate from your system packages. Re-running it is a fast no-op once
+everything is in place. Use R **4.5.3**, the version recorded in
+`renv.lock` and tested by CI.
 
 ## Install and open the tutorial
 
@@ -120,9 +121,9 @@ setup fails fast instead of slowly at the first fit.
 The tutorial creates its own data, so no download is needed. It fits
 a circular generalized linear model (GLM) with `brms`' formula
 interface and the repository's custom von Mises family
-(`R/unwrap_family.R`), using the same modulo mean link and softplus
-concentration link as the Python tutorial with Bambi. Both the mean
-direction and the directional concentration depend on a predictor.
+(`R/unwrap_family.R`): a modulo mean link for the direction and a
+softplus link for the concentration, with both depending on a
+predictor.
 The [model guide](models.md) explains GLM formulas and their
 extension to generalized linear mixed models (GLMMs) for repeated
 observations of animals or groups.
