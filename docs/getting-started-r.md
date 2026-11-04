@@ -8,26 +8,28 @@ one-time environment:
 - **Jupyter**: the same example as an `.ipynb` with the **R** kernel.
 
 The environment is pinned in `renv.lock`, the R equivalent of
-`requirements.txt`: the short R script in step 2 installs exactly the
+`requirements.txt`: the short R script in step 3 installs exactly the
 recorded versions into a project-local library, like `uv sync` does
 for Python. Use R **4.5.3**, the version recorded in `renv.lock` and
 tested by CI.
 
 ## Install and open the tutorial
 
-First, get the repository:
+### 1. Get the repository
 
 ```bash
 git clone https://github.com/jgraving/unwrap.git
 cd unwrap
 ```
 
-### 1. System packages (the only OS-specific step)
+Every step below runs from this directory.
+
+### 2. System packages (the only OS-specific step)
 
 A few pinned packages link against native libraries, and on some
 operating systems a few are built from source; install those
 prerequisites first. The C++ toolchain is also used to build CmdStan
-in step 3.
+in step 4.
 
 **Linux (tested on Ubuntu 24.04):**
 
@@ -52,12 +54,12 @@ brew install gdal proj geos udunits freetype icu4c fontconfig \
 **Windows:** install [R 4.5.3](https://cran.r-project.org/bin/windows/base/old/4.5.3/)
 and [Rtools 4.5](https://cran.r-project.org/bin/windows/Rtools/). On
 Windows the pinned CRAN packages install as prebuilt binaries; Rtools
-serves the CmdStan build in step 3 and any source-build fallback.
+serves the CmdStan build in step 4 and any source-build fallback.
 
-### 2. The pinned R packages
+### 3. The pinned R packages
 
-From the **repository root**, in any R session (RStudio's console or
-`R` in a terminal):
+In any R session (RStudio's console or `R` in a terminal), from the
+repository root:
 
 ```r
 # Four Stan development packages (cmdstanr, loo, posterior, bayesplot),
@@ -85,16 +87,16 @@ script is fast.
 any R session started in the repository — RStudio, scripts, or the
 Jupyter R kernel — uses that project library.
 
-### 3. CmdStan
+### 4. CmdStan
 
 ```r
 cmdstanr::install_cmdstan(version = "2.40.0")
 ```
 
 Fetches the Stan compiler into your home folder (~50 MB) and builds it
-with the C++ toolchain from step 1.
+with the C++ toolchain from step 2.
 
-### 4. The Jupyter R kernel (only if you use Jupyter)
+### 5. The Jupyter R kernel (only if you use Jupyter)
 
 ```r
 IRkernel::installspec()
@@ -125,8 +127,8 @@ The [model guide](models.md) explains GLM formulas and their
 extension to generalized linear mixed models (GLMMs) for repeated
 observations of animals or groups.
 
-On a machine that is already set up, step 2 re-checks the pinned
-versions after a fresh clone; steps 3 and 4 run once per machine.
+On a machine that is already set up, a fresh clone plus step 3
+re-checks the pinned versions; steps 4 and 5 run once per machine.
 
 ## Prepare your angles
 
@@ -140,14 +142,16 @@ Remember that the angles wrap: the average of 179° and −179° is near
 that handle this. The [link guide](links.md) explains the
 mathematical conventions.
 
-## Run a biological example
+## Run a study example
 
-The [example guide](examples.md) lists each example and what its
-verified run covers. After the tutorial, try `beetles`,
-`locust_density_order`, or `zebra_escape`, in RStudio or Jupyter; the
-R examples reproduce their Python counterparts with the same
-observations, formulas, and prior scales (the
-[R and MATLAB](languages.md) page has the details).
+The [example guide](examples.md) organizes the notebooks into the
+circular regression tutorial (simulated toy data, not a biological
+study), five biological studies, and two method examples (periodic
+but not circular, and the von Mises navigation policy). After the
+tutorial, try `beetles`, `locust_density_order`, or `zebra_escape`,
+in RStudio or Jupyter; the R examples reproduce their Python
+counterparts with the same observations, formulas, and prior scales
+(the [R and MATLAB](languages.md) page has the details).
 
 The animal-behavior notebooks load each study through a data cell that
 fetches the raw files from the `jgraving/unwrap-data` repository on

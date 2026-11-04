@@ -1,18 +1,6 @@
-# Biological examples
+# Examples
 
-Start with the
-[circular regression tutorial](notebooks/circular_regression.ipynb)
-for a complete introduction using simulated observations. It fits a circular
-generalized linear model (GLM) with predictors for both mean direction and
-concentration, using Bambi's formula interface and PyMC for inference.
-
-The research examples extend the same framework to biological experiments.
-Repeated observations can be represented with generalized linear mixed models
-(GLMMs), which estimate animal-specific variation alongside population-level
-effects. The [model guide](models.md) connects these terms to biological
-questions and model formulas.
-
-**Every study below is available in Python and in R.** The R notebooks live
+**Every example is available in Python and in R.** The R notebooks live
 under `notebooks_r/` next to their Python counterparts and use the same
 observations, formulas, and prior scales, fitted with
 [brms](https://paulbuerkner.com/brms/) on CmdStan. The [R setup
@@ -23,7 +11,26 @@ examples.
 The [notebook guide](https://github.com/jgraving/unwrap/blob/main/notebooks/README.md)
 lists all examples, their inputs, and what each validated run covers.
 
-## Grevy's zebra body orientation during an escape response
+## The tutorial
+
+The [circular regression tutorial](notebooks/circular_regression.ipynb)
+([R](notebooks_r/circular_regression.ipynb)) is a complete introduction
+using simulated observations: a math example on toy data, not a
+biological study, and the cheapest way to see the whole workflow. It
+fits a circular generalized linear model (GLM) with predictors for both
+mean direction and concentration, using Bambi's formula interface and
+PyMC for inference. The tutorial creates its own data, so no download
+is needed.
+
+## Biological examples
+
+The biological examples extend the same framework to real experiments.
+Repeated observations can be represented with generalized linear mixed
+models (GLMMs), which estimate animal-specific variation alongside
+population-level effects. The [model guide](models.md) connects these
+terms to biological questions and model formulas.
+
+### Grevy's zebra body orientation during an escape response
 
 A focal group of Grevy's zebra (*Equus grevyi*) was recorded with an overhead
 drone and automated tracking at the Mpala Conservancy in Laikipia, Kenya: the
@@ -44,7 +51,7 @@ mean direction, alignment between individuals (how the individual mean
 directions cluster), and within-individual consistency (how tightly each
 zebra's observations cluster around its own mean direction).
 
-## Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
+### Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
 
 The [homing bat analysis](notebooks/goldshtein_bats.ipynb)
 ([R](notebooks_r/goldshtein_bats.ipynb)) revisits
@@ -67,7 +74,7 @@ each step arises either from a directed von Mises component (goal-directed
 "exploitation") or an undirected uniform component (search "exploration"),
 compared with a unimodal von Mises baseline.
 
-## Order and density shape locust directional alignment in virtual reality
+### Order and density shape locust directional alignment in virtual reality
 
 The [order and density analysis](notebooks/locust_density_order.ipynb)
 ([R](notebooks_r/locust_density_order.ipynb)) revisits
@@ -85,7 +92,7 @@ over the order and density specifications supports an order-dominant
 interpretation - order captures the bulk of the improvement in out-of-sample
 performance, and adding density provides at most a secondary gain.
 
-## Testing optic-flow vs. vectorial encoding in marching locusts
+### Testing optic-flow vs. vectorial encoding in marching locusts
 
 The [mixture analysis](notebooks/locust_direction_mixture_model.ipynb)
 ([R](notebooks_r/locust_direction_mixture_model.ipynb)) tests
@@ -98,7 +105,7 @@ alignment to wide-field motion) versus vectorial encoding (a choice-like
 commitment to one of the two lateral swarms, with leftward and rightward
 turns).
 
-## Artificial light reorients nocturnal dung beetles
+### Artificial light reorients nocturnal dung beetles
 
 The [beetle analysis](notebooks/beetles.ipynb)
 ([R](notebooks_r/beetles.ipynb)) revisits a two-condition
