@@ -89,7 +89,7 @@ jobs:
       # "https://stan-dev.r-universe.dev" (a URL, not "CRAN").
       - name: Restore the pinned environment
         run: |
-          Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::activate(); renv::restore(repos = repos)'
+          Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::activate(); renv::load(); renv::restore(repos = repos)'
           # A fresh process now reads the .Rprofile written by activate().
           Rscript -e 'cat(.libPaths(), sep = "\n")'
 
