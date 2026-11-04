@@ -1,4 +1,4 @@
-## STATE - updated 2026-11-03 (R EXAMPLES PHASE — CI DROPPED PER USER (LOCAL TESTS ONLY), P0 MERGED (15abf88), P1 on r-examples-p1-local @ eca5c68: workflow deletion + local test module committed, bakes in progress)
+## STATE - updated 2026-11-04 (R EXAMPLES PHASE: P0-P2 MERGED; P3 @ 6da2d63 static-reviewed PASS, FULL-BUDGET BAKE IN FLIGHT; PY ACCEPTANCE REF CAPTURED (locust_reference_elpd.txt); VECTORIZATION PR SCOPED (post-P3); WORDING PR #94 SHIPPED (markdown-only, local docs gate passed, CI pending))
 
 ### CI DECISION (2026-11-03, user: "Do not run ci on GitHub for notebooks. They need to be locally tested only. Write tests but make it so that GitHub doesn't run them we run them locally.")
 - `.github/workflows/notebooks.yml` is DELETED (it ran the Python tutorial + every R notebook on every PR, 240-min job).
@@ -581,6 +581,41 @@ Branch `r-examples-p1-local` in /tmp/opencode/wt-r-p1:
      marginal EXPECTED), posterior parity targets (mu_pop ~ +/-1.45,
      mu_kappa ~27/21, weights_pop ~0.5) - all in
      /tmp/opencode/locust_reference_elpd.txt.
+   WORDING PR SHIPPED (2026-11-04, PR #94, branch
+   docs/wording-paper-language @ a536456, base 53e0a3c, worktree
+   /tmp/opencode/wt-mdpolish): markdown-only pass over all 7 Python +
+   7 R example notebooks (the R locust-mixture twin EXCLUDED - its
+   wording ships in P3). Audit = full md dump of all 15 notebooks
+   (md_audit_all.txt) read end to end + the paper's five Example
+   sections mined as the language standard (beetles ~1272, zebra ~1359,
+   locust order-density ~1443, bats ~1620, locust mixture ~1740 in
+   paper.tex). docs/*.md pages scanned: already clean, untouched.
+   Changes: (1) dev meta removed (CI/test-harness refs, clone/cache
+   plumbing, bambi internals + bug workaround, "In the implementation"
+   mapping tables, "The centerpiece.", PyTensor line, "Local review",
+   headless-map-fallback, "Notebook execution is local by design" in
+   all R Setup cells); (2) stale draft wording ("This draft is
+   intentionally unbaked" x3, "unbaked drafts make no convergence
+   claim", R bats "(baseline, Bambi)"/"(PyMC)" headings + "section
+   heading identifies the Python reference" notes); (3) R twins stand
+   alone ("This R port of X.ipynb" -> model description); (4) slop/
+   redundancy (locust-mixture TOC + duplicated hypothesis re-derivation
+   c26, label-restating PPC bullets c19, doubled weak-ID story in
+   locust_density c34, "security-light trial table", "Rmd's
+   grouped-data machinery"); (5) Figure-style save_path=/gitignored
+   plumbing -> one-liner in all 8 Python notebooks (vmp included);
+   (6) FIXED PRE-EXISTING SITE BUG: locust-mixture c13 display math
+   was not blank-line-separated -> arithmatex never processed it (4
+   stray $$ on the page) + unescaped set braces in Theta_i/Y_i/Y.
+   Local acceptance done: nbformat.validate all, full strict docs
+   build (== docs CI job) passes, rendered HTML page-by-page check
+   clean (only the 2 MathJax-config $$ literals on every page; 404.html
+   has 0, expected). Net diff: 15 files (14 + vmp py), -183 lines.
+   Patch tooling: /tmp/opencode/apply_mdpolish.py (exact-string,
+   one-match assertions, skip-argv for the already-applied files).
+   PR #94 OPEN, checks pending (docs job is the meaningful gate).
+   No re-bake (no executed cell changed). When green: plain merge
+   --delete-branch per house flow.
    VECTORIZATION PR SCOPED (2026-11-04, plan in
    /tmp/opencode/vectorization-plan.md): only two changes - bats c29
    kde_vm (361-iteration vapply -> matrix colMeans, algebraically
