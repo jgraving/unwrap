@@ -23,7 +23,8 @@ Use R 4.5.3, the version recorded in `renv.lock` and tested by CI.
 
 The pinned R packages link against a handful of native libraries
 (GDAL/PROJ/GEOS for `sf`, freetype/fontconfig for `ragg`, ICU for
-`stringi`, libuv for `fs`, zmq for the Jupyter R kernel). The tested Ubuntu and Windows restores use
+`stringi`, libuv for `fs`, zmq for the Jupyter R kernel). The tested
+Ubuntu and Windows restores use
 prebuilt binaries for the pinned CRAN packages; Ubuntu also builds the
 four r-universe packages from source. On macOS the restore uses a mix of
 binaries and source builds, so the listed headers and libraries support
@@ -49,8 +50,7 @@ brew install gdal proj geos udunits freetype icu4c fontconfig libpng libuv
 ```
 
 **Windows:** install [R 4.5.3](https://cran.r-project.org/bin/windows/base/old/4.5.3/)
-and
-[Rtools 4.5](https://cran.r-project.org/bin/windows/Rtools/). The tested
+and [Rtools 4.5](https://cran.r-project.org/bin/windows/Rtools/). The tested
 package restore used prebuilt Windows binaries, but the CmdStan step below
 builds C++ code and needs the toolchain.
 
@@ -64,8 +64,8 @@ Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://
 
 Both URLs need to be in the same command (not just in `renv.lock`):
 passing `repos` to `renv::restore()` replaces the repositories recorded
-in the lockfile, and four pinned entries (`cmdstanr`, `loo`, `posterior`, `bayesplot`)
-record the Stan r-universe repository URL as their repository ID. The
+in the lockfile, and four pinned entries (`cmdstanr`, `loo`,
+`posterior`, `bayesplot`) record the Stan r-universe repository URL as their repository ID. The
 `CRAN` entry routes the other 129 entries to the RSPM snapshot above.
 
 - `renv::restore()` restores the 133 package records — 129 from the

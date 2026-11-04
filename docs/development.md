@@ -52,7 +52,8 @@ Rscript -e 'renv::snapshot()'   # updates renv.lock from the project library
 ```
 
 Commit the updated `renv.lock`, but not the machine-local state under
-`renv/` (see `renv/.gitignore`) or the generated `.Rprofile`. The lockfile's `Hash` fields identify packages for renv's cache, rather
+`renv/` (see `renv/.gitignore`) or the generated `.Rprofile`. The
+lockfile's `Hash` fields identify packages for renv's cache, rather
 than checksumming downloaded archives. After changing pinned versions,
 re-verify a fresh `renv::restore()` from the updated lockfile in a clean
 project.

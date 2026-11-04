@@ -75,7 +75,7 @@ jobs:
       # available. Source builds also occur; renv Hash values are cache IDs,
       # not archive checksums. Both URLs must be in the same
       # repos vector (passing repos to restore() replaces the
-      # lockfile's recorded repositories; the four r-universe dev
+      # lockfile's recorded repositories; the four r-universe
       # entries record that repository ID), and every entry must be
       # NAMED: renv matches each package's lockfile Repository id to a
       # name in this vector, and the lockfile records the four
