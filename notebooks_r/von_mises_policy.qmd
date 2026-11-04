@@ -151,7 +151,7 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) {
 #| cell-id: "von-mises-policy-006"
 FIG_DIR <- file.path(repo_root, "figures", "von_mises_policy")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
-# Render headless PNGs with ragg; keep archival vector PDFs alongside them.
+# Render PNGs for inline display; keep vector PDFs alongside them.
 
 show_figure <- function(plot, name, width, height, res = 110) {
   file <- file.path(FIG_DIR, paste0(name, ".png"))
@@ -224,9 +224,7 @@ draw_vm <- function(mu, kappa) {
 
 ## Figure style
 
-Figures use portable sans text and the shared minimal theme. Each figure
-renders inline through the headless ragg PNG helper and saves a vector PDF
-under `figures/von_mises_policy/`. The generated directory is gitignored.
+Figures use the shared minimal theme. Each figure renders inline and saves a vector PDF under `figures/von_mises_policy/`.
 
 
 ## 1. The heading policy and its configuration

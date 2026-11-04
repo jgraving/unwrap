@@ -149,12 +149,9 @@ N_PREDICTIVE <- if (quick_run) 25L else 100L
 
 ## Figure style
 
-All figures render inline as headless ragg PNGs and save vector PDFs under
-`figures/locust_direction_mixture_model/`. Basenames match the Python twin,
-which uses `figures/locust/`. Colors retain orange for bimodal/vectorial,
-blue for unimodal/optic flow, and red for predictive model densities.
-Typography uses portable sans text. Line plots use monotone iteration or
-angle grids; XY tracks use explicit successive-point segments.
+Figures render inline and save vector PDFs under `figures/locust_direction_mixture_model/`.
+Colors match the Python twin: orange for bimodal/vectorial, blue for
+unimodal/optic flow, red for predictive model densities.
 
 
 ```{r}

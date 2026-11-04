@@ -91,11 +91,9 @@ FIG_DIR <- file.path(repo_root, "figures", "beetles")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 theme_set(theme_minimal(base_size = 12))
 
-# Headless R installs (like this one) ship with neither X11 nor
-# cairo, so the kernel's default device cannot rasterise plots. Render
-# each figure to PNG with ragg (self-contained; no system graphics
-# stack required) and display it inline; the vector PDFs remain the
-# archival copies.
+# Without X11/cairo (most server R installs) the default device cannot
+# rasterise, so each figure renders to a PNG through ragg and displays
+# inline; a vector PDF is saved alongside as the portable copy.
 show_figure <- function(plot, name, width, height, res = 110) {
   file <- file.path(FIG_DIR, paste0(name, ".png"))
   ragg::agg_png(file, width = width, height = height, units = "in",
@@ -135,8 +133,8 @@ c(R = as.character(getRversion()),
 ## Figure style
 
 Figures render inline and save vector PDFs under `figures/beetles/`.
-The condition colors match those of the Python analysis. Font selection uses the device's portable sans
-family. All angular calculations use radians and circular summaries.
+The condition colors match those of the Python analysis. All angular
+calculations use radians and circular summaries.
 
 
 ```{r}
@@ -813,4 +811,4 @@ convergence and warning-free execution require the full-budget local run.
 The [model guide](../models.md) and [circular GLMM guide](../math/glmms.md)
 explain the distinction between within-individual precision and
 between-individual alignment. Re-run all cells to record versions and
-regenerate the inline and archival figures.
+regenerate the inline and vector figures.

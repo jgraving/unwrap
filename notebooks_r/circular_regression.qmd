@@ -96,11 +96,9 @@ FIG_DIR <- file.path(repo_root, "figures", "circular_regression")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 theme_set(theme_minimal(base_size = 12))
 
-# Headless R installs (like this one) ship with neither X11 nor
-# cairo, so the kernel's default device cannot rasterise plots. Render
-# each figure to PNG with ragg (self-contained; no system graphics
-# stack required) and display it inline; the vector PDFs remain the
-# archival copies.
+# Without X11/cairo (most server R installs) the default device cannot
+# rasterise, so each figure renders to a PNG through ragg and displays
+# inline; a vector PDF is saved alongside as the portable copy.
 show_figure <- function(plot, name, width, height, res = 110) {
   file <- file.path(FIG_DIR, paste0(name, ".png"))
   ragg::agg_png(file, width = width, height = height, units = "in",
@@ -131,9 +129,7 @@ c(R = as.character(getRversion()),
 
 ## Figure style
 
-One figure style for every figure (the shared house convention): figures
-render inline and are saved as vector (PDF) files under
-`figures/circular_regression/` (gitignored).
+Figures render inline and are saved as vector (PDF) files under `figures/circular_regression/`.
 
 ## 1. Generate synthetic angular data
 

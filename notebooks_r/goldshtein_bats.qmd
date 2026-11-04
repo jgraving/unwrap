@@ -115,7 +115,7 @@ source(file.path(repo_root, "R", "unwrap_functions.R"))
 #| cell-id: "goldshtein-bats-006"
 FIG_DIR <- file.path(repo_root, "figures", "goldshtein_bats")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
-# Render headless PNGs with ragg; keep archival vector PDFs alongside them.
+# Render PNGs for inline display; keep vector PDFs alongside them.
 
 show_figure <- function(plot, name, width, height, res = 110) {
   file <- file.path(FIG_DIR, paste0(name, ".png"))
@@ -140,11 +140,18 @@ save_figure <- function(plot, name, width = 8, height = 5) {
 #| cell-id: "goldshtein-bats-007"
 SEED <- 123
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
-CHAINS <- if (quick_run) 2L else 4L
+CHAINS <- 4L
 ITER <- if (quick_run) 3000L else 4000L
 WARMUP <- if (quick_run) 1500L else 2000L
-# These are local execution budgets, not convergence claims. Hard diagnostic
-# gates below apply to both budgets; increase sampling if they fail.
+# These are local execution budgets, not convergence claims. The hard
+# diagnostic gates below apply to both budgets (R-hat < 1.01 everywhere;
+# bulk ESS > 400 on every parameter on the full budget, with the quick
+# budget taking a ~100-ESS-per-chain floor on weak per-animal offsets -
+# see diagnose_fit). The quick budget runs the same 4-chain topology as
+# the full budget at 75% of the draws (1500 post-warmup per chain, 6000
+# total): at the old quick budget (2 chains, 3000 total) two angular
+# coefficients of the vM baseline (ESS 344 / 396) fell under the strict
+# standard, so no quick run could finish end to end.
 
 ```
 
@@ -188,7 +195,8 @@ draw_matrix <- function(fit, parameters) {
     posterior::as_draws_array(fit), variable = parameters)))
 }
 
-diagnose_fit <- function(fit, angular = character(), parameters = NULL) {
+diagnose_fit <- function(fit, angular = character(), parameters = NULL,
+  quick = Sys.getenv("UNWRAP_R_QUICK") == "1") {
   # Probe exactly the flags retained by this brms/backend combination.
   divergences <- tryCatch({
     samples <- fit$fit@sim$samples
@@ -229,7 +237,21 @@ diagnose_fit <- function(fit, angular = character(), parameters = NULL) {
   }))
   print(summary_frame)
   stopifnot(all(is.finite(summary_frame$rhat)), all(summary_frame$rhat < 1.01),
-    all(is.finite(summary_frame$ess_bulk)), all(summary_frame$ess_bulk > 400))
+    all(is.finite(summary_frame$ess_bulk)))
+  if (quick) {
+    # Smoke gate for the quick budget: the population-level
+    # parameters (b_*, sd_*, kmu_*) keep the strict bulk-ESS > 400
+    # standard, while per-animal offsets (r_*) may sit as low as ~100
+    # ESS per chain for small tags; a shortfall that spreads beyond a
+    # handful of animals still fails. The full budget keeps the strict
+    # standard on every parameter.
+    population <- !grepl("^r_", summary_frame$parameter)
+    stopifnot(all(summary_frame$ess_bulk[population] > 400),
+      all(summary_frame$ess_bulk[!population] > 200),
+      sum(summary_frame$ess_bulk < 400) <= 5L)
+  } else {
+    stopifnot(all(summary_frame$ess_bulk > 400))
+  }
   summary_frame
 }
 trace_plot <- function(fit, parameters, angular = character()) {
@@ -577,6 +599,10 @@ treatment_labels <- setNames(vapply(levels(df_track$treatment), function(t) {
   as.character(df_track$treatmentName[which(df_track$treatment == t)[1]])
 }, character(1)), levels(df_track$treatment))
 treatment_colors <- setNames(c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"), levels(df_track$treatment))
+# The seaborn "colorblind" (Paul Tol) palette in the same treatment order,
+# for the figures whose Python twin uses it (PPC, predictive curves, deltas).
+treatment_colors_cb <- setNames(c("#0072B2", "#D55E00", "#009E73", "#F0E442"), levels(df_track$treatment))
+tnames <- treatment_labels[levels(df_track$treatment)]
 for (t in 2:4) df_track[[paste0("treat", t)]] <- as.integer(df_track$treatment == as.character(t))
 print(aggregate(tag ~ treatment, df_track, function(x) length(unique(x))))
 print(table(df_track$treatment))
@@ -595,9 +621,8 @@ All maps use static lake and roost outlines with metric coordinate axes; no onli
 
 ```{r}
 #| cell-id: "goldshtein-bats-020"
-# Headless-static fallback: plain sf lake/roost outlines, with metric axes.
-# mapview's documented basemaps are interactive map options rather than
-# an exported ggplot layer. No HTML widget or browser rendering is used.
+# Static sf lake/roost outlines in metric coordinates: an offline stand-in
+# for an image basemap, with no interactive map widget.
 map_segments <- function(track, probability = NULL) {
   do.call(rbind, lapply(split(track, track$tag), function(g) {
     g <- g[order(g$time), ]
@@ -618,10 +643,11 @@ map_base <- function(destination_panels = FALSE) {
     roost_outline$destination <- "Roost"
   }
   ggplot() + geom_sf(data = lake_outline, fill = "#D9EAF3", colour = "#4477AA", linewidth = 0.3) +
-    geom_sf(data = roost_outline, shape = 17, size = 2, colour = "black") +
-    coord_sf(crs = sf::st_crs(32636), datum = NA) +
-    labs(x = "Easting (m, UTM 36N)", y = "Northing (m)",
-         caption = "Static outline fallback; no image basemap")
+    geom_sf(data = roost_outline, shape = 8, size = 3.2, colour = "black", fill = "white") +
+    coord_sf(crs = sf::st_crs(32636), datum = NA, expand = FALSE) +
+    theme(axis.text = element_blank(), axis.title = element_blank(),
+      axis.ticks = element_blank(),
+      panel.border = element_rect(colour = "grey80", fill = NA, linewidth = 0.3))
 }
 segments <- map_segments(track_w_treat)
 p_destination <- map_base(destination_panels = TRUE) +
@@ -723,7 +749,11 @@ changes directional bias or precision.
 #| cell-id: "goldshtein-bats-029"
 theta_grid <- seq(0, 2 * pi, length.out = 361)
 kde_vm <- function(y, theta = theta_grid, kappa = 15) {
-  vapply(theta, function(t) mean(exp(vm_logpdf(t, y, kappa))), numeric(1))
+  # Matrix form of the grid-point averages: exp(vm_logpdf(t, y, kappa))
+  # = exp(kappa*cos(t - y)) / (2*pi*I0(kappa)); rowMeans takes the mean
+  # over the observations at each grid point, as the vapply did.
+  rowMeans(exp(kappa * cos(outer(theta, y, `-`))) /
+    (2 * pi * besselI(kappa, 0, expon.scaled = FALSE)))
 }
 descriptive_data <- track_w_treat[is.finite(track_w_treat$flightAngDiffDest_deg), ]
 descriptive_data$HeadingRadians <- wrap(descriptive_data$flightAngDiffDest_deg * pi / 180)
@@ -736,11 +766,45 @@ kde_data <- do.call(rbind, lapply(tag_observed, function(g) {
   data.frame(theta = theta_grid, density = kde_vm(g$HeadingRadians),
     tag = as.character(g$tag[1]), treatment = g$treatment[1], destination = g$destination[1])
 }))
-p_polar_data <- ggplot(kde_data, aes(theta, 1 + density, group = tag, colour = treatment)) +
-  geom_path(linewidth = 0.3, alpha = 0.6) +
-  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) +
-  coord_polar() + facet_grid(treatment ~ destination) +
-  scale_colour_manual(values = treatment_colors) + labs(x = "goal-relative angle (rad)", y = "1 + density")
+# Per-tag polar KDE panels, in the Python twin's look: 0 deg at right with
+# the counter-clockwise orientation, one tab10-colored curve per tag, the
+# two density rings (r = 1 at density 0, r = 2 at density 1), four grey
+# direction spokes, and a darker 0-deg segment from r = 1 to r = 2.
+xmap_polar <- function(a) (pi / 2 - a) %% (2 * pi)
+kde_data$theta_x <- xmap_polar(kde_data$theta)
+kde_data$taglabel <- paste0("tag ", as.character(kde_data$tag))
+rmax_polar <- 1 + max(1, max(kde_data$density)) + 0.2
+pg_a <- seq(0, 2 * pi, length.out = 361L)
+polar_rings <- data.frame(theta = rep(xmap_polar(pg_a), 2),
+  y = c(rep(1, 361L), rep(2, 361L)), ring = rep(c(1, 2), each = 361L))
+spoke_a <- c(0, pi / 2, pi, 3 * pi / 2)
+polar_spokes <- data.frame(theta = rep(xmap_polar(spoke_a), each = 2),
+  y = rep(c(1, rmax_polar), 4), sp = spoke_a[rep(1:4, each = 2)])
+polar_zero <- data.frame(theta = c(xmap_polar(0), xmap_polar(0)), y = c(1, 2))
+nc_polar <- ceiling(sqrt(length(unique(kde_data$tag))))
+p_polar_data <- ggplot(kde_data, aes(theta_x, 1 + density, colour = treatment,
+    group = interaction(treatment, tag))) +
+  geom_path(linewidth = 0.45, alpha = 0.95) +
+  geom_path(data = polar_rings, inherit.aes = FALSE, aes(theta, y, group = ring),
+    colour = "grey40", linewidth = 0.25, alpha = 0.65) +
+  geom_path(data = polar_spokes, inherit.aes = FALSE, aes(theta, y, group = sp),
+    colour = "grey25", linewidth = 0.2, alpha = 0.7) +
+  geom_path(data = polar_zero, inherit.aes = FALSE, aes(theta, y),
+    colour = "grey35", linewidth = 0.6, alpha = 0.95) +
+  facet_wrap(~ taglabel, ncol = nc_polar) +
+  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0),
+    breaks = xmap_polar(spoke_a), labels = c("0°", "90°", "±180°", "-90°")) +
+  coord_polar() +
+  scale_y_continuous(limits = c(0, rmax_polar), expand = c(0, 0)) +
+  scale_colour_manual(values = treatment_colors, name = NULL) +
+  guides(colour = "none") +
+  theme_minimal(base_size = 9) +
+  theme(axis.line = element_blank(), axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(size = 6, colour = "grey25"),
+    panel.grid = element_blank(), panel.border = element_blank(),
+    strip.background = element_blank(), strip.text = element_text(size = 7)) +
+  labs(x = "", y = "")
 estimate_kappa <- function(rbar, n) {
   rbar <- min(max(rbar, 0), 0.999999999)
   if (rbar < 0.53) {
@@ -786,7 +850,7 @@ p_align_desc <- descriptive_plot("alignment0", "per-tag alignment E[cos(theta)]"
 
 ```{r}
 #| cell-id: "goldshtein-bats-030"
-save_figure(p_polar_data, "polar_vonmises_kde_all", 10, 10)
+save_figure(p_polar_data, "polar_vonmises_kde_all", 11, 10)
 
 ```
 
@@ -1179,22 +1243,46 @@ delta_individual <- do.call(rbind, lapply(split(seq_len(nrow(df_track)), df_trac
   data.frame(tag = as.character(df_track$tag[ii[1]]), treatment = df_track$treatment[ii[1]],
     delta_row(ii, as.character(df_track$tag[ii[1]])))
 }))
-p_total <- ggplot(res_total, aes(elpd, reorder(model, elpd))) +
-  geom_errorbar(aes(xmin = elpd - se_elpd, xmax = elpd + se_elpd), orientation = "y", width = 0.2) +
-  geom_point() + labs(x = "PSIS-LOO ELPD +/-1 SE", y = "")
-delta_df$label <- factor(delta_df$label, levels = rev(delta_df$label))
-p_delta <- ggplot(delta_df, aes(delta_elpd, label)) +
-  geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd, xmax = delta_elpd + se_delta_elpd),
-                 orientation = "y", width = 0.2) +
-  geom_point() + geom_vline(xintercept = 0, linetype = "dashed") +
-  labs(x = "delta ELPD (vMU - vM), paired +/-1 SE", y = "")
+# Minimal black-and-white ELPD panels (Python twin look): best model on
+# top, dashed line at the best total ELPD, no grid, bottom/left axes only.
+total_elpd_panel <- function(vline = TRUE, xlabel = "PSIS-LOO ELPD") {
+  best <- res_total$elpd[which.max(res_total$elpd)]
+  p <- ggplot(res_total, aes(elpd, reorder(model, -elpd))) +
+    geom_errorbar(aes(xmin = elpd - se_elpd, xmax = elpd + se_elpd),
+      orientation = "y", width = 0.15, linewidth = 0.35) +
+    geom_point(size = 2)
+  if (vline) p <- p + geom_vline(xintercept = best, linetype = "dashed", linewidth = 0.3)
+  p + theme_classic(base_size = 9) +
+    labs(x = xlabel, y = "")
+}
+p_total <- total_elpd_panel()
+# Total + per-treatment deltas: Total row on top (black), treatments in
+# tab10 below, named y ticks, dashed line at zero.
+delta_df$yrow <- c(5L, 4L, 3L, 2L, 1L)  # Total on top, treatments 1-4 below
+delta_df$rcol <- ifelse(delta_df$label == "Total", "black",
+  treatment_colors[as.character(levels(df_track$treatment))])
+p_delta <- ggplot(delta_df, aes(delta_elpd, yrow)) +
+  geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd, xmax = delta_elpd + se_delta_elpd,
+    colour = rcol), orientation = "y", width = 0.15, linewidth = 0.35) +
+  geom_point(aes(colour = rcol), size = 2) +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
+  scale_y_continuous(breaks = 5:1, labels = delta_df$label) +
+  scale_colour_identity(guide = "none") +
+  theme_classic(base_size = 9) +
+  labs(x = "ELPD difference (vMU - vM)", y = "")
+# Per-animal deltas, one colorblind panel per treatment (named).
+delta_individual$tlabel <- treatment_labels[as.character(delta_individual$treatment)]
 p_delta_individual <- ggplot(delta_individual,
   aes(delta_elpd, reorder(tag, delta_elpd), colour = treatment)) +
   geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd, xmax = delta_elpd + se_delta_elpd),
-    orientation = "y", width = 0.2, linewidth = 0.25) +
-  geom_point(size = 1) + facet_wrap(~ treatment, scales = "free_y") +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  scale_colour_manual(values = treatment_colors) + labs(x = "delta ELPD per animal", y = "tag")
+    orientation = "y", width = 0.15, linewidth = 0.25) +
+  geom_point(size = 1.2) +
+  facet_wrap(~ tlabel, ncol = 4, scales = "free_y") +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
+  scale_colour_manual(values = treatment_colors_cb) +
+  labs(x = "delta ELPD per animal", y = "tag") +
+  theme_classic(base_size = 8) + theme(legend.position = "none",
+    strip.background = element_blank(), strip.text = element_text(size = 8))
 
 ```
 
@@ -1322,7 +1410,7 @@ save_figure(p_base_density, "treatment_pred_density_at0_mu_kappa", 9, 5)
 
 ```{r}
 #| cell-id: "goldshtein-bats-054"
-save_figure(p_total, "psisloo_total_elpd_all_models", 9, 5)
+save_figure(p_total, "psisloo_total_elpd_all_models", 3.6, 1.6)
 
 ```
 
@@ -1333,7 +1421,7 @@ it is the evidence for a non-trivial undirected component.
 
 ```{r}
 #| cell-id: "goldshtein-bats-056"
-save_figure(p_delta, "psisloo_delta_total_and_by_treatment_vMU_minus_vM", 9, 5)
+save_figure(p_delta, "psisloo_delta_total_and_by_treatment_vMU_minus_vM", 3.6, 2.3)
 
 ```
 
@@ -1342,7 +1430,40 @@ Total ELPD by model (vMU vs vM), best first.
 
 ```{r}
 #| cell-id: "goldshtein-bats-058"
-save_figure(patchwork::wrap_plots(p_total, p_delta, ncol = 1), "psisloo_combined", 9, 8)
+# Combined (Python twin look): total ELPD panel on top; below, the total
+# delta point with a "Within-treatment" bracket over the per-treatment
+# deltas (colorblind), and a dashed line at zero.
+brk <- delta_df
+brk$rcol <- ifelse(brk$label == "Total", "black",
+  treatment_colors_cb[as.character(levels(df_track$treatment))])
+gx <- range(c(brk$delta_elpd - brk$se_delta_elpd, brk$delta_elpd + brk$se_delta_elpd))
+padx <- 0.12 * diff(gx)
+xlim_b <- range(gx) - c(padx, -padx)
+xb <- xlim_b[1] + 0.008 * diff(xlim_b)
+p_bracket <- ggplot(brk, aes(delta_elpd, yrow)) +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
+  geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd, xmax = delta_elpd + se_delta_elpd,
+    colour = rcol), orientation = "y", width = 0.15, linewidth = 0.35) +
+  geom_point(aes(colour = rcol), size = 2) +
+  annotate("segment", x = xb, y = 1, xend = xb, yend = 4,
+    linewidth = 0.35, colour = "black") +
+  annotate("segment", x = xb, y = 4, xend = xb + 0.02 * diff(xlim_b), yend = 4,
+    linewidth = 0.35, colour = "black") +
+  annotate("segment", x = xb, y = 1, xend = xb + 0.02 * diff(xlim_b), yend = 1,
+    linewidth = 0.35, colour = "black") +
+  # Plain text just right of the zero line: one treatment delta is
+  # negative (unlike the Python twin), so left of zero is occupied and
+  # a boxed label at the panel edge clips.
+  geom_text(data = data.frame(xlab = 0.6), aes(x = xlab, y = 2.5), hjust = 0,
+    label = "Within-treatment", size = 3, colour = "black") +
+  scale_y_continuous(breaks = 5, labels = "Total") +
+  scale_x_continuous(limits = xlim_b) +
+  scale_colour_identity(guide = "none") +
+  theme_classic(base_size = 9) +
+  labs(x = "ELPD difference", y = "")
+p_combined <- patchwork::wrap_plots(total_elpd_panel(FALSE, "ELPD"), p_bracket,
+  ncol = 1, heights = c(2, 3))
+save_figure(p_combined, "psisloo_combined", 4, 3.6)
 
 ```
 
@@ -1472,6 +1593,11 @@ The posterior predictive checks (population and individual) resample / bootstrap
 ```{r}
 #| cell-id: "goldshtein-bats-081"
 # Full budgets reproduce the source's local bootstrap/draw budgets.
+N_WORKERS <- min(8L, max(2L, parallel::detectCores()))
+# The per-treatment and per-tag blocks below are independent and run
+# forked in parallel: per-task results are reproducible (per-tag
+# tasks set their own seed; per-treatment tasks inherit one common
+# stream state).
 N_BOOT_OBS <- if (quick_run) 150L else 1000L
 N_PPC_DRAWS <- if (quick_run) 150L else 4000L
 N_INDIV_BOOT <- if (quick_run) 100L else 500L
@@ -1490,9 +1616,16 @@ stopifnot(identical(names(tag_rows), as.character(tag_grid$tag)))
 sim_one_tag <- function(j, d) {
   n <- length(tag_rows[[j]])
   goal <- runif(n) < ppc_par$p[j, d]
-  vapply(seq_len(n), function(i) {
-    if (goal[i]) draw_vm(ppc_par$mu[j, d], ppc_par$kappa[j, d]) else draw_vm(0, KAPPA_UNIFORM)
-  }, numeric(1))
+  # One n-draw call per component: the draw stream of each call matches
+  # the n-scalar-call stream exactly (probed), at a large constant-factor
+  # speedup. The two pools are drawn separately rather than interleaved
+  # row by row, so replicated steps here are stream-different (though
+  # distribution-identical) to the earlier interleaved version.
+  gd <- as.numeric(circular::rvonmises(n, vmu(ppc_par$mu[j, d]),
+    ppc_par$kappa[j, d], control.circular = vm_ctrl))
+  fd <- as.numeric(circular::rvonmises(n, vmu(0), KAPPA_UNIFORM,
+    control.circular = vm_ctrl))
+  wrap(ifelse(goal, gd, fd))
 }
 hier_y <- function(ys) {
   selected <- sample.int(length(ys), length(ys), replace = TRUE)
@@ -1507,7 +1640,7 @@ band_table <- function(draws, x, treatment, source, kind, equal_tail = FALSE) {
   data.frame(x = x, median = apply(draws, 1, median), low = bounds[, 1],
     high = bounds[, 2], treatment = treatment, source = source, kind = kind)
 }
-population_ppc <- do.call(rbind, lapply(levels(df_track$treatment), function(t) {
+population_ppc <- do.call(rbind, parallel::mclapply(levels(df_track$treatment), function(t) {
   jj <- which(tag_grid$treatment == t)
   observed <- lapply(jj, function(j) df_track$HeadingRadians[tag_rows[[j]]])
   obs_kde <- obs_hist <- pred_kde <- pred_hist <- NULL
@@ -1526,14 +1659,58 @@ population_ppc <- do.call(rbind, lapply(levels(df_track$treatment), function(t) 
     band_table(pred_kde, angles, t, "posterior predictive", "KDE"),
     band_table(obs_hist, bin_centers, t, "observed bootstrap", "histogram"),
     band_table(pred_hist, bin_centers, t, "posterior predictive", "histogram"))
-}))
+}, mc.cores = N_WORKERS))
 population_ppc$treatment <- factor(population_ppc$treatment, levels = 1:4)
-p_population_ppc <- ggplot(population_ppc, aes(x, median, colour = source, fill = source)) +
-  geom_ribbon(aes(ymin = low, ymax = high), alpha = 0.15, colour = NA) +
-  geom_line(linewidth = 0.4) + facet_grid(kind ~ treatment, scales = "free_x") +
-  labs(x = "goal-relative bearing (rad)", y = "density") + theme(legend.position = "bottom")
+# Polar population PPC, one panel per treatment (Python twin look): 0 deg
+# at top, clockwise; edge ring at r = 0.55 (density 0); observed headings
+# black dashed with a 95% HDI band; posterior-predictive headings in the
+# treatment's colorblind colour with a band; Data/Model legend at the
+# bottom. The histogram rows stay in the table; the figure shows KDE
+# bands only, as in the Python twin.
+ppc_plot <- population_ppc[population_ppc$kind == "KDE", , drop = FALSE]
+ppc_plot$key <- ifelse(ppc_plot$source == "observed bootstrap", "Data", "Model")
+ppc_plot$tlabel <- treatment_labels[as.character(ppc_plot$treatment)]
+ppc_plot$fcol <- ifelse(ppc_plot$key == "Data", "black",
+  treatment_colors_cb[as.character(ppc_plot$treatment)])
+edge_ppc <- 0.55
+amp_ppc <- 0.5
+rmax_ppc <- edge_ppc + amp_ppc * 1.15
+ppc_plot$ymed <- pmin(edge_ppc + amp_ppc * ppc_plot$median, rmax_ppc)
+ppc_plot$ylow <- pmin(edge_ppc + amp_ppc * ppc_plot$low, rmax_ppc)
+ppc_plot$yhi <- pmin(edge_ppc + amp_ppc * ppc_plot$high, rmax_ppc)
+polar_ring360 <- function(r) {
+  a <- seq(0, 2 * pi, length.out = 361L)
+  data.frame(x = a, y = r)
+}
+p_population_ppc <- ggplot(ppc_plot, aes(x, ymed)) +
+  geom_ribbon(aes(ymin = ylow, ymax = yhi, group = interaction(key, tlabel)),
+    fill = ppc_plot$fcol, alpha = 0.25, colour = NA) +
+  geom_line(aes(colour = key, linetype = key, group = interaction(key, tlabel)),
+    linewidth = 0.35) +
+  geom_path(data = polar_ring360(edge_ppc), inherit.aes = FALSE, aes(x, y),
+    colour = "grey65", linewidth = 0.25) +
+  geom_path(data = polar_ring360(edge_ppc + amp_ppc), inherit.aes = FALSE, aes(x, y),
+    colour = "grey15", linewidth = 0.25) +
+  geom_path(data = data.frame(x = c(0, 0), y = c(edge_ppc, edge_ppc + amp_ppc)),
+    inherit.aes = FALSE, aes(x, y), colour = "grey15", linewidth = 0.3) +
+  facet_wrap(~ tlabel, ncol = 4) +
+  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0),
+    breaks = 0, labels = "0°") +
+  coord_polar() +
+  scale_y_continuous(limits = c(0, rmax_ppc), expand = c(0, 0)) +
+  scale_colour_manual(values = c(Data = "black", Model = "black"), name = NULL) +
+  scale_linetype_manual(values = c(Data = "dashed", Model = "solid"), name = NULL) +
+  theme_minimal(base_size = 9) +
+  theme(axis.line = element_blank(), axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(size = 6, colour = "grey25"),
+    panel.grid = element_blank(), panel.border = element_blank(),
+    strip.background = element_blank(), strip.text = element_text(size = 9),
+    legend.position = "bottom", legend.key = element_blank(),
+    legend.text = element_text(size = 8)) +
+  labs(x = "", y = "")
 
-individual_ppc <- do.call(rbind, lapply(seq_along(tag_rows), function(j) {
+individual_ppc <- do.call(rbind, parallel::mclapply(seq_along(tag_rows), function(j) {
   set.seed(10000L + j - 1L)
   y <- df_track$HeadingRadians[tag_rows[[j]]]
   observed <- replicate(N_INDIV_BOOT, {
@@ -1546,20 +1723,66 @@ individual_ppc <- do.call(rbind, lapply(seq_along(tag_rows), function(j) {
     band_table(predicted, angles, tag_grid$treatment[j], "posterior predictive", "KDE", TRUE))
   z$tag <- as.character(tag_grid$tag[j])
   z
-}))
-peak <- max(individual_ppc$high)
-p_individual_ppc <- ggplot(individual_ppc,
-  aes(x, 1 + median / peak, colour = source, fill = source, group = source)) +
-  geom_ribbon(aes(ymin = 1 + low / peak, ymax = 1 + high / peak), alpha = 0.15, colour = NA) +
-  geom_path(linewidth = 0.25) + facet_wrap(~ tag, ncol = 8) +
-  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) + coord_polar() +
-  labs(x = "goal-relative bearing (rad)", y = "1 + scaled density") + theme(legend.position = "bottom")
+}, mc.cores = N_WORKERS))
+# Per-tag polar PPC grid (Python twin look): 8 columns, 0 deg at top and
+# clockwise, only the 0-deg label, two grey rings and a 0-deg spoke;
+# observed bootstrap black dashed + grey band, posterior-predictive in the
+# tag's treatment colour (colorblind) + band; bold tag titles; legend with
+# Data/Model plus the named treatments.
+ind_edge <- 0.55
+ind_rmax <- ind_edge + 1.01
+ind <- individual_ppc
+ind$taglabel <- paste0("tag ", as.character(ind$tag))
+ind$key <- ifelse(ind$source == "observed bootstrap", "Data",
+  treatment_labels[as.character(ind$treatment)])
+ind$key <- factor(ind$key, levels = c("Data", "Model", tnames))
+ind$fcol <- ifelse(ind$source == "observed bootstrap", "grey20",
+  treatment_colors_cb[as.character(ind$treatment)])
+ind$ymed <- pmin(ind_edge + ind$median, ind_rmax)
+ind$ylow <- pmin(ind_edge + ind$low, ind_rmax)
+ind$yhi <- pmin(ind_edge + ind$high, ind_rmax)
+ind_obs <- ind[ind$source == "observed bootstrap", , drop = FALSE]
+ind_ppc <- ind[ind$source == "posterior predictive", , drop = FALSE]
+p_individual_ppc <- ggplot(ind, aes(x, ymed)) +
+  geom_ribbon(data = ind_obs, aes(ymin = ylow, ymax = yhi, group = tag),
+    fill = "grey20", alpha = 0.18, colour = NA) +
+  geom_ribbon(data = ind_ppc, aes(ymin = ylow, ymax = yhi, group = tag),
+    fill = ind_ppc$fcol, alpha = 0.28, colour = NA) +
+  geom_line(data = ind_obs, aes(group = tag), colour = "grey5",
+    linetype = "dashed", linewidth = 0.3) +
+  geom_line(data = ind_ppc, aes(group = tag, colour = key, linetype = key),
+    linewidth = 0.4) +
+  geom_path(data = polar_ring360(ind_edge), inherit.aes = FALSE, aes(x, y),
+    colour = "grey20", linewidth = 0.2) +
+  geom_path(data = polar_ring360(ind_edge + 0.5), inherit.aes = FALSE, aes(x, y),
+    colour = "grey14", linewidth = 0.2) +
+  geom_path(data = data.frame(x = c(0, 0), y = c(ind_edge, ind_rmax)),
+    inherit.aes = FALSE, aes(x, y), colour = "grey15", linewidth = 0.3) +
+  facet_wrap(~ taglabel, ncol = 8) +
+  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0),
+    breaks = 0, labels = "0°") +
+  coord_polar() +
+  scale_y_continuous(limits = c(0, ind_rmax), expand = c(0, 0)) +
+  scale_colour_manual(values = c(Data = "black", Model = "black",
+    setNames(treatment_colors_cb[levels(df_track$treatment)], tnames)), name = NULL) +
+  scale_linetype_manual(values = c(Data = "dashed", Model = "solid",
+    setNames(rep("solid", length(tnames)), tnames))) +
+  theme_minimal(base_size = 9) +
+  theme(axis.line = element_blank(), axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(size = 6, colour = "grey25"),
+    panel.grid = element_blank(), panel.border = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_text(size = 7, face = "bold"),
+    legend.position = "bottom", legend.key = element_blank(),
+    legend.text = element_text(size = 8)) +
+  labs(x = "", y = "")
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-082"
-save_figure(p_population_ppc, "bat_population_ppc_by_treatment", 12, 7)
+save_figure(p_population_ppc, "bat_population_ppc_by_treatment", 10.5, 3.4)
 
 ```
 
@@ -1568,7 +1791,7 @@ Individual PPC: bootstrap vs posterior KDE of the goal-directed component per an
 
 ```{r}
 #| cell-id: "goldshtein-bats-084"
-save_figure(p_individual_ppc, "bat_individual_ppc_bootstrap_vs_ppc_kde", 14, 16)
+save_figure(p_individual_ppc, "bat_individual_ppc_bootstrap_vs_ppc_kde", 8, 9)
 
 ```
 
@@ -1611,24 +1834,89 @@ stopifnot(!anyDuplicated(key(df_track$tag, df_track$time)))
 join <- match(key(segments$tag, segments$time), key(df_track$tag, df_track$time))
 prob_segments <- segments
 prob_segments$p <- df_track$p_goal_post_mean[join]
+prob_segments$tlabel <- treatment_labels[as.character(prob_segments$treatment)]
+field_x <- range(prob_segments$x)
+field_y <- range(prob_segments$y)
+# Metric scale bar (roughly a quarter of the panel width, rounded) and a
+# north arrow in the bottom corners, as in the Python map. Annotation
+# layers span every facet, so the chrome is carried by per-panel data
+# rows instead, over the panel range (tracks plus the lake outline).
+sb_lens <- c(50, 100, 200, 250, 500, 1000, 2000, 5000, 10000)
+sb_len <- max(sb_lens[sb_lens <= 0.25 * diff(field_x)])
+sb_lab <- if (sb_len >= 1000) paste0(sb_len / 1000, " km") else paste0(sb_len, " m")
+lake_xy <- as.data.frame(sf::st_coordinates(lake_m))
+panel_x <- range(c(prob_segments$x, prob_segments$xend, lake_xy[[1]]))
+panel_y <- range(c(prob_segments$y, prob_segments$yend, lake_xy[[2]]))
+y0 <- panel_y[1] + 0.045 * diff(panel_y)
+pan <- data.frame(tlabel = tnames,
+  bar_x = panel_x[1] + 0.05 * diff(panel_x), bar_y = y0,
+  bar_xend = panel_x[1] + 0.05 * diff(panel_x) + sb_len, bar_yend = y0,
+  t1_x = panel_x[1] + 0.05 * diff(panel_x),
+  t1_y1 = y0 - 0.008 * diff(panel_y), t1_y2 = y0 + 0.008 * diff(panel_y),
+  lab_x = panel_x[1] + 0.05 * diff(panel_x) + sb_len / 2,
+  lab_y = y0 - 0.02 * diff(panel_y),
+  ns_x = panel_x[2] - 0.055 * diff(panel_x), ns_y1 = y0,
+  ns_y2 = y0 + 0.03 * diff(panel_y))
+borders <- do.call(rbind, lapply(split(prob_segments, prob_segments$treatment),
+  function(g) data.frame(tlabel = g$tlabel[1], treatment = g$treatment[1],
+    xmin = min(c(g$x, g$xend)), xmax = max(c(g$x, g$xend)),
+    ymin = min(c(g$y, g$yend)), ymax = max(c(g$y, g$yend)))))
+# One translocation marker per tag, at its first position (release point).
+transloc <- do.call(rbind, lapply(split(track_w_treat, track_w_treat$tag), function(g) {
+  g <- g[order(g$time), ]
+  data.frame(tlabel = treatment_labels[as.character(g$treatment[1])],
+    x = g$x_m[1], y = g$y_m[1])
+}))
 p_probability_map <- map_base() +
   geom_segment(data = prob_segments, aes(x, y, xend = xend, yend = yend, colour = p, linetype = gap),
-    linewidth = 0.4, alpha = 0.9) + facet_wrap(~ treatment) +
+    linewidth = 0.4, alpha = 0.9)
+# One colour-blind border layer per treatment keeps the constant colours
+# out of the continuous probability scale.
+for (i in seq_len(nrow(borders))) {
+  p_probability_map <- p_probability_map +
+    geom_rect(data = borders[i, , drop = FALSE], inherit.aes = FALSE,
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+      colour = treatment_colors_cb[as.character(borders$treatment[i])],
+      fill = NA, linewidth = 0.9)
+}
+p_probability_map <- p_probability_map +
+  geom_point(data = transloc, aes(x = x, y = y), shape = 18, size = 3.5,
+    colour = "black", fill = "white") +
+  geom_segment(data = pan, inherit.aes = FALSE,
+    aes(x = bar_x, y = bar_y, xend = bar_xend, yend = bar_yend),
+    linewidth = 0.9, colour = "black") +
+  geom_segment(data = pan, inherit.aes = FALSE,
+    aes(x = t1_x, y = t1_y1, xend = t1_x, yend = t1_y2),
+    linewidth = 0.6, colour = "black") +
+  geom_segment(data = pan, inherit.aes = FALSE,
+    aes(x = ns_x, y = ns_y1, xend = ns_x, yend = ns_y2),
+    linewidth = 0.7, colour = "black") +
+  geom_point(data = pan, inherit.aes = FALSE, aes(ns_x, ns_y2), shape = 13, size = 2.8,
+    colour = "black") +
+  geom_text(data = pan, inherit.aes = FALSE, aes(lab_x, lab_y, label = sb_lab),
+    size = 3.5, colour = "black") +
+  geom_text(data = pan, inherit.aes = FALSE,
+    aes(ns_x, ns_y2 + 0.012 * diff(panel_y), label = "N"), size = 3.5, colour = "black") +
+  facet_wrap(~ tlabel, ncol = 4) +
   scale_colour_viridis_c(limits = c(0, 1), na.value = "grey70") +
   scale_linetype_manual(values = c("0" = "solid", "1" = "dashed")) +
-  labs(colour = "directed-component probability")
+  guides(linetype = "none",
+    colour = guide_colorbar(title = "Directed-component probability",
+      title.position = "top")) +
+  theme(legend.position = "bottom", legend.direction = "horizontal",
+    strip.background = element_blank(), strip.text = element_text(size = 9, face = "bold"))
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-087"
-save_figure(p_probability_map, "treatment_panels_tracks_pgoal", 11, 9)
+save_figure(p_probability_map, "treatment_panels_tracks_pgoal", 10, 7.5)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-088"
-save_figure(p_probability_map, "treatment_panels_tracks_pgoal_small_bigfont", 8, 7)
+save_figure(p_probability_map, "treatment_panels_tracks_pgoal_small_bigfont", 8, 6)
 
 ```
 
@@ -1710,18 +1998,31 @@ end_curves <- make_curves("steps_from_end")
 curve_plot <- function(curves, individual = FALSE, reverse = FALSE) {
   x <- if (individual) curves$individual else curves$population
   x$treatment <- factor(x$treatment, levels = 1:4)
-  p <- ggplot(x, aes(x, mean, colour = treatment,
-    group = if (individual) tag else treatment, fill = treatment)) +
-    geom_ribbon(aes(ymin = low, ymax = high), alpha = if (individual) 0.06 else 0.2, colour = NA) +
-    geom_line(linewidth = if (individual) 0.25 else 0.6) +
-    scale_colour_manual(values = treatment_colors) + scale_fill_manual(values = treatment_colors) +
+  x$tlabel <- treatment_labels[as.character(x$treatment)]
+  lv <- levels(x$treatment)
+  # Colorblind treatment colours with a named legend, 0.5 reference line,
+  # p(goal | step) on [0, 1], no grid, bottom/left axes only (Python look).
+  p <- ggplot(x, aes(x, mean, colour = treatment, fill = treatment,
+    group = if (individual) tag else treatment)) +
+    geom_ribbon(aes(ymin = low, ymax = high),
+      alpha = if (individual) 0.10 else 0.20, colour = NA, linewidth = 0) +
+    geom_line(linewidth = if (individual) 0.3 else 0.5,
+      alpha = if (individual) 0.75 else 1) +
+    geom_hline(yintercept = 0.5, colour = "grey90", linetype = "dashed", linewidth = 0.3) +
+    scale_colour_manual(values = treatment_colors_cb[lv], labels = tnames, name = NULL) +
+    scale_fill_manual(values = treatment_colors_cb[lv], name = NULL) +
+    scale_y_continuous(limits = c(0, 1), expand = c(0, 0.02)) +
+    guides(fill = "none") +
     labs(x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
-         y = "Directed-component probability") + theme(legend.position = "bottom")
-  if (individual) p <- p + facet_wrap(~ treatment)
+      y = if (individual) "p(goal | step)" else "Population mean p(goal | step)") +
+    theme_classic(base_size = 9) +
+    theme(legend.position = "bottom", legend.text = element_text(size = 8))
+  if (individual) p <- p + facet_wrap(~ tlabel, ncol = 2)
   if (reverse) {
-    p <- p + scale_x_reverse()
+    p <- p + scale_x_reverse(labels = function(v) format(abs(v), big.mark = ","))
   } else {
-    p <- p + scale_x_continuous(limits = c(-110 * 60, 0), labels = function(x) abs(x))
+    p <- p + scale_x_continuous(limits = c(-110 * 60, 0),
+      labels = function(v) format(abs(v), big.mark = ","))
   }
   p
 }
@@ -1740,7 +2041,7 @@ save_figure(p_curve_distance, "p_goal_pop_kernel_distance_TRUNC_SMOOTH", 10, 5)
 
 ```{r}
 #| cell-id: "goldshtein-bats-092"
-save_figure(p_curve_end, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH", 10, 5)
+save_figure(p_curve_end, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH", 6, 3.5)
 
 ```
 

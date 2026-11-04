@@ -96,7 +96,7 @@ source(file.path(repo_root, "R", "unwrap_functions.R"))
 #| cell-id: "periodic-not-circular-006"
 FIG_DIR <- file.path(repo_root, "figures", "periodic_not_circular")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
-# Render headless PNGs with ragg; keep archival vector PDFs alongside them.
+# Render PNGs for inline display; keep vector PDFs alongside them.
 
 show_figure <- function(plot, name, width, height, res = 110) {
   file <- file.path(FIG_DIR, paste0(name, ".png"))
@@ -232,9 +232,7 @@ trace_plot <- function(fit, parameters, angular = character()) {
 
 ## Figure style
 
-Figures use portable sans text and the shared minimal theme. Each figure
-renders inline through the headless ragg PNG helper and saves a vector PDF
-under `figures/periodic_not_circular/`. The generated directory is gitignored.
+Figures use the shared minimal theme. Each figure renders inline and saves a vector PDF under `figures/periodic_not_circular/`.
 
 
 ## 1. Simulate the 24-hour rhythm
