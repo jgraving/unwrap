@@ -96,8 +96,8 @@ test (see the [development](development.md) page):
 UNWRAP_TEST_NOTEBOOKS=1 uv run --no-project python -m pytest tests/test_notebooks.py -v
 ```
 
-Set `UNWRAP_R_QUICK=1` for the short two-chain smoke budget; unset it
-for full sampling. The grouped models use longer adaptation and
+Set `UNWRAP_R_QUICK=1` for the short smoke budget (reduced draws); unset
+it for full sampling. The grouped models use longer adaptation and
 retained-draw budgets than the introductory GLM in both modes, and
 always keep the full datasets and model structures. Review R-hat, bulk
 ESS, the divergence report, and predictive checks before interpreting
