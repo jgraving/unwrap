@@ -36,6 +36,25 @@ NEW_SHOW_TAIL = (
     "  plot\n"
 )
 
+# Native-R figures must not depend on Cairo SVG: headless R builds (the kind
+# people fit models on with a bare R install) often lack it. ragg is already
+# in the pinned environment — the Jupyter notebooks use ragg::agg_png for the
+# same reason — so Quarto's figure device is pointed at it.
+DEVICE_CHUNK = [
+    "```{r}",
+    "#| label: figure-device",
+    "#| dev: ragg_png",
+    "#| echo: false",
+    "#| warning: false",
+    "# The Jupyter notebook shows inline figures through IRdisplay; native R",
+    "# has no such channel, so Quarto captures the returned plot objects",
+    "# itself. The device is ragg (headless-safe) rather than the Cairo SVG",
+    "# default, which many headless R builds lack entirely.",
+    'knitr::opts_chunk$set(dev = "ragg_png")',
+    "```",
+    "",
+]
+
 
 def markdown_title(md_text, fallback):
     m = re.search(r"^#\s+(.+)$", md_text, flags=re.MULTILINE)
@@ -59,6 +78,7 @@ def convert(nb_path: Path) -> str:
         "> Runs in RStudio/Quarto with plain R (no Jupyter kernel required).",
         "",
     ]
+    lines += DEVICE_CHUNK
     for cell in nb["cells"]:
         src = "".join(cell["source"])
         if cell.get("cell_type") == "markdown":
