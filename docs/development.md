@@ -57,6 +57,18 @@ tarballs carry version-pinned checksums in the lockfile; after changing
 pinned versions, re-verify a fresh `renv::restore()` from the updated
 lockfile in a clean project.
 
+The install one-liner on the [R setup](getting-started-r.md) page and
+the environment check job in `.github/workflows/r-env.yml` both pin the
+restore to a dated [RSPM](https://packagemanager.posit.co/cran) CRAN
+snapshot (a frozen mirror of CRAN dated when the lockfile was cut), so
+the prebuilt-binary versions match the lockfile exactly. When you update
+`renv.lock`, update that snapshot date in **both** places to the date of
+the new lockfile:
+
+```bash
+grep -rn "packagemanager.posit.co/cran/" docs/getting-started-r.md .github/workflows/r-env.yml
+```
+
 The Quarto twins `notebooks_r/*.qmd` are generated from the `.ipynb`
 source of truth. After any R notebook change, regenerate and commit
 them:

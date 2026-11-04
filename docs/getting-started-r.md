@@ -22,16 +22,21 @@ records R 4.5.3.
 
 ### 1. System packages (the only OS-specific step)
 
-A few of the pinned R packages link against native libraries, so the
-machine needs those libraries plus a working compiler toolchain
-(C/C++, and Fortran where source compilation happens).
+The pinned R packages link against a handful of native libraries
+(GDAL/PROJ/GEOS for `sf`, freetype/fontconfig for `ragg`, ICU for
+`stringi`, libuv for `fs`, zmq for the Jupyter R kernel). On Linux and
+Windows the restore in step 2 uses **prebuilt binaries**, so these are
+runtime libraries (the `-dev` headers are only needed if a package ever
+builds from source). On macOS the compiled packages build from source,
+so they are build dependencies.
 
 **Linux (Ubuntu/Debian):**
 
 ```bash
 sudo apt-get install -y build-essential gfortran \
   libgdal-dev libproj-dev libgeos-dev libudunits2-dev \
-  libfreetype-dev libfontconfig1-dev libpng-dev libicu-dev libuv1-dev
+  libfreetype-dev libfontconfig1-dev libpng-dev libicu-dev \
+  libuv1-dev libzmq3-dev
 ```
 
 **macOS** (Homebrew; `r` installs R itself):
@@ -53,21 +58,29 @@ or in R: `install.packages("rtools40"); rtools40::install_rtools()`).
 From the **repository root**, in a terminal:
 
 ```bash
-Rscript -e 'install.packages("renv", repos = "https://cloud.r-project.org"); renv::restore(); renv::activate()'
+Rscript -e 'install.packages("renv", repos = c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03")); renv::restore(repos = c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03")); renv::activate()'
 ```
 
 - `renv::restore()` installs the 133 pinned packages — the rest of the
   stack from CRAN, and `cmdstanr`, `loo`, `bayesplot`, and `posterior`
   from the Stan team's `stan-dev.r-universe.dev` — into a project-local
   library under `renv/`; every source tarball is SHA-256 checked
-  against the lockfile. On Windows this is a fast, binaries-only
-  download. On macOS and Linux the compiled packages build from CRAN
-  source: allow roughly 20–60 minutes on a typical laptop for the
-  first run; later re-runs are fast.
+  against the lockfile. The repository URL is Posit's free **RSPM**
+  mirror of CRAN, pinned to a snapshot verified to carry prebuilt
+  binaries for exactly the locked versions: on Linux and Windows that
+  makes the restore a download-only, compile-free install (a few
+  minutes). On macOS there is no free binary source, so
+  the compiled packages build from CRAN source — allow roughly 20–60
+  minutes on a typical laptop for the first run; later re-runs are fast
+  everywhere.
 - `renv::activate()` writes a machine-local `.Rprofile` (gitignored)
   that puts any R session started in the repository — including the
   Jupyter R kernel — on that project library. RStudio also activates
   the project automatically when you open `unwrap.Rproj`.
+- If the snapshot URL above ever 404s (it is a permanent snapshot, so
+  it normally will not), use any RSPM snapshot dated on or after the
+  latest package `Date` field in `renv.lock` (for example, the date the
+  lockfile was last changed in this repository's history).
 
 ### 3. CmdStan (one-time, ~50 MB)
 

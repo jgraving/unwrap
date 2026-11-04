@@ -1,0 +1,102 @@
+name: R environment
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r-environment-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Exercises the R install path the setup page documents, end to end: the
+# exact one-liner a user runs (renv restore against the date-pinned RSPM
+# CRAN snapshot whose binary set matches the lockfile), then a real brms
+# fit through CmdStan.
+#
+# - ubuntu-latest: prebuilt Linux binaries from RSPM, no compilation
+#   (also the first real test of the apt system-library line).
+# - windows-latest: CRAN prebuilt Windows binaries, no compilation
+#   (validates the "no compiler needed" claim).
+# - macos-latest: RSPM serves no free macOS binaries, so this is the
+#   source-build path - the compile test, and the slow pole of CI
+#   (~15-30 min on the 6-core runner).
+#
+# These jobs inform but do not gate the (faster) Python matrix.
+jobs:
+  restore:
+    name: ${{ matrix.os }} / R restore + smoke fit
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            timeout: 30
+          - os: windows-latest
+            timeout: 30
+          - os: macos-latest
+            timeout: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v3
+        with:
+          # The lockfile records R 4.5.3; RSPM's binary index is
+          # per-R-version, so a newer R release would force source builds.
+          r-version: '4.5.3'
+
+      # Runtime libraries the prebuilt binaries link against (Linux); the
+      # -dev variants also cover a from-source build. macOS has no free
+      # binary source, so these are compiled-package build dependencies.
+      - name: Install system libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gfortran \
+            libgdal-dev libproj-dev libgeos-dev libudunits2-dev \
+            libfreetype-dev libfontconfig1-dev libpng-dev libicu-dev \
+            libuv1-dev libzmq3-dev
+
+      - name: Install system libraries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          xcode-select --install || true
+          brew install gdal proj geos udunits freetype icu4c fontconfig png libuv
+
+      # The documented one-liner, unchanged. RSPM's date-pinned CRAN
+      # snapshot is pinned to the lockfile's date, so the binary set
+      # available on Linux/windows matches exactly the locked versions.
+      # macOS has no binary index there, and renv falls back to the
+      # same hash-verified source tarballs.
+      - name: Restore the pinned environment
+        run: |
+          Rscript -e 'install.packages("renv", repos = c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03")); renv::restore(repos = c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03")); renv::activate()'
+          # A fresh process now reads the .Rprofile written by activate().
+          Rscript -e 'cat(.libPaths(), sep = "\n")'
+
+      - name: Install CmdStan
+        run: |
+          Rscript -e 'cmdstanr::install_cmdstan()'
+
+      - name: Smoke test: load the stack and fit a real model
+        run: |
+          Rscript -e '
+            suppressMessages({ library(brms); library(rmarkdown) })
+            stopifnot(dir.exists(as.character(cmdstanr::cmdstan_path())))
+            cat("CmdStan:", as.character(cmdstanr::version()), "\n")
+            set.seed(1)
+            d <- data.frame(y = rnorm(60))
+            fit <- brm(y ~ 1, data = d, iter = 500, warmup = 250, chains = 2,
+                       backend = "cmdstanr", refresh = 0, quiet = FALSE)
+            print(summary(fit, pars = "y_Intercept"))
+            cat("SMOKE-OK\n")
+          '
