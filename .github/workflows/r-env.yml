@@ -96,6 +96,7 @@ jobs:
       - name: Install CmdStan
         run: |
           Rscript -e 'cmdstanr::install_cmdstan(version = "2.40.0")'
+          Rscript -e 'message("POST-CMDSTAN-R-START-OK")'
 
       - name: Smoke test - load the stack and fit a real model
         run: |
@@ -110,7 +111,7 @@ jobs:
             set.seed(1)
             d <- data.frame(y = rnorm(60))
             fit <- brm(y ~ 1, data = d, iter = 500, warmup = 250, chains = 2,
-                       backend = "cmdstanr", refresh = 0, quiet = FALSE)
+                       backend = "cmdstanr", refresh = 0)
             print(summary(fit, pars = "y_Intercept"))
             cat("SMOKE-OK\n")
           '
