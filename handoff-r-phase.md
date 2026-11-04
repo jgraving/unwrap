@@ -1,4 +1,4 @@
-## STATE - updated 2026-11-04 (R EXAMPLES PHASE: P0-P2 MERGED; P3 @ 6da2d63 static-reviewed PASS, FULL-BUDGET BAKE IN FLIGHT; PY ACCEPTANCE REF CAPTURED (locust_reference_elpd.txt); VECTORIZATION PR SCOPED (post-P3); WORDING PR #94 SHIPPED (markdown-only, local docs gate passed, CI pending))
+## STATE - updated 2026-11-04 (R EXAMPLES PHASE: P0-P3 ALL MERGED (P3 @ 9b37395 incl. full-budget bake outputs + final markdown); WORDING PR #94 MERGED (8a636b6); PY c25 FORMULA FIX #95 MERGED (58f5a5b); ONLY WORK REMAINING = VECTORIZATION PR (post-P3, bats-only))
 
 ### CI DECISION (2026-11-03, user: "Do not run ci on GitHub for notebooks. They need to be locally tested only. Write tests but make it so that GitHub doesn't run them we run them locally.")
 - `.github/workflows/notebooks.yml` is DELETED (it ran the Python tutorial + every R notebook on every PR, 240-min job).
@@ -633,3 +633,59 @@ Branch `r-examples-p1-local` in /tmp/opencode/wt-r-p1:
   P3: locust direction — custom
   2-component circular MIXTURE Stan model, the one real modeling risk
   (validate vs the Python posterior).
+
+## CLOSE-OUT (2026-11-04 session 2: P3 landed, wording landed, P3 R markdown pass done)
+  ALL THREE PRS MERGED, main now 9b37395. P0-P3 of the R examples
+  phase are COMPLETE; nothing P-related is open or queued except the
+  vectorization PR (see plan above; P3 merge unblocks it - machine is
+  free) and the deferred R post-fit slowness PR.
+  PR #94 (wording) MERGED @ 8a636b6: markdown-only, 15 files
+  (7 py + 7 R + py vmp figure block), +127/-269; raw-JSON patch
+  runner (/tmp/opencode/apply_mdpolish.py) preserved each file's own
+  serialization (vmp pair = ensure_ascii=True no trailing newline;
+  all others ensure_ascii=False + "\n") so the diff is exactly the
+  edited markdown cells (0 artifacts); strict docs build + page-by-
+  page HTML check green; CI full matrix green.
+  PR #91 (P3 R port) MERGED @ 9b37395: head 1f4eb72 = branch 6da2d63
+  (static-reviewed model) + baked full-budget outputs + final markdown
+  pass (/tmp/opencode/apply_p3r_polish.py, 27 patches: TOC/draft-notes/
+  dev-meta removed, R twin stands alone, budgets documented in c19,
+  arithmatex c23 display-math fix + escaped braces, Python variable
+  names + vestigial "Formula correction" note dropped, paper-aligned
+  result sentence in c50). Acceptance (bake = acceptance run; test
+  suite is a redundant re-execute subset): 51 cells 0 errors; BOTH
+  fits strict-clean (0 failing rows, the in-notebook stopifnot gate);
+  ELPD bimodal -3404.488 (SE 39.242) / unimodal -3501.249 (SE 38.763),
+  delta +96.761 (SE 16.710) vs Python ref -3404.123/-3501.771 (+97.6);
+  honest caveat recorded in PR body: bimodal max Pareto k 0.7041 (1/2435)
+  0.004 over 0.70 (Python 0.676) = PSIS boundary noise, comparison
+  unaffected; population hypothesis: lateral (±pi/2) elpd -1.285 vs
+  forward 0 elpd -2.567, P(lateral>forward)=1 -> vectorial /
+  ring-attractor supported.
+  PR #95 MERGED @ 58f5a5b: fixed the Python locust-mixture c25
+  hypothesis-test display (shared Z over two different-concentration
+  components is not the mixture normalizer) -> per-component
+  M(y|mu,kappa) form the code actually evaluates (matches c26 + R c42);
+  same cell drops the `weights_pop`-style variable names. No executed
+  cell changed; strict docs build + HTML arithmatex check green.
+  GH QUIRK (cost time twice): `gh api` POST/delete on
+  repos/{owner}/{repo}/pulls/N/merge intermittently 404s when cwd is
+  inside a worktree; retry from a cwd outside the repo (e.g. /tmp)
+  with GITHUB_REPOSITORY set, or use `gh pr merge` from the worktree
+  that holds the head branch. `gh pr merge --delete-branch` also
+  fails when another worktree has main checked out ("already used by
+  worktree") - plain merge + git push --delete works fine.
+  WORKTREES: wt-mdpolish, wt-c25, wt-r-p3 removed; local branches
+  docs/wording-paper-language, docs/locust-hypot-formula,
+  r-examples-p3-review deleted; remote branches r-examples-p3,
+  docs/locust-hypot-formula, docs/wording-paper-language gone.
+  KEPT: wt-handoff (this file), wt-mainref (detached 53e0a3c - the
+  venv's editable unwrap target), house repo /home/jake/projects/
+  unwrap on docs/notebooks-explained (READ-ONLY rule unchanged).
+  NEXT: vectorization PR per /tmp/opencode/vectorization-plan.md -
+  base = current main (9b37395), bats-only: c29 kde_vm matrix
+  (~100x), c81 sim_one_tag rvonmises n-draws (371x, stream-identical
+  probe done), PPC-bands MC-noise disclosure, full bats rebake
+  (bake_p3.py driver reusable with BAKE_ROOT + name; liveness =
+  pgrep "IRkernel::main"), check_gate.py vs bats_reference_elpd.txt +
+  gate tables + delta-ELPD +118.49.
