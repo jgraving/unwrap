@@ -533,6 +533,54 @@ Branch `r-examples-p1-local` in /tmp/opencode/wt-r-p1:
    - After green: same finish sequence (pr ready -> checks -> merge
      --delete-branch -> worktree/branch cleanup), then hand off the
      P3 acceptance evidence and note the phase (P0-P3) is COMPLETE.
+   P3 REVIEW (2026-11-04, codex shipped 6da2d63 = d8f4b01 merge-main +
+   442a697 notebook + 6da2d63 nav): PASSED static. Worktree
+   /tmp/opencode/wt-r-p3 (branch r-examples-p3-review).
+   - Model parity vs Python twin: EXACT (both models, every prior; the
+     PR STATUS has the full port tables + the sort-encoding explanation,
+     satisfying the brief's acceptance).
+   - Sort/label-switching encoding: brms custom_family
+     vars="first_component" repurposed as a PARAMETER-DEPENDENT ORDER -
+     tparameters `real first_component = b_popone[1] <= b_poptwo[1] ? 1
+     : 2` (linear order, per brief), likelihood locust_mix_lpdf selects
+     unsorted components by the saved index, flips the animal eta sign
+     when index 2 leads, log_sum_exp of the two log-weighted VM
+     densities with locust_wrap(mean sums). extract_state reads the
+     saved first_component from the posterior draws and re-sorts every
+     component-indexed quantity per draw (stopifnot vs p1>p2). Verified
+     correct.
+   - Static probe (p3_stan_probe.py -> p3_stan_probe.log, cells
+     c04-c24 verbatim, NO sampling): 0 errors; generated Stan clean
+     (one first_component decl, bounded b_popone/b_poptwo/b_devone/
+     b_devtwo [1,1,52,52], kmu_one/two lower=0, all target += lines,
+     design order 0..51 checked); data parity on the REAL data: 54
+     recordings / 52 animals / 2435 steps / 3-204 per animal (exact
+     Python counts, stopifnot-enforced in c13).
+   - Init: bimodal = kmeans(2, nstart=20) on (cos,sin) cluster anchors
+     + per-animal offsets, seam-margin stopifnot, +/-0.08 post-wrap
+     jitter, seed SEED+k per chain (same-wrap-class pattern).
+     Unimodal = pooled circ_mean + seam-gap re-anchor if any animal
+     lands near +/-pi (codex found the pooled mean was seam-close).
+   - Budgets: quick 2x4000/2000, FULL 4x8000/4000 (codex bumped above
+     bats' 4x4000/2000 on purpose: Python unimodal has 18 marginal
+     gate rows - see locust_reference_elpd.txt). PPC/hyp/align
+     constants mirror locust_posthoc exactly (1000/1000 boot, 360
+     grid, 16 bins, bw 30/15, seeds 123 + 10000+idx); LOO = the bats
+     pattern (raw ll -> loo::loo, scaled relative_eff); prints
+     ELPD table + delta table for acceptance.
+   - Nav pair commit verified (mkdocs.yml, same pair style).
+   - Full-budget BAKE IN FLIGHT (bake_p3.log, driver bake_p3.py,
+     per-cell timeout raised to 10 h; the bimodal fit cell is the long
+     pole, expect hours). Machine note: a llama-server at ~430% CPU
+     shares the box (load ~7-8) - wall times stretched but bakes
+     proceed.
+   - ACCEPTANCE when green: gate tables (bimodal clean strict;
+     unimodal may sit on its marginal rows - reference file has the
+     criteria + levers), ELPD vs reference (bimodal -3404.1 SE 39.2,
+     uni -3501.8 SE 38.7, delta ~+97.6 bimodal better, uni k-hat
+     marginal EXPECTED), posterior parity targets (mu_pop ~ +/-1.45,
+     mu_kappa ~27/21, weights_pop ~0.5) - all in
+     /tmp/opencode/locust_reference_elpd.txt.
    VECTORIZATION PR SCOPED (2026-11-04, plan in
    /tmp/opencode/vectorization-plan.md): only two changes - bats c29
    kde_vm (361-iteration vapply -> matrix colMeans, algebraically
