@@ -32,8 +32,9 @@ counterparts, with circular individual effects represented through brms'
 nonlinear machinery where needed.
 
 To use one, install the one-time environment from the
-[R setup page](getting-started-r.md) (CRAN packages, CmdStan, and the Jupyter
-R kernel), select the **R (`ir`)** kernel, and run the cells in order. The
+[R setup page](getting-started-r.md) (pinned package environment, CmdStan,
+and the Jupyter R kernel), select the **R (`ir`)** kernel, and run the cells
+in order. The
 first cell of each notebook re-checks the environment and restores missing
 pieces, so on a set-up machine it is a no-op. As with the Python research
 notebooks, the fits are too long for CI, so the notebooks are not executed on

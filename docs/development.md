@@ -37,9 +37,12 @@ UNWRAP_TEST_NOTEBOOKS=1 UNWRAP_NOTEBOOKS=circular_regression,beetles \
 
 The R notebooks need the `ir` kernelspec (see the
 [R setup](getting-started-r.md)); set `UNWRAP_R_QUICK=1` for the short
-two-chain budget while iterating. Before a change that touches a
+smoke budget (reduced draws) while iterating. Before a change that touches a
 notebook is merged, that notebook is rerun end to end from the checkout
 this way, and the outputs stored in the repository come from that run.
+R package versions (and checksums) are pinned in `renv.lock`: after a
+deliberate upgrade, regenerate it with `Rscript -e 'renv::snapshot()'`
+(see the [R setup](getting-started-r.md) page).
 
 ## Build and preview documentation
 
