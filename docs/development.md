@@ -58,21 +58,23 @@ than checksumming downloaded archives. After changing pinned versions,
 re-verify a fresh `renv::restore()` from the updated lockfile in a clean
 project.
 
-The install one-liner on the [R setup](getting-started-r.md) page and
-the environment check job in `.github/workflows/r-env.yml` both pin the
-restore to a dated [RSPM](https://packagemanager.posit.co/cran) CRAN
-snapshot, currently **2026-11-03**. The green three-OS CI run restored
-the locked versions, with some source builds. When updating `renv.lock`,
-verify a new snapshot's package availability and update its date in
-**both** places and this note:
+The setup script on the [R setup](getting-started-r.md) page and the
+environment job in `.github/workflows/r-env.yml` run the same restore
+calls — the workflow joins them into one `Rscript -e` line — and both
+pin the restore to a dated
+[RSPM](https://packagemanager.posit.co/cran) CRAN snapshot, currently
+**2026-11-03**. The green three-OS CI run restored the locked versions,
+with some source builds. When updating `renv.lock`, verify a new
+snapshot's package availability and update its date in **both** places
+and this note:
 
 ```bash
 grep -rn "packagemanager.posit.co/cran/" docs/getting-started-r.md .github/workflows/r-env.yml
 ```
 
-The Quarto twins `notebooks_r/*.qmd` are generated from the `.ipynb`
-source of truth. After any R notebook change, regenerate and commit
-them:
+The Quarto files `notebooks_r/*.qmd` are generated from the `.ipynb`
+source of truth; never edit a `.qmd` by hand. After any R notebook
+change, regenerate and commit them:
 
 ```bash
 python tools/ipynb_to_qmd.py

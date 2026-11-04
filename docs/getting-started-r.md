@@ -5,32 +5,31 @@ one-time environment:
 
 - **RStudio + Quarto (recommended)**: open the `.qmd` file and press
   *Run All*. It runs with plain R — no Jupyter at all.
-- **Jupyter**: the same example as a `.ipynb` with the R (`ir`) kernel
-  selected. The documentation site renders from these.
+- **Jupyter**: the same example as an `.ipynb` with the **R** kernel.
 
-The environment itself is pinned in `renv.lock`, which plays the role
-`requirements.txt` plays for Python: package versions and sources are
-recorded for the environment used to verify the examples. And
-`renv::restore()` plays the role `uv sync` plays: one command installs
-exactly those versions, into a project-local library, so you do not
-have to install anything by hand and hope.
+The environment is pinned in `renv.lock`, the R equivalent of
+`requirements.txt`: the short R script in step 2 installs exactly the
+recorded versions into a project-local library, like `uv sync` does
+for Python. Use R **4.5.3**, the version recorded in `renv.lock` and
+tested by CI.
 
-Use R 4.5.3, the version recorded in `renv.lock` and tested by CI.
+## Install and open the tutorial
 
-## One-time environment
+First, get the repository:
+
+```bash
+git clone https://github.com/jgraving/unwrap.git
+cd unwrap
+```
 
 ### 1. System packages (the only OS-specific step)
 
-The pinned R packages link against a handful of native libraries
-(GDAL/PROJ/GEOS for `sf`, freetype/fontconfig for `ragg`, ICU for
-`stringi`, libuv for `fs`, zmq for the Jupyter R kernel). The tested
-Ubuntu and Windows restores use
-prebuilt binaries for the pinned CRAN packages; Ubuntu also builds the
-four r-universe packages from source. On macOS the restore uses a mix of
-binaries and source builds, so the listed headers and libraries support
-packages that compile locally.
+A few pinned packages link against native libraries, and on some
+operating systems a few are built from source; install those
+prerequisites first. The C++ toolchain is also used to build CmdStan
+in step 3.
 
-**Linux (Ubuntu 24.04, the tested runner):**
+**Linux (tested on Ubuntu 24.04):**
 
 ```bash
 sudo apt-get update
@@ -40,153 +39,130 @@ sudo apt-get install -y build-essential gfortran \
   libuv1-dev libzmq3-dev
 ```
 
-**macOS:** install R 4.5.3 from CRAN ([Apple silicon](https://cran.r-project.org/bin/macosx/big-sur-arm64/base/R-4.5.3-arm64.pkg)
-or [Intel](https://cran.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.5.3-x86_64.pkg)),
-then install the system libraries with Homebrew:
+**macOS:** install [R 4.5.3](https://cran.r-project.org/bin/macosx/big-sur-arm64/base/R-4.5.3-arm64.pkg)
+(Apple silicon; the [Intel build](https://cran.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.5.3-x86_64.pkg)
+follows the same steps), then:
 
 ```bash
 xcode-select --install
-brew install gdal proj geos udunits freetype icu4c fontconfig libpng libuv
+brew install gdal proj geos udunits freetype icu4c fontconfig \
+  libpng libuv
 ```
 
 **Windows:** install [R 4.5.3](https://cran.r-project.org/bin/windows/base/old/4.5.3/)
-and [Rtools 4.5](https://cran.r-project.org/bin/windows/Rtools/). The tested
-package restore used prebuilt Windows binaries, but the CmdStan step below
-builds C++ code and needs the toolchain.
+and [Rtools 4.5](https://cran.r-project.org/bin/windows/Rtools/). On
+Windows the pinned CRAN packages install as prebuilt binaries; Rtools
+serves the CmdStan build in step 3 and any source-build fallback.
 
-### 2. The pinned R packages (identical on every OS)
+### 2. The pinned R packages
 
-From the **repository root**, in a terminal:
+From the **repository root**, in any R session (RStudio's console or
+`R` in a terminal):
 
-```bash
-Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::activate(); renv::load(); renv::restore(repos = repos)'
+```r
+# Four Stan development packages (cmdstanr, loo, posterior, bayesplot),
+# from the Stan team's r-universe:
+ru <- "https://stan-dev.r-universe.dev"
+# The rest, from a dated CRAN snapshot that serves prebuilt binaries
+# on Linux and Windows:
+cran <- "https://packagemanager.posit.co/cran/2026-11-03"
+repos <- c(CRAN = cran, setNames(ru, ru))
+
+install.packages("renv", repos = repos)
+renv::activate()      # record the project library in a local .Rprofile
+renv::load()
+renv::restore(repos = repos)
 ```
 
-Both URLs need to be in the same command (not just in `renv.lock`):
-passing `repos` to `renv::restore()` replaces the repositories recorded
-in the lockfile, and four pinned entries (`cmdstanr`, `loo`,
-`posterior`, `bayesplot`) record the Stan r-universe repository URL as their repository ID. The
-`CRAN` entry routes the other 129 entries to the RSPM snapshot above.
+The final line installs the 133 pinned packages (129 from CRAN, four
+from r-universe) into a project-local `renv/` library. The CRAN
+packages arrive as prebuilt binaries on Linux and Windows; the
+r-universe packages — and a few others on macOS — are built from
+source, so a first install can take 20–60 minutes. Re-running the
+script is fast.
 
-- `renv::restore()` restores the 133 package records — 129 from the
-  `CRAN` entry and four from `stan-dev.r-universe.dev` — into a
-  project-local library under `renv/`. The `CRAN` entry points to Posit's
-  dated **RSPM** snapshot. CI installed its pinned CRAN packages as
-  binaries on Ubuntu 24.04, Windows, and macOS; Ubuntu built the four
-  r-universe packages from source, and macOS built `pbdZMQ` and `IRkernel`
-  from source. The `Hash` fields in `renv.lock` identify packages for
-  renv's cache; they are not archive checksums. Allow more time when
-  source builds are needed; later re-runs can reuse cached packages.
-- `renv::activate()` writes a machine-local `.Rprofile` (gitignored)
-  that puts any R session started in the repository — including the
-  Jupyter R kernel — on that project library. RStudio also activates
-  the project automatically when you open `unwrap.Rproj`.
+`renv::activate()` writes a machine-local `.Rprofile` (gitignored), so
+any R session started in the repository — RStudio, scripts, or the
+Jupyter R kernel — uses that project library.
 
-### 3. CmdStan (one-time, ~50 MB)
+### 3. CmdStan
 
-```bash
-Rscript -e 'cmdstanr::install_cmdstan(version = "2.40.0")'
+```r
+cmdstanr::install_cmdstan(version = "2.40.0")
 ```
 
-Downloads the Stan compiler into your home directory. (The examples'
-setup cells check for it and will download it automatically on first
-use if it is missing.)
+Fetches the Stan compiler into your home folder (~50 MB) and builds it
+with the C++ toolchain from step 1.
 
-### 4. Jupyter mode only
+### 4. The Jupyter R kernel (only if you use Jupyter)
 
-```bash
-Rscript -e 'IRkernel::installspec()'
+```r
+IRkernel::installspec()
 ```
 
-Registers the **R** kernel so `jupyter lab` / VS Code / Positron can
-run the `.ipynb` examples. Start the Jupyter frontend **from the
-repository root** so the R kernel inherits the activated project:
+Skip this if you only use RStudio/Quarto. Registers the **R** kernel
+so `jupyter lab`, VS Code, or Positron can run the `.ipynb` examples.
 
-```bash
-cd unwrap
-jupyter lab
-```
+### Open the tutorial
 
-## Running the examples
+- **RStudio/Quarto:** open `notebooks_r/circular_regression.qmd` and
+  run all cells.
+- **Jupyter:** from the repository root run `jupyter lab`, open
+  `notebooks_r/circular_regression.ipynb`, select the **R** kernel,
+  and run the cells in order.
 
-The R examples live under `notebooks_r/`; each one exists both as a
-Quarto twin (`.qmd`, opened in RStudio) and as a Jupyter notebook
-(`.ipynb`, opened in Jupyter). The `.ipynb` is the source of truth; the
-`.qmd` twins are generated from it (`tools/ipynb_to_qmd.py`), and each
-example's documentation page carries a "Download Quarto" button.
+The first code cell checks the environment and stops, with a pointer
+back to this page, if the one-time setup has not been run — a failed
+setup fails fast instead of slowly at the first fit.
 
-```bash
-git clone https://github.com/jgraving/unwrap.git
-cd unwrap
-jupyter lab   # or: open unwrap.Rproj in RStudio
-```
+The tutorial creates its own data, so no download is needed. It fits
+a circular generalized linear model (GLM) with `brms`' formula
+interface and the repository's custom von Mises family
+(`R/unwrap_family.R`), using the same modulo mean link and softplus
+concentration link as the Python tutorial with Bambi. Both the mean
+direction and the directional concentration depend on a predictor.
+The [model guide](models.md) explains GLM formulas and their
+extension to generalized linear mixed models (GLMMs) for repeated
+observations of animals or groups.
 
-- **RStudio/Quarto**: open `notebooks_r/<example>.qmd` and run all
-  cells.
-- **Jupyter**: open `notebooks_r/<example>.ipynb`, select the **R**
-  kernel, and run the cells in order.
+On a machine that is already set up, step 2 re-checks the pinned
+versions after a fresh clone; steps 3 and 4 run once per machine.
 
-The `brms` package is the modeling front end (its formula interface and
-the repository's custom von Mises family, `R/unwrap_family.R`);
-`circular` provides the von Mises sampling and angle utilities; `ragg`
-renders figures on headless machines; `arrow` reads the published
-Parquet data used by the locust-density and zebra examples. The
-data-loading cells require Git and fetch each study's data on first use
-into a repository-relative `unwrap-data/` checkout. Set
-`UNWRAP_DATA_ROOT` to an existing data checkout to reuse local files.
+## Prepare your angles
 
-The first code cell of each example re-checks the environment and
-restores missing pieces from CRAN, so on a machine set up as above it
-is a no-op — and running an example outside the activated project
-(without the `.Rprofile`) still works, just not at the pinned versions.
+The models take angles in **radians** (the example data's angle
+columns already are). If you work in degrees, convert with
+`degrees * pi / 180` and keep one reference direction and one
+clockwise or counterclockwise convention throughout the analysis.
 
-## The tutorial
+Remember that the angles wrap: the average of 179° and −179° is near
+180°, not 0°. The tutorial shows the circular summaries and plots
+that handle this. The [link guide](links.md) explains the
+mathematical conventions.
 
-Start with `circular_regression`: it creates its own data, so no
-download is needed. It fits a circular generalized linear model (GLM)
-using `brms`' formula interface and the repository's custom von Mises
-family (`R/unwrap_family.R`), with the same circular mean link (the
-modulo link) and softplus concentration link as the Python tutorial
-uses with Bambi. Both mean direction and directional concentration
-depend on a predictor. The tutorial shows how to display uncertainty
-and compare model predictions with observations. It is the cheapest R
-example to run end to end.
+## Run a biological example
 
-The [model guide](models.md) explains GLM formulas and their extension
-to generalized linear mixed models (GLMMs) for repeated observations of
-animals or groups. The [R and MATLAB](languages.md) page covers the
-standalone R scripts (the tutorial example runs the same machinery as
-`R/brms_example.R`, in notebook form) and the MATLAB examples.
+The [example guide](examples.md) lists each example and what its
+verified run covers. After the tutorial, try `beetles`,
+`locust_density_order`, or `zebra_escape`, in RStudio or Jupyter; the
+R examples reproduce their Python counterparts with the same
+observations, formulas, and prior scales (the
+[R and MATLAB](languages.md) page has the details).
 
-## Research examples
+The animal-behavior notebooks load each study through a data cell that
+fetches the raw files from the `jgraving/unwrap-data` repository on
+first use (needs Git) into a `unwrap-data/` checkout next to the
+repository, then resolves from that checkout. Set `UNWRAP_DATA_ROOT`
+to an existing checkout to reuse local files.
 
-After the tutorial, try `beetles`, `locust_density_order`, or
-`zebra_escape` (RStudio/Quarto or Jupyter). Their study titles and
-biological questions match the [biological examples](examples.md).
-These use the same observations, formulas, and prior scales as their
-Python counterparts, with circular individual effects represented using
-the repository's nonlinear brms machinery where needed.
+`locust_density_order` downloads roughly 870 MB of tracking parts and
+fits five individual-level screening models before the final
+hierarchy; allow substantial time and memory. The notebooks follow a
+shorter draw budget when `UNWRAP_R_QUICK=1` is set; unset, they run
+the full budgets. Review R-hat, bulk ESS, the divergence report, and
+the predictive checks before interpreting results.
 
-The beetle example loads per-trial exit bearings. The zebra example
-loads the published 10-second block averages. The locust-density
-example downloads approximately 870 MB of tracking parts, reproduces
-the trajectory rediscretization, fits five individual-level screening
-models, and fits the final step-level hierarchy; allow substantial time
-and memory for that complete workflow. No research example is executed
-while building the documentation site.
-
-Figures render inline and are saved as vector PDFs under
-`figures/<example_stem>/` (gitignored). No GitHub workflow executes
-these examples; they are verified end to end by the local notebook
-test (see the [development](development.md) page):
-
-```bash
-UNWRAP_TEST_NOTEBOOKS=1 uv run --no-project python -m pytest tests/test_notebooks.py -v
-```
-
-Set `UNWRAP_R_QUICK=1` for the short smoke budget (reduced draws); unset
-it for full sampling. The grouped models use longer adaptation and
-retained-draw budgets than the introductory GLM in both modes, and
-always keep the full datasets and model structures. Review R-hat, bulk
-ESS, the divergence report, and predictive checks before interpreting
-or publishing results.
+No GitHub workflow runs these examples; before a change is merged the
+notebooks it touches are re-run end to end, and the outputs stored in
+the repository come from that run (see the
+[development](development.md) page).

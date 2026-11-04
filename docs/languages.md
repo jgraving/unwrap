@@ -23,7 +23,7 @@ direction is intended; individual angular offsets use the same construction.
 von Mises prior with a near-zero concentration.
 
 [`notebooks_r/circular_regression.ipynb`](notebooks_r/circular_regression.ipynb)
-is the R twin of the
+is the R version of the
 [Python tutorial](notebooks/circular_regression.ipynb), and the seven
 research notebooks mirror the
 [biological examples](examples.md) and the method examples one for one.
@@ -33,16 +33,15 @@ nonlinear machinery where needed.
 
 To use one, install the one-time environment from the
 [R setup page](getting-started-r.md) (the pinned package environment,
-CmdStan, and, for the Jupyter route, the R kernel). RStudio/Quarto users
-open the example's `.qmd` version (each R example's documentation page
-has a "Download Quarto" button); Jupyter users select the **R (`ir`)**
-kernel; then run the cells in order either way.
-The first cell of each notebook re-checks the environment and restores missing
-pieces, so on a set-up machine it is a no-op. As with the Python research
-notebooks, the fits are too long for CI, so the notebooks are not executed on
-every build; a change to a notebook is verified end to end by the local
-[notebook test](development.md#notebook-execution-local-only) before it is
-merged, and the committed outputs come from that run.
+CmdStan, and, for the Jupyter route, the R kernel), then open the
+example's `.qmd` in RStudio or its `.ipynb` in Jupyter (select the
+**R (`ir`) kernel**) and run the cells in order.
+The first code cell checks the environment and stops, with a pointer to
+the setup page, if anything is missing. As with the Python research
+notebooks, the fits are too long for CI, so the notebooks are not
+executed on every build; a change to a notebook is verified end to end
+by the local [notebook test](development.md#notebook-execution-local-only)
+before it is merged, and the committed outputs come from that run.
 
 ### Standalone scripts
 

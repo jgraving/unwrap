@@ -70,7 +70,8 @@ jobs:
           xcode-select --install || true
           brew install gdal proj geos udunits freetype icu4c fontconfig libpng libuv
 
-      # The documented one-liner, unchanged. RSPM's date-pinned CRAN
+      # The documented setup (R setup page, step 2) joined into one
+      # line. RSPM's date-pinned CRAN
       # snapshot carries the locked CRAN versions, with binaries where
       # available. Source builds also occur; renv Hash values are cache IDs,
       # not archive checksums. Both URLs must be in the same
