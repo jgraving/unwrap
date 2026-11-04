@@ -10,6 +10,8 @@ plugins:
       execute: false
       markdown_cell_processor: mkdocs
       custom_template: docs/jupyter_templates/notebook.html.j2
+hooks:
+  - docs_hooks/notebook_css.py
 edit_uri: blob/main/docs/
 theme:
   name: material
