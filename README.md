@@ -181,21 +181,27 @@ to the [link conventions](docs/links.md) and
 
 ## R and MATLAB
 
-The language implementations currently have separate interfaces and setup
-requirements. Installing the Python package does not install the R or MATLAB
-dependencies, and equivalent behaviour across implementations has not yet been
-established by a shared automated test suite.
+The R and MATLAB implementations have separate one-time setup requirements;
+installing the Python package does not install the R or MATLAB dependencies.
+The R study notebooks reproduce their Python counterparts with the same data,
+formulas, and prior scales (see the [examples](docs/examples.md)).
 
 ### R
 
-Start with [`R/brms_example.R`](R/brms_example.R), which uses
-[`R/unwrap_family.R`](R/unwrap_family.R) to define a custom von Mises family
-for brms. The example loads `brms` and `circular` and uses
-[`R/vonmises_data.csv`](R/vonmises_data.csv). Its relative paths assume that
-the working directory is `R/`.
+The full R study notebooks live under
+[`notebooks_r/`](notebooks_r/) — runnable end to end with a pinned, one-time
+package environment (see the [R setup](docs/getting-started-r.md) page;
+`renv.lock` is the R equivalent of `requirements.txt`, and the install is a
+no-compile download on Linux and Windows). Each example exists both as a
+Jupyter notebook (`.ipynb`, R kernel) and as a Quarto twin (`.qmd`, plain R
+with no Jupyter kernel) for RStudio.
 
-Additional functions and analysis are in
-[`R/unwrap_functions.R`](R/unwrap_functions.R) and
+The standalone example [`R/brms_example.R`](R/brms_example.R) uses
+[`R/unwrap_family.R`](R/unwrap_family.R) to define the custom von Mises family
+for brms — the same machinery the R notebooks build on. It loads `brms` and
+`circular` and uses [`R/vonmises_data.csv`](R/vonmises_data.csv). Its relative
+paths assume that the working directory is `R/`. Additional functions and
+analysis are in [`R/unwrap_functions.R`](R/unwrap_functions.R) and
 [the R Markdown analysis](R/Circular%20Dataset%20Structures.Rmd).
 
 ### MATLAB

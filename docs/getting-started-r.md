@@ -47,10 +47,11 @@ brew install r gdal proj geos udunits freetype icu4c fontconfig libpng libuv
 ```
 
 **Windows:** install a current R release from
-<https://cloud.r-project.org>. That is all you need up front: CRAN
-ships prebuilt Windows binaries for these packages, so the restore in
-step 2 is plain downloads and no compiler is required. If a package
-ever falls back to a source build, install Rtools ([Rtools 40](https://cloud.r-project.org/utils/Rtools-40/),
+<https://cloud.r-project.org>. That is all you need up front: every
+pinned package ships a prebuilt Windows binary at the repositories the
+step-2 command uses, so the restore is plain downloads and no compiler
+is required. If a package ever falls back to a source build, install
+Rtools ([Rtools 40](https://cloud.r-project.org/utils/Rtools-40/),
 or in R: `install.packages("rtools40"); rtools40::install_rtools()`).
 
 ### 2. The pinned R packages (identical on every OS)
@@ -62,17 +63,19 @@ Rscript -e 'repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03",
 ```
 
 - `renv::restore()` installs the 133 pinned packages — the rest of the
-  stack from CRAN, and `cmdstanr`, `loo`, `bayesplot`, and `posterior`
-  from the Stan team's `stan-dev.r-universe.dev` — into a project-local
-  library under `renv/`; every source tarball is SHA-256 checked
-  against the lockfile. The repository URL is Posit's free **RSPM**
-  mirror of CRAN, pinned to a snapshot verified to carry prebuilt
-  binaries for exactly the locked versions: on Linux and Windows that
-  makes the restore a download-only, compile-free install (a few
-  minutes). On macOS there is no free binary source, so
-  the compiled packages build from CRAN source — allow roughly 20–60
-  minutes on a typical laptop for the first run; later re-runs are fast
-  everywhere.
+  stack from the `CRAN` repository in the command, and `cmdstanr`,
+  `loo`, `bayesplot`, and `posterior` from the Stan team's
+  `stan-dev.r-universe.dev` — into a project-local library under `renv/`.
+  The `CRAN` entry is Posit's free **RSPM** mirror of CRAN, pinned to a
+  snapshot verified to carry prebuilt binaries for exactly the locked
+  versions: on Linux and Windows that makes the restore a download-only,
+  compile-free install (a few minutes). Every package the lockfile
+  resolves is integrity-checked — source tarballs against the SHA-256
+  hashes recorded in `renv.lock`, prebuilt binaries against the hashes
+  the repositories publish for them. On macOS there is no free binary
+  source, so the compiled packages build from source — allow roughly
+  20–60 minutes on a typical laptop for the first run; later re-runs are
+  fast everywhere.
 - `renv::activate()` writes a machine-local `.Rprofile` (gitignored)
   that puts any R session started in the repository — including the
   Jupyter R kernel — on that project library. RStudio also activates
