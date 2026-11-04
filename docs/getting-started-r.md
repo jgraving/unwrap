@@ -58,7 +58,7 @@ or in R: `install.packages("rtools40"); rtools40::install_rtools()`).
 From the **repository root**, in a terminal:
 
 ```bash
-Rscript -e 'install.packages("renv", repos = c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03")); renv::restore(repos = c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03")); renv::activate()'
+Rscript -e 'repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", "https://stan-dev.r-universe.dev"); install.packages("renv", repos = repos); renv::restore(repos = repos); renv::activate()'
 ```
 
 - `renv::restore()` installs the 133 pinned packages — the rest of the
