@@ -77,16 +77,19 @@ jobs:
           brew install gdal proj geos udunits freetype icu4c fontconfig libpng libuv
 
       # The documented one-liner, unchanged. RSPM's date-pinned CRAN
-      # snapshot is pinned to the lockfile's date, so the binary set
-      # available on Linux/windows matches exactly the locked versions.
-      # macOS has no binary index there, and renv falls back to the
-      # same hash-verified source tarballs. The r-universe URL must be
-      # in the same repos vector: passing repos to restore() replaces
-      # the lockfile's recorded repositories, and four packages
-      # (cmdstanr, loo, posterior, bayesplot) only resolve from there.
+      # snapshot carries prebuilt binaries for exactly the locked
+      # versions; macOS has no binary index there, so it falls back to
+      # hash-verified source tarballs. Both URLs must be in the same
+      # repos vector (passing repos to restore() replaces the
+      # lockfile's recorded repositories; the four r-universe dev
+      # packages only resolve from there), and every entry must be
+      # NAMED: renv matches each package's lockfile Repository id to a
+      # name in this vector, and the lockfile records the four
+      # r-universe packages under the repository id
+      # "https://stan-dev.r-universe.dev" (a URL, not "CRAN").
       - name: Restore the pinned environment
         run: |
-          Rscript -e 'repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", "https://stan-dev.r-universe.dev"); install.packages("renv", repos = repos); renv::restore(repos = repos); renv::activate()'
+          Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::restore(repos = repos); renv::activate()'
           # A fresh process now reads the .Rprofile written by activate().
           Rscript -e 'cat(.libPaths(), sep = "\n")'
 

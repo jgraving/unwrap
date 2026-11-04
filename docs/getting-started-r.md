@@ -59,8 +59,15 @@ or in R: `install.packages("rtools40"); rtools40::install_rtools()`).
 From the **repository root**, in a terminal:
 
 ```bash
-Rscript -e 'repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", "https://stan-dev.r-universe.dev"); install.packages("renv", repos = repos); renv::restore(repos = repos); renv::activate()'
+Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::restore(repos = repos); renv::activate()'
 ```
+
+Both URLs need to be in the same command (not just in `renv.lock`):
+passing `repos` to `renv::restore()` replaces the repositories recorded
+in the lockfile, and four of the pinned packages (`cmdstanr`, `loo`,
+`posterior`, `bayesplot`) are dev versions that only exist on the Stan
+teams r-universe, while the `CRAN` entry is what routes the other 129
+packages to the RSPM snapshot above.
 
 - `renv::restore()` installs the 133 pinned packages — the rest of the
   stack from the `CRAN` repository in the command, and `cmdstanr`,
