@@ -59,7 +59,7 @@ or in R: `install.packages("rtools40"); rtools40::install_rtools()`).
 From the **repository root**, in a terminal:
 
 ```bash
-Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::restore(repos = repos); renv::activate()'
+Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::activate(); renv::restore(repos = repos)'
 ```
 
 Both URLs need to be in the same command (not just in `renv.lock`):
