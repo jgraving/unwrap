@@ -74,7 +74,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           xcode-select --install || true
-          brew install gdal proj geos udunits freetype icu4c fontconfig png libuv
+          brew install gdal proj geos udunits freetype icu4c fontconfig libpng libuv
 
       # The documented one-liner, unchanged. RSPM's date-pinned CRAN
       # snapshot is pinned to the lockfile's date, so the binary set

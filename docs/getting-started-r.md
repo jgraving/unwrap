@@ -43,7 +43,7 @@ sudo apt-get install -y build-essential gfortran \
 
 ```bash
 xcode-select --install
-brew install r gdal proj geos udunits freetype icu4c fontconfig png libuv
+brew install r gdal proj geos udunits freetype icu4c fontconfig libpng libuv
 ```
 
 **Windows:** install a current R release from
