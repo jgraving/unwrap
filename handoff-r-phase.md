@@ -499,11 +499,40 @@ Branch `r-examples-p1-local` in /tmp/opencode/wt-r-p1:
    notebooks_r/locust_direction_mixture_model.ipynb, 1 commit), base
    main, branched from main @ 15abf88 (P0-only main, 24 commits STALE:
    predates P1+P2). Codex evidently ran an earlier brief on 11-03.
-   When the user ships codex-p3-brief.md: codex must CONTINUE from
+   When the user shipped codex-p3-brief.md (user said SHIPPED
+   2026-11-04; codex is working): codex must CONTINUE from
    PR #91 / r-examples-p3 and REBASE it onto current origin/main
-   (merge main first, as P2 did), NOT start a fresh branch; the brief's
-   "branch r-examples-p3 off origin/main" then reads as "make the
-   existing branch current". Flag this to the user with the phrase.
+   (merge main first, as P2 did), NOT start a fresh branch.
+   P3 ACCEPTANCE PLAN (main agent):
+   - Draft audit (done 2026-11-04): the 9fdfcb8 draft is a SUBSTANTIVE
+     46-cell port (custom_family locust_mix, both fits, chunked
+     explicit_loo, per-individual ELPD, PPC, hypothesis + alignment
+     tables). It predates P1/P2 templates -> recheck: same-wrap-class
+     init per the bats c39/c44 pattern, diagnose_fit gate at BOTH
+     budgets, UNWRAP_R_QUICK switch, nav pair, mk_init/stopifnot
+     guards, no trailing commas.
+   - Python REFERENCE re-running in background: locust_ref_run.py ->
+     locust_ref.log (venv editable unwrap re-pointed to
+     /tmp/opencode/wt-mainref origin/main worktree - the old
+     /tmp/opencode/wt-unified mapping was dangling after cleanup and
+     `import unwrap` died; fixed with pip install -e). Captures:
+     gate tables (failing rows) BOTH models, az.loo per model
+     (elpd/se/pareto_k_max) + loo_compare, key posterior means.
+     CAVEAT IN ADVANCE: the COMMITTED Python unimodal output ALREADY
+     has 19 failing gate rows (worst mu_pop rhat 1.05, ESS 110; the
+     bimodal committed table is EMPTY). If the R unimodal bake
+     fails the strict gate the same way, the levers are (a)
+     data-anchored same-wrap-class init on mu_pop/mu_raw, (b) budget
+     bump like zebra 4x8000/3000, (c) document-vs-twin deviation as
+     last resort - decide after seeing the ref-run numbers.
+   - Bake: bake_p3.py written (BAKE_ROOT=wt-r-p3, 6h per-cell budget,
+     same validate protocol); deps confirmed in Rlib (circular ggplot2
+     ragg IRdisplay patchwork posterior brms cmdstanr loo readxl all
+     TRUE). Budget convention: UNWRAP_R_QUICK 2x3000/1500 else
+     4x4000/2000 (like bats) - verify the cell mirrors it.
+   - After green: same finish sequence (pr ready -> checks -> merge
+     --delete-branch -> worktree/branch cleanup), then hand off the
+     P3 acceptance evidence and note the phase (P0-P3) is COMPLETE.
    (3) deferred: R post-fit vectorization follow-up PR.
   NOTE: bats c48 LOO cell untouched; reference values in
   /tmp/opencode/bats_reference_elpd.txt.
