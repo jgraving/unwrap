@@ -95,7 +95,7 @@ packages to the RSPM snapshot above.
 ### 3. CmdStan (one-time, ~50 MB)
 
 ```bash
-Rscript -e 'cmdstanr::install_cmdstan()'
+Rscript -e 'cmdstanr::install_cmdstan(version = "2.40.0")'
 ```
 
 Downloads the Stan compiler into your home directory. (The examples'
