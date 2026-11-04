@@ -40,6 +40,9 @@ The R notebooks need the `ir` kernelspec (see the
 smoke budget (reduced draws) while iterating. Before a change that touches a
 notebook is merged, that notebook is rerun end to end from the checkout
 this way, and the outputs stored in the repository come from that run.
+R package versions (and checksums) are pinned in `renv.lock`: after a
+deliberate upgrade, regenerate it with `Rscript -e 'renv::snapshot()'`
+(see the [R setup](getting-started-r.md) page).
 
 ## Build and preview documentation
 
