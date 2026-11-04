@@ -96,22 +96,20 @@ jobs:
       - name: Install CmdStan
         run: |
           Rscript -e 'cmdstanr::install_cmdstan(version = "2.40.0")'
-          Rscript -e 'message("POST-CMDSTAN-R-START-OK")'
 
       - name: Smoke test - load the stack and fit a real model
+        shell: Rscript {0}
         run: |
-          Rscript -e '
-            cat("SMOKE-START\n"); flush(stdout())
-            suppressMessages(library(brms))
-            cat("BRMS-LOADED\n"); flush(stdout())
-            suppressMessages(library(rmarkdown))
-            cat("RMARKDOWN-LOADED\n"); flush(stdout())
-            stopifnot(dir.exists(as.character(cmdstanr::cmdstan_path())))
-            cat("CmdStan:", as.character(cmdstanr::cmdstan_version()), "\n")
-            set.seed(1)
-            d <- data.frame(y = rnorm(60))
-            fit <- brm(y ~ 1, data = d, iter = 500, warmup = 250, chains = 2,
-                       backend = "cmdstanr", refresh = 0)
-            print(summary(fit, pars = "y_Intercept"))
-            cat("SMOKE-OK\n")
-          '
+          cat("SMOKE-START\n"); flush(stdout())
+          suppressMessages(library(brms))
+          cat("BRMS-LOADED\n"); flush(stdout())
+          suppressMessages(library(rmarkdown))
+          cat("RMARKDOWN-LOADED\n"); flush(stdout())
+          stopifnot(dir.exists(as.character(cmdstanr::cmdstan_path())))
+          cat("CmdStan:", as.character(cmdstanr::cmdstan_version()), "\n")
+          set.seed(1)
+          d <- data.frame(y = rnorm(60))
+          fit <- brm(y ~ 1, data = d, iter = 500, warmup = 250, chains = 2,
+                     backend = "cmdstanr", refresh = 0)
+          print(summary(fit, pars = "y_Intercept"))
+          cat("SMOKE-OK\n")
