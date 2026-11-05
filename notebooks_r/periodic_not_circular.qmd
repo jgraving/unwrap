@@ -14,10 +14,10 @@ format: html
 #| dev: ragg_png
 #| echo: false
 #| warning: false
-# The Jupyter notebook shows inline figures through IRdisplay; native R
-# has no such channel, so Quarto captures the returned plot objects
-# itself. The device is ragg (headless-safe) rather than the Cairo SVG
-# default, which many headless R builds lack entirely.
+# The Jupyter notebook shows inline figures through its display
+# channel, which native R has no equivalent of, so Quarto captures
+# the returned plot objects itself. The device is ragg (headless-safe)
+# rather than the Cairo SVG default, which many headless R builds lack.
 knitr::opts_chunk$set(dev = "ragg_png")
 ```
 
@@ -34,32 +34,41 @@ The statistical model is a Beta GLM with a sinusoidal design on time:
 
 ## Setup
 
-Select the R (`ir`) kernel and follow the [R setup](../getting-started-r.md)
-page for the compiler and kernel prerequisites. Run the cells in order.
+Follow the [R setup](../getting-started-r.md)
+page for the environment and kernel prerequisites; the first code cell
+checks the pinned packages and CmdStan and stops with a pointer there
+if the one-time setup has not been run. Run the cells in order.
 
 
 ```{r}
 #| cell-id: "periodic-not-circular-002"
-required <- c("brms", "posterior", "circular", "ggplot2", "ragg", "IRdisplay", "patchwork")
-missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
-if (length(missing)) {
-  install.packages(missing, repos = "https://cloud.r-project.org")
-}
+# Setup: check that this notebook's stack is available. The examples
+# are verified against the pinned package set recorded in renv.lock, so
+# this cell deliberately does not auto-install: an unpinned install
+# could silently drift from the verified set. Run the one-time setup on
+# the R setup page first (docs/getting-started-r.md).
 
-if (!requireNamespace("cmdstanr", quietly = TRUE)) {
-  install.packages("cmdstanr",
-    repos = c("https://stan-dev.r-universe.dev", "https://cloud.r-project.org"))
-}
-cmdstan_ok <- tryCatch(dir.exists(as.character(cmdstanr::cmdstan_path())),
+required <- c("brms", "posterior", "circular", "ggplot2", "ragg",   "patchwork")
+missing <- required[!vapply(required, requireNamespace, logical(1),
+  quietly = TRUE)]
+if (length(missing))
+  stop("Missing R package(s): ", paste(missing, collapse = ", "),
+       " - run the one-time setup on the R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
+
+cmdstan_ok <- tryCatch(
+  dir.exists(as.character(cmdstanr::cmdstan_path())),
   error = function(e) FALSE)
-if (!cmdstan_ok) cmdstanr::install_cmdstan()
-
+if (!cmdstan_ok)
+  stop("cmdstanr/CmdStan is not available - run the one-time setup on the",
+       " R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
 ```
 
 ```{r}
 #| cell-id: "periodic-not-circular-003"
 versions <- c(R = as.character(getRversion()),
-  vapply(c("brms", "posterior", "circular", "ggplot2", "ragg", "IRdisplay", "patchwork", "cmdstanr"),
+  vapply(c("brms", "posterior", "circular", "ggplot2", "ragg", "patchwork", "cmdstanr"),
     function(p) as.character(packageVersion(p)), character(1)))
 versions
 
@@ -104,8 +113,8 @@ show_figure <- function(plot, name, width, height, res = 110) {
                 res = res)
   print(plot)
   invisible(dev.off())
-  # Quarto renders the returned plot object natively; no IRdisplay
-  # (Jupyter) channel is needed or available outside the R kernel.
+  # Quarto renders the returned plot object natively; there is no
+  # display channel to write to outside Jupyter.
   plot
 }
 
@@ -121,7 +130,7 @@ save_figure <- function(plot, name, width = 8, height = 5) {
 #| cell-id: "periodic-not-circular-007"
 SEED <- 42
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
-CHAINS <- if (quick_run) 2L else 4L
+CHAINS <- 4L
 ITER <- if (quick_run) 3000L else 4000L
 WARMUP <- if (quick_run) 1500L else 2000L
 # These are local execution budgets, not convergence claims. Hard diagnostic
@@ -293,16 +302,20 @@ priors <- (
   prior("normal(1, 1)", class = "b", coef = "sin24", nlpar = "eta") +
   prior("normal(0, 1)", class = "b", coef = "cos24", nlpar = "eta")
 )
-ITER <- 2000L
-WARMUP <- 1000L
-# Execution budgets only; the diagnostic gate applies at either chain count.
+ITER <- if (quick_run) 1500L else 2000L
+WARMUP <- if (quick_run) 750L else 1000L
+# Execution budgets only; the diagnostic gate applies at either budget.
 stan_code <- make_stancode(form, data = data, prior = priors)
 stopifnot(grepl("log1p_exp", stan_code, fixed = TRUE))
 cat(stan_code)
 set.seed(42)
-fit <- brm(form, data = data, prior = priors, backend = "cmdstanr",
-  chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
-  seed = 42, control = list(adapt_delta = 0.95))
+fit <- unwrap_load_fit_cache("periodic_fit", 42L, ITER, WARMUP)
+if (is.null(fit)) {
+  fit <- brm(form, data = data, prior = priors, backend = "cmdstanr",
+    chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
+    seed = 42, control = list(adapt_delta = 0.95))
+  unwrap_save_fit_cache("periodic_fit", fit, 42L, ITER, WARMUP)
+}
 parameters <- c("b_Intercept", "b_sin24", "b_cos24",
                 "b_eta_Intercept", "b_eta_sin24", "b_eta_cos24")
 summary_frame <- diagnose_fit(fit, parameters = parameters)

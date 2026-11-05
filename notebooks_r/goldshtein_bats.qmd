@@ -14,10 +14,10 @@ format: html
 #| dev: ragg_png
 #| echo: false
 #| warning: false
-# The Jupyter notebook shows inline figures through IRdisplay; native R
-# has no such channel, so Quarto captures the returned plot objects
-# itself. The device is ragg (headless-safe) rather than the Cairo SVG
-# default, which many headless R builds lack entirely.
+# The Jupyter notebook shows inline figures through its display
+# channel, which native R has no equivalent of, so Quarto captures
+# the returned plot objects itself. The device is ragg (headless-safe)
+# rather than the Cairo SVG default, which many headless R builds lack.
 knitr::opts_chunk$set(dev = "ragg_png")
 ```
 
@@ -48,32 +48,42 @@ ELPD).
 
 ## Setup
 
-Select the R (`ir`) kernel and follow the [R setup](../getting-started-r.md)
-page for the compiler and kernel prerequisites. Run the cells in order.
+Follow the [R setup](../getting-started-r.md)
+page for the environment and kernel prerequisites; the first code cell
+checks the pinned packages and CmdStan and stops with a pointer there
+if the one-time setup has not been run. Run the cells in order.
 
 
 ```{r}
 #| cell-id: "goldshtein-bats-002"
-required <- c("brms", "posterior", "loo", "circular", "readxl", "sf", "geosphere", "Matrix", "ggplot2", "ragg", "IRdisplay", "patchwork")
-missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
-if (length(missing)) {
-  install.packages(missing, repos = "https://cloud.r-project.org")
-}
+# Setup: check that this notebook's stack is available. The examples
+# are verified against the pinned package set recorded in renv.lock, so
+# this cell deliberately does not auto-install: an unpinned install
+# could silently drift from the verified set. Run the one-time setup on
+# the R setup page first (docs/getting-started-r.md).
 
-if (!requireNamespace("cmdstanr", quietly = TRUE)) {
-  install.packages("cmdstanr",
-    repos = c("https://stan-dev.r-universe.dev", "https://cloud.r-project.org"))
-}
-cmdstan_ok <- tryCatch(dir.exists(as.character(cmdstanr::cmdstan_path())),
+required <- c("brms", "posterior", "loo", "circular", "readxl", "sf",
+  "geosphere", "Matrix", "ggplot2", "ragg", "patchwork")
+missing <- required[!vapply(required, requireNamespace, logical(1),
+  quietly = TRUE)]
+if (length(missing))
+  stop("Missing R package(s): ", paste(missing, collapse = ", "),
+       " - run the one-time setup on the R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
+
+cmdstan_ok <- tryCatch(
+  dir.exists(as.character(cmdstanr::cmdstan_path())),
   error = function(e) FALSE)
-if (!cmdstan_ok) cmdstanr::install_cmdstan()
-
+if (!cmdstan_ok)
+  stop("cmdstanr/CmdStan is not available - run the one-time setup on the",
+       " R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-003"
 versions <- c(R = as.character(getRversion()),
-  vapply(c("brms", "posterior", "loo", "circular", "readxl", "sf", "geosphere", "Matrix", "ggplot2", "ragg", "IRdisplay", "patchwork", "cmdstanr"),
+  vapply(c("brms", "posterior", "loo", "circular", "readxl", "sf", "geosphere", "Matrix", "ggplot2", "ragg", "patchwork", "cmdstanr"),
     function(p) as.character(packageVersion(p)), character(1)))
 versions
 
@@ -123,8 +133,8 @@ show_figure <- function(plot, name, width, height, res = 110) {
                 res = res)
   print(plot)
   invisible(dev.off())
-  # Quarto renders the returned plot object natively; no IRdisplay
-  # (Jupyter) channel is needed or available outside the R kernel.
+  # Quarto renders the returned plot object natively; there is no
+  # display channel to write to outside Jupyter.
   plot
 }
 
@@ -969,12 +979,16 @@ mk_init <- function(anchor_seed) {
   list(b_beta0 = as.numeric(c(mu_anchor, treat_anchor) + j(base_standata$K_beta0)))
 }
 set.seed(123)
-fit_vm <- brm(base_form, data = df_track, prior = base_priors,
-  stanvars = base_stanvars, backend = "cmdstanr",
-  chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
-  seed = SEED,
-  init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
-  control = list(adapt_delta = 0.97))
+fit_vm <- unwrap_load_fit_cache("bats_fit_vm", SEED, ITER, WARMUP)
+if (is.null(fit_vm)) {
+  fit_vm <- brm(base_form, data = df_track, prior = base_priors,
+    stanvars = base_stanvars, backend = "cmdstanr",
+    chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
+    seed = SEED,
+    init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
+    control = list(adapt_delta = 0.97))
+  unwrap_save_fit_cache("bats_fit_vm", fit_vm, SEED, ITER, WARMUP)
+}
 base_parameters <- posterior::variables(posterior::as_draws_array(fit_vm))
 base_angular <- base_parameters[grepl("^b_beta0_", base_parameters)]
 base_summary <- diagnose_fit(fit_vm, angular = base_angular)
@@ -1130,12 +1144,16 @@ mk_init <- function(anchor_seed) {
     kmu_tag = 30)
 }
 set.seed(123)
-fit_mix <- brm(mix_form, data = df_track, prior = mix_priors,
-  stanvars = mix_stanvars, backend = "cmdstanr",
-  chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
-  seed = SEED,
-  init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
-  control = list(adapt_delta = 0.97))
+fit_mix <- unwrap_load_fit_cache("bats_fit_mix", SEED, ITER, WARMUP)
+if (is.null(fit_mix)) {
+  fit_mix <- brm(mix_form, data = df_track, prior = mix_priors,
+    stanvars = mix_stanvars, backend = "cmdstanr",
+    chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
+    seed = SEED,
+    init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
+    control = list(adapt_delta = 0.97))
+  unwrap_save_fit_cache("bats_fit_mix", fit_mix, SEED, ITER, WARMUP)
+}
 mix_parameters <- posterior::variables(posterior::as_draws_array(fit_mix))
 mix_angular <- mix_parameters[grepl("^b_(mu0|mutreat|mutag)_", mix_parameters)]
 mix_summary <- diagnose_fit(fit_mix, angular = mix_angular)

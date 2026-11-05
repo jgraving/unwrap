@@ -14,10 +14,10 @@ format: html
 #| dev: ragg_png
 #| echo: false
 #| warning: false
-# The Jupyter notebook shows inline figures through IRdisplay; native R
-# has no such channel, so Quarto captures the returned plot objects
-# itself. The device is ragg (headless-safe) rather than the Cairo SVG
-# default, which many headless R builds lack entirely.
+# The Jupyter notebook shows inline figures through its display
+# channel, which native R has no equivalent of, so Quarto captures
+# the returned plot objects itself. The device is ragg (headless-safe)
+# rather than the Cairo SVG default, which many headless R builds lack.
 knitr::opts_chunk$set(dev = "ragg_png")
 ```
 
@@ -48,37 +48,36 @@ The joint hierarchical von Mises model is fit with `brms` and the custom `unwrap
 
 ## Setup
 
-Follow the [R setup](../getting-started-r.md) page once, select the
-**R (`ir`)** kernel, and run all cells in order. The setup cell restores
-missing packages and CmdStan. Running the notebook records versions,
-diagnostics, inline PNGs, and vector PDFs.
+Follow the [R setup](../getting-started-r.md) page once, and run all cells in order. The setup cell checks
+that the pinned packages and CmdStan are available; it stops with a
+pointer to the setup page if the one-time setup has not been run.
+Running the notebook records versions, diagnostics, inline PNGs, and
+vector PDFs.
 
 
 ```{r}
 #| cell-id: "zebra-escape-02"
-# Setup: make sure this notebook's stack is installed. The Python
-# notebooks rely on the local virtual environment (or Colab's bootstrap
-# cell); R has no one-click runtime, so this cell guarantees the packages
-# instead. Follow the R setup page for the manual route.
-# cmdstanr is distributed by the Stan team on r-universe (it is no
-# longer on CRAN); everything else comes from CRAN.
-if (!requireNamespace("cmdstanr", quietly = TRUE)) {
-  # two repos so cmdstanr's CRAN dependencies resolve as well
-  install.packages("cmdstanr",
-    repos = c("https://stan-dev.r-universe.dev", "https://cloud.r-project.org"))
-}
-required <- c("brms", "posterior", "loo", "circular", "ggplot2", "ragg", "arrow")
-missing <- setdiff(required, rownames(installed.packages()))
-if (length(missing)) {
-  install.packages(missing, repos = "https://cloud.r-project.org")
-}
-cmdstan_ok <- tryCatch(dir.exists(as.character(cmdstanr::cmdstan_path())),
-  error = function(e) FALSE)
-if (!cmdstan_ok) {
-  # One-time ~50 MB download (see the R setup page).
-  cmdstanr::install_cmdstan()
-}
+# Setup: check that this notebook's stack is available. The examples
+# are verified against the pinned package set recorded in renv.lock, so
+# this cell deliberately does not auto-install: an unpinned install
+# could silently drift from the verified set. Run the one-time setup on
+# the R setup page first (docs/getting-started-r.md).
 
+required <- c("brms", "posterior", "loo", "circular", "ggplot2", "ragg", "arrow")
+missing <- required[!vapply(required, requireNamespace, logical(1),
+  quietly = TRUE)]
+if (length(missing))
+  stop("Missing R package(s): ", paste(missing, collapse = ", "),
+       " - run the one-time setup on the R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
+
+cmdstan_ok <- tryCatch(
+  dir.exists(as.character(cmdstanr::cmdstan_path())),
+  error = function(e) FALSE)
+if (!cmdstan_ok)
+  stop("cmdstanr/CmdStan is not available - run the one-time setup on the",
+       " R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
 ```
 
 ```{r}
@@ -94,7 +93,7 @@ suppressPackageStartupMessages({
 
 # The repository's R helpers (custom brms family + circular statistics)
 # live next to the notebook; make them reachable regardless of the
-# kernel's working directory.
+# current working directory.
 repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) ".." else
     if (file.exists(file.path("R", "unwrap_family.R"))) "." else
     stop("Run this notebook from notebooks_r/ or from the repository root.")
@@ -115,8 +114,8 @@ show_figure <- function(plot, name, width, height, res = 110) {
                 res = res)
   print(plot)
   invisible(dev.off())
-  # Quarto renders the returned plot object natively; no IRdisplay
-  # (Jupyter) channel is needed or available outside the R kernel.
+  # Quarto renders the returned plot object natively; there is no
+  # display channel to write to outside Jupyter.
   plot
 }
 
@@ -124,12 +123,12 @@ show_figure <- function(plot, name, width, height, res = 110) {
 SEED <- 42
 set.seed(SEED)
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
-CHAINS <- if (quick_run) 2L else 4L
+CHAINS <- 4L
 # Hierarchical models need longer adaptation and more retained draws than
 # the introductory GLM. Quick mode keeps the full data and model, shortening only
 # sampling and Monte Carlo plotting/bootstrapping budgets.
-ITER <- if (quick_run) 3000L else 8000L
-WARMUP <- if (quick_run) 1500L else 3000L
+ITER <- if (quick_run) 6000L else 8000L
+WARMUP <- if (quick_run) 2250L else 3000L
 ADAPT_DELTA <- 0.97
 # The tighter adapt_delta protects the grouped concentration geometry;
 # these are execution budgets, not a claim of verified convergence.
@@ -356,8 +355,9 @@ Full sampling uses four chains with 3,000 warmup and 5,000 retained
 draws per chain. This budget is larger than the other grouped
 notebook: the concentration hyperpriors descend slowly from their
 LogNormal priors, and at 3,000 iterations the R-hat/ESS gate
-remained elevated. Quick mode (`UNWRAP_R_QUICK=1`) uses two chains with
-1,500 warmup and 1,500 retained draws. The longer adaptation than the
+remained elevated. Quick mode (`UNWRAP_R_QUICK=1`) uses the same four
+chains with 2,250 warmup and 3,750 retained draws (three-quarters of
+the full budget). The longer adaptation than the
 introductory GLM and `adapt_delta = 0.97` allow for the grouped model
 geometry.
 
@@ -737,16 +737,3 @@ p_replicates <- ggplot(rep_stats, aes(id, mean, colour = condition)) +
 save_figure(p_replicates, "ppc_replicated", 10, 4)
 
 ```
-
-## Next steps
-
-Inspect diagnostics and both levels of predictive checks before drawing
-biological conclusions. Increase sampling if meaningful parameters have
-R-hat at or above 1.01 or bulk ESS at or below 400. `UNWRAP_R_QUICK=1`
-checks the complete data/model shape with shorter simulation budgets;
-convergence and warning-free execution require the full-budget local run.
-
-The [model guide](../models.md) and [circular GLMM guide](../math/glmms.md)
-explain the distinction between within-individual precision and
-between-individual alignment. Re-run all cells to record versions and
-regenerate the inline and vector figures.

@@ -14,10 +14,10 @@ format: html
 #| dev: ragg_png
 #| echo: false
 #| warning: false
-# The Jupyter notebook shows inline figures through IRdisplay; native R
-# has no such channel, so Quarto captures the returned plot objects
-# itself. The device is ragg (headless-safe) rather than the Cairo SVG
-# default, which many headless R builds lack entirely.
+# The Jupyter notebook shows inline figures through its display
+# channel, which native R has no equivalent of, so Quarto captures
+# the returned plot objects itself. The device is ragg (headless-safe)
+# rather than the Cairo SVG default, which many headless R builds lack.
 knitr::opts_chunk$set(dev = "ragg_png")
 ```
 
@@ -51,37 +51,36 @@ approximately 870 MB on first download, followed by rediscretization.
 
 ## Setup
 
-Follow the [R setup](../getting-started-r.md) page once, select the
-**R (`ir`)** kernel, and run all cells in order. The setup cell restores
-missing packages and CmdStan. Running the notebook records versions,
-diagnostics, inline PNGs, and vector PDFs.
+Follow the [R setup](../getting-started-r.md) page once, and run all cells in order. The setup cell checks
+that the pinned packages and CmdStan are available; it stops with a
+pointer to the setup page if the one-time setup has not been run.
+Running the notebook records versions, diagnostics, inline PNGs, and
+vector PDFs.
 
 
 ```{r}
 #| cell-id: "locust-density-order-02"
-# Setup: make sure this notebook's stack is installed. The Python
-# notebooks rely on the local virtual environment (or Colab's bootstrap
-# cell); R has no one-click runtime, so this cell guarantees the packages
-# instead. Follow the R setup page for the manual route.
-# cmdstanr is distributed by the Stan team on r-universe (it is no
-# longer on CRAN); everything else comes from CRAN.
-if (!requireNamespace("cmdstanr", quietly = TRUE)) {
-  # two repos so cmdstanr's CRAN dependencies resolve as well
-  install.packages("cmdstanr",
-    repos = c("https://stan-dev.r-universe.dev", "https://cloud.r-project.org"))
-}
-required <- c("brms", "posterior", "loo", "circular", "ggplot2", "ragg", "arrow")
-missing <- setdiff(required, rownames(installed.packages()))
-if (length(missing)) {
-  install.packages(missing, repos = "https://cloud.r-project.org")
-}
-cmdstan_ok <- tryCatch(dir.exists(as.character(cmdstanr::cmdstan_path())),
-  error = function(e) FALSE)
-if (!cmdstan_ok) {
-  # One-time ~50 MB download (see the R setup page).
-  cmdstanr::install_cmdstan()
-}
+# Setup: check that this notebook's stack is available. The examples
+# are verified against the pinned package set recorded in renv.lock, so
+# this cell deliberately does not auto-install: an unpinned install
+# could silently drift from the verified set. Run the one-time setup on
+# the R setup page first (docs/getting-started-r.md).
 
+required <- c("brms", "posterior", "loo", "circular", "ggplot2", "ragg", "arrow")
+missing <- required[!vapply(required, requireNamespace, logical(1),
+  quietly = TRUE)]
+if (length(missing))
+  stop("Missing R package(s): ", paste(missing, collapse = ", "),
+       " - run the one-time setup on the R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
+
+cmdstan_ok <- tryCatch(
+  dir.exists(as.character(cmdstanr::cmdstan_path())),
+  error = function(e) FALSE)
+if (!cmdstan_ok)
+  stop("cmdstanr/CmdStan is not available - run the one-time setup on the",
+       " R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
 ```
 
 ```{r}
@@ -97,7 +96,7 @@ suppressPackageStartupMessages({
 
 # The repository's R helpers (custom brms family + circular statistics)
 # live next to the notebook; make them reachable regardless of the
-# kernel's working directory.
+# current working directory.
 repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) ".." else
     if (file.exists(file.path("R", "unwrap_family.R"))) "." else
     stop("Run this notebook from notebooks_r/ or from the repository root.")
@@ -118,8 +117,8 @@ show_figure <- function(plot, name, width, height, res = 110) {
                 res = res)
   print(plot)
   invisible(dev.off())
-  # Quarto renders the returned plot object natively; no IRdisplay
-  # (Jupyter) channel is needed or available outside the R kernel.
+  # Quarto renders the returned plot object natively; there is no
+  # display channel to write to outside Jupyter.
   plot
 }
 
@@ -127,12 +126,15 @@ show_figure <- function(plot, name, width, height, res = 110) {
 SEED <- 123
 set.seed(SEED)
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
-CHAINS <- if (quick_run) 2L else 4L
+CHAINS <- 4L
 # Hierarchical models need longer adaptation and more retained draws than
-# the introductory GLM. Quick mode keeps the full data and model, shortening only
-# sampling and Monte Carlo plotting/bootstrapping budgets.
-ITER <- if (quick_run) 2000L else 3000L
-WARMUP <- if (quick_run) 1000L else 2000L
+# the introductory GLM. Quick mode keeps the full data and model and shortens
+# the Monte Carlo plotting/bootstrapping budgets and the screening fits below.
+# The final fit keeps its full sampling budget even in quick mode: its
+# R-hat/ESS gate needs the ESS the full budget provides (the same convention
+# as the mixture notebook).
+ITER <- 3000L
+WARMUP <- 2000L
 ADAPT_DELTA <- 0.97
 # The tighter adapt_delta protects the grouped concentration geometry;
 # these are execution budgets, not a claim of verified convergence.
@@ -481,14 +483,18 @@ screen_formula <- function(rhs, centered = TRUE) {
   bf(as.formula(paste("y ~", prefix, rhs)),
      as.formula(paste("kappa ~", prefix, rhs)), family = unwrap_von_mises)
 }
-SCREEN_ITER <- if (quick_run) 1600L else 2000L
-SCREEN_WARMUP <- if (quick_run) 800L else 1000L
-screen_fit <- brm(screen_formula("t_density * t_order", centered = FALSE),
-  data = screen_df,
-  prior = screen_priors("t_density * t_order", centered = FALSE),
-  stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
-  chains = CHAINS, iter = SCREEN_ITER, warmup = SCREEN_WARMUP, cores = CHAINS,
-  seed = SEED, control = list(adapt_delta = 0.95))
+SCREEN_ITER <- if (quick_run) 1500L else 2000L
+SCREEN_WARMUP <- if (quick_run) 750L else 1000L
+screen_fit <- unwrap_load_fit_cache("locust_d_screen_td_to", SEED, SCREEN_ITER, SCREEN_WARMUP)
+if (is.null(screen_fit)) {
+  screen_fit <- brm(screen_formula("t_density * t_order", centered = FALSE),
+    data = screen_df,
+    prior = screen_priors("t_density * t_order", centered = FALSE),
+    stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
+    chains = CHAINS, iter = SCREEN_ITER, warmup = SCREEN_WARMUP, cores = CHAINS,
+    seed = SEED, control = list(adapt_delta = 0.95))
+  unwrap_save_fit_cache("locust_d_screen_td_to", screen_fit, SEED, SCREEN_ITER, SCREEN_WARMUP)
+}
 diagnose_fit(screen_fit, "b_Intercept")
 
 ```
@@ -567,11 +573,15 @@ names(sweep_fits) <- names(sweep_loo) <- names(candidate_rhs)
 for (name in names(candidate_rhs)) {
   cat("Fitting screening model:", name, "\n")
   rhs <- candidate_rhs[[name]]
-  sweep_fits[[name]] <- brm(screen_formula(rhs), data = screen_df,
-    prior = screen_priors(rhs, uniform = TRUE),
-    stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
-    chains = CHAINS, iter = SCREEN_ITER, warmup = SCREEN_WARMUP, cores = CHAINS,
-    seed = SEED, control = list(adapt_delta = 0.95))
+  sweep_fits[[name]] <- unwrap_load_fit_cache(paste0("locust_d_screen_", name), SEED, SCREEN_ITER, SCREEN_WARMUP)
+  if (is.null(sweep_fits[[name]])) {
+    sweep_fits[[name]] <- brm(screen_formula(rhs), data = screen_df,
+      prior = screen_priors(rhs, uniform = TRUE),
+      stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
+      chains = CHAINS, iter = SCREEN_ITER, warmup = SCREEN_WARMUP, cores = CHAINS,
+      seed = SEED, control = list(adapt_delta = 0.95))
+    unwrap_save_fit_cache(paste0("locust_d_screen_", name), sweep_fits[[name]], SEED, SCREEN_ITER, SCREEN_WARMUP)
+  }
   print(diagnose_fit(sweep_fits[[name]], "b_Intercept"))
   sweep_loo[[name]] <- explicit_loo(sweep_fits[[name]], screen_df)
 }
@@ -653,10 +663,14 @@ prior_vonmises
 
 ```{r}
 #| cell-id: "locust-density-order-21"
-fit <- brm(form_vonmises, data = data, prior = prior_vonmises,
-  stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
-  chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
-  seed = SEED, control = list(adapt_delta = ADAPT_DELTA))
+fit <- unwrap_load_fit_cache("locust_d_final", SEED, ITER, WARMUP)
+if (is.null(fit)) {
+  fit <- brm(form_vonmises, data = data, prior = prior_vonmises,
+    stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
+    chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
+    seed = SEED, control = list(adapt_delta = ADAPT_DELTA))
+  unwrap_save_fit_cache("locust_d_final", fit, SEED, ITER, WARMUP)
+}
 
 ```
 
@@ -917,20 +931,14 @@ save_figure(p_alignment_boot, "order_density_alignment_ppc_bootstrap", 10, 6)
 
 ```
 
-## Next steps
+## Limitations
 
-Inspect individual- and cell-level checks alongside the screening
-comparison. Review Pareto k before trusting PSIS-LOO differences; use
-refitting or a more appropriate validation design if influential animals
-make the approximation unreliable. Step-level conditional LOO does not
-measure performance on new animals. The fitted interaction is the final specification for this analysis.
-
-Increase sampling when meaningful parameters fail R-hat < 1.01 or bulk
-ESS > 400, and assess the divergence report separately. The quick budget
-retains all observations, all five screening candidates, and the final
-hierarchy. A full-budget local run must verify warning-free execution,
-data parity, convergence, and the figures.
+Review Pareto k before trusting PSIS-LOO differences; use refitting
+or a more appropriate validation design if influential animals make
+the approximation unreliable. Step-level conditional LOO does not
+measure performance on new animals. The fitted interaction is the
+final specification for this analysis.
 
 See the [model guide](../models.md), [circular GLMM guide](../math/glmms.md),
 and [R setup](../getting-started-r.md) for the statistical framework and
-environment. Re-running records versions and regenerates PDFs and PNGs.
+environment.
