@@ -757,8 +757,8 @@ changes directional bias or precision.
 
 ```{r}
 #| cell-id: "goldshtein-bats-029"
-theta_grid <- seq(0, 2 * pi, length.out = 361)
-kde_vm <- function(y, theta = theta_grid, kappa = 15) {
+theta_grid <- seq(0, 2 * pi, length.out = 360)
+kde_vm <- function(y, theta = theta_grid, kappa = 30) {
   # Matrix form of the grid-point averages: exp(vm_logpdf(t, y, kappa))
   # = exp(kappa*cos(t - y)) / (2*pi*I0(kappa)); rowMeans takes the mean
   # over the observations at each grid point, as the vapply did.
@@ -794,7 +794,7 @@ polar_zero <- data.frame(theta = c(xmap_polar(0), xmap_polar(0)), y = c(1, 2))
 nc_polar <- ceiling(sqrt(length(unique(kde_data$tag))))
 p_polar_data <- ggplot(kde_data, aes(theta_x, 1 + density, colour = treatment,
     group = interaction(treatment, tag))) +
-  geom_path(linewidth = 0.45, alpha = 0.95) +
+  geom_path(linewidth = 0.7, alpha = 0.95) +
   geom_path(data = polar_rings, inherit.aes = FALSE, aes(theta, y, group = ring),
     colour = "grey40", linewidth = 0.25, alpha = 0.65) +
   geom_path(data = polar_spokes, inherit.aes = FALSE, aes(theta, y, group = sp),
@@ -1388,12 +1388,34 @@ polar_pdf <- do.call(rbind, lapply(seq_len(nrow(population_grid)), function(j) {
       median = median(pdf), as.list(hdi(pdf)))
   }))
 }))
-p_mixture_polar <- ggplot(polar_pdf, aes(theta, median, colour = treatment, group = treatment)) +
-  geom_ribbon(aes(ymin = low, ymax = high, fill = treatment), alpha = 0.2, colour = NA) +
-  geom_path(linewidth = 0.5) + facet_wrap(~ treatment) +
-  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) + coord_polar() +
-  scale_colour_manual(values = treatment_colors) + scale_fill_manual(values = treatment_colors) +
-  labs(x = "goal-relative bearing (rad)", y = "mixture density") + theme(legend.position = "none")
+# Polar mixture panels follow the Python twin: 0 deg at the top, rotating
+# clockwise; the radius is 1 + pdf/peak_max, where peak_max is the shared
+# peak of every panel's 95% band upper bound, so density zero sits on the
+# ring at radius 1 and the shared peak on the ring at radius 2.
+# Colourblind treatment colours, 95% band at the twin's 0.35 opacity, no
+# angle labels; the rings and the 0-deg spoke are drawn explicitly.
+peak_max_mix <- max(polar_pdf$high)
+polar_pdf$r_med <- 1 + polar_pdf$median / peak_max_mix
+polar_pdf$r_low <- 1 + polar_pdf$low / peak_max_mix
+polar_pdf$r_high <- 1 + polar_pdf$high / peak_max_mix
+rmax_mix <- 2.05
+mix_ring <- function(r) data.frame(theta = seq(0, 2 * pi, length.out = 361L), r = r)
+p_mixture_polar <- ggplot(polar_pdf, aes(theta, r_med, colour = treatment, group = treatment)) +
+  geom_ribbon(aes(ymin = r_low, ymax = r_high, fill = treatment), alpha = 0.35, colour = NA) +
+  geom_path(linewidth = 0.5) +
+  geom_path(data = mix_ring(1), inherit.aes = FALSE, aes(theta, r),
+    colour = "grey40", linewidth = 0.25) +
+  geom_path(data = mix_ring(2), inherit.aes = FALSE, aes(theta, r),
+    colour = "grey40", linewidth = 0.25) +
+  geom_path(data = data.frame(theta = c(0, 0), r = c(1, rmax_mix)),
+    inherit.aes = FALSE, aes(theta, r), colour = "grey15", linewidth = 0.3) +
+  facet_wrap(~ treatment) +
+  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0), breaks = NULL) +
+  coord_polar() +
+  scale_y_continuous(limits = c(0, rmax_mix), expand = c(0, 0)) +
+  scale_colour_manual(values = treatment_colors_cb) +
+  scale_fill_manual(values = treatment_colors_cb) +
+  labs(x = "", y = "") + theme(legend.position = "none")
 p_weight <- mean_hdi_plot(pop_summary, "p", "Mixture weight", 0.5)
 p_kappa <- mean_hdi_plot(pop_summary, "kappa", "Directed concentration kappa")
 p_mix_density <- mean_hdi_plot(pop_summary, "dens0_mix", "Mixture density at goal", 1 / (2 * pi))
@@ -1756,9 +1778,13 @@ ind$key <- ifelse(ind$source == "observed bootstrap", "Data",
 ind$key <- factor(ind$key, levels = c("Data", "Model", tnames))
 ind$fcol <- ifelse(ind$source == "observed bootstrap", "grey20",
   treatment_colors_cb[as.character(ind$treatment)])
-ind$ymed <- pmin(ind_edge + ind$median, ind_rmax)
-ind$ylow <- pmin(ind_edge + ind$low, ind_rmax)
-ind$yhi <- pmin(ind_edge + ind$high, ind_rmax)
+# Peak normalization follows the Python twin: radius = 0.55 + 1 *
+# d/peak_max, where peak_max is the maximum of all per-tag 95% band
+# peaks, so the twin's 1.56 outer limit is preserved.
+peak_max_ind <- max(ind$high)
+ind$ymed <- pmin(ind_edge + ind$median / peak_max_ind, ind_rmax)
+ind$ylow <- pmin(ind_edge + ind$low / peak_max_ind, ind_rmax)
+ind$yhi <- pmin(ind_edge + ind$high / peak_max_ind, ind_rmax)
 ind_obs <- ind[ind$source == "observed bootstrap", , drop = FALSE]
 ind_ppc <- ind[ind$source == "posterior predictive", , drop = FALSE]
 p_individual_ppc <- ggplot(ind, aes(x, ymed)) +
