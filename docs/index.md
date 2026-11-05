@@ -74,7 +74,7 @@ can each hold a steady heading while pointing in different directions.
 
 ## Go further
 
-- [Biological examples](examples.md): choose an analysis and check its inputs.
+- [Examples](examples.md): the tutorial, the biological studies, and the method examples.
 - [Circular GLMs and GLMMs](models.md): connect biological questions to model formulas.
 - [Mathematical guide](math/von-mises.md): build from the von Mises likelihood to GLMs, GLMMs, and mixtures.
 - [Circular links](links.md): how predictors map to directions and concentration.

@@ -34,33 +34,6 @@
   height: 1.5rem;
   width: auto;
 }
-/* "Download Quarto" button (R notebook pages only): downloads the
-   generated .qmd twin so RStudio/Quarto users can run the example with
-   plain R. No official badge asset exists, so it is a plain text pill
-   matched to the site palette. */
-.unwrap-qmd-button {
-  display: inline-block;
-  margin-left: 0.5rem;
-  padding: 0.2rem 0.65rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--md-primary-fg-color, #3572a5);
-  background: rgba(53, 114, 165, 0.08);
-  border: 1px solid rgba(53, 114, 165, 0.4);
-  border-radius: 0.4rem;
-  text-decoration: none;
-  white-space: nowrap;
-}
-[data-md-color-scheme="slate"] .unwrap-qmd-button {
-  background: rgba(92, 154, 207, 0.12);
-  border-color: rgba(92, 154, 207, 0.5);
-}
-.unwrap-qmd-button:hover {
-  text-decoration: none;
-  background: rgba(53, 114, 165, 0.16);
-}
-
 /* The overview already has a wordmark. Keep its generated title accessible
    without displaying a second brand heading above the logo. */
 .md-content:has(.unwrap-brand) h1 {

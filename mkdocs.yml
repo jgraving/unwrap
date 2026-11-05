@@ -55,7 +55,7 @@ nav:
       - 2. Circular GLMs: math/glms.md
       - 3. Circular GLMMs: math/glmms.md
       - 4. Mixture extensions: math/mixtures.md
-  - Biological examples:
+  - Examples:
       - Overview: examples.md
       - Circular regression tutorial:
           - Python: notebooks/circular_regression.ipynb

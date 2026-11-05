@@ -85,19 +85,13 @@ mkdocs-material #}
 {%- block body_header -%}
 {# CHANGE: "Open in Google Colab" button for the repository notebook.
      colab-badge.svg is the official self-labeling badge ("Open in Colab"),
-     so it stands alone; the accessible name comes from alt. The
-     "Download Quarto" button is hidden by default and shown (with its
-     repository link filled in by the footer script) on the R notebook
-     pages, where it downloads the generated .qmd twin. #}
+     so it stands alone; the accessible name comes from alt. The footer
+     script keeps the button only on the Python notebook pages. #}
 <div class="unwrap-nb-toolbar">
   <a class="unwrap-colab-button" id="unwrap-colab"
      href="https://colab.research.google.com/" target="_blank" rel="noopener">
     <img src="https://colab.research.google.com/assets/colab-badge.svg"
          alt="Open in Google Colab" loading="lazy">
-  </a>
-  <a class="unwrap-qmd-button" id="unwrap-qmd" href="#" hidden download
-     title="Download the generated Quarto .qmd for RStudio/Quarto users">
-    &#11015; Download Quarto
   </a>
 </div>
 <div class="jupyter-wrapper"{% if resources.mkdocs.markdown_cell_processor == "mkdocs" %} markdown="1"{% endif %}>
@@ -184,26 +178,16 @@ mkdocs-material #}
 {% block body_footer %}
 </div> <!-- jp-Notebook -->
 </div> <!-- jupyter-wrapper -->
-{# CHANGE: point the Colab button (Python pages) and the Download Quarto
-     button (R pages) at the notebook's repository path #}
+{# CHANGE: point the Colab button (Python notebook pages) at the
+     notebook's repository path; on other pages drop the toolbar #}
 <script>
 (function () {
   var colab = document.getElementById("unwrap-colab");
-  var qmd = document.getElementById("unwrap-qmd");
   var bar = colab && colab.closest(".unwrap-nb-toolbar");
-  var path = window.location.pathname;
-  var py = path.match(/\/notebooks\/([A-Za-z0-9_.\-]+)/);
-  var r = path.match(/\/notebooks_r\/([A-Za-z0-9_.\-]+)/);
+  var py = window.location.pathname.match(/\/notebooks\/([A-Za-z0-9_.\-]+)/);
   if (py) {
     colab.href = "https://colab.research.google.com/github/jgraving/unwrap/blob/main/notebooks/"
       + py[1] + ".ipynb";
-    if (qmd) { qmd.remove(); }
-  } else if (r) {
-    if (colab) { colab.remove(); }
-    if (qmd) {
-      qmd.href = "https://github.com/jgraving/unwrap/raw/main/notebooks_r/" + r[1] + ".qmd";
-      qmd.hidden = false;
-    }
   } else if (bar) {
     bar.remove();
   }
