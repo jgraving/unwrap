@@ -899,3 +899,75 @@ log_lik_unwrap_von_mises <- function(i, prep) {
   )
   log_lik_weight(out, i = i, prep = prep)
 }
+
+
+# Development fit cache ----------------------------------------------------
+# When UNWRAP_R_FIT_CACHE=1, a notebook's brms fits are reused across
+# local runs instead of resampled: before fitting, a cell asks
+# unwrap_load_fit_cache() for a saved snapshot; when none is valid it
+# fits as usual and stores the result with unwrap_save_fit_cache().
+# A snapshot is only reused when name, seed, iter, and warmup all match
+# (and the fixed-effects size still matches), so a stale cache can
+# never sneak into a run. With UNWRAP_R_FIT_CACHE unset (the default,
+# and how committed notebooks are validated) these helpers are silent
+# no-ops and nothing is read from or written to disk.
+
+unwrap_fit_cache_enabled <- function() {
+  identical(Sys.getenv("UNWRAP_R_FIT_CACHE"), "1")
+}
+
+unwrap_fit_cache_path <- function(name) {
+  if (!unwrap_fit_cache_enabled()) {
+    return(NULL)
+  }
+  dir <- Sys.getenv("UNWRAP_R_FIT_CACHE_DIR")
+  if (!nzchar(dir)) {
+    dir <- file.path(Sys.getenv("TMPDIR", tempdir()), "unwrap_fit_cache")
+  }
+  file.path(dir, paste0(name, ".rds"))
+}
+
+unwrap_load_fit_cache <- function(name, seed, iter, warmup) {
+  path <- unwrap_fit_cache_path(name)
+  if (is.null(path) || !file.exists(path)) {
+    return(NULL)
+  }
+  entry <- tryCatch(readRDS(path), error = function(e) NULL)
+  meta <- if (is.list(entry)) attr(entry, "unwrap_fit_cache_meta") else NULL
+  ok <- is.list(meta) &&
+    identical(as.character(meta$name), name) &&
+    identical(as.numeric(meta$seed), as.numeric(seed)) &&
+    identical(as.numeric(meta$iter), as.numeric(iter)) &&
+    identical(as.numeric(meta$warmup), as.numeric(warmup))
+  if (ok && !is.na(meta$n_fixed)) {
+    ok <- tryCatch(
+      identical(length(fixef(entry)), as.numeric(meta$n_fixed)),
+      error = function(e) FALSE)
+  }
+  if (!ok) {
+    message("Unwrap fit cache: '", name, "' is stale; refitting.")
+    return(NULL)
+  }
+  message("Unwrap fit cache: reusing '", name, "' (seed ", meta$seed,
+          ", iter ", meta$iter, ", warmup ", meta$warmup, ").")
+  entry
+}
+
+unwrap_save_fit_cache <- function(name, fit, seed, iter, warmup) {
+  path <- unwrap_fit_cache_path(name)
+  if (is.null(path)) {
+    return(invisible(NULL))
+  }
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  n_fixed <- tryCatch(length(fixef(fit)), error = function(e) NA_real_)
+  meta <- list(name = name, seed = seed, iter = iter, warmup = warmup,
+               n_fixed = n_fixed,
+               saved_utc = format(Sys.time(), usetz = TRUE))
+  if (is.list(fit)) {
+    attr(fit, "unwrap_fit_cache_meta") <- meta
+  }
+  tmp <- paste0(path, ".tmp")
+  saveRDS(fit, tmp)
+  file.rename(tmp, path)
+  invisible(NULL)
+}
