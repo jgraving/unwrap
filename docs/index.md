@@ -39,10 +39,12 @@ inference, and **Bambi** for a high-level formula interface to GLMs and GLMMs.
 | Does behavior follow a daily rhythm rather than a compass heading? | A periodic (not circular) regression on time of day |
 | What should optimal goal-directed steering do? | The von Mises navigation policy |
 
-[Install `unwrap`](getting-started.md), then follow the
-[circular regression tutorial](notebooks/circular_regression.ipynb).
-It generates its own observations and shows how to fit a model, interpret its
-predictions, and check how well it describes the data.
+Install the Python side (the [Python setup page](getting-started.md)) or
+take the [R setup](getting-started-r.md), then do the circular
+regression tutorial in [Python](notebooks/circular_regression.ipynb) or
+[R](notebooks_r/circular_regression.ipynb). It generates its own
+observations and shows how to fit a model, interpret its predictions, and
+check how well it describes the data.
 The [model guide](models.md) explains how these questions become GLM and GLMM
 formulas, with biological interpretations alongside the statistical terms.
 
