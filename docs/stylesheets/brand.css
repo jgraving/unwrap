@@ -45,3 +45,34 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Examples overview: language buttons directly under each example
+   title. Both stacks carry equal weight, in the language brand colors
+   (Python blue/yellow, R blue). The negative top margin pulls the row
+   up against the section heading. */
+.unwrap-lang-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: -0.75rem 0 1rem;
+}
+.unwrap-lang {
+  display: inline-block;
+  padding: 0.1rem 1rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.7;
+  text-decoration: none;
+}
+.unwrap-lang:hover {
+  filter: brightness(1.08);
+}
+.unwrap-lang-py {
+  background: #306998;
+  color: #ffd43b;
+}
+.unwrap-lang-r {
+  background: #276dc3;
+  color: #ffffff;
+}
