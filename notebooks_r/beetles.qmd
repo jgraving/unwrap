@@ -258,25 +258,67 @@ head(data)
 #| cell-id: "beetles-08"
 # Polar per-individual raw headings, circular mean (solid) and median
 # (dashed), with the floodlight at -135 degrees.
-raw_plot <- transform(data, theta = HeadingRadians %% (2 * pi), radius = 1)
-direction_lines <- do.call(rbind, lapply(split(data, list(data$Individual,
+# Polar raw-data grid following the Python twin (beetles_plots.py,
+# plot_data_polar): each heading sits at (heading, trial number), so the
+# radial axis is the trial order 1-10; each condition is summarised by a
+# solid circular-mean spoke, a dashed circular-median spoke and a
+# transparent wedge of mean +/- one normalized circular standard
+# deviation. 0 degrees is at the top and the angle axis runs clockwise
+# with a label every 45 degrees.
+raw_plot <- transform(data, theta = HeadingRadians %% (2 * pi), radius = Trial)
+radial_max <- 10
+circ_sd_norm <- function(a) {
+  as.numeric(circular::sd.circular(vmu(a), high = pi, low = -pi,
+    normalize = TRUE))[1]
+}
+blocks <- do.call(rbind, lapply(split(data, list(data$Individual,
   data$condition), drop = TRUE), function(g) {
   a <- c(circ_mean(g$HeadingRadians),
-    as.numeric(circular::median.circular(vmu(g$HeadingRadians)))[1]) %% (2 * pi)
+    as.numeric(circular::median.circular(vmu(g$HeadingRadians)))[1])
   data.frame(Individual = g$Individual[1], condition = g$condition[1],
-    theta = a, radius = 0, radius_end = 1,
+    theta = a %% (2 * pi), radius = 0, radius_end = radial_max,
+    wedge_center = a[1], wedge_sd = circ_sd_norm(g$HeadingRadians),
     statistic = c("circular mean", "circular median"))
 }))
+# Wedge sector mean +/- sd, split into at most two polygons across the
+# (0, 2 pi) seam; each polygon is origin, outer arc, origin.
+wedges <- do.call(rbind, lapply(seq_len(nrow(blocks)), function(k) {
+  lo <- mod_circular(blocks$wedge_center[k] - blocks$wedge_sd[k])
+  hi <- mod_circular(blocks$wedge_center[k] + blocks$wedge_sd[k])
+  chunks <- if (lo < hi) {
+    list(seq(lo, hi, length.out = 100L))
+  } else {
+    list(seq(lo, 2 * pi, length.out = 50L), c(0, seq(0, hi, length.out = 49L)))
+  }
+  do.call(rbind, lapply(seq_along(chunks), function(j) {
+    th <- chunks[[j]]
+    data.frame(theta = c(th[1L], th[-1L], th[length(th)]),
+      radius = c(0, rep(radial_max, length(th) - 1L), 0),
+      condition = blocks$condition[k], group = 10L * k + j)
+  }))
+}))
 p_data <- ggplot(raw_plot, aes(theta, radius, colour = condition)) +
-  geom_point(alpha = 0.6, position = position_jitter(width = 0, height = 0.04, seed = SEED)) +
-  geom_segment(data = direction_lines,
+  geom_point(alpha = 0.6, size = 2) +
+  geom_polygon(data = wedges, aes(theta, radius, group = group,
+    fill = condition), inherit.aes = FALSE, alpha = 0.2, colour = NA) +
+  geom_segment(data = blocks,
     aes(x = theta, xend = theta, y = radius, yend = radius_end,
-        colour = condition, linetype = statistic), inherit.aes = FALSE) +
-  scale_x_continuous(limits = c(0, 2 * pi), breaks = (0:3) * pi / 2,
-                     labels = c("0", "pi/2", "pi", "3pi/2"), expand = c(0, 0)) +
-  coord_polar(start = 0) + facet_wrap(~ Individual) +
+        colour = condition, linetype = statistic),
+    inherit.aes = FALSE, linewidth = 0.7) +
+  scale_x_continuous(limits = c(0, 2 * pi),
+    breaks = (0:7) * pi / 4,
+    labels = c("0°", "45°", "90°", "135°",
+      "180°", "225°", "270°", "315°"),
+    expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, radial_max + 1),
+    breaks = seq(2, radial_max, by = 2)) +
+  coord_polar() +
+  facet_wrap(~ Individual, ncol = 2,
+    labeller = as_labeller(setNames(
+      paste0("Individual ", seq_len(nlevels(data$Individual))),
+      levels(data$Individual)))) +
   scale_colour_manual(values = condition_colors) +
-  labs(x = "heading (rad)", y = "") + theme(legend.position = "bottom")
+  labs(x = "heading (rad)", y = "") + theme(legend.position = "right")
 save_figure(p_data, "data_individual_polar_grid", 11, 8)
 
 ```
@@ -582,16 +624,53 @@ mu_kde <- do.call(rbind, lapply(1:2, function(c) {
     density = vapply(theta, function(t) mean(exp(vm_logpdf(t, population_mu[, c], 80))), numeric(1)),
     condition = condition_labels[c])
 }))
+# Polar population-mu KDE following the Python twin (beetles_plots.py,
+# plot_polar_mu_kde): the radius is 0.5 + 0.5 * kde/max_kde, so the
+# density-zero ring sits at radius 0.5 and the shared peak at 1.0. The
+# outer reference ring at radius 1.11 carries each beetle's per-condition
+# circular mean; the floodlight sector at -135 +/- 45 degrees is a black
+# arc with end-and-centre ticks. The twin carries no tick labels here.
+max_kde_mu <- max(mu_kde$density)
+ring_base <- 0.5
+mu_kde$base <- ring_base
+mu_kde$r <- ring_base + 0.5 * mu_kde$density / max_kde_mu
+r_pts <- ring_base + 0.5 * 1.22
 # The marked arc is the +/-45-degree floodlight sector, centered at -135.
-flood_arc <- data.frame(theta = seq(-pi, -pi / 2, length.out = 100) %% (2 * pi),
-                        density = max(mu_kde$density) * 1.05)
-p_mu <- ggplot(mu_kde, aes(theta, density, colour = condition)) +
-  geom_line() + geom_path(data = flood_arc, aes(theta, density),
-    inherit.aes = FALSE, colour = "#D9A521", linewidth = 2) +
-  coord_polar() + scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) +
+flood_dir <- -3 * pi / 4
+r_on_max <- max(mu_kde$r[mu_kde$condition == condition_labels[2]])
+r_mark <- r_on_max + 0.4 * (r_pts - r_on_max)
+cap <- 0.03 * r_pts
+flood_arc <- data.frame(theta = seq(flood_dir - pi / 4, flood_dir + pi / 4,
+  length.out = 100L) %% (2 * pi), r = r_mark)
+flood_ticks <- data.frame(theta = c(flood_dir - pi / 4, flood_dir,
+  flood_dir + pi / 4) %% (2 * pi), lo = r_mark - cap, hi = r_mark + cap)
+ind_means <- do.call(rbind, lapply(split(data, list(data$Individual,
+  data$condition), drop = TRUE), function(g) data.frame(
+    theta = circ_mean(g$HeadingRadians) %% (2 * pi),
+    condition = g$condition[1])))
+ind_means$r <- r_pts
+p_mu <- ggplot(mu_kde, aes(theta, r, colour = condition)) +
+  geom_ribbon(aes(ymin = base, ymax = r, fill = condition),
+    alpha = 0.22, colour = NA) +
+  geom_line(linewidth = 0.7) +
+  geom_path(data = data.frame(theta = theta %% (2 * pi), r = r_pts),
+    inherit.aes = FALSE, aes(theta, r), colour = "grey25", linewidth = 0.35) +
+  geom_line(data = flood_arc, inherit.aes = FALSE, aes(theta, r),
+    colour = "black", linewidth = 0.4, alpha = 0.75) +
+  geom_segment(data = flood_ticks, inherit.aes = FALSE,
+    aes(x = theta, xend = theta, y = lo, yend = hi),
+    colour = "black", linewidth = 0.4, alpha = 0.75) +
+  geom_point(data = ind_means, inherit.aes = FALSE,
+    aes(theta, r, colour = condition), size = 3.5, alpha = 0.95) +
+  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, r_pts * 1.1), expand = c(0, 0)) +
+  coord_polar() +
   scale_colour_manual(values = condition_colors) +
-  labs(x = "population mean direction (rad)", y = "posterior density") +
-  theme(legend.position = "bottom")
+  scale_fill_manual(values = condition_colors) +
+  labs(x = "", y = "") +
+  theme(legend.position = "none", axis.text = element_blank(),
+    axis.ticks = element_blank(), panel.grid = element_blank(),
+    panel.border = element_blank())
 save_figure(p_mu, "treat_polar_mu_kde_clean", 5, 5)
 
 # Python's main treatment figure uses the fixed-effect (zero individual

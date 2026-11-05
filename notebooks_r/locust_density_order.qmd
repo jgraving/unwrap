@@ -823,12 +823,71 @@ pdf_summary <- do.call(rbind, lapply(seq_len(nrow(cell_grid)), function(j) {
       theta = t %% (2 * pi), median = median(p), as.list(hdi(p, 0.9)))
   }))
 }))
-p_polar <- ggplot(pdf_summary, aes(theta, median, colour = order, group = order)) +
-  geom_ribbon(aes(ymin = low, ymax = high, fill = order), alpha = 0.1, colour = NA) +
-  geom_line(linewidth = 0.3) + facet_wrap(~ density) + coord_polar() +
-  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) +
-  labs(x = "direction (rad)", y = "predictive density, 90% HDI")
-save_figure(p_polar, "order_density_polar_pdfs_grid", 11, 7)
+# Two-row polar grid following the Python twin (locust_density_plots.py,
+# plot_polar_pdfs): row 1 facets by order (curves = density levels, red
+# shades), row 2 facets by density (curves = order levels, purple
+# shades). The radius is 1 + pdf/peak_max, where peak_max is the shared
+# peak of every cell's 90% HDI upper curve, so density zero sits on the
+# ring at radius 1 and the shared peak on the ring at radius 2. The twin
+# uses the mathematical orientation (0 at 3 o'clock,
+# counter-clockwise) and no tick labels; the rings and a 0-degree spoke
+# are drawn explicitly.
+peak_max <- max(pdf_summary$high)
+pdf_summary$r_med <- 1 + pdf_summary$median / peak_max
+pdf_summary$r_low <- 1 + pdf_summary$low / peak_max
+pdf_summary$r_high <- 1 + pdf_summary$high / peak_max
+RMAX_polar <- 1 + 1.03
+order_levels <- sort(unique(pdf_summary$order))
+density_levels <- sort(unique(pdf_summary$density))
+order_colors <- setNames(
+  scales::colour_ramp(c("white", "purple"))(
+    seq(0.45, 0.95, length.out = length(order_levels))),
+  as.character(order_levels))
+density_colors <- setNames(
+  scales::colour_ramp(c("white", "red"))(
+    seq(0.45, 0.95, length.out = length(density_levels))),
+  as.character(density_levels))
+polar_rings <- rbind(
+  data.frame(theta = theta %% (2 * pi), y = 1, ring = 1),
+  data.frame(theta = theta %% (2 * pi), y = 2, ring = 2))
+polar_deco <- function(p) {
+  p + geom_path(data = polar_rings, inherit.aes = FALSE,
+    aes(x = theta, y = y, group = ring),
+    colour = "grey25", linewidth = 0.2) +
+    geom_segment(data = data.frame(x = 0, xend = 0, y = 1,
+      yend = RMAX_polar), inherit.aes = FALSE,
+    aes(x = x, xend = xend, y = y, yend = yend),
+    colour = "grey20", linewidth = 0.3) +
+    scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0),
+      breaks = NULL) +
+    scale_y_continuous(limits = c(0, RMAX_polar), expand = c(0, 0),
+      breaks = NULL) +
+    coord_polar()
+}
+p_row_orders <- polar_deco(ggplot(pdf_summary,
+  aes(theta, r_med,
+    colour = as.factor(density), group = as.factor(density))) +
+  geom_ribbon(aes(ymin = r_low, ymax = r_high, fill = as.factor(density)),
+    alpha = 0.5, colour = NA) +
+  geom_line(linewidth = 0.2) +
+  facet_wrap(~ as.factor(order), ncol = length(order_levels)) +
+  scale_colour_manual(values = density_colors) +
+  scale_fill_manual(values = density_colors, name = "Density") +
+  theme_void(base_size = 8) + theme(legend.position = "right") +
+  guides(colour = "none"))
+p_row_density <- polar_deco(ggplot(pdf_summary,
+  aes(theta, r_med,
+    colour = as.factor(order), group = as.factor(order))) +
+  geom_ribbon(aes(ymin = r_low, ymax = r_high, fill = as.factor(order)),
+    alpha = 0.5, colour = NA) +
+  geom_line(linewidth = 0.2) +
+  facet_wrap(~ as.factor(density), ncol = length(order_levels)) +
+  scale_colour_manual(values = order_colors) +
+  scale_fill_manual(values = order_colors, name = "Order") +
+  theme_void(base_size = 8) + theme(legend.position = "right") +
+  guides(colour = "none"))
+p_polar <- patchwork::wrap_plots(p_row_orders, p_row_density, ncol = 1)
+save_figure(p_polar, "order_density_polar_pdfs_grid", 11, 10)
 
 coefficient_draws <- as.data.frame(posterior::as_draws_df(fit))
 coefficient_summary <- do.call(rbind, lapply(trace_parameters, function(p) {

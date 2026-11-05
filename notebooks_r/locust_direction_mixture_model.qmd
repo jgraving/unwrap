@@ -426,10 +426,21 @@ raw_densities <- do.call(rbind, lapply(seq_len(num_individuals), function(i) {
 }))
 raw_densities$individual <- factor(raw_densities$individual,
   levels = seq_len(num_individuals), labels = paste("Individual", seq_len(num_individuals)))
+# Same radius convention as the other polar figures: density zero sits on
+# the ring at radius 1 (the bars rise from it) and the shared peak of all
+# 52 histograms sits on the ring at radius 2; the 0-degree spoke marks the
+# 3 o'clock zero of the mathematical orientation.
+peak_max_hist <- max(raw_densities$density)
+raw_densities$radius <- 1 + raw_densities$density / peak_max_hist
 p_observed <- ggplot(raw_densities) +
-  geom_rect(aes(xmin = left, xmax = right, ymin = 0, ymax = density), fill = "grey35") +
+  geom_rect(aes(xmin = left, xmax = right, ymin = 1, ymax = radius), fill = "grey35") +
+  geom_hline(yintercept = c(1, 2), colour = "grey40", linewidth = 0.25) +
+  geom_segment(data = data.frame(x = 0, xend = 0, y = 1, yend = 2.01),
+    inherit.aes = FALSE,
+    aes(x = x, xend = xend, y = y, yend = yend),
+    colour = "grey20", linewidth = 0.25) +
   scale_x_continuous(limits = c(-pi, pi), expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 2.05), expand = c(0, 0)) +
   coord_polar(start = pi / 2, direction = -1) +
   facet_wrap(~ individual, ncol = 7) + theme_void(base_size = 8)
 save_figure(p_observed, "locust_directional_observed_polar_grid", 14, 16)
@@ -1182,6 +1193,10 @@ save_figure(p_hist / p_kde, "population_directional_validation_cartesian", 7, 7)
 
 ```{r}
 #| cell-id: "locust-r-033"
+# Angle ticks use the twin's degree labels (locust_direction_plots.py):
+# the mathematical orientation (0 at 3 o'clock, counter-clockwise) is the
+# twin default for this x range, and the density-zero ring at radius 0.5
+# is drawn as a black circle, as in the twin.
 edge_radius <- 0.5
 p_validation_polar <- ggplot(model_density, aes(theta, edge_radius + center)) +
   geom_ribbon(aes(ymin = edge_radius + low, ymax = edge_radius + high), fill = RED, alpha = 0.25) +
@@ -1191,12 +1206,15 @@ p_validation_polar <- ggplot(model_density, aes(theta, edge_radius + center)) +
   geom_line(data = kde_density, linetype = "dashed", linewidth = 0.5) +
   geom_errorbar(data = hist_density, aes(ymin = edge_radius + low, ymax = edge_radius + high), width = 0.02) +
   geom_point(data = hist_density, size = 1.3) +
-  geom_hline(yintercept = edge_radius, linewidth = 0.3) +
-  scale_x_continuous(limits = c(-pi, pi), breaks = angle_breaks,
-                     labels = angle_labels, expand = c(0, 0)) +
+  geom_hline(yintercept = edge_radius, colour = "black", linewidth = 0.5) +
+  scale_x_continuous(limits = c(-pi, pi),
+                     breaks = c(-pi / 2, 0, pi / 2, pi),
+                     labels = c("-90°", "0°", " 90°", "±180°     "),
+                     expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, edge_radius + max(model_density$high, kde_density$high) * 1.2)) +
   coord_polar(start = pi / 2, direction = -1) +
-  labs(x = "Direction", y = "Density above radius 0.5") +
+  # The twin shows no axis labels; keep blank radius tick labels like it.
+  labs(x = "", y = "") +
   theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
 save_figure(p_validation_polar, "population_directional_validation", 7, 7)
 ```
@@ -1274,7 +1292,7 @@ p_individual_ppc <- ggplot(ppc_curves, aes(theta, 1 + model, group = individual)
   geom_vline(xintercept = c(-pi, -pi / 2, 0, pi / 2), colour = "grey70", linetype = "dashed", linewidth = 0.2) +
   geom_ribbon(aes(ymin = 1 + kde_low, ymax = 1 + kde_high), fill = "grey50", alpha = 0.25) +
   geom_line(aes(y = 1 + kde), colour = "grey20", linetype = "dashed", linewidth = 0.4) +
-  geom_ribbon(aes(ymin = 1 + model_low, ymax = 1 + model_high), fill = RED, alpha = 0.3) +
+  geom_ribbon(aes(ymin = 1 + model_low, ymax = 1 + model_high), fill = RED, alpha = 0.35) +
   geom_line(colour = RED, linewidth = 0.5) +
   geom_segment(data = ppc_ticks,
     aes(x = theta, xend = theta, y = 1, yend = 1.1), inherit.aes = FALSE, linewidth = 0.2) +
@@ -1437,15 +1455,33 @@ save_figure(p_population_predictive, "population_predictive_both_models", 9, 7)
 individual_predictive <- rbind(ppc_bimodal$individual, ppc_unimodal$individual)
 individual_predictive$individual <- factor(individual_predictive$individual,
                                             levels = levels(ppc_curves$individual))
-p_individual_predictive <- ggplot(individual_predictive, aes(theta, center)) +
-  geom_ribbon(aes(ymin = low, ymax = high, fill = model), alpha = 0.14) +
+# Same radius convention as the other polar figures: density zero sits on
+# the ring at radius 1 and the shared peak (largest model centre density
+# over all individuals and both models) on the ring at radius 2, so the
+# two models' peaks are directly comparable across the grid; the dashed
+# observed bootstrap KDE is drawn on the same radius.
+peak_max_ppc <- max(individual_predictive$center)
+individual_predictive$r_low <- 1 + individual_predictive$low / peak_max_ppc
+individual_predictive$r_center <- 1 + individual_predictive$center / peak_max_ppc
+individual_predictive$r_high <- 1 + individual_predictive$high / peak_max_ppc
+ppc_curves$kde_r <- 1 + ppc_curves$kde / peak_max_ppc
+rmax_ppc <- max(2, 1 + 1.15 * max(individual_predictive$high,
+  ppc_curves$kde) / peak_max_ppc)
+p_individual_predictive <- ggplot(individual_predictive,
+  aes(theta, r_center)) +
+  geom_hline(yintercept = c(1, 2), colour = "grey40", linewidth = 0.25) +
+  geom_segment(data = data.frame(x = 0, xend = 0, y = 1, yend = rmax_ppc),
+    inherit.aes = FALSE,
+    aes(x = x, xend = xend, y = y, yend = yend),
+    colour = "grey20", linewidth = 0.25) +
+  geom_ribbon(aes(ymin = r_low, ymax = r_high, fill = model), alpha = 0.14) +
   geom_line(aes(colour = model), linewidth = 0.4) +
-  geom_line(data = ppc_curves, aes(y = kde),
+  geom_line(data = ppc_curves, aes(y = kde_r),
     linetype = "dashed", linewidth = 0.4) +
   scale_colour_manual(values = c(Bimodal = ORANGE, Unimodal = BLUE)) +
   scale_fill_manual(values = c(Bimodal = ORANGE, Unimodal = BLUE)) +
   scale_x_continuous(limits = c(-pi, pi), expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0, NA), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, rmax_ppc), expand = c(0, 0)) +
   coord_polar(start = pi / 2, direction = -1) +
   facet_wrap(~ individual, ncol = 7) + theme_void(base_size = 8) +
   labs(colour = NULL, fill = NULL, caption = "Dashed: observed bootstrap KDE.") +
