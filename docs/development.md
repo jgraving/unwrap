@@ -40,9 +40,43 @@ The R notebooks need the `ir` kernelspec (see the
 smoke budget (reduced draws) while iterating. Before a change that touches a
 notebook is merged, that notebook is rerun end to end from the checkout
 this way, and the outputs stored in the repository come from that run.
-R package versions (and checksums) are pinned in `renv.lock`: after a
-deliberate upgrade, regenerate it with `Rscript -e 'renv::snapshot()'`
-(see the [R setup](getting-started-r.md) page).
+
+### Maintaining the R environment
+
+The R package versions and sources are recorded in `renv.lock`. After
+a deliberate upgrade, from an activated project (see the
+[R setup](getting-started-r.md) page):
+
+```bash
+Rscript -e 'renv::snapshot()'   # updates renv.lock from the project library
+```
+
+Commit the updated `renv.lock`, but not the machine-local state under
+`renv/` (see `renv/.gitignore`) or the generated `.Rprofile`. The
+lockfile's `Hash` fields identify packages for renv's cache, rather
+than checksumming downloaded archives. After changing pinned versions,
+re-verify a fresh `renv::restore()` from the updated lockfile in a clean
+project.
+
+The install one-liner on the [R setup](getting-started-r.md) page and
+the environment check job in `.github/workflows/r-env.yml` both pin the
+restore to a dated [RSPM](https://packagemanager.posit.co/cran) CRAN
+snapshot, currently **2026-11-03**. The green three-OS CI run restored
+the locked versions, with some source builds. When updating `renv.lock`,
+verify a new snapshot's package availability and update its date in
+**both** places and this note:
+
+```bash
+grep -rn "packagemanager.posit.co/cran/" docs/getting-started-r.md .github/workflows/r-env.yml
+```
+
+The Quarto twins `notebooks_r/*.qmd` are generated from the `.ipynb`
+source of truth. After any R notebook change, regenerate and commit
+them:
+
+```bash
+python tools/ipynb_to_qmd.py
+```
 
 ## Build and preview documentation
 

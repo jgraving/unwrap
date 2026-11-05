@@ -1,0 +1,109 @@
+name: R environment
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r-environment-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Exercises the R install path the setup page documents, end to end: the
+# exact one-liner a user runs (renv restore against the date-pinned RSPM
+# CRAN snapshot whose binary set matches the lockfile), then a real brms
+# fit through CmdStan.
+#
+# - ubuntu-24.04: RSPM binaries for CRAN; four r-universe source builds.
+# - windows-latest: prebuilt R packages; CmdStan still compiles with Rtools.
+# - macos-latest: mostly CRAN binaries, with some source builds, plus CmdStan.
+#
+# These jobs inform but do not gate the (faster) Python matrix.
+jobs:
+  restore:
+    name: ${{ matrix.os }} / R restore + smoke fit
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ubuntu-24.04, not ubuntu-latest: the `-latest` label migrated to
+          # Ubuntu 26 after a runner-label migration. 24.04 is the
+          # tested LTS documented on the setup page.
+          - os: ubuntu-24.04
+            timeout: 30
+          - os: windows-latest
+            timeout: 30
+          - os: macos-latest
+            timeout: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          # The lockfile records R 4.5.3; use the same version for
+          # the tested package binaries.
+          r-version: '4.5.3'
+
+      # Runtime libraries the prebuilt binaries link against (Linux); the
+      # -dev variants also cover packages built from source on either OS.
+      - name: Install system libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gfortran \
+            libgdal-dev libproj-dev libgeos-dev libudunits2-dev \
+            libfreetype-dev libfontconfig1-dev libpng-dev libicu-dev \
+            libuv1-dev libzmq3-dev
+
+      - name: Install system libraries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          xcode-select --install || true
+          brew install gdal proj geos udunits freetype icu4c fontconfig libpng libuv
+
+      # The documented one-liner, unchanged. RSPM's date-pinned CRAN
+      # snapshot carries the locked CRAN versions, with binaries where
+      # available. Source builds also occur; renv Hash values are cache IDs,
+      # not archive checksums. Both URLs must be in the same
+      # repos vector (passing repos to restore() replaces the
+      # lockfile's recorded repositories; the four r-universe
+      # entries record that repository ID), and every entry must be
+      # NAMED: renv matches each package's lockfile Repository id to a
+      # name in this vector, and the lockfile records the four
+      # r-universe packages under the repository id
+      # "https://stan-dev.r-universe.dev" (a URL, not "CRAN").
+      - name: Restore the pinned environment
+        run: |
+          Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::activate(); renv::load(); renv::restore(repos = repos)'
+          # A fresh process now reads the .Rprofile written by activate().
+          Rscript -e 'cat(.libPaths(), sep = "\n")'
+
+      - name: Install CmdStan
+        run: |
+          Rscript -e 'cmdstanr::install_cmdstan(version = "2.40.0")'
+
+      - name: Smoke test - load the stack and fit a real model
+        shell: Rscript {0}
+        run: |
+          cat("SMOKE-START\n"); flush(stdout())
+          suppressMessages(library(brms))
+          cat("BRMS-LOADED\n"); flush(stdout())
+          suppressMessages(library(rmarkdown))
+          cat("RMARKDOWN-LOADED\n"); flush(stdout())
+          stopifnot(dir.exists(as.character(cmdstanr::cmdstan_path())))
+          cat("CmdStan:", as.character(cmdstanr::cmdstan_version()), "\n")
+          set.seed(1)
+          d <- data.frame(y = rnorm(60))
+          fit <- brm(y ~ 1, data = d, iter = 500, warmup = 250, chains = 2,
+                     backend = "cmdstanr", refresh = 0)
+          print(summary(fit, pars = "y_Intercept"))
+          cat("SMOKE-OK\n")
