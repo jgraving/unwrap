@@ -17,8 +17,8 @@ lists all examples, their inputs, and what each validated run covers.
 ## The tutorial
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="notebooks/circular_regression.ipynb">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/circular_regression.ipynb">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/circular_regression/">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/circular_regression/">R</a>
 </p>
 
 The circular regression tutorial
@@ -39,8 +39,8 @@ terms to biological questions and model formulas.
 ### Grevy's zebra body orientation during an escape response
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="notebooks/zebra_escape.ipynb">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/zebra_escape.ipynb">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/zebra_escape/">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/zebra_escape/">R</a>
 </p>
 
 A focal group of Grevy's zebra (*Equus grevyi*) was recorded with an overhead
@@ -64,8 +64,8 @@ zebra's observations cluster around its own mean direction).
 ### Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="notebooks/goldshtein_bats.ipynb">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/goldshtein_bats.ipynb">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/goldshtein_bats/">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/goldshtein_bats/">R</a>
 </p>
 
 The homing bat analysis
@@ -91,8 +91,8 @@ compared with a unimodal von Mises baseline.
 ### Order and density shape locust directional alignment in virtual reality
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="notebooks/locust_density_order.ipynb">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/locust_density_order.ipynb">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/locust_density_order/">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/locust_density_order/">R</a>
 </p>
 
 The order and density analysis
@@ -113,8 +113,8 @@ performance, and adding density provides at most a secondary gain.
 ### Testing optic-flow vs. vectorial encoding in marching locusts
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="notebooks/locust_direction_mixture_model.ipynb">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/locust_direction_mixture_model.ipynb">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/locust_direction_mixture_model/">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/locust_direction_mixture_model/">R</a>
 </p>
 
 The mixture analysis
@@ -130,8 +130,8 @@ turns).
 ### Artificial light reorients nocturnal dung beetles
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="notebooks/beetles.ipynb">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/beetles.ipynb">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/beetles/">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/beetles/">R</a>
 </p>
 
 The beetle analysis a two-condition
@@ -160,8 +160,8 @@ backwards from likelihood to behavior.
 ### Periodic but not circular: a 24-hour activity rhythm
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="notebooks/periodic_not_circular.ipynb">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/periodic_not_circular.ipynb">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/periodic_not_circular/">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/periodic_not_circular/">R</a>
 </p>
 
 The periodicity example
@@ -178,8 +178,8 @@ posterior-predictive uncertainty bands.
 ### Von Mises navigation policy
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="notebooks/von_mises_policy.ipynb">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/von_mises_policy.ipynb">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/von_mises_policy/">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/von_mises_policy/">R</a>
 </p>
 
 The policy example
