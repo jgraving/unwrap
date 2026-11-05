@@ -1,10 +1,13 @@
 # Examples
 
-**Every example is available in Python and in R.** The R notebooks live
-under `notebooks_r/` next to their Python counterparts and use the same
-observations, formulas, and prior scales, fitted with
-[brms](https://paulbuerkner.com/brms/) on CmdStan. The [R setup
-page](getting-started-r.md) covers the one-time environment;
+**Every example is available in Python and in R.** The Python notebooks
+live under `notebooks/`, built on **PyMC** (with **Bambi** for the formula
+interface), and the site's "Open in Colab" button launches them in the
+cloud; the R notebooks live under `notebooks_r/` next to their Python
+counterparts, fitted with [brms](https://paulbuerkner.com/brms/) on
+CmdStan. The two sides of each pair use the same observations, formulas,
+and prior scales. The [Python setup page](getting-started.md) covers the
+Python environment and the [R setup page](getting-started-r.md) the R one;
 [R and MATLAB](languages.md) covers the standalone R scripts and the MATLAB
 examples.
 
@@ -13,8 +16,8 @@ lists all examples, their inputs, and what each validated run covers.
 
 ## The tutorial
 
-The [circular regression tutorial](notebooks/circular_regression.ipynb)
-([R](notebooks_r/circular_regression.ipynb)) is a complete introduction
+The circular regression tutorial ([Python](notebooks/circular_regression.ipynb),
+[R](notebooks_r/circular_regression.ipynb)) is a complete introduction
 using simulated observations: a math example on toy data, not a
 biological study, and the cheapest way to see the whole workflow. It
 fits a circular generalized linear model (GLM) with a formula for both
@@ -40,8 +43,8 @@ using drones and computer vision," *Journal of Animal Ecology* **92**(6),
 1415-1433 (2023); [doi:10.1111/1365-2656.13904](https://doi.org/10.1111/1365-2656.13904).
 The first flights capture baseline (grazing) body orientation, and the final
 flight contains a disturbance event in which a human observer approaches the
-group. The [zebra analysis](notebooks/zebra_escape.ipynb)
-([R](notebooks_r/zebra_escape.ipynb)) compares
+group. The zebra analysis ([Python](notebooks/zebra_escape.ipynb),
+[R](notebooks_r/zebra_escape.ipynb)) compares
 body orientation in the **pre-stimulus baseline period** (pre-approach) with
 the **post-stimulus period** (post-approach), using circularly averaged
 orientation over 10 s windows. The hierarchical model separates three
@@ -52,8 +55,8 @@ zebra's observations cluster around its own mean direction).
 
 ### Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
 
-The [homing bat analysis](notebooks/goldshtein_bats.ipynb)
-([R](notebooks_r/goldshtein_bats.ipynb)) revisits
+The homing bat analysis ([Python](notebooks/goldshtein_bats.ipynb),
+[R](notebooks_r/goldshtein_bats.ipynb)) revisits
 kilometer-scale homing flights of echolocating bats from the experiments of
 A. Goldshtein et al., "Acoustic cognitive map-based navigation in
 echolocating bats," *Science* **386**(6721), 561-567 (2024);
@@ -75,8 +78,8 @@ compared with a unimodal von Mises baseline.
 
 ### Order and density shape locust directional alignment in virtual reality
 
-The [order and density analysis](notebooks/locust_density_order.ipynb)
-([R](notebooks_r/locust_density_order.ipynb)) revisits
+The order and density analysis ([Python](notebooks/locust_density_order.ipynb),
+[R](notebooks_r/locust_density_order.ipynb)) revisits
 a virtual-reality experiment from S. Sayin et al., "The behavioral
 mechanisms governing collective motion in swarming locusts," *Science*
 **387**(6737), 995-1000 (2025);
@@ -93,8 +96,8 @@ performance, and adding density provides at most a secondary gain.
 
 ### Testing optic-flow vs. vectorial encoding in marching locusts
 
-The [mixture analysis](notebooks/locust_direction_mixture_model.ipynb)
-([R](notebooks_r/locust_direction_mixture_model.ipynb)) tests
+The mixture analysis ([Python](notebooks/locust_direction_mixture_model.ipynb),
+[R](notebooks_r/locust_direction_mixture_model.ipynb)) tests
 a second paradigm from the same experiments, in which moving virtual
 conspecifics are placed symmetrically at a lateral distance of 8 or 50 cm. A hierarchical
 bimodal von Mises mixture fitted to the full distribution of headings
@@ -106,8 +109,8 @@ turns).
 
 ### Artificial light reorients nocturnal dung beetles
 
-The [beetle analysis](notebooks/beetles.ipynb)
-([R](notebooks_r/beetles.ipynb)) revisits a two-condition
+The beetle analysis ([Python](notebooks/beetles.ipynb),
+[R](notebooks_r/beetles.ipynb)) revisits a two-condition
 arena experiment in the nocturnal ball-rolling dung beetle *Escarabaeus
 satyrus* from the experiments of J. J. Foster et al., "Light pollution
 forces a change in dung beetle orientation behavior," *Current Biology*
@@ -132,8 +135,8 @@ backwards from likelihood to behavior.
 
 ### Periodic but not circular: a 24-hour activity rhythm
 
-The [periodicity example](notebooks/periodic_not_circular.ipynb)
-([R](notebooks_r/periodic_not_circular.ipynb)) draws the line between
+The periodicity example ([Python](notebooks/periodic_not_circular.ipynb),
+[R](notebooks_r/periodic_not_circular.ipynb)) draws the line between
 *periodic* and *circular*: time of day repeats every 24 hours, but the
 quantity of interest - activity - is a level bounded in (0, 1), not an angle.
 The periodicity belongs to the *predictor*, so the model is a Beta GLM whose
@@ -146,8 +149,8 @@ posterior-predictive uncertainty bands.
 
 ### Von Mises navigation policy
 
-The [policy example](notebooks/von_mises_policy.ipynb)
-([R](notebooks_r/von_mises_policy.ipynb)) reads the von Mises distribution in
+The policy example ([Python](notebooks/von_mises_policy.ipynb),
+[R](notebooks_r/von_mises_policy.ipynb)) reads the von Mises distribution in
 the opposite direction - as a *navigation policy* rather than a likelihood.
 With utility defined as the negated distance to a goal, the heading
 distribution that maximizes utility in constant-length steps is exactly a von
