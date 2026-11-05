@@ -14,10 +14,10 @@ format: html
 #| dev: ragg_png
 #| echo: false
 #| warning: false
-# The Jupyter notebook shows inline figures through IRdisplay; native R
-# has no such channel, so Quarto captures the returned plot objects
-# itself. The device is ragg (headless-safe) rather than the Cairo SVG
-# default, which many headless R builds lack entirely.
+# The Jupyter notebook shows inline figures through its display
+# channel, which native R has no equivalent of, so Quarto captures
+# the returned plot objects itself. The device is ragg (headless-safe)
+# rather than the Cairo SVG default, which many headless R builds lack.
 knitr::opts_chunk$set(dev = "ragg_png")
 ```
 
@@ -45,27 +45,39 @@ keeping every direction on the circle.
 
 ## Setup
 
-Select the **R (`ir`)** kernel after following the [R setup](../getting-started-r.md)
-page.
+Follow the [R setup](../getting-started-r.md)
+page; the setup cell stops with a pointer there if the pinned packages
+or CmdStan are not available.
 
 Run the cells in order from `notebooks_r/` or the repository root.
 
 Running the notebook records versions, diagnostics, inline PNGs, and vector PDFs.
 
+
 ```{r}
 #| cell-id: "locust-r-002"
-required <- c("brms", "posterior", "loo", "arrow", "circular",
-              "ggplot2", "patchwork", "ragg", "IRdisplay")
-missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
-if (length(missing)) install.packages(missing, repos = "https://cloud.r-project.org")
-if (!requireNamespace("cmdstanr", quietly = TRUE)) {
-  install.packages("cmdstanr",
-    repos = c("https://stan-dev.r-universe.dev", "https://cloud.r-project.org"))
-}
-cmdstan_ok <- tryCatch(dir.exists(as.character(cmdstanr::cmdstan_path())),
-  error = function(e) FALSE)
-if (!cmdstan_ok) cmdstanr::install_cmdstan()
+# Setup: check that this notebook's stack is available. The examples
+# are verified against the pinned package set recorded in renv.lock, so
+# this cell deliberately does not auto-install: an unpinned install
+# could silently drift from the verified set. Run the one-time setup on
+# the R setup page first (docs/getting-started-r.md).
 
+required <- c("brms", "posterior", "loo", "arrow", "circular",
+              "ggplot2", "patchwork", "ragg")
+missing <- required[!vapply(required, requireNamespace, logical(1),
+  quietly = TRUE)]
+if (length(missing))
+  stop("Missing R package(s): ", paste(missing, collapse = ", "),
+       " - run the one-time setup on the R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
+
+cmdstan_ok <- tryCatch(
+  dir.exists(as.character(cmdstanr::cmdstan_path())),
+  error = function(e) FALSE)
+if (!cmdstan_ok)
+  stop("cmdstanr/CmdStan is not available - run the one-time setup on the",
+       " R setup page first:",
+       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
 ```
 
 ```{r}
@@ -117,8 +129,8 @@ show_figure <- function(plot, name, width, height, res = 110) {
                 res = res)
   print(plot)
   invisible(dev.off())
-  # Quarto renders the returned plot object natively; no IRdisplay
-  # (Jupyter) channel is needed or available outside the R kernel.
+  # Quarto renders the returned plot object natively; there is no
+  # display channel to write to outside Jupyter.
   plot
 }
 
@@ -135,9 +147,14 @@ save_figure <- function(plot, name, width = 8, height = 5) {
 SEED <- 42L
 set.seed(SEED)
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
-CHAINS <- if (quick_run) 2L else 4L
-ITER <- if (quick_run) 4000L else 8000L
-WARMUP <- if (quick_run) 2000L else 4000L
+CHAINS <- 4L
+# Quick keeps the full MCMC budget: at three-quarters of it
+# (4 x 6,000 iterations / 3,000 warmup) the unimodal baseline
+# fit's `mu_pop` R-hat reached 1.0109, over the 1.01 hard gate,
+# so the four chains need the full draws to mix. Quick still
+# shortens the cheap bootstrap, KDE, and predictive budgets.
+ITER <- 8000L
+WARMUP <- 4000L
 N_BOOTSTRAPS <- if (quick_run) 150L else 1000L
 N_BOOT_KDE <- if (quick_run) 100L else 1000L
 N_PREDICTIVE <- if (quick_run) 25L else 100L
@@ -222,8 +239,15 @@ angle_breaks <- c(-pi, -pi / 2, 0, pi / 2, pi)
 angle_labels <- c("-pi", "-pi/2", "0", "pi/2", "pi")
 
 circular_kde <- function(theta, y, bw) {
-  y <- circular::circular(wrap(y), units = "radians", modulo = "asis")
-  circular::density.circular(y, z = theta, bw = bw, kernel = "vonmises")$y
+  # The grid is passed as an explicit circular object: density.circular
+  # would otherwise coerce the raw numeric grid internally, which emits
+  # a default-value coercion warning on every call (thousands of them in
+  # the bootstrap cells).
+  y <- circular::circular(wrap(y), units = "radians", template = "none",
+                          modulo = "asis")
+  z <- circular::circular(theta, units = "radians", template = "none",
+                          modulo = "asis")
+  circular::density.circular(y, z = z, bw = bw, kernel = "vonmises")$y
 }
 kde_basis <- function(theta, y, bw) {
   # The KDE is linear in observation weights. Repeating a single angle
@@ -671,11 +695,13 @@ the sampler's path, never the posterior.
 
 Full sampling uses four chains of 8,000 iterations with 4,000 warmup
 each (16,000 posterior draws in total), with `adapt_delta = 0.97` and
-`max_treedepth = 12`. Quick mode (`UNWRAP_R_QUICK=1`) halves the budget:
-two chains of 4,000 iterations with 2,000 warmup, fewer bootstrap
-resamples (150 instead of 1,000), fewer KDE draws (100 instead of 1,000),
-and fewer predictive replicates (25 instead of 100). The hard diagnostic
-gates apply at either budget.
+`max_treedepth = 12`. Quick mode (`UNWRAP_R_QUICK=1`) keeps that full
+MCMC budget, because at three-quarters of it the unimodal baseline fit's
+`mu_pop` R-hat reached 1.0109, over the 1.01 hard gate; it instead
+shortens the cheap post-processing, with fewer bootstrap resamples
+(150 instead of 1,000), fewer KDE draws (100 instead of
+1,000), and fewer predictive replicates (25 instead of 100). The hard
+gates apply in either mode.
 
 ```{r}
 #| cell-id: "locust-r-019"
@@ -709,10 +735,14 @@ mk_init <- function(anchor_seed) {
 }
 init_mix <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
 set.seed(SEED)
-fit_bimodal <- brm(mix_form, data = df, prior = mix_priors, stanvars = mix_stanvars,
-  backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
-  cores = CHAINS, seed = SEED, init = init_mix,
-  control = list(adapt_delta = 0.97, max_treedepth = 12))
+fit_bimodal <- unwrap_load_fit_cache("locust_mix_bimodal", SEED, ITER, WARMUP)
+if (is.null(fit_bimodal)) {
+  fit_bimodal <- brm(mix_form, data = df, prior = mix_priors, stanvars = mix_stanvars,
+    backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
+    cores = CHAINS, seed = SEED, init = init_mix,
+    control = list(adapt_delta = 0.97, max_treedepth = 12))
+  unwrap_save_fit_cache("locust_mix_bimodal", fit_bimodal, SEED, ITER, WARMUP)
+}
 ```
 
 ```{r}
@@ -954,10 +984,14 @@ mk_init <- function(anchor_seed) {
 }
 init_uni <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
 set.seed(SEED)
-fit_unimodal <- brm(uni_form, data = df, prior = uni_priors, stanvars = uni_stanvars,
-  backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
-  cores = CHAINS, seed = SEED, init = init_uni,
-  control = list(adapt_delta = 0.97, max_treedepth = 12))
+fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal", SEED, ITER, WARMUP)
+if (is.null(fit_unimodal)) {
+  fit_unimodal <- brm(uni_form, data = df, prior = uni_priors, stanvars = uni_stanvars,
+    backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
+    cores = CHAINS, seed = SEED, init = init_uni,
+    control = list(adapt_delta = 0.97, max_treedepth = 12))
+  unwrap_save_fit_cache("locust_mix_unimodal", fit_unimodal, SEED, ITER, WARMUP)
+}
 state_unimodal <- extract_state(fit_unimodal, bimodal = FALSE)
 summary_unimodal <- diagnose_fit(fit_unimodal, state_unimodal)
 ```
@@ -1271,36 +1305,89 @@ animal-specific densities. These checks complement the analytic-density figures 
 
 ```{r}
 #| cell-id: "p3-ppc-draws"
-bin_heading_density <- function(y) {
-  bin <- findInterval(wrap(y), bins, rightmost.closed = TRUE)
-  tabulate(bin, nbins = length(bin_centers)) / (length(y) * bin_width)
-}
-replicate_headings <- function(state, i, draw, n) {
+# The 52 animal sections of the predictive check are independent, so
+# they run on a PSOCK cluster (fresh child R processes) instead of
+# in the kernel. Workers are seeded per (model, animal), so results do
+# not depend on the core count. (The earlier parallelize attempt used
+# parallel::mclapply, whose fork is not safe under IRkernel: workers
+# inherit the kernel's live ZMQ socket and the fork corrupts it. This
+# also re-seeds the PPC draw streams relative to the original
+# shared-stream implementation; the values move by Monte Carlo noise
+# only, and the in-notebook gates are on the fit, not on these draws.
+# The workers are plain top-level functions, which serialize as
+# ~50-byte closures over the globalenv; all data flows through the
+# explicit parLapply arguments.)
+ppc_worker <- function(i, state, draws, n, theta_grid, bins, bin_widths,
+                       bin_centers, rng_seed) {
+  wrap <- function(x) (x + pi) %% (2 * pi) - pi
+  circular_kde <- function(theta, y, bw) {
+    yc <- circular::circular(wrap(y), units = "radians", template = "none",
+                             modulo = "asis")
+    z <- circular::circular(theta, units = "radians", template = "none",
+                            modulo = "asis")
+    circular::density.circular(yc, z = z, bw = bw,
+                               kernel = "vonmises")$y
+  }
+  bin_heading_density <- function(y) {
+    b <- findInterval(wrap(y), bins, rightmost.closed = TRUE)
+    tabulate(b, nbins = length(bin_centers)) /
+      (length(y) * bin_widths)
+  }
   draw_vm <- function(n, mu, kappa) {
     if (!n) return(numeric())
-    as.numeric(circular::rvonmises(n, mu = mu, kappa = kappa))
+    vmu <- circular::circular(mu, units = "radians", template = "none",
+                              modulo = "2pi")
+    as.numeric(circular::rvonmises(n, vmu, kappa,
+      control.circular = list(units = "radians", template = "none",
+                              modulo = "2pi")))
   }
   if (is.null(state$weight)) {
-    return(wrap(draw_vm(n, state$muone[i, draw], state$kone[i, draw])))
+    rep_head <- function(draw) {
+      wrap(draw_vm(n, state$muone[i, draw], state$kone[i, draw]))
+    }
+  } else {
+    rep_head <- function(draw) {
+      first <- rbinom(1, n, state$weight[i, draw])
+      wrap(c(draw_vm(first, state$muone[i, draw], state$kone[i, draw]),
+             draw_vm(n - first, state$mutwo[i, draw], state$ktwo[i,
+               draw])))
+    }
   }
-  first <- rbinom(1, n, state$weight[i, draw])
-  wrap(c(draw_vm(first, state$muone[i, draw], state$kone[i, draw]),
-         draw_vm(n - first, state$mutwo[i, draw], state$ktwo[i, draw])))
+  set.seed(rng_seed)
+  y_rep <- lapply(draws, rep_head)
+  list(hist = vapply(y_rep, bin_heading_density,
+                     numeric(length(bin_centers))),
+    population = vapply(y_rep, function(y) {
+      circular_kde(theta_grid, y, bw = 30)
+    }, numeric(length(theta_grid))),
+    individual = vapply(y_rep, function(y) {
+      circular_kde(theta_grid, y, bw = 15)
+    }, numeric(length(theta_grid))))
 }
-predictive_checks <- function(state, model) {
+ppc_task <- function(i, state, draws, n_all, theta_grid, bins,
+                     bin_widths, bin_centers, rng_tag) {
+  ppc_worker(i, state, draws, n_all[i], theta_grid, bins, bin_widths,
+             bin_centers, rng_tag + i)
+}
+predictive_checks <- function(state, model, model_tag) {
   draws <- sample.int(nrow(state$draws), N_PREDICTIVE)
+  n_all <- vapply(rows_by_animal, length, integer(1L))
+  ppc_cores <- min(8L, max(2L, parallel::detectCores()))
+  cl <- parallel::makePSOCKcluster(ppc_cores)
+  on.exit(parallel::stopCluster(cl), add = TRUE)
+  parallel::clusterEvalQ(cl, quote({
+    .libPaths(c(Filter(nzchar, c(Sys.getenv("R_LIBS_USER"),
+      Sys.getenv("R_LIBS_SITE"))), .libPaths()))
+  }))
+  parallel::clusterExport(cl, c("ppc_worker", "ppc_task"),
+                          envir = globalenv())
+  individuals <- parallel::parLapply(
+    cl, seq_len(num_individuals), ppc_task,
+    state = state, draws = draws, n_all = n_all, theta_grid = theta_grid,
+    bins = bins, bin_widths = bin_width, bin_centers = bin_centers,
+    rng_tag = SEED + 90000L + 1000L * model_tag)
   pop_hist <- matrix(0, nrow = length(bin_centers), ncol = length(draws))
   pop_kde <- matrix(0, nrow = length(theta_grid), ncol = length(draws))
-  individuals <- lapply(seq_len(num_individuals), function(i) {
-    n <- length(rows_by_animal[[i]])
-    y_rep <- lapply(draws, function(s) replicate_headings(state, i, s, n))
-    # Return each animal's contributions and aggregate them outside lapply.
-    list(hist = vapply(y_rep, bin_heading_density, numeric(length(bin_centers))),
-      population = vapply(y_rep, function(y) circular_kde(theta_grid, y, bw = 30),
-                         numeric(length(theta_grid))),
-      individual = vapply(y_rep, function(y) circular_kde(theta_grid, y, bw = 15),
-                         numeric(length(theta_grid))))
-  })
   for (ind in individuals) {
     pop_hist <- pop_hist + ind$hist / num_individuals
     pop_kde <- pop_kde + ind$population / num_individuals
@@ -1316,9 +1403,11 @@ predictive_checks <- function(state, model) {
   list(population = transform(population, model = model),
        individual = transform(individual, model = model))
 }
-set.seed(SEED)
-ppc_bimodal <- predictive_checks(state_bimodal, "Bimodal")
-ppc_unimodal <- predictive_checks(state_unimodal, "Unimodal")
+set.seed(SEED + 1L)
+ppc_bimodal <- predictive_checks(state_bimodal, "Bimodal", model_tag = 1L)
+set.seed(SEED + 2L)
+ppc_unimodal <- predictive_checks(state_unimodal, "Unimodal", model_tag = 2L)
+
 ```
 
 ```{r}
