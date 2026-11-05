@@ -800,31 +800,26 @@ def plot_predictive_both_models_population(trace_bimodal, trace_unimodal, df,
 
     fig, axes = plt.subplots(2, 2, figsize=(2.2 * 2, 1.7 * 2),
                              dpi=_plots.DEFAULT_DISPLAY_DPI)
-    model_lines = {}
-    obs_hist = obs_kde = None
     for row, (x, mkey) in enumerate(((bin_centers, "hist"), (angles, "kde"))):
         for col, (model, color) in enumerate(
                 (("Bimodal", BIMODAL), ("Unimodal", UNIMODAL))):
             ax = axes[row, col]
             s = stats[model]
-            line, = ax.plot(x, s[f"{mkey}_median"], color, linewidth=1.2,
-                            zorder=3)
+            ax.plot(x, s[f"{mkey}_median"], color, linewidth=1.2, zorder=3)
             ax.fill_between(x, s[f"{mkey}_lower"], s[f"{mkey}_upper"],
                             color=color, alpha=0.2, zorder=2)
             # Black observed-bootstrap overlays, on every cell as in R.
-            ex = ax.errorbar(
+            ax.errorbar(
                 hist_stats["hist_bin_centers"], hist_stats["hist_median"],
                 yerr=hist_stats["hist_errors"], fmt="o", ecolor="black",
                 markeredgecolor="black", markerfacecolor="black",
                 linewidth=1, capsize=2, markersize=2, zorder=4)
-            ox, = ax.plot(kde_stats["kde_angles"], kde_stats["kde_median"],
-                          "black", linestyle="--", linewidth=1.2, zorder=4)
+            ax.plot(kde_stats["kde_angles"], kde_stats["kde_median"],
+                    "black", linestyle="--", linewidth=1.2, zorder=4)
             ax.fill_between(kde_stats["kde_angles"],
                             kde_stats["kde_lower_bounds"],
                             kde_stats["kde_upper_bounds"],
                             color="black", alpha=0.12, zorder=1)
-            if row == 0 and col == 0:
-                obs_hist, obs_kde = ex, ox
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
             ax.set_xticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi],
@@ -832,7 +827,6 @@ def plot_predictive_both_models_population(trace_bimodal, trace_unimodal, df,
                            r"$\frac{\pi}{2}$", r"$\pi$"])
             if row == 1:
                 ax.set_xlabel("Heading (radians)")
-            model_lines[(row, col)] = line
 
     # Column headers (the models) and row labels (the estimates).
     axes[0, 0].set_title("Bimodal", fontsize=8)
@@ -843,18 +837,12 @@ def plot_predictive_both_models_population(trace_bimodal, trace_unimodal, df,
              ha="center", fontsize=7)
     fig.text(-0.06, 0.5, "Density", rotation="vertical", va="center",
              fontsize=7)
-    fig.legend(
-        [model_lines[(0, 0)], model_lines[(0, 1)], obs_hist, obs_kde],
-        ["Bimodal", "Unimodal", "Observed histogram", "Observed KDE"],
-        handler_map={model_lines[(0, 0)]: _density_legend_handler(BIMODAL),
-                     model_lines[(0, 1)]: _density_legend_handler(UNIMODAL),
-                     obs_kde: _density_legend_handler("black", "--", 0.12)},
-        bbox_to_anchor=(1.0, 1.0), frameon=False, loc="upper left",
-    )
     fig.text(0.5, 0.01,
              "Black: observed bootstrap. Colour: posterior predictive "
              "replicates.", ha="center", fontsize=6)
-    plt.tight_layout(rect=(0.03, 0.03, 0.80, 0.97))
+    # No legend: the R twin carries none either (the black overlays are
+    # named in the caption).
+    plt.tight_layout(rect=(0.03, 0.03, 1.0, 0.97))
     _save(fig, save, save_path)
 
 
@@ -900,13 +888,13 @@ def plot_predictive_both_models_individual(trace_bimodal, trace_unimodal, df,
         ax.fill_between(angles, r_of(s_b["lower"][idx]), r_of(s_b["upper"][idx]),
                         color=BIMODAL, alpha=0.14, linewidth=0, zorder=1)
         ax.plot(angles, r_of(s_b["median"][idx]), color=BIMODAL,
-                linewidth=1.0, label="Bimodal (posterior 95%)"
-                if idx == 0 else None, zorder=3)
+                linewidth=1.0, label="Bimodal" if idx == 0 else None,
+                zorder=3)
         ax.fill_between(angles, r_of(s_u["lower"][idx]), r_of(s_u["upper"][idx]),
                         color=UNIMODAL, alpha=0.14, linewidth=0, zorder=1)
         ax.plot(angles, r_of(s_u["median"][idx]), color=UNIMODAL,
-                linewidth=1.0, label="Unimodal (posterior 95%)"
-                if idx == 0 else None, zorder=3)
+                linewidth=1.0, label="Unimodal" if idx == 0 else None,
+                zorder=3)
         if np.isfinite(obs["kde_med"][idx]).any():
             ax.plot(angles, r_of(obs["kde_med"][idx]), color="black",
                     linestyle="--", linewidth=1.0,
@@ -930,8 +918,11 @@ def plot_predictive_both_models_individual(trace_bimodal, trace_unimodal, df,
 
     handles, labels = axs[0].get_legend_handles_labels()
     if len(handles) > 0:
-        fig.legend(handles, labels, loc="upper right",
-                   bbox_to_anchor=(1.02, 1.02), frameon=True)
-
-    plt.tight_layout()
+        # Bottom legend like the R twin (Bimodal/Unimodal); the dashed
+        # observed overlay is named in the caption instead.
+        fig.legend(handles[:2], labels[:2], loc="lower center", ncol=2,
+                   frameon=False, bbox_to_anchor=(0.5, 0.012), fontsize=8)
+        fig.text(0.99, 0.002, "Dashed: observed bootstrap KDE.",
+                 ha="right", fontsize=6)
+    plt.tight_layout(rect=(0.0, 0.045, 1.0, 1.0))
     _save(fig, save, save_path)
