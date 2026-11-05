@@ -16,8 +16,12 @@ lists all examples, their inputs, and what each validated run covers.
 
 ## The tutorial
 
-The circular regression tutorial ([Python](notebooks/circular_regression.ipynb),
-[R](notebooks_r/circular_regression.ipynb)) is a complete introduction
+<p class="unwrap-lang-row">
+  <a class="unwrap-lang unwrap-lang-py" href="notebooks/circular_regression.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/circular_regression.ipynb">R</a>
+</p>
+
+The circular regression tutorial
 using simulated observations: a math example on toy data, not a
 biological study, and the cheapest way to see the whole workflow. It
 fits a circular generalized linear model (GLM) with a formula for both
@@ -34,6 +38,11 @@ terms to biological questions and model formulas.
 
 ### Grevy's zebra body orientation during an escape response
 
+<p class="unwrap-lang-row">
+  <a class="unwrap-lang unwrap-lang-py" href="notebooks/zebra_escape.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/zebra_escape.ipynb">R</a>
+</p>
+
 A focal group of Grevy's zebra (*Equus grevyi*) was recorded with an overhead
 drone and automated tracking at the Mpala Conservancy in Laikipia, Kenya: the
 body orientations come from the drone recordings of B. Koger, A. Deshpande,
@@ -43,8 +52,7 @@ using drones and computer vision," *Journal of Animal Ecology* **92**(6),
 1415-1433 (2023); [doi:10.1111/1365-2656.13904](https://doi.org/10.1111/1365-2656.13904).
 The first flights capture baseline (grazing) body orientation, and the final
 flight contains a disturbance event in which a human observer approaches the
-group. The zebra analysis ([Python](notebooks/zebra_escape.ipynb),
-[R](notebooks_r/zebra_escape.ipynb)) compares
+group. The zebra analysis
 body orientation in the **pre-stimulus baseline period** (pre-approach) with
 the **post-stimulus period** (post-approach), using circularly averaged
 orientation over 10 s windows. The hierarchical model separates three
@@ -55,8 +63,12 @@ zebra's observations cluster around its own mean direction).
 
 ### Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
 
-The homing bat analysis ([Python](notebooks/goldshtein_bats.ipynb),
-[R](notebooks_r/goldshtein_bats.ipynb)) revisits
+<p class="unwrap-lang-row">
+  <a class="unwrap-lang unwrap-lang-py" href="notebooks/goldshtein_bats.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/goldshtein_bats.ipynb">R</a>
+</p>
+
+The homing bat analysis
 kilometer-scale homing flights of echolocating bats from the experiments of
 A. Goldshtein et al., "Acoustic cognitive map-based navigation in
 echolocating bats," *Science* **386**(6721), 561-567 (2024);
@@ -78,8 +90,12 @@ compared with a unimodal von Mises baseline.
 
 ### Order and density shape locust directional alignment in virtual reality
 
-The order and density analysis ([Python](notebooks/locust_density_order.ipynb),
-[R](notebooks_r/locust_density_order.ipynb)) revisits
+<p class="unwrap-lang-row">
+  <a class="unwrap-lang unwrap-lang-py" href="notebooks/locust_density_order.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/locust_density_order.ipynb">R</a>
+</p>
+
+The order and density analysis
 a virtual-reality experiment from S. Sayin et al., "The behavioral
 mechanisms governing collective motion in swarming locusts," *Science*
 **387**(6737), 995-1000 (2025);
@@ -96,8 +112,12 @@ performance, and adding density provides at most a secondary gain.
 
 ### Testing optic-flow vs. vectorial encoding in marching locusts
 
-The mixture analysis ([Python](notebooks/locust_direction_mixture_model.ipynb),
-[R](notebooks_r/locust_direction_mixture_model.ipynb)) tests
+<p class="unwrap-lang-row">
+  <a class="unwrap-lang unwrap-lang-py" href="notebooks/locust_direction_mixture_model.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/locust_direction_mixture_model.ipynb">R</a>
+</p>
+
+The mixture analysis
 a second paradigm from the same experiments, in which moving virtual
 conspecifics are placed symmetrically at a lateral distance of 8 or 50 cm. A hierarchical
 bimodal von Mises mixture fitted to the full distribution of headings
@@ -109,8 +129,12 @@ turns).
 
 ### Artificial light reorients nocturnal dung beetles
 
-The beetle analysis ([Python](notebooks/beetles.ipynb),
-[R](notebooks_r/beetles.ipynb)) revisits a two-condition
+<p class="unwrap-lang-row">
+  <a class="unwrap-lang unwrap-lang-py" href="notebooks/beetles.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/beetles.ipynb">R</a>
+</p>
+
+The beetle analysis a two-condition
 arena experiment in the nocturnal ball-rolling dung beetle *Escarabaeus
 satyrus* from the experiments of J. J. Foster et al., "Light pollution
 forces a change in dung beetle orientation behavior," *Current Biology*
@@ -135,8 +159,12 @@ backwards from likelihood to behavior.
 
 ### Periodic but not circular: a 24-hour activity rhythm
 
-The periodicity example ([Python](notebooks/periodic_not_circular.ipynb),
-[R](notebooks_r/periodic_not_circular.ipynb)) draws the line between
+<p class="unwrap-lang-row">
+  <a class="unwrap-lang unwrap-lang-py" href="notebooks/periodic_not_circular.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/periodic_not_circular.ipynb">R</a>
+</p>
+
+The periodicity example
 *periodic* and *circular*: time of day repeats every 24 hours, but the
 quantity of interest - activity - is a level bounded in (0, 1), not an angle.
 The periodicity belongs to the *predictor*, so the model is a Beta GLM whose
@@ -149,8 +177,12 @@ posterior-predictive uncertainty bands.
 
 ### Von Mises navigation policy
 
-The policy example ([Python](notebooks/von_mises_policy.ipynb),
-[R](notebooks_r/von_mises_policy.ipynb)) reads the von Mises distribution in
+<p class="unwrap-lang-row">
+  <a class="unwrap-lang unwrap-lang-py" href="notebooks/von_mises_policy.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="notebooks_r/von_mises_policy.ipynb">R</a>
+</p>
+
+The policy example
 the opposite direction - as a *navigation policy* rather than a likelihood.
 With utility defined as the negated distance to a goal, the heading
 distribution that maximizes utility in constant-length steps is exactly a von
