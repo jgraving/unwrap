@@ -908,7 +908,12 @@ log_lik_unwrap_von_mises <- function(i, prep) {
 # fits as usual and stores the result with unwrap_save_fit_cache().
 # A snapshot is only reused when name, seed, iter, and warmup all match
 # (and the fixed-effects size still matches), so a stale cache can
-# never sneak into a run. With UNWRAP_R_FIT_CACHE unset (the default,
+# never sneak into a run.
+# name is caller-provided, so it must identify the MODEL as well as its
+# budget: a model change (priors/formula/family) under an unchanged name
+# would silently reuse the old snapshot. Bump the name (e.g. a version
+# suffix like "fit_v2") whenever the model changes.
+# With UNWRAP_R_FIT_CACHE unset (the default,
 # and how committed notebooks are validated) these helpers are silent
 # no-ops and nothing is read from or written to disk.
 
