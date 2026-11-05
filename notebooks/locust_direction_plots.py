@@ -775,3 +775,154 @@ def plot_alignment_individual(trace_bimodal, *, save=True,
 
     fig.tight_layout()
     _save(fig, save, save_path)
+
+
+# ---------------------------------------------------------------------------
+# Replicated-heading checks under both models (the Python twin of the R
+# notebook's replicated-PPC section): population check in cartesian form
+# and a 52-disk polar grid, both overlaying the observed bootstrap
+# estimates in black.
+# ---------------------------------------------------------------------------
+def plot_predictive_both_models_population(trace_bimodal, trace_unimodal, df,
+                                           *, save=True,
+                                           save_path="figures/locust/population_predictive_both_models.pdf"):
+    """Cartesian 2x2 population check. Rows: the estimate (top: 16-bin
+    bootstrap histogram, bottom: von Mises KDE); columns: the model.
+    Each cell shows the model's replicated predictive density (median +
+    2.5/97.5 band across the shared draws) in the model colour, with
+    both black observed-bootstrap overlays (histogram error bars, dashed
+    KDE line with a light band) on every cell, as in the R twin."""
+    stats = posthoc.both_models_ppc_stats(trace_bimodal, trace_unimodal, df)
+    angles = stats["population_angles"]
+    bin_centers = stats["bin_centers"]
+    hist_stats = posthoc.bootstrap_histogram_stats(df)
+    kde_stats = posthoc.bootstrap_von_mises_kde_stats(df)
+
+    fig, axes = plt.subplots(2, 2, figsize=(2.2 * 2, 1.7 * 2),
+                             dpi=_plots.DEFAULT_DISPLAY_DPI)
+    for row, (x, mkey) in enumerate(((bin_centers, "hist"), (angles, "kde"))):
+        for col, (model, color) in enumerate(
+                (("Bimodal", BIMODAL), ("Unimodal", UNIMODAL))):
+            ax = axes[row, col]
+            s = stats[model]
+            ax.plot(x, s[f"{mkey}_median"], color, linewidth=1.2, zorder=3)
+            ax.fill_between(x, s[f"{mkey}_lower"], s[f"{mkey}_upper"],
+                            color=color, alpha=0.2, zorder=2)
+            # Black observed-bootstrap overlays, on every cell as in R.
+            ax.errorbar(
+                hist_stats["hist_bin_centers"], hist_stats["hist_median"],
+                yerr=hist_stats["hist_errors"], fmt="o", ecolor="black",
+                markeredgecolor="black", markerfacecolor="black",
+                linewidth=1, capsize=2, markersize=2, zorder=4)
+            ax.plot(kde_stats["kde_angles"], kde_stats["kde_median"],
+                    "black", linestyle="--", linewidth=1.2, zorder=4)
+            ax.fill_between(kde_stats["kde_angles"],
+                            kde_stats["kde_lower_bounds"],
+                            kde_stats["kde_upper_bounds"],
+                            color="black", alpha=0.12, zorder=1)
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.set_xticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi],
+                          [r"$-\pi$", r"$-\frac{\pi}{2}$", "0",
+                           r"$\frac{\pi}{2}$", r"$\pi$"])
+            if row == 1:
+                ax.set_xlabel("Heading (radians)")
+
+    # Column headers (the models) and row labels (the estimates).
+    axes[0, 0].set_title("Bimodal", fontsize=8)
+    axes[0, 1].set_title("Unimodal", fontsize=8)
+    fig.text(0.015, 0.72, "Histogram", rotation="vertical", va="center",
+             ha="center", fontsize=7)
+    fig.text(0.015, 0.28, "Von Mises KDE", rotation="vertical", va="center",
+             ha="center", fontsize=7)
+    fig.text(-0.06, 0.5, "Density", rotation="vertical", va="center",
+             fontsize=7)
+    fig.text(0.5, 0.01,
+             "Black: observed bootstrap. Colour: posterior predictive "
+             "replicates.", ha="center", fontsize=6)
+    # No legend: the R twin carries none either (the black overlays are
+    # named in the caption).
+    plt.tight_layout(rect=(0.03, 0.03, 1.0, 0.97))
+    _save(fig, save, save_path)
+
+
+def plot_predictive_both_models_individual(trace_bimodal, trace_unimodal, df,
+                                           *, save=True,
+                                           save_path="figures/locust/individual_predictive_both_models.pdf"):
+    """52-disk polar grid, one disk per animal: both models' replicated
+    densities (median + 2.5/97.5 band) on the shared radius convention -
+    density zero sits on the ring at r = 1 and the shared peak (largest
+    model median over all animals and both models) on the ring at
+    r = 2, so the two models' peaks are directly comparable; the
+    observed bootstrap von Mises KDE rides the same radius as a dashed
+    black line. Mathematical orientation (0 at 3 o'clock,
+    counter-clockwise), no tick labels; rings and a 0-degree spoke are
+    drawn explicitly."""
+    stats = posthoc.both_models_ppc_stats(trace_bimodal, trace_unimodal, df)
+    obs = posthoc.individual_ppc_stats(trace_bimodal, df)
+    angles = stats["individual_angles"]
+    n_ind = stats["n_individuals"]
+
+    peak_max = max(stats["Bimodal"]["median"].max(),
+                   stats["Unimodal"]["median"].max())
+
+    def r_of(d):
+        return 1.0 + d / peak_max
+
+    rmax = max(2.0, 1.0 + 1.15 * max(
+        stats["Bimodal"]["upper"].max(), stats["Unimodal"]["upper"].max(),
+        np.nanmax(obs["kde_med"])) / peak_max)
+
+    ncols = 7
+    nrows = int(np.ceil(n_ind / ncols))
+    fig, axs = plt.subplots(
+        nrows=nrows, ncols=ncols,
+        subplot_kw={"projection": "polar"},
+        figsize=(2.0 * ncols, 2.0 * nrows), dpi=_plots.DEFAULT_DISPLAY_DPI,
+    )
+    axs = np.array(axs).reshape(-1)
+
+    for idx in range(n_ind):
+        ax = axs[idx]
+        s_b, s_u = stats["Bimodal"], stats["Unimodal"]
+        ax.fill_between(angles, r_of(s_b["lower"][idx]), r_of(s_b["upper"][idx]),
+                        color=BIMODAL, alpha=0.14, linewidth=0, zorder=1)
+        ax.plot(angles, r_of(s_b["median"][idx]), color=BIMODAL,
+                linewidth=1.0, label="Bimodal" if idx == 0 else None,
+                zorder=3)
+        ax.fill_between(angles, r_of(s_u["lower"][idx]), r_of(s_u["upper"][idx]),
+                        color=UNIMODAL, alpha=0.14, linewidth=0, zorder=1)
+        ax.plot(angles, r_of(s_u["median"][idx]), color=UNIMODAL,
+                linewidth=1.0, label="Unimodal" if idx == 0 else None,
+                zorder=3)
+        if np.isfinite(obs["kde_med"][idx]).any():
+            ax.plot(angles, r_of(obs["kde_med"][idx]), color="black",
+                    linestyle="--", linewidth=1.0,
+                    label="Observed bootstrap KDE" if idx == 0 else None,
+                    zorder=2)
+        ax.add_artist(Circle((0, 0), 1.0, transform=ax.transData._b,
+                             color="0.4", fill=False, linewidth=0.5,
+                             zorder=10))
+        ax.add_artist(Circle((0, 0), 2.0, transform=ax.transData._b,
+                             color="0.4", fill=False, linewidth=0.5,
+                             zorder=10))
+        ax.plot([0, 0], [1.0, rmax], color="0.2", linewidth=0.6, zorder=0)
+        ax.set_ylim(0, rmax)
+        ax.set_title(f"Individual {idx + 1}", fontsize=8)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.spines["polar"].set_visible(False)
+
+    for ax in axs[n_ind:]:
+        ax.set_visible(False)
+
+    handles, labels = axs[0].get_legend_handles_labels()
+    if len(handles) > 0:
+        # Bottom legend like the R twin (Bimodal/Unimodal); the dashed
+        # observed overlay is named in the caption instead.
+        fig.legend(handles[:2], labels[:2], loc="lower center", ncol=2,
+                   frameon=False, bbox_to_anchor=(0.5, 0.012), fontsize=8)
+        fig.text(0.99, 0.002, "Dashed: observed bootstrap KDE.",
+                 ha="right", fontsize=6)
+    plt.tight_layout(rect=(0.0, 0.045, 1.0, 1.0))
+    _save(fig, save, save_path)

@@ -54,6 +54,8 @@ N_BOOT_KDE = 1000     # bootstrap reps per individual
 BASE_SEED = 123       # individual KDE seeds: BASE_SEED + 10_000 + idx
 BOOTSTRAP_SEED = 123  # population bootstrap seed (deterministic pipeline)
 N_ANGLES = 360        # individual PPC evaluation grid (endpoint=False)
+N_PREDICTIVE = 100    # shared posterior draws per replicated-heading check
+PRED_SEED = 42        # notebook SEED: draw pick and per-animal replication
 EPS = 1e-12
 Z = 1.96
 PERP_COMBINE = "avg"  # combine p(+/-pi/2) by averaging (log scale)
@@ -776,4 +778,135 @@ def individual_alignment_stats(trace_bimodal):
         "hdi_f": hdi_f, "hdi_p": hdi_p,
         "p_VE_gt_OF": p_VE_gt_OF,
         "n_ind": n_ind,
+    }
+
+
+# ===========================================================================
+# Entry point 14: replicated-heading checks under both models
+# ===========================================================================
+def _reps_summary(reps, axis):
+    """Median and 2.5/97.5 percentile band across a replicate axis."""
+    return np.quantile(reps, [0.025, 0.5, 0.975], axis=axis)
+
+
+def _replicate_model(mu, kappa, weights, n_steps_per_ind, angles_pop,
+                     angles_ind, bins, draw_ids, seed_tag):
+    """Per-animal replicated headings for one model.
+
+    ``mu``/``kappa``/``weights`` are flattened (draws, individuals[, 2])
+    arrays; ``weights`` is None for the unimodal fit. For every shared
+    posterior draw each animal's observed step count is replicated - for
+    the mixture, ``Binomial(n, weight)`` steps come from component 1 and
+    the rest from component 2 - and every replica is wrapped, binned and
+    smoothed (population and individual KDE grids). The per-animal RNG is
+    seeded independently (``seed_tag + animal``) so results do not depend
+    on core counts."""
+    n_ind = n_steps_per_ind.size
+    n_reps = draw_ids.size
+    n = bins[1] - bins[0]
+    hist_all = np.empty((n_ind, n_reps, len(bins) - 1), dtype=np.float32)
+    pop_kde_all = np.empty((n_ind, n_reps, angles_pop.size), dtype=np.float32)
+    ind_kde_all = np.empty((n_ind, n_reps, angles_ind.size), dtype=np.float32)
+    for i in range(n_ind):
+        rng = np.random.default_rng(seed_tag + i)
+        n_i = int(n_steps_per_ind[i])
+        for d in range(n_reps):
+            draw = draw_ids[d]
+            if weights is None:
+                y = rng.vonmises(mu[draw, i], kappa[draw, i], size=n_i)
+            else:
+                first = int(rng.binomial(n_i, weights[draw, i, 0]))
+                y = np.concatenate([
+                    rng.vonmises(mu[draw, i, 0], kappa[draw, i, 0], size=first),
+                    rng.vonmises(mu[draw, i, 1], kappa[draw, i, 1],
+                                 size=n_i - first),
+                ])
+            y = wrap_pm_pi(np.asarray(y, float))
+            counts, _ = np.histogram(y, bins=bins)
+            hist_all[i, d] = counts / (n_i * n)
+            pop_kde_all[i, d] = _von_mises_kde(
+                y, angles_pop.astype(float), KAPPA_KDE_POP)
+            ind_kde_all[i, d] = _von_mises_kde(
+                y, angles_ind.astype(float), KAPPA_KDE)
+    return hist_all, pop_kde_all, ind_kde_all
+
+
+def both_models_ppc_stats(trace_bimodal, trace_unimodal, df, *,
+                          n_predictive=N_PREDICTIVE, seed=PRED_SEED):
+    """Replicated heading densities per animal under both models.
+
+    For each of the animals, the observed number of heading steps is
+    replicated under each model using one shared posterior draw per
+    replicate (picked under ``seed + 1`` / ``seed + 2`` for the bimodal /
+    unimodal fit, mirroring the R notebook); the per-animal replication
+    streams are seeded ``seed + 90_000 + 1000 * model_tag + animal`` with
+    model_tag 1 (bimodal) / 2 (unimodal). Population checks average the
+    per-animal densities with equal weight, as in the observed
+    bootstrap; individual checks keep the animal-specific densities.
+
+    Returns a dict: per model, ``population`` (band across replicates of
+    the per-animal-mean histogram and population KDE on the population
+    grid) and ``individual`` (band across replicates of the
+    animal-specific KDE on the individual grid)."""
+    posterior_b = trace_bimodal["posterior"]
+    mu_b = wrap_pm_pi(posterior_b["mu"].values)        # (chain, draw, I, 2)
+    kappa_b = np.asarray(posterior_b["kappa"].values, float)
+    weights_b = np.asarray(posterior_b["weights"].values, float)
+
+    posterior_u = trace_unimodal["posterior"]
+    mu_u = wrap_pm_pi(posterior_u["mu"].values)        # (chain, draw, I)
+    kappa_u = np.asarray(posterior_u["kappa"].values, float)
+
+    n_ind = mu_b.shape[2]
+    if mu_b.shape[:2] != mu_u.shape[:2] or mu_u.shape[2] != n_ind:
+        raise ValueError("The two fits must share shape (chain, draw, I[, c]).")
+
+    directions = wrap_pm_pi(df["direction"].to_numpy(float))
+    individuals = np.asarray(df["animal_id"].to_numpy(), int)
+    n_steps_per_ind = np.array(
+        [np.sum((individuals == i) & np.isfinite(directions))
+         for i in range(n_ind)])
+
+    angles_pop = np.linspace(-np.pi, np.pi, N_POINTS)
+    angles_ind = np.linspace(-np.pi, np.pi, N_ANGLES, endpoint=False)
+    bins = np.linspace(-np.pi, np.pi, N_BINS + 1)
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+
+    def _run(mu, kappa, weights, model_tag):
+        rng_pick = np.random.default_rng(seed + model_tag)
+        n_rows = mu.shape[0] * mu.shape[1]
+        n_comp = 2 if weights is not None else 1
+        draw_ids = rng_pick.choice(
+            n_rows, min(n_predictive, n_rows), replace=False)
+        mu_r = mu.reshape(-1, n_ind, n_comp)
+        kappa_r = kappa.reshape(-1, n_ind, n_comp)
+        weights_r = None if weights is None else weights.reshape(-1, n_ind, 2)
+        return _replicate_model(
+            mu_r, kappa_r, weights_r, n_steps_per_ind, angles_pop,
+            angles_ind, bins, draw_ids,
+            seed + 90_000 + 1000 * model_tag)
+
+    hist_b, pop_b, ind_b = _run(mu_b, kappa_b, weights_b, model_tag=1)
+    hist_u, pop_u, ind_u = _run(mu_u, kappa_u, None, model_tag=2)
+
+    def _bundle(hist, pop, ind):
+        pop_hist = hist.mean(axis=0)                   # (reps, bins)
+        pop_kde = pop.mean(axis=0)                     # (reps, angles)
+        hi_lo, hi_med, hi_hi = _reps_summary(pop_hist, axis=0)
+        pd_lo, pd_med, pd_hi = _reps_summary(pop_kde, axis=0)
+        lo, med, hi = _reps_summary(ind, axis=1)       # (I, angles)
+        return {
+            "hist_median": hi_med, "hist_lower": hi_lo, "hist_upper": hi_hi,
+            "kde_median": pd_med, "kde_lower": pd_lo, "kde_upper": pd_hi,
+            "median": med, "lower": lo, "upper": hi,
+        }
+
+    return {
+        "n_individuals": n_ind,
+        "population_angles": angles_pop,
+        "individual_angles": angles_ind,
+        "bin_centers": bin_centers,
+        "bins": bins,
+        "Bimodal": _bundle(hist_b, pop_b, ind_b),
+        "Unimodal": _bundle(hist_u, pop_u, ind_u),
     }
