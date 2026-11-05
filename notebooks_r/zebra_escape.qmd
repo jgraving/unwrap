@@ -565,18 +565,50 @@ save_figure(p_individual, "individual_posteriors", 10, 6)
 # uses population fixed effects for its group-direction comparison.
 group_mu <- cbind(apply(mu[, pre, drop = FALSE], 1, circ_mean),
                    apply(mu[, post, drop = FALSE], 1, circ_mean))
+# Polar KDE panels follow the Python twin (zebra_plots.py, plot_summary):
+# the plotted radius is 1 + kde/max_kde, where max_kde is the shared peak
+# of all group and per-track curves; the inner ring (radius 1, labelled
+# "0") therefore sits at density zero instead of the origin, the outer
+# ring (radius 2, "1.0") at the shared peak. 0 degrees is at the top and
+# the angle axis runs clockwise with a label every 45 degrees;
+# empirical circular means sit at fixed radius 2.25, away from the curves.
 theta <- seq(-pi, pi, length.out = 201)
 group_kde <- do.call(rbind, lapply(1:2, function(c) {
   data.frame(theta = theta %% (2 * pi),
     density = vapply(theta, function(t) mean(exp(vm_logpdf(t, group_mu[, c], 500))), numeric(1)),
     condition = condition_labels[c])
 }))
-p_group_mu <- ggplot(group_kde, aes(theta, density, colour = condition)) +
-  geom_line() + coord_polar() +
-  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) +
+track_kde <- do.call(rbind, lapply(seq_len(nrow(prediction_data)), function(j) {
+  data.frame(theta = theta %% (2 * pi),
+    density = vapply(theta, function(t) mean(exp(vm_logpdf(t, mu[, j], 300))), numeric(1)),
+    Track = prediction_data$Track[j], condition = prediction_data$condition[j])
+}))
+max_kde <- max(group_kde$density, track_kde$density)
+group_kde$r <- 1 + group_kde$density / max_kde
+track_kde$r <- 1 + track_kde$density / max_kde
+polar_x <- scale_x_continuous(
+  limits = c(0, 2 * pi), expand = c(0, 0),
+  breaks = (0:7) * pi / 4,
+  labels = c("0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°"))
+polar_y <- scale_y_continuous(limits = c(0, 2.5), expand = c(0, 0),
+  breaks = c(1.0, 2.0), labels = c("0", "1.0"))
+polar_theme <- theme(legend.position = "bottom",
+  axis.line = element_blank(), panel.border = element_blank())
+# The point shapes mirror the condition (twin convention: pre = square,
+# post = circle); the shape scale only carries the marker, hide its keys.
+polar_guides <- guides(shape = "none")
+empirical_group <- do.call(rbind, lapply(1:2, function(c) data.frame(
+  theta = circ_mean(group_mu[, c]) %% (2 * pi), r = 2.25,
+  condition = condition_labels[c],
+  shape = if (c == 2L) "filled circle" else "filled square")))
+p_group_mu <- ggplot(group_kde, aes(theta, r, colour = condition)) +
+  geom_line(linewidth = 0.5) +
+  geom_point(data = empirical_group, aes(theta, r, colour = condition,
+    shape = shape), inherit.aes = FALSE, size = 1.2) +
+  coord_polar(start = pi / 2, direction = -1) + polar_x + polar_y +
   scale_colour_manual(values = condition_colors) +
-  labs(x = "group mean direction (rad)", y = "posterior density") +
-  theme(legend.position = "bottom")
+  labs(x = "group mean direction (rad)", y = "") + polar_theme +
+  polar_guides
 save_figure(p_group_mu, "group_direction", 5, 5)
 alignment_df <- do.call(rbind, lapply(1:2, function(c) {
   data.frame(condition = condition_labels[c],
@@ -589,21 +621,20 @@ p_alignment <- ggplot(alignment_df, aes(condition, mean, colour = condition)) +
 save_figure(p_alignment, "group_alignment", 5, 4)
 
 # Per-track polar direction posteriors, with empirical circular means.
-track_kde <- do.call(rbind, lapply(seq_len(nrow(prediction_data)), function(j) {
-  data.frame(theta = theta %% (2 * pi),
-    density = vapply(theta, function(t) mean(exp(vm_logpdf(t, mu[, j], 500))), numeric(1)),
-    Track = prediction_data$Track[j], condition = prediction_data$condition[j])
-}))
 empirical <- do.call(rbind, lapply(split(data, list(data$Track, data$condition),
   drop = TRUE), function(g) data.frame(Track = g$Track[1],
     condition = g$condition[1], theta = circ_mean(g$HeadingRadians) %% (2 * pi),
-    density = 0)))
-p_track_mu <- ggplot(track_kde, aes(theta, density, colour = condition)) +
-  geom_line() + geom_point(data = empirical, aes(theta, density), shape = 16) +
-  coord_polar() + scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) +
+    r = 2.25,
+    shape = if (g$condition[1] == condition_labels[2]) "filled circle" else
+      "filled square")))
+p_track_mu <- ggplot(track_kde, aes(theta, r, colour = condition)) +
+  geom_line(linewidth = 0.3, alpha = 0.5) +
+  geom_point(data = empirical, aes(theta, r, colour = condition,
+    shape = shape), inherit.aes = FALSE, size = 0.9) +
+  coord_polar(start = pi / 2, direction = -1) + polar_x + polar_y +
   facet_wrap(~ Track) + scale_colour_manual(values = condition_colors) +
-  labs(x = "track mean direction (rad)", y = "posterior density") +
-  theme(legend.position = "bottom")
+  labs(x = "track mean direction (rad)", y = "") + polar_theme +
+  polar_guides
 save_figure(p_track_mu, "track_direction_polar", 11, 9)
 
 ```
