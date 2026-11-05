@@ -922,7 +922,12 @@ unwrap_fit_cache_path <- function(name) {
   }
   dir <- Sys.getenv("UNWRAP_R_FIT_CACHE_DIR")
   if (!nzchar(dir)) {
-    dir <- file.path(Sys.getenv("TMPDIR", tempdir()), "unwrap_fit_cache")
+    # Stable across R sessions (tempdir() is per-session and would be
+    # wiped on kernel exit, defeating the cache). Override with
+    # UNWRAP_R_FIT_CACHE_DIR for a shared or scratch location.
+    home <- Sys.getenv("HOME")
+    dir <- if (nzchar(home)) file.path(home, ".unwrap_fit_cache")
+    else file.path(tempdir(), "unwrap_fit_cache")
   }
   file.path(dir, paste0(name, ".rds"))
 }
