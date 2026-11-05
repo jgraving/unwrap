@@ -1,7 +1,9 @@
 # Python setup
 
 Use Python 3.12 or newer and install from GitHub in a virtual environment.
-This keeps the notebook's dependencies together.
+This keeps the notebook's dependencies together. If your machine's
+`python` is older, the [uv option below](#optional-use-uv) installs the
+right version for you.
 
 ## Install and open the tutorial
 
@@ -59,6 +61,10 @@ uv venv --python 3.12
 uv pip install -e ".[notebook]"
 uv run --no-project jupyter lab notebooks/circular_regression.ipynb
 ```
+
+If you do not have Python 3.12, `uv venv --python 3.12` downloads a
+managed CPython 3.12 (into your user profile, no administrator or root
+rights needed) before creating the environment.
 
 ## Prepare your angles
 
