@@ -167,8 +167,8 @@ N_PREDICTIVE <- if (quick_run) 25L else 100L
 ## Figure style
 
 Figures render inline and save vector PDFs under `figures/locust_direction_mixture_model/`.
-Colors match the Python twin: orange for bimodal/vectorial, blue for
-unimodal/optic flow, red for predictive model densities.
+Orange marks the bimodal/vectorial model and blue the
+unimodal/optic-flow model; red is the predictive model density.
 
 
 ```{r}
@@ -558,7 +558,7 @@ Stan samples both unsorted population means and derives one component
 order from their linear values on the bounded interval. The likelihood
 uses that order to select each animal's means, concentrations, and
 weights together. The saved first-component index also determines the
-order for population and individual summaries, matching the Python analysis.
+order used for population and individual summaries.
 The free unsorted parameters retain their permutation symmetry. The
 ordered view identifies the labels used in the analysis.
 
@@ -1126,7 +1126,7 @@ replacement, resamples steps within each selected animal, then averages the
 animal densities with equal weight. The histogram uses 16 bins on a
 360-point grid; the von Mises KDE has kernel concentration 30 for the
 population and 15 for individuals. The bootstrap is redrawn in this
-notebook, so its realization need not match the Python analysis's.
+notebook, so its random realization differs from run to run.
 
 ```{r}
 #| cell-id: "locust-r-032"
