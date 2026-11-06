@@ -34,7 +34,7 @@ sitting, with no external data and no downloads.
 
 This is the **first R notebook to run** if you are new to the R
 examples: it is the cheapest of the R notebooks to run end to end. A
-Python version of this tutorial is available in
+matching version of the same tutorial lives in
 `notebooks/circular_regression.ipynb`.
 
 
