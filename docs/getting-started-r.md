@@ -12,7 +12,7 @@ of every package this project uses, and the short R script in step 3
 installs precisely those versions into a project-local library,
 separate from your system packages. Re-running it is a fast no-op once
 everything is in place. Use R **4.5.3**, the version recorded in
-`renv.lock` and tested by CI.
+`renv.lock`.
 
 ## Install and open the tutorial
 
@@ -77,7 +77,7 @@ renv::load()
 renv::restore(repos = repos)
 ```
 
-The final line installs the 133 pinned packages (129 from CRAN, four
+The final line installs the 136 pinned packages (132 from CRAN, four
 from r-universe) into a project-local `renv/` library. The CRAN
 packages arrive as prebuilt binaries on Linux and Windows; the
 r-universe packages — and a few others on macOS — are built from
@@ -150,9 +150,7 @@ circular regression tutorial (simulated toy data, not a biological
 study), five biological studies, and two method examples (periodic
 but not circular, and the von Mises navigation policy). After the
 tutorial, try `beetles`, `locust_density_order`, or `zebra_escape`,
-in RStudio or Jupyter; the R examples reproduce their Python
-counterparts with the same observations, formulas, and prior scales
-(the [R and MATLAB](languages.md) page has the details).
+in RStudio or Jupyter.
 
 The animal-behavior notebooks load each study through a data cell that
 fetches the raw files from the `jgraving/unwrap-data` repository on
@@ -167,7 +165,5 @@ shorter draw budget when `UNWRAP_R_QUICK=1` is set; unset, they run
 the full budgets. Review R-hat, bulk ESS, the divergence report, and
 the predictive checks before interpreting results.
 
-No GitHub workflow runs these examples; before a change is merged the
-notebooks it touches are re-run end to end, and the outputs stored in
-the repository come from that run (see the
-[development](development.md) page).
+Every notebook's stored outputs come from an end-to-end run of that
+notebook (see the [development](development.md) page).
