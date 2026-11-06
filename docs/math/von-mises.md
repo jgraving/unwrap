@@ -45,7 +45,7 @@ exact direction is not a probability.
 
 ## Angular conventions
 
-All model equations use radians. The Python circular-modulo function represents
+All model equations use radians. The circular-modulo link represents
 angles in $[-\pi,\pi)$. The alternative $(-\pi,\pi]$ convention is equivalent:
 the endpoints describe the same direction. Keep the angular origin
 and clockwise or anticlockwise convention consistent across observations and

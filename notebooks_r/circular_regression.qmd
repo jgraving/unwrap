@@ -24,30 +24,27 @@ knitr::opts_chunk$set(dev = "ragg_png")
 # Circular regression with Unwrap (R)
 
 A minimal, fully self-contained introduction, in R, to the circular
-regression machinery of `unwrap`: individual angular observations, with
-both the von Mises mean direction and the concentration modeled as
-functions of a continuous predictor, and all angles in **radians**. The
-notebook generates synthetic angular data, fits a `brms` von Mises model
-through the repository's custom `unwrap_von_mises` family
-(`R/unwrap_family.R`), and checks the posterior — all in one sitting,
-with no external data and no downloads.
+regression machinery of `unwrap`: individual angular observations,
+with both the von Mises mean direction and the concentration modeled
+as functions of a continuous predictor, and all angles in
+**radians**. The notebook generates synthetic angular data, fits a
+`brms` von Mises model through the repository's custom
+`unwrap_von_mises` family, and checks the posterior — all in one
+sitting, with no external data and no downloads.
 
-This is the **first R notebook to run** if you are new to the R examples: it is the cheapest of the R notebooks to run end to end.
+This is the **first R notebook to run** if you are new to the R
+examples: it is the cheapest of the R notebooks to run end to end. A
+Python version of this tutorial is available in
+`notebooks/circular_regression.ipynb`.
 
-The Python version of this tutorial
-(`notebooks/circular_regression.ipynb`) fits the same model (same
-data-generating parameters, links, and prior scales) with Bambi and PyMC.
 
 ## Setup
 
-There is no one-click R runtime behind these notebooks (Colab is
-Python-only), so set the R side up once: the [R setup](../getting-started-r.md)
-page installs the CRAN packages, CmdStan, and the Jupyter R kernel (used by the `.ipynb` twin; this
-file runs without any kernel)
-against the pinned `renv.lock` versions. The first code cell below
-re-checks the environment and stops with a pointer to the setup page
-if the one-time setup has not been run; on a set-up machine it is a
-no-op.
+Set up the R side once: the [R setup](../getting-started-r.md) page
+installs the CRAN packages, CmdStan, and the Jupyter R kernel against
+the pinned `renv.lock` versions. The first code cell below re-checks
+the environment and stops with a pointer to the setup page if the
+one-time setup has not been run; on a set-up machine it is a no-op.
 
 
 ```{r}
@@ -137,14 +134,15 @@ Figures render inline and are saved as vector (PDF) files under `figures/circula
 ## 1. Generate synthetic angular data
 
 Draw from a von Mises model with known mean and concentration — a
-test-bed: because the true relationship is known, we can check that the
-posterior recovers it. For predictor $x \in (-1, 1)$, the generating
-mean is $\mu = x$ (wrapped to $[-\pi,\pi)$) and the concentration is
-$\kappa = \operatorname{softplus}(2 + 0.5x)$: larger concentration
-means less angular dispersion. These values create a simple example;
-they do not prescribe priors for a real dataset. Sampling uses
-`circular::rvonmises`, the same distribution PyMC draws from in the
-Python tutorial.
+test-bed: because the true relationship is known, we can check that
+the posterior recovers it. For predictor $x \in (-1, 1)$, the
+generating mean is $\mu = x$ (wrapped to $[-\pi,\pi)$) and the
+concentration is $\kappa = \operatorname{softplus}(2 + 0.5x)$:
+larger concentration means less angular dispersion. These values
+create a simple example; they do not prescribe priors for a real
+dataset. Sampling uses `circular::rvonmises`, the standard von Mises
+sampler.
+
 
 ```{r}
 #| cell-id: "c06"
@@ -180,18 +178,17 @@ head(data)
 ## 2. Specify the model
 
 `brms`'s formula interface describes the regression; the circular
-nature is carried by the custom `unwrap_von_mises` family from
-`R/unwrap_family.R`, whose Stan log-density applies the circular modulo
-link to the mean *inside* the likelihood.
+nature is carried by the custom `unwrap_von_mises` family, which keeps
+the mean direction on the circle through a periodic (modulo) link.
 
 `y ~ x` describes the mean direction; `kappa ~ x` describes
 concentration. Softplus keeps the concentration positive, so the
-concentration coefficients live on the **pre-softplus** scale (the
-Python tutorial puts its priors on the same scale). The mean intercept
-has an approximately uniform circular prior; the slope priors assume
-this predictor's scale of $-1$ to $1$. Adapt these choices to your
-scientific question and check prior predictive behavior when analyzing
-real data.
+concentration coefficients live on the **pre-softplus** scale. The
+mean intercept has an approximately uniform circular prior; the slope
+priors assume this predictor's scale of $-1$ to $1$. Adapt these
+choices to your scientific question and check prior predictive
+behavior when analyzing real data.
+
 
 ```{r}
 #| cell-id: "c08"
@@ -199,8 +196,10 @@ real data.
 form_vonmises <- bf(y ~ x, kappa ~ x, family = unwrap_von_mises)
 
 prior_vonmises <- (
-  # approximately uniform circular prior on the mean intercept
-  prior("unwrap_von_mises(0, 1e-16)", class = "Intercept", dpar = "mu") +
+  # effectively uniform circular prior on the mean intercept: von Mises
+  # (0, kappa) with kappa = double-precision machine epsilon, the same
+  # CircularUniformPrior() value the Python twin uses.
+  prior("unwrap_von_mises(0, 2.220446049250313e-16)", class = "Intercept", dpar = "mu") +
   # slope priors assume this predictor's scale of -1 to 1
   prior("normal(0, pi()/2)", class = "b", dpar = "mu") +
   prior("normal(2.0, 0.5)", class = "Intercept", dpar = "kappa") +
@@ -211,26 +210,24 @@ prior_vonmises
 
 ## 3. Fit and inspect sampling
 
-`brm()` runs NUTS via Stan (the `cmdstanr` backend). Four chains with
-500 warmup iterations and 500 retained draws each keep this
-introduction manageable — the same sampling budget as the Python
-tutorial — and they are not a universal sampling prescription.
+`brm()` runs NUTS via Stan. Four chains with 500 warmup iterations
+and 500 retained draws each keep this introduction manageable — the
+budget is a convenience for a toy dataset, not a universal sampling
+prescription.
 
-Inspect the divergence count first — $\hat{R}$ and the effective
-sample sizes are only meaningful when it is 0. Not every R backend
-build keeps the per-iteration divergence flag in the fit object, in
-which case the count is reported accordingly and the $\hat{R}$ and ESS
-checks below carry the convergence evidence.
-$\hat{R} \approx 1$ (computed on the *unwrapped* intercept: the
-repository's `Rhat_unwrap` centres the angular draws before comparing
-chains, the circular analogue of the naive R-hat) and effective sample
-sizes above 400. The true mean direction used to generate the data
-should be recoverable from the posterior; increase sampling or revise
-the model if the diagnostics are unsatisfactory.
+Inspect the divergence count first — it must be 0 for the other
+diagnostics to mean anything. $\hat{R} \approx 1$ on the
+*unwrapped* intercept (directions are periodic, so chain draws are
+centered and compared on the line before taking R-hat: the circular
+analogue of the naive statistic) and effective sample sizes well above
+400. The true mean direction used to generate the data should be
+recoverable from the posterior; increase sampling or revise the model
+if the diagnostics are unsatisfactory.
+
 
 ```{r}
 #| cell-id: "c10"
-fit <- unwrap_load_fit_cache("circular_regression_fit", SEED, ITER, WARMUP)
+fit <- unwrap_load_fit_cache("circular_regression_fit_v2", SEED, ITER, WARMUP)
 if (is.null(fit)) {
   fit <- brm(
       form_vonmises, data = data,
@@ -239,7 +236,7 @@ if (is.null(fit)) {
       chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
       seed = SEED, control = list(adapt_delta = 0.9),
       backend = "cmdstanr")
-  unwrap_save_fit_cache("circular_regression_fit", fit, SEED, ITER, WARMUP)
+  unwrap_save_fit_cache("circular_regression_fit_v2", fit, SEED, ITER, WARMUP)
 }
 # NUTS divergences. Not every brms/cmdstanr combination keeps the
 # per-iteration divergence flag in the fit object, so probe for it and
@@ -424,12 +421,14 @@ show_figure(p_ppc, "ppc", 5, 3)
 
 ## Next steps
 
-The beetle, zebra, and locust notebooks explore more complex analyses
-and may require additional setup. Start by defining the scientific
-estimand, angular reference direction, and sampling structure. This
-tutorial assumes independent observations and does not address
-hierarchical dependence or mixtures.
+The beetle, zebra, and locust notebooks build on the same setup to
+explore more complex designs — hierarchical structure, treatments,
+and mixture likelihoods. When analyzing your own data, start by
+defining the scientific estimand, the angular reference direction,
+and the sampling structure. This tutorial assumes independent
+observations and does not address hierarchical dependence or
+mixtures.
 
-The standalone R scripts
-(`R/brms_example.R`, `R/unwrap_functions.R`) that this notebook builds
-on are documented on the [R and MATLAB](../languages.md) page.
+The standalone R scripts (`R/brms_example.R`, `R/unwrap_functions.R`)
+that this notebook builds on are documented on the [R and
+MATLAB](../languages.md) page.

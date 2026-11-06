@@ -157,14 +157,13 @@ does not prevent weak identification when its components look similar.
 For either mixture, compare predictions with observed angular distributions
 at both animal and population levels before assigning biological meaning.
 
-## Python implementation
+## Implementation
 
-Specify mixture structure explicitly in PyMC. The
-[`VonMisesMixture` helper](../api.md#distributions-unwrapdistributions) combines
-von Mises components; component regressions, weight links, priors, and
-identifying structure belong in the model specification. The vMU equation
-also requires a uniform component. These mixture equations are not selected
-by Bambi's single-component `family="vonmises"` setting.
+The
+[`VonMisesMixture` helper](../api.md#distributions-unwrapdistributions)
+combines von Mises components; component regressions, weight links,
+priors, and identifying structure belong in the model specification. The
+vMU equation also requires a uniform component.
 
 See the [biological examples](../examples.md) for the optic-flow vs.
 vectorial encoding analysis in marching locusts, along with its data and
