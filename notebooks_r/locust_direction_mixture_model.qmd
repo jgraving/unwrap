@@ -1054,7 +1054,9 @@ explicit_loo <- function(state, bimodal = TRUE, chunk_size = 128L) {
   # invariant to this scaling. Preserve chain IDs rather than flattening.
   likelihood <- exp(sweep(ll, 2, apply(ll, 2, max), "-"))
   r_eff <- loo::relative_eff(likelihood, chain_id = state$draws[[".chain"]])
-  result <- loo::loo(ll, r_eff = r_eff)
+  # The full Pareto-k table is printed below and its summary columns are
+  # carried in the ELPD table, so suppress loo()'s redundant high-k nag.
+  result <- suppressWarnings(loo::loo(ll, r_eff = r_eff))
   print(result)
   print(loo::pareto_k_table(result))
   result
