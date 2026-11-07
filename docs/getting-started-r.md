@@ -167,3 +167,30 @@ the predictive checks before interpreting results.
 
 Every notebook's stored outputs come from an end-to-end run of that
 notebook (see the [development](development.md) page).
+
+## Skip the refit with the saved fits
+
+The fit cells are seeded, and the fits they produce are published in
+the `jgraving/unwrap-data` repository under `fit_cache/` (one RDS
+file per model and draw budget). The data checkout the notebooks
+create is sparse -- one study at a time -- so add that directory
+first (a full clone already has it):
+
+    git -C <data-root> sparse-checkout add fit_cache
+
+Then start RStudio or Jupyter with
+
+    UNWRAP_R_FIT_CACHE=1
+    UNWRAP_R_FIT_CACHE_DIR=<data-root>/fit_cache
+
+where `<data-root>` is the data checkout (by default the
+`unwrap-data/` directory inside this repository, or the path you
+hand to `UNWRAP_DATA_ROOT`). A snapshot is reused only when its
+model name, seed, draw budget, and warmup all match the fit cell,
+and the fixed-effects size is unchanged; otherwise the cell says the
+cache entry is stale and refits as usual. Leave the cache unset for
+`UNWRAP_R_QUICK` runs: a quick-budget fit saves under the same name
+and would replace the full-budget snapshot. The stored notebook
+outputs always come from runs with the cache off -- the helpers are
+no-ops while it is -- so the committed runs exercise the full
+sampling path.
