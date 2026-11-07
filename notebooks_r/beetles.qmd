@@ -263,7 +263,7 @@ head(data)
 # circular standard deviation, following the Python twin
 # (beetles_plots.py, plot_data_polar). Each heading sits at (heading, trial
 # number), so the radial axis is the trial order 1-10; the ring labels sit
-# on the 45-degree spoke as in the Python twin. 0 degrees is at the top and
+# on the 22.5-degree spoke. 0 degrees is at the top and
 # the angle axis runs clockwise with a label every 45 degrees.
 raw_plot <- transform(data, theta = HeadingRadians %% (2 * pi), radius = Trial)
 radial_max <- 10
@@ -284,9 +284,9 @@ blocks <- do.call(rbind, lapply(split(data, list(data$Individual,
 # (0, 2 pi) seam. Each polygon carries its Individual so every panel only
 # draws the two wedges of its own beetle; without that column ggplot paints
 # all twenty wedges into every panel.
-wedges <- do.call(rbind, lapply(seq_len(nrow(blocks)), function(k) {
-  lo <- mod_circular(blocks$wedge_center[k] - blocks$wedge_sd[k])
-  hi <- mod_circular(blocks$wedge_center[k] + blocks$wedge_sd[k])
+wedges <- do.call(rbind, lapply(which(blocks$statistic == "circular mean"), function(k) {
+  lo <- (blocks$wedge_center[k] - blocks$wedge_sd[k]) %% (2 * pi)
+  hi <- (blocks$wedge_center[k] + blocks$wedge_sd[k]) %% (2 * pi)
   chunks <- if (lo < hi) {
     list(seq(lo, hi, length.out = 100L))
   } else {
@@ -295,12 +295,12 @@ wedges <- do.call(rbind, lapply(seq_len(nrow(blocks)), function(k) {
   do.call(rbind, lapply(seq_along(chunks), function(j) {
     th <- chunks[[j]]
     data.frame(Individual = blocks$Individual[k],
-      theta = c(th[1L], th[-1L], th[length(th)]),
-      radius = c(0, rep(radial_max, length(th) - 1L), 0),
+      theta = c(th[1L], th, th[length(th)]),
+      radius = c(0, rep(radial_max, length(th)), 0),
       condition = blocks$condition[k], group = 10L * k + j)
   }))
 }))
-ring_labels <- data.frame(theta = pi / 4,
+ring_labels <- data.frame(theta = pi / 8,
   radius = seq(2, radial_max, by = 2L),
   lab = as.character(seq(2, radial_max, by = 2L)))
 p_data <- ggplot(raw_plot, aes(theta, radius, colour = condition)) +
@@ -743,12 +743,8 @@ hdi_fill_values <- function(rows, cols) {
 hdi_bar <- function(rows, title, ylab, cols, xlims) {
   rows$key <- paste(rows$kind, rows$cond, sep = "_")
   p <- ggplot(rows, aes(x = pos, y = value, colour = cond, fill = key)) +
-    geom_segment(aes(xend = pos, yend = low), linewidth = 0.3) +
-    geom_segment(aes(xend = pos, yend = high), linewidth = 0.3) +
-    geom_segment(aes(xend = pos - 0.08, yend = low), linewidth = 0.3) +
-    geom_segment(aes(xend = pos + 0.08, yend = low), linewidth = 0.3) +
-    geom_segment(aes(xend = pos - 0.08, yend = high), linewidth = 0.3) +
-    geom_segment(aes(xend = pos + 0.08, yend = high), linewidth = 0.3) +
+    geom_errorbar(aes(ymin = low, ymax = high), width = 0.16,
+      linewidth = 0.3) +
     geom_point(shape = 16, size = 1.5) +
     scale_x_continuous(limits = xlims, breaks = unique(rows$pos),
       labels = rows$cond[order(rows$pos)], expand = c(0, 0)) +
@@ -780,7 +776,7 @@ p_conc_attract <- hdi_bar(mass_df, "Floodlight\nattraction",
   "Predictive mass (+-45 deg)", cond2_colors, xlim2) +
   geom_hline(yintercept = 0.25, linetype = "dashed", linewidth = 0.35) +
   annotate("text", x = 2.22, y = 0.22, label = "Uniform",
-    hjust = 1, vjust = -1, size = 3.3, colour = "black")
+    hjust = 1, vjust = 1, size = 3.3, colour = "black")
 p_conc_delta <- hdi_bar(delta_df, "Floodlight\ntreatment effect",
   "Difference in\npredictive mass (+-45 deg)",
   c("On - Off" = cond2_colors[["On"]]), xlim1)
@@ -944,7 +940,7 @@ p_g_mu <- ggplot(add_key(df_gmu), aes(x = x, y = y)) +
   geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.5) +
   scale_colour_manual(values = ppc_cond_colors, guide = "none") +
   scale_fill_manual(values = ppc_fill_vals, guide = "none") +
-  scale_shape_manual(values = c(Off = 15, On = 16), guide = "none") +
+  scale_shape_manual(values = c(Off = 22, On = 21), guide = "none") +
   scale_x_continuous(limits = c(0, 360), breaks = c(0, 90, 180, 270, 360)) +
   top_y +
   labs(x = "Group mean direction (deg)", y = "",
@@ -959,7 +955,7 @@ p_gr <- ggplot(add_key(df_gr), aes(x = x, y = y)) +
   geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.5) +
   scale_colour_manual(values = ppc_cond_colors, guide = "none") +
   scale_fill_manual(values = ppc_fill_vals, guide = "none") +
-  scale_shape_manual(values = c(Off = 15, On = 16), guide = "none") +
+  scale_shape_manual(values = c(Off = 22, On = 21), guide = "none") +
   scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
   top_y +
   labs(x = "Mean resultant length", y = "", title = "Group alignment") +
@@ -1011,7 +1007,7 @@ ind_mu_panel <- function(rows, lab, show_labels, xlab) {
     geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.9) +
     scale_colour_manual(values = ppc_cond_colors, guide = "none") +
     scale_fill_manual(values = ppc_fill_vals, guide = "none") +
-    scale_shape_manual(values = c(Off = 15, On = 16), guide = "none") +
+    scale_shape_manual(values = c(Off = 22, On = 21), guide = "none") +
     scale_x_continuous(limits = c(0, 360), breaks = c(0, 180, 360)) +
     ind_y(show_labels) +
     labs(x = xlab, y = "") +
@@ -1027,7 +1023,7 @@ ind_r_panel <- function(rows, lab, show_labels, xlab) {
     geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.9) +
     scale_colour_manual(values = ppc_cond_colors, guide = "none") +
     scale_fill_manual(values = ppc_fill_vals, guide = "none") +
-    scale_shape_manual(values = c(Off = 15, On = 16), guide = "none") +
+    scale_shape_manual(values = c(Off = 22, On = 21), guide = "none") +
     scale_x_continuous(expand = c(0.05, 0.05)) +
     ind_y(show_labels) +
     labs(x = xlab, y = "") +
