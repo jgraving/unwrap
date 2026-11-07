@@ -63,7 +63,8 @@ if the one-time setup has not been run. Run the cells in order.
 # the R setup page first (docs/getting-started-r.md).
 
 required <- c("brms", "posterior", "loo", "circular", "readxl", "sf",
-  "geosphere", "Matrix", "ggplot2", "ragg", "patchwork")
+  "geosphere", "Matrix", "ggplot2", "ragg", "patchwork",
+  "curl", "png")
 missing <- required[!vapply(required, requireNamespace, logical(1),
   quietly = TRUE)]
 if (length(missing))
@@ -131,7 +132,10 @@ show_figure <- function(plot, name, width, height, res = 110) {
   file <- file.path(FIG_DIR, paste0(name, ".png"))
   ragg::agg_png(file, width = width, height = height, units = "in",
                 res = res)
-  print(plot)
+  # gtable objects (the individual PPC grid carries a hand-drawn
+  # legend row) print via the grid engine rather than print();
+  # a plain print leaves the device blank.
+  if (inherits(plot, "gtable")) grid::grid.draw(plot) else print(plot)
   invisible(dev.off())
   # Quarto renders the returned plot object natively; there is no
   # display channel to write to outside Jupyter.
@@ -611,12 +615,28 @@ treatment_labels <- setNames(vapply(levels(df_track$treatment), function(t) {
 treatment_colors <- setNames(c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"), levels(df_track$treatment))
 # The seaborn "colorblind" (Paul Tol) palette in the same treatment order,
 # for the figures whose Python twin uses it (PPC, predictive curves, deltas).
-treatment_colors_cb <- setNames(c("#0072B2", "#D55E00", "#009E73", "#F0E442"), levels(df_track$treatment))
+treatment_colors_cb <- setNames(c("#0173B2", "#DE8F05", "#029E73", "#D55E00"), levels(df_track$treatment))
 tnames <- treatment_labels[levels(df_track$treatment)]
 for (t in 2:4) df_track[[paste0("treat", t)]] <- as.integer(df_track$treatment == as.character(t))
 print(aggregate(tag ~ treatment, df_track, function(x) length(unique(x))))
 print(table(df_track$treatment))
 
+# The Python _format_treatment_name rule: lowercase, split on commas,
+# drop "control" when it is one of several parts, sort the parts,
+# capitalise each part's first letter, rejoin with ", ". A coefficient
+# figure additionally names its intercept row "Control (Intercept)".
+fmt_treat_label <- function(name) {
+  s <- tolower(trimws(as.character(name)))
+  parts <- trimws(unlist(strsplit(s, ",", fixed = TRUE)))
+  parts <- parts[nzchar(parts)]
+  if (length(parts) > 1L && "control" %in% parts) parts <- parts[parts != "control"]
+  if (!length(parts)) parts <- "control"
+  parts <- sort(parts)
+  parts <- paste0(toupper(substr(parts, 1, 1L)), substr(parts, 2, 1000L))
+  paste(parts, collapse = ", ")
+}
+treatment_nice <- setNames(vapply(treatment_labels, fmt_treat_label, character(1)),
+  names(treatment_labels))
 ```
 
 ## 5. Trajectory maps (goal-relative context)
@@ -625,99 +645,514 @@ Panels of the resampled tracks, colored by destination (roost vs Agamon) and by 
 lake polygon (Agamon) overlaid. Useful ground truth for what "aimed at the goal" looks like in each
 condition before we fit any model.
 
-
-All maps use static lake and roost outlines with metric coordinate axes; no online basemaps are used.
+The panels sit on CartoDB basemap tiles (one 256 px Web-Mercator tile per grid cell,
+composed into a single raster per panel, fetched with the `curl` package):
+`dark_all` for the full destination and flow-field figures,
+`light_nolabels_novector` for the compact destination figure, and `light_all`
+for the per-treatment probability panels. CartoDB basemaps need an API key:
+create a free account at <https://carto.com> (the free tier covers most
+non-commercial use), copy your public key from the account-management page,
+and set it in your shell before starting the notebook
+(`export UNWRAP_CARTO_API_KEY=...`), or paste it at the marker in the first
+map cell (below). Without the key, each panel falls back to a flat fill in
+the reference background color (dark `#262626`, light `#fafaf8`).
 
 
 ```{r}
 #| cell-id: "goldshtein-bats-020"
-# Static sf lake/roost outlines in metric coordinates: an offline stand-in
-# for an image basemap, with no interactive map widget.
-map_segments <- function(track, probability = NULL) {
+# Basemap infrastructure for the trajectory map figures. The Python
+# twins pull CartoDB raster tiles through contextily; this cell does the
+# same tile math in R: one 256 px Web-Mercator tile per (zoom, x, y),
+# fetched with the curl package (cached under ~/.cache/unwrap-carto-tiles)
+# and baked per panel into a fine mosaic of filled cells, drawn below the
+# track layers (recent ggplot2 builds cannot draw grid rasters, so the
+# tile content is drawn as vector cells rather than one image).
+# CartoDB no longer serves keyless tiles, so real map content needs an
+# API key (free for most non-commercial use; get one at https://carto.com
+# and copy the public key from the account-management page):
+#
+#   UNWRAP_CARTO_API_KEY=<key>
+#
+# Without the key - or if a tile fails - each panel falls back to a flat
+# fill in the exact reference background color: #262626 for the dark
+# "DarkMatter" figures and #fafaf8 for the light "Positron" ones. That is
+# precisely what the committed Python bakes show today (placeholder
+# panels); with a key set, the same figures show real CartoDB content.
+# Use your key by exporting UNWRAP_CARTO_API_KEY in your shell before
+# starting this notebook, or uncomment the next line and paste it (keep
+# that edit local; never commit a real key):
+# Sys.setenv(UNWRAP_CARTO_API_KEY = "PASTE-KEY-HERE")
+CARTO_KEY <- Sys.getenv("UNWRAP_CARTO_API_KEY")
+CARTO_SUBDOMAINS <- c("a", "b", "c", "d")
+R_EARTH <- 20037508.342789244
+TILE_PX <- 256L
+TILE_HANDLE <- curl::new_handle()
+curl::handle_setheaders(TILE_HANDLE,
+  "User-Agent" = "unwrap-r-notebooks-tiles (bake; jgraving/unwrap)")
+if (nzchar(CARTO_KEY)) {
+  cat("Basemap: CartoDB tiles (UNWRAP_CARTO_API_KEY set; tiles fetched + cached locally)\n")
+} else {
+  cat("Basemap: UNWRAP_CARTO_API_KEY not set - flat-panel fallback (exact reference colors)\n")
+}
+
+fetch_carto_tile <- function(z, x, y, variant) {
+  cache_dir <- file.path(
+    Sys.getenv("UNWRAP_TILE_CACHE",
+      file.path(Sys.getenv("XDG_CACHE_HOME",
+        file.path(Sys.getenv("HOME", "."), ".cache")), "unwrap-carto-tiles")),
+    variant)
+  f <- file.path(cache_dir, sprintf("%d_%d_%d.png", z, x, y))
+  if (file.exists(f)) {
+    img <- try(png::readPNG(f), silent = TRUE)
+    if (!inherits(img, "try-error")) return(img)
+  }
+  url <- sprintf("https://%s.basemaps.cartocdn.com/%s/%d/%d/%d.png",
+    CARTO_SUBDOMAINS[((x + y) %% 4L) + 1L], variant, z, x, y)
+  if (nzchar(CARTO_KEY)) url <- paste0(url, "?key=", CARTO_KEY)
+  resp <- curl::curl_fetch_memory(url, handle = TILE_HANDLE)
+  # CartoDB answers 200 with a small watermarked placeholder for a missing
+  # or invalid key; treat that as a failure too.
+  if (resp$status_code != 200L || length(resp$content) < 5000L) return(NULL)
+  img <- png::readPNG(resp$content)
+  dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
+  writePNG(img, f)
+  img
+}
+
+# Compose the tiles covering [xmin, xmax] x [ymin, ymax] (EPSG:3857,
+# meters) at the given zoom into one raster. The extent is quantized to
+# the tile-pixel grid first, so image pixels line up 1:1 with tile pixels
+# and the copy is exact. Returns list(img, xmin, ymin, xmax, ymax) where
+# the limits are the (quantized) range the raster spans.
+basemap_panel_img <- function(xmin, ymin, xmax, ymax, variant, zoom,
+                              fallback_hex, warn = TRUE) {
+  if (!nzchar(CARTO_KEY)) {
+    if (warn) cat("Basemap: flat-panel fallback (no UNWRAP_CARTO_API_KEY set).\n")
+    return(list(flat = TRUE, hex = fallback_hex, xmin = xmin, ymin = ymin,
+      xmax = xmax, ymax = ymax))
+  }
+  n <- 2 ^ zoom
+  ts <- 2 * R_EARTH / n
+  px_m <- ts / TILE_PX
+  U0 <- R_EARTH - ymax       # u measures distance south of the north pole
+  U1 <- R_EARTH - ymin
+  U0 <- floor(U0 / px_m) * px_m
+  U1 <- ceiling(U1 / px_m) * px_m
+  xmin <- floor(xmin / px_m) * px_m
+  xmax <- ceiling(xmax / px_m) * px_m
+  # The panel draws the tiles as a fine vector mosaic (~64 cells across the
+  # long edge): each fetched tile contributes the average color of every
+  # mosaic cell it covers, so the full-resolution tile grid never has to
+  # exist as one big array.
+  n_mosaic <- 64L
+  cell_m <- max(xmax - xmin, (R_EARTH - U0) - (R_EARTH - U1)) / n_mosaic
+  mx0 <- floor(xmin / cell_m) * cell_m
+  my0 <- floor((R_EARTH - U1) / cell_m) * cell_m
+  mx0i <- mx0 / cell_m
+  my0i <- my0 / cell_m
+  mnx <- as.integer(ceiling((xmax - mx0) / cell_m))
+  mny <- as.integer(ceiling((R_EARTH - U0 - my0) / cell_m))
+  acc <- array(0, c(mny, mnx, 3L))
+  cnt <- matrix(0L, nrow = mny, ncol = mnx)
+  tx <- floor(c(xmin, xmax) / ts)
+  ty <- floor(c(U0, U1) / ts)
+  failed <- FALSE
+  for (txi in as.integer(tx[1]):as.integer(tx[2])) {
+    for (tyi in as.integer(ty[1]):as.integer(ty[2])) {
+      tile <- fetch_carto_tile(zoom, txi, tyi, variant)
+      if (is.null(tile)) { failed <- TRUE; next }
+      if (dim(tile)[3] == 4L) tile <- tile[, , 1:3]
+      tlx <- txi * ts
+      tby <- R_EARTH - (tyi + 1) * ts
+      cxa <- as.integer(floor(pmax(xmin, tlx) / cell_m))
+      cxb <- as.integer(ceiling(pmin(xmax, tlx + ts) / cell_m))
+      cya <- as.integer(floor(pmax(R_EARTH - U1, tby) / cell_m))
+      cyb <- as.integer(ceiling(pmin(R_EARTH - U0, tby + ts) / cell_m))
+      for (cxi in cxa:cxb) {
+        ix <- as.integer(cxi - mx0i) + 1L
+        if (ix < 1L || ix > mnx) next
+        for (cyi in cya:cyb) {
+          iy <- as.integer(cyi - my0i) + 1L
+          if (iy < 1L || iy > mny) next
+          p0 <- pmax(1L, as.integer(floor((cxi * cell_m - tlx) / px_m)) + 1L)
+          p1 <- pmin(TILE_PX, as.integer(ceiling(((cxi + 1) * cell_m - tlx) / px_m)))
+          q0 <- pmax(1L, as.integer(floor((cyi * cell_m - tby) / px_m)) + 1L)
+          q1 <- pmin(TILE_PX, as.integer(ceiling(((cyi + 1) * cell_m - tby) / px_m)))
+          if (p1 < p0 || q1 < q0) next
+          blk <- tile[q0:q1, p0:p1, ]
+          acc[iy, ix, ] <- acc[iy, ix, ] + colSums(blk)
+          cnt[iy, ix] <- cnt[iy, ix] + prod(dim(blk)[1:2])
+        }
+      }
+    }
+  }
+  if (failed || !any(cnt > 0L)) {
+    if (warn) cat("Basemap failed (continuing without tiles): some CartoDB tiles were unavailable.\n")
+    return(list(flat = TRUE, hex = fallback_hex, xmin = xmin,
+      ymin = R_EARTH - U1, xmax = xmax, ymax = R_EARTH - U0))
+  }
+  have <- which(cnt > 0L, arr.ind = TRUE)
+  tdf <- data.frame(
+    x = (mx0i + have[, 2] - 1L + 0.5) * cell_m,
+    y = (my0i + have[, 1] - 1L + 0.5) * cell_m,
+    col = grDevices::rgb(
+      acc[cbind(have[, 1], have[, 2], rep(1L, nrow(have)))] / cnt[have],
+      acc[cbind(have[, 1], have[, 2], rep(2L, nrow(have)))] / cnt[have],
+      acc[cbind(have[, 1], have[, 2], rep(3L, nrow(have)))] / cnt[have]))
+  list(flat = FALSE, tiles = tdf, cell = cell_m, xmin = xmin,
+    ymin = R_EARTH - U1, xmax = xmax, ymax = R_EARTH - U0)
+}
+
+# --- map geometry in EPSG:3857 (the same Web-Mercator plane the
+# --- Python figures plot on), plus the fixed sites.
+roost_3857 <- sf::st_transform(roost, 3857)
+ROOST_XY <- as.numeric(sf::st_coordinates(roost_3857)[1, ])
+trans_3857 <- sf::st_transform(
+  sf::st_sfc(sf::st_point(c(35.592712, 33.135136)),
+    sf::st_point(c(35.604462, 33.081932)), crs = 4326), 3857)
+TRANS_XY <- t(sf::st_coordinates(trans_3857))
+lake_3857 <- sf::st_transform(lake, 3857)
+lake_union_3857 <- sf::st_union(lake_3857)
+
+# Consecutive-point track segments in 3857 (solid steps + dashed gap
+# connectors), the R twin of the Python segment/gap layer. With pcol the
+# per-segment probability is the mean of the two endpoint values.
+segments_3857 <- function(track, pcol = NULL) {
+  trk_xy <- sf::st_coordinates(sf::st_transform(
+    sf::st_as_sf(track, coords = c("lon", "lat"), crs = 4326, remove = FALSE), 3857))
+  track$px <- trk_xy[, 1]
+  track$py <- trk_xy[, 2]
   do.call(rbind, lapply(split(track, track$tag), function(g) {
     g <- g[order(g$time), ]
     if (nrow(g) < 2L) return(NULL)
     n <- nrow(g)
-    data.frame(tag = g$tag[-1], treatment = factor(g$treatment[-1], levels = 1:4),
-      destination = g$destination[-1], x = g$x_m[-n], y = g$y_m[-n],
-      xend = g$x_m[-1], yend = g$y_m[-1],
-      gap = factor(g$gap_before[-1], levels = c(0, 1)),
-      time = g$time[-1])
+    out <- data.frame(
+      x = g$px[-n], y = g$py[-n], xend = g$px[-1], yend = g$py[-1],
+      treatment = factor(g$treatment[-1], levels = levels(df_track$treatment)),
+      destination = g$dest[-1], gap = as.integer(g$gap_before[-1]) == 1L,
+      time = g$time[-1], row.names = NULL)
+    if (!is.null(pcol)) out$p <- 0.5 * (g[[pcol]][-n] + g[[pcol]][-1])
+    out
   }))
 }
-map_base <- function(destination_panels = FALSE) {
-  lake_outline <- sf::st_sf(geometry = lake_m)
-  roost_outline <- sf::st_sf(geometry = roost_m)
-  if (destination_panels) {
-    lake_outline$destination <- "Agamon"
-    roost_outline$destination <- "Roost"
-  }
-  ggplot() + geom_sf(data = lake_outline, fill = "#D9EAF3", colour = "#4477AA", linewidth = 0.3) +
-    geom_sf(data = roost_outline, shape = 8, size = 3.2, colour = "black", fill = "white") +
-    coord_sf(crs = sf::st_crs(32636), datum = NA, expand = FALSE) +
-    theme(axis.text = element_blank(), axis.title = element_blank(),
-      axis.ticks = element_blank(),
-      panel.border = element_rect(colour = "grey80", fill = NA, linewidth = 0.3))
-}
-segments <- map_segments(track_w_treat)
-p_destination <- map_base(destination_panels = TRUE) +
-  geom_segment(data = segments, aes(x, y, xend = xend, yend = yend,
-    colour = treatment, linetype = gap), linewidth = 0.35, alpha = 0.7) +
-  facet_grid(treatment ~ destination) + scale_colour_manual(values = treatment_colors) +
-  scale_linetype_manual(values = c("0" = "solid", "1" = "dashed")) +
-  theme(legend.position = "bottom")
 
-# The source flow figure uses an EDT-to-lake raster smoothed at sigma=1
-# pixel. Reproduce the discrete distance transform on a 200 m mask.
-smooth_field <- grid_geometry(track_w_treat$x_m, track_w_treat$y_m, 200)
-lake_cells <- which(smooth_field$mask, arr.ind = TRUE)
-stopifnot(nrow(lake_cells) > 0L)
-rc <- which(matrix(TRUE, nrow(smooth_field$mask), ncol(smooth_field$mask)), arr.ind = TRUE)
-distance_sq <- rep(Inf, nrow(rc))
-for (i in seq_len(nrow(lake_cells))) {
-  distance_sq <- pmin(distance_sq, (rc[, 1] - lake_cells[i, 1])^2 +
-                       (rc[, 2] - lake_cells[i, 2])^2)
+# The unified data extent the Python figures compute (min/max over all
+# layers + a small pad).
+map_extent <- function(layer_bounds, pad = 0.06) {
+  minx <- min(vapply(layer_bounds, function(b) b["xmin"], numeric(1)))
+  miny <- min(vapply(layer_bounds, function(b) b["ymin"], numeric(1)))
+  maxx <- max(vapply(layer_bounds, function(b) b["xmax"], numeric(1)))
+  maxy <- max(vapply(layer_bounds, function(b) b["ymax"], numeric(1)))
+  c(xmin = minx - (maxx - minx) * pad, ymin = miny - (maxy - miny) * pad,
+    xmax = maxx + (maxx - minx) * pad, ymax = maxy + (maxy - miny) * pad)
 }
-distance_field <- matrix(sqrt(distance_sq) * 200,
-  nrow = nrow(smooth_field$mask), ncol = ncol(smooth_field$mask))
-reflect_index <- function(i, n) {
-  while (any(i < 1L | i > n)) {
-    i[i < 1L] <- 1L - i[i < 1L]
-    i[i > n] <- 2L * n + 1L - i[i > n]
+seg_bounds <- function(seg)
+  c(xmin = min(seg$x, seg$xend), ymin = min(seg$y, seg$yend),
+    xmax = max(seg$x, seg$xend), ymax = max(seg$y, seg$yend))
+
+# The Python panels use set_aspect("equal", adjustable = "box"): the axis
+# box is forced to the panel aspect and the data is centered inside it.
+# Emulate that by padding the data extent to the panel aspect (the extra
+# space shows the white panel background, as in the references).
+aspect_extent <- function(bm, aspect, xlim = NULL, ylim = NULL) {
+  if (is.null(xlim)) xlim <- c(bm$xmin, bm$xmax)
+  if (is.null(ylim)) ylim <- c(bm$ymin, bm$ymax)
+  ew <- diff(xlim); eh <- diff(ylim)
+  if (ew / eh > aspect) ew <- eh * aspect else eh <- ew / aspect
+  list(xlim = c(mean(xlim) - ew / 2, mean(xlim) + ew / 2),
+    ylim = c(mean(ylim) - eh / 2, mean(ylim) + eh / 2))
+}
+
+# One basemap panel: the composed tile raster (or flat panel) across its
+# range with no axes; meters per unit stay equal on both axes. The optional
+# lake outline is drawn as part of the panel base, because its sf layers
+# must be added before the coordinate system: in this ggplot2 build adding a
+# geom_sf afterwards silently replaces the coordinate (and with it the fixed
+# limits and the forced equal-aspect box), and the panel collapses.
+map_panel <- function(bm, title = NULL, title_size = 16, border_col = NULL,
+                      aspect = 1, lake = FALSE,
+                      lake_colour = "#17BECF", lake_alpha = 0.35,
+                      lake_lw = 1.0) {
+  ae <- aspect_extent(bm, aspect)
+  p <- ggplot()
+  if (isTRUE(bm$flat)) {
+    p <- p + annotate("rect", xmin = bm$xmin, xmax = bm$xmax,
+      ymin = bm$ymin, ymax = bm$ymax, fill = bm$hex, colour = NA)
+  } else {
+    p <- p + geom_tile(data = bm$tiles, aes(x = x, y = y, fill = col),
+      inherit.aes = FALSE, width = bm$cell, height = bm$cell) +
+      scale_fill_identity() + guides(fill = "none")
   }
-  i
+  if (lake) {
+    # Teal lake overlay (Agamon panels + p_goal panels); in the Python
+    # z-order the lake sits below the track lines.
+    p <- p +
+      geom_sf(data = sf::st_sf(geometry = lake_union_3857), inherit.aes = FALSE,
+        fill = lake_colour, colour = lake_colour, alpha = lake_alpha,
+        linewidth = lake_lw * 0.3528) +
+      geom_sf(data = sf::st_sf(geometry = sf::st_boundary(lake_union_3857)),
+        inherit.aes = FALSE, colour = lake_colour, fill = NA,
+        linewidth = (lake_lw + 0.2) * 0.3528)
+  }
+  # theme_void() carries its own plot.title (relative size, left-just);
+  # compose the explicit title/border themes AFTER it so they win.
+  th <- theme_void()
+  if (!is.null(border_col)) {
+    th <- th + theme(panel.border = element_rect(
+      colour = border_col, fill = NA, linewidth = 0.35))
+  }
+  if (!is.null(title)) {
+    p <- p + labs(title = title)
+    th <- th + theme(plot.title = element_text(size = title_size, hjust = 0.5,
+      margin = margin(0, 0, 2, 0)))
+  }
+  p + th +
+    coord_sf(crs = sf::st_crs(3857), datum = NA, expand = FALSE,
+      xlim = ae$xlim, ylim = ae$ylim)
 }
-gaussian_pass <- function(x) {
-  offset <- -4:4
-  weights <- exp(-0.5 * offset^2)
-  weights <- weights / sum(weights)
-  vapply(seq_along(x), function(j) sum(weights * x[reflect_index(j + offset, length(x))]), numeric(1))
+
+# Marker radius in meters for a matplotlib marker-size s (pt^2) drawn on
+# a panel of panel_in inches that shows extent_m meters wide.
+marker_radius_m <- function(s_pt2, panel_in, extent_m)
+  sqrt(s_pt2) / 72 / panel_in * extent_m / 2
+
+# The Python figures mark the roost with a white star (black edge) and
+# the two translocations with white X marks (black edge).
+star_poly_pts <- function(cx, cy, r) {
+  k <- 0:9
+  ang <- (90 - 36 * k) * pi / 180
+  rad <- ifelse(k %% 2 == 0L, r, r * 0.38196601)
+  cbind(cx + rad * cos(ang), cy + rad * sin(ang))
 }
-distance_field <- apply(distance_field, 2, gaussian_pass)
-distance_field <- t(apply(distance_field, 1, gaussian_pass))
-smooth_field <- field_vectors(smooth_field, distance_field)
-flow <- expand.grid(x = smooth_field$xs, y = smooth_field$ys)
-flow$tx <- as.numeric(t(smooth_field$tx))
-flow$ty <- as.numeric(t(smooth_field$ty))
-flow <- flow[is.finite(flow$tx) & is.finite(flow$ty), ]
-flow <- flow[seq.int(1L, nrow(flow), by = 3L), ]
-lake_flow <- transform(flow, xend = x + 140 * tx, yend = y + 140 * ty,
-                        destination = "Agamon")
-roost_flow <- flow
-roost_norm <- sqrt((roost_xy[1] - flow$x)^2 + (roost_xy[2] - flow$y)^2)
-roost_flow$xend <- flow$x + 140 * (roost_xy[1] - flow$x) / roost_norm
-roost_flow$yend <- flow$y + 140 * (roost_xy[2] - flow$y) / roost_norm
-roost_flow$destination <- "Roost"
-p_flow <- map_base(destination_panels = TRUE) + geom_segment(data = rbind(lake_flow, roost_flow),
-  aes(x, y, xend = xend, yend = yend),
-  arrow = grid::arrow(length = grid::unit(0.04, "inches")),
-  linewidth = 0.2, alpha = 0.6) + facet_wrap(~ destination)
+add_roost_marker <- function(r) {
+  st <- star_poly_pts(ROOST_XY[1], ROOST_XY[2], r)
+  annotate("polygon", x = st[, 1], y = st[, 2],
+    fill = "white", colour = "black", linewidth = 0.35)
+}
+add_x_markers <- function(points_xy, r) {
+  do.call(c, lapply(seq_len(nrow(points_xy)), function(i) {
+    cx <- points_xy[i, 1]; cy <- points_xy[i, 2]
+    c(
+      annotate("segment", x = cx - r, y = cy - r, xend = cx + r, yend = cy + r,
+        linewidth = 1.0, colour = "white"),
+      annotate("segment", x = cx + r, y = cy - r, xend = cx - r, yend = cy + r,
+        linewidth = 1.0, colour = "white"),
+      annotate("segment", x = cx - r, y = cy - r, xend = cx + r, yend = cy + r,
+        linewidth = 0.45, colour = "black"),
+      annotate("segment", x = cx + r, y = cy - r, xend = cx - r, yend = cy + r,
+        linewidth = 0.45, colour = "black")
+    )
+  }))
+}
+# Scale bar + north arrow in a panel corner (data coordinates), the R
+# twin of the Python helper: a two-tone bar with an outline, the length
+# label below it (nice 1-2-5 length ~20% of the panel width) and a
+# compass arrow centered above the bar. Returns the plot with the layers.
+nice_scale_len <- function(width_m) {
+  target <- max(width_m * 0.20, 1)
+  e <- floor(log10(target))
+  b <- target / 10 ^ e
+  nice <- if (b < 1.5) 1 else if (b < 3.5) 2 else if (b < 7.5) 5 else 10
+  nice * 10 ^ e
+}
+fmt_scale_label <- function(m)
+  paste0(as.integer(round(m)), " m")
+add_scale_compass <- function(p, xlim, ylim, side = "right",
+                              panel_w_in = 2.5, panel_h_in = 5.85,
+                              variant = "classic") {
+  w_m <- diff(xlim); h_m <- diff(ylim)
+  pt2m <- h_m / (panel_h_in * 72)
+  L <- nice_scale_len(w_m)
+  xr <- if (side == "right") xlim[2] else xlim[1]
+  if (identical(variant, "classic")) {
+    # 16-px corner pad (100 dpi), 7-pt bar, 9-pt label, 30-pt compass -
+    # the Agamon map geometry.
+    pad_pt <- 16 * 72 / 100
+    seg_h_pt <- 7
+    breath_pt <- 7
+    lab_pt <- 9
+    bar_edge_pt <- 0.9
+    tail_pt <- 1.9
+    noff <- 2
+    ytxt <- ylim[1] + (pad_pt + 10.5) * pt2m
+    yb0 <- ytxt + breath_pt * pt2m
+    yb1 <- yb0 + seg_h_pt * pt2m
+    cbase <- (yb0 + yb1) / 2 + (seg_h_pt / 2 + 8) * pt2m
+    arrow_pt <- 30; hw_pt <- 9; hl_pt <- 10
+  } else {
+    # p_goal geometry: equal 22-px (full) / 14-px (compact) corner pads at
+    # 80 dpi, 8-pt bar, 10-pt label, compass with its base on the bar top
+    # (20-pt arrow full / 18-pt compact) and the N 10-pt.
+    small <- identical(variant, "pgoal_small")
+    pad_pt <- if (small) 14 * 72 / 80 else 22 * 72 / 80
+    seg_h_pt <- 8
+    breath_pt <- if (small) 5 else 6
+    lab_pt <- 10
+    bar_edge_pt <- if (small) 0.8 else 0.9
+    tail_pt <- if (small) 1.8 else 2.0
+    noff <- if (small) 2 else 3
+    # 10-pt font bbox is ~13 pt tall: the label's bottom edge sits on the
+    # pad line, the bar breathes above it.
+    ytxt <- ylim[1] + pad_pt * pt2m
+    yb0 <- ytxt + (13 + breath_pt) * pt2m
+    yb1 <- yb0 + seg_h_pt * pt2m
+    cbase <- yb1 + 2 * pt2m
+    arrow_pt <- if (small) 18 else 20
+    hw_pt <- if (small) 8 else 9
+    hl_pt <- if (small) 9 else 10
+  }
+  ctip <- cbase + arrow_pt * pt2m
+  hw <- hw_pt / 2 * pt2m; hl <- hl_pt * pt2m
+  x1 <- xr - pad_pt * pt2m
+  x0 <- x1 - L
+  xc <- (x0 + x1) / 2
+  # vjust in this build: 1 pins the text TOP at the anchor, 0 pins the
+  # BOTTOM - classic keeps its top-pinned label, p_goal pins the label
+  # bottom on the pad line.
+  lab_vjust <- if (identical(variant, "classic")) 1 else 0
+  p +
+    geom_rect(inherit.aes = FALSE,
+      data = data.frame(xmin = x0, xmax = xc, ymin = yb0, ymax = yb1),
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "#ffffff", colour = NA) +
+    geom_rect(inherit.aes = FALSE,
+      data = data.frame(xmin = xc, xmax = x1, ymin = yb0, ymax = yb1),
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = "#000000", colour = NA) +
+    geom_rect(inherit.aes = FALSE,
+      data = data.frame(xmin = x0, xmax = x1, ymin = yb0, ymax = yb1),
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), fill = NA, colour = "#000000",
+      linewidth = bar_edge_pt * 0.3528) +
+    annotate("text", x = xc, y = ytxt,
+      label = fmt_scale_label(L), size = lab_pt * 0.3528, colour = "#000000",
+      hjust = 0.5, vjust = lab_vjust) +
+    annotate("segment", x = xc, y = cbase,
+      xend = xc, yend = ctip - hl + 2 * pt2m, linewidth = tail_pt * 0.3528,
+      colour = "#000000") +
+    annotate("polygon", x = c(xc, xc - hw, xc + hw),
+      y = c(ctip, ctip - hl, ctip - hl), fill = "#000000", colour = "#000000",
+      linewidth = 0.9 * 0.3528) +
+    annotate("text", x = xc, y = ctip + noff * pt2m, label = "N",
+      size = lab_pt * 0.3528, colour = "#000000", hjust = 0.5, vjust = 0)
+}
+
+# Hand-drawn figure-level legend panel (the Python fig.legend items): a
+# framed white box with marker/line glyphs and labels, no axes.
+# Side/bottom legend: a white box with one stacked column of keys (the
+# destination/flow map columns) or one packed horizontal row of keys
+# (the p_goal figure legend). Data coordinates are inches of the cell the
+# panel is measured to occupy, so keys stay round and the box keeps its
+# fixed shape however patchwork allocates the cell.
+legend_glyph <- function(p, kind, gx, gy) {
+  if (kind == "star") {
+    st <- star_poly_pts(gx, gy, 0.07)
+    p + annotate("polygon", x = st[, 1], y = st[, 2],
+      fill = "white", colour = "black")
+  } else if (kind == "x") {
+    r <- 0.065
+    p +
+      annotate("segment", x = gx - r, y = gy - r, xend = gx + r, yend = gy + r,
+        linewidth = 1.2, colour = "white") +
+      annotate("segment", x = gx + r, y = gy - r, xend = gx - r, yend = gy + r,
+        linewidth = 1.2, colour = "white") +
+      annotate("segment", x = gx - r, y = gy - r, xend = gx + r, yend = gy + r,
+        linewidth = 0.5, colour = "black") +
+      annotate("segment", x = gx + r, y = gy - r, xend = gx - r, yend = gy + r,
+        linewidth = 0.5, colour = "black")
+  } else if (kind == "dash") {
+    p + annotate("segment", x = gx - 0.09, y = gy, xend = gx + 0.09, yend = gy,
+      linewidth = 0.5, colour = "black", linetype = "dashed")
+  } else {  # swatch (Lake): pale cyan chip
+    p + annotate("rect", xmin = gx - 0.07, xmax = gx + 0.07,
+      ymin = gy - 0.05, ymax = gy + 0.05, fill = "#17BECF", alpha = 0.35,
+      colour = "#17BECF", linewidth = 0.3)
+  }
+}
+legend_panel <- function(items, cell_w = 1.8, cell_h = 5.85, font_mm = 3.0) {
+  if (is.null(items$n)) items$n <- rep(1, nrow(items))
+  nrow_i <- length(unique(items$n))
+  # rows 0.34 in apart; the box hugs them with a 0.15 in pad. A single
+  # row keeps the bare 0.15 in pad.
+  box_half <- if (nrow_i > 1L) ((nrow_i - 1L) / 2) * 0.34 + 0.15 else 0.15
+  p <- ggplot() +
+    annotate("rect", xmin = 0.03, xmax = cell_w - 0.03,
+      ymin = cell_h / 2 - box_half, ymax = cell_h / 2 + box_half,
+      fill = "#ffffff", colour = "#000000", linewidth = 0.25)
+  if (nrow_i > 1L) {
+    for (j in seq_len(nrow_i)) {
+      it <- items[items$n == j, , drop = FALSE]
+      gy <- cell_h / 2 + ((nrow_i - 1L) / 2 - (j - 1L)) * 0.34
+      p <- legend_glyph(p, it$kind, 0.32, gy)
+      # annotate("text") sizes are millimetres of glyph height here
+      # (3.0 mm ~ 8.5 pt); theme element_text sizes are points.
+      p <- p + annotate("text", x = 0.55, y = gy, label = it$label,
+        size = font_mm, hjust = 0, vjust = 0.5)
+    }
+  } else {
+    # one packed, centred row: key, label, gap, key, label, ...
+    lw_in <- strwidth(items$label, units = "inches") * (8 / 12)
+    key_in <- 0.18; gk_in <- 0.06; gi_in <- 0.16
+    tot_in <- sum(lw_in) + nrow(items) * (key_in + gk_in) +
+      (nrow(items) - 1) * gi_in
+    starts_in <- (cell_w - tot_in) / 2 +
+      cumsum(c(0, key_in + gk_in + lw_in[-nrow(items)] + gi_in))
+    for (i in seq_len(nrow(items))) {
+      p <- legend_glyph(p, items$kind[i], starts_in[i] + key_in / 2, cell_h / 2)
+      p <- p + annotate("text", x = starts_in[i] + key_in + gk_in,
+        y = cell_h / 2, label = items$label[i], size = font_mm,
+        hjust = 0, vjust = 0.5)
+    }
+  }
+  p + coord_cartesian(xlim = c(0, cell_w), ylim = c(0, cell_h), expand = FALSE) +
+    theme_void()
+}
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-021"
-save_figure(p_destination, "rediscretized_destination_panels", 11, 10)
+# Full-track destination panels by treatment x destination: one Home and
+# one Agamon Hula Lake panel on dark CartoDB tiles (the Python twin
+# requests zoom-15 retina tiles; z16 here at the same apparent
+# resolution), no repeated treatment legend.
+segs_treat <- segments_3857(track_w_treat)
+site_bounds <- list(sf::st_bbox(lake_union_3857), sf::st_bbox(roost_3857),
+  sf::st_bbox(trans_3857))
+ext_dest <- map_extent(c(list(seg_bounds(segs_treat)), site_bounds), pad = 0.06)
+bm_dark <- basemap_panel_img(ext_dest["xmin"], ext_dest["ymin"],
+  ext_dest["xmax"], ext_dest["ymax"], "dark_all", 16, "#262626")
+# The equal-aspect panel boxes of the 7x8 figure are ~0.43 wide/tall.
+ae_dest <- aspect_extent(bm_dark, 0.43)
+xlim_dest <- ae_dest$xlim; ylim_dest <- ae_dest$ylim
+r_roost_dest <- marker_radius_m(220, 3.0, diff(xlim_dest))
+r_trans_dest <- marker_radius_m(140, 3.0, diff(xlim_dest))
+
+panel_dest <- function(dest, title, lake = FALSE) {
+  sd <- segs_treat[segs_treat$destination == dest, , drop = FALSE]
+  p <- map_panel(bm_dark, title, title_size = 15, aspect = 0.43,
+    lake = lake, lake_colour = "#56B4E9", lake_alpha = 0.35, lake_lw = 1.2)
+  p +
+    geom_segment(data = sd[sd$gap, ], inherit.aes = FALSE,
+      aes(x = x, y = y, xend = xend, yend = yend, colour = treatment),
+      linetype = "dashed", linewidth = 1.44 * 0.3528, alpha = 0.85) +
+    geom_segment(data = sd[!sd$gap, ], inherit.aes = FALSE,
+      aes(x = x, y = y, xend = xend, yend = yend, colour = treatment),
+      linewidth = 1.6 * 0.3528, alpha = 0.95) +
+    scale_colour_manual(values = treatment_colors_cb) +
+    guides(colour = "none") +
+    add_roost_marker(r_roost_dest) +
+    add_x_markers(TRANS_XY, r_trans_dest)
+}
+p_dest_home <- panel_dest("Home", "Home")
+p_dest_agam <- panel_dest("Agamon", "Agamon Hula Lake", lake = TRUE)
+p_dest_agam <- add_scale_compass(p_dest_agam, xlim_dest, ylim_dest,
+  panel_w_in = 2.53, panel_h_in = 5.88)
+p_dest_legend <- legend_panel(data.frame(
+  n = c(1, 2, 3), kind = c("star", "x", "dash"),
+  label = c("Roost", "Translocation", "Signal Dropout")),
+  cell_w = 1.8, cell_h = 5.85)
+p_destination <- (p_dest_home | p_dest_agam | p_dest_legend) +
+  plot_layout(widths = c(0.37, 0.37, 0.26)) +
+  theme(plot.margin = margin(2, 2, 2, 2))
+save_figure(p_destination, "rediscretized_destination_panels", width = 7, height = 8)
 
 ```
 
@@ -726,7 +1161,95 @@ Compact per-panel trajectory plots (one panel per treatment / destination combin
 
 ```{r}
 #| cell-id: "goldshtein-bats-023"
-save_figure(p_destination, "rediscretized_destination_panels_compact", 7, 9)
+# Compact destination panels (one panel per destination) on light
+# CartoDB Positron (no labels) tiles with black panel outlines and the
+# legend inside the Agamon panel - the Python twin with fig_w=2.5,
+# fig_h=3.8, title_fs=9, legend_fs=6.
+ext_compact <- map_extent(c(list(seg_bounds(segs_treat)), site_bounds), pad = 0.05)
+bm_light <- basemap_panel_img(ext_compact["xmin"], ext_compact["ymin"],
+  ext_compact["xmax"], ext_compact["ymax"], "light_nolabels_novector", 15,
+  "#fafaf8")
+# The equal-aspect panel boxes of the 2.5x3.8 figure are ~1.22 x 3.10 in.
+ae_compact <- aspect_extent(bm_light, 1.22 / 3.10)
+xlim_c <- ae_compact$xlim; ylim_c <- ae_compact$ylim
+r_roost_c <- marker_radius_m(150, 1.22, diff(xlim_c))
+r_trans_c <- marker_radius_m(90, 1.22, diff(xlim_c))
+
+panel_compact <- function(dest, title, lake = FALSE) {
+  sd <- segs_treat[segs_treat$destination == dest, , drop = FALSE]
+  p <- map_panel(bm_light, title, title_size = 9, border_col = "black",
+    aspect = 1.22 / 3.10, lake = lake, lake_alpha = 0.35, lake_lw = 1.0)
+  p +
+    geom_segment(data = sd[sd$gap, ], inherit.aes = FALSE,
+      aes(x = x, y = y, xend = xend, yend = yend, colour = treatment),
+      linetype = "dashed", linewidth = 1.22 * 0.3528, alpha = 0.85) +
+    geom_segment(data = sd[!sd$gap, ], inherit.aes = FALSE,
+      aes(x = x, y = y, xend = xend, yend = yend, colour = treatment),
+      linewidth = 1.35 * 0.3528, alpha = 0.95) +
+    scale_colour_manual(values = treatment_colors_cb) +
+    guides(colour = "none") +
+    add_roost_marker(r_roost_c) +
+    add_x_markers(TRANS_XY, r_trans_c)
+}
+# Compact legend inside the Agamon panel, top-right (the Python twin
+# draws it at (0.985, 0.985) of that panel).
+add_compact_legend <- function(p) {
+  # Point scale from the panel's rendered height (2.5x3.8 page with this
+  # layout draws the equal-aspect panel ~2.855in tall), so keys, frame pad
+  # and 6pt labels land at true point sizes.
+  m_per_in <- diff(ylim_c) / 2.855
+  pp <- function(pts) pts * m_per_in / 72
+  fs_pt <- 6
+  labels <- c("Roost", "Translocation", "Signal dropout")
+  lw_in <- strwidth(labels, units = "inches") * fs_pt / 12
+  pad <- pp(0.35 * fs_pt)          # borderpad
+  mcol <- pp(7.2)                  # marker column (markersize 7.2)
+  hpad <- pp(0.45 * fs_pt)         # handletextpad
+  pitch <- pp(1.35 * fs_pt)        # row pitch (labelspacing 0.35)
+  box_w <- 2 * pad + mcol + hpad + max(lw_in) * 1.05 * m_per_in
+  box_h <- 2 * pad + pp(fs_pt) + (length(labels) - 1) * pitch
+  x1 <- xlim_c[1] + 0.985 * diff(xlim_c)
+  x0 <- x1 - box_w
+  y1 <- ylim_c[2] - (1 - 0.985) * diff(ylim_c)
+  y0 <- y1 - box_h
+  gx <- x0 + pad + mcol / 2
+  tx <- x0 + pad + mcol + hpad
+  ys <- y1 - (pad + pp(fs_pt) / 2 + (0:(length(labels) - 1)) * pitch)
+  r_s <- pp(7.2 * 0.9 / 2)         # Roost star radius (scale 0.9)
+  r_x <- pp(6.2 * 0.9 / 2)         # X half-diagonal
+  d_h <- pp(1.4 * fs_pt / 2)       # dashed-handle half-length
+  st <- star_poly_pts(gx, ys[1], r_s)
+  p +
+    annotate("rect", xmin = x0, xmax = x1, ymin = y0, ymax = y1,
+      fill = "#fbfbfb", colour = "#cccccc", linewidth = 0.3528) +
+    annotate("polygon", x = st[, 1], y = st[, 2],
+      fill = "white", colour = "black", linewidth = 0.8 * 0.3528) +
+    annotate("segment", x = gx - r_x, y = ys[2] - r_x,
+      xend = gx + r_x, yend = ys[2] + r_x, linewidth = 0.6, colour = "white") +
+    annotate("segment", x = gx + r_x, y = ys[2] - r_x,
+      xend = gx - r_x, yend = ys[2] + r_x, linewidth = 0.6, colour = "white") +
+    annotate("segment", x = gx - r_x, y = ys[2] - r_x,
+      xend = gx + r_x, yend = ys[2] + r_x, linewidth = 0.8 * 0.3528, colour = "black") +
+    annotate("segment", x = gx + r_x, y = ys[2] - r_x,
+      xend = gx - r_x, yend = ys[2] + r_x, linewidth = 0.8 * 0.3528, colour = "black") +
+    annotate("text", x = tx, y = ys[1], label = "Roost",
+      size = fs_pt * 0.3528, hjust = 0, vjust = 0.5) +
+    annotate("text", x = tx, y = ys[2], label = "Translocation",
+      size = fs_pt * 0.3528, hjust = 0, vjust = 0.5) +
+    annotate("segment", x = gx - d_h, y = ys[3], xend = gx + d_h, yend = ys[3],
+      linewidth = 0.3528, colour = "black", linetype = "dashed") +
+    annotate("text", x = tx, y = ys[3], label = "Signal dropout",
+      size = fs_pt * 0.3528, hjust = 0, vjust = 0.5)
+}
+p_compact_home <- panel_compact("Home", "Home")
+p_compact_home <- add_scale_compass(p_compact_home, xlim_c, ylim_c,
+  panel_w_in = 1.22, panel_h_in = 3.10)
+p_compact_agam <- panel_compact("Agamon", "Agamon Hula Lake", lake = TRUE)
+p_compact_agam <- add_compact_legend(p_compact_agam)
+p_destination_compact <- (p_compact_home | p_compact_agam) +
+  theme(plot.margin = margin(1, 3, 1, 3))
+save_figure(p_destination_compact, "rediscretized_destination_panels_compact",
+  width = 2.5, height = 3.8)
 
 ```
 
@@ -743,7 +1266,105 @@ constructions above.
 
 ```{r}
 #| cell-id: "goldshtein-bats-027"
-save_figure(p_flow, "destination_flow_fields_smoothed_distance", 11, 6)
+# Goal-approach direction fields feeding bearing_to_dest: the radial
+# roost field over the Home panel and the smoothed-distance lake field
+# over the Agamon Hula Lake panel, white quivers on dark CartoDB tiles
+# (the Python twin uses lake_field="smoothed_distance", 200 m grids and
+# no scale/compass UI).
+ext_flow <- map_extent(c(list(seg_bounds(segs_treat)), site_bounds), pad = 0.06)
+bm_flow <- basemap_panel_img(ext_flow["xmin"], ext_flow["ymin"],
+  ext_flow["xmax"], ext_flow["ymax"], "dark_all", 15, "#262626")
+# The equal-aspect panel boxes of the 8x9 figure are ~0.41 wide/tall.
+ae_flow <- aspect_extent(bm_flow, 0.41)
+xlim_flow <- ae_flow$xlim; ylim_flow <- ae_flow$ylim
+r_roost_f <- marker_radius_m(220, 3.4, diff(xlim_flow))
+r_trans_f <- marker_radius_m(140, 3.4, diff(xlim_flow))
+
+# Flow grids (200 m, the Python resolution) over the full panel extent.
+flow_res <- 200
+gx <- seq(ceiling(xlim_flow[1] / flow_res) * flow_res,
+  floor(xlim_flow[2] / flow_res) * flow_res, by = flow_res)
+gy <- seq(ceiling(ylim_flow[1] / flow_res) * flow_res,
+  floor(ylim_flow[2] / flow_res) * flow_res, by = flow_res)
+gpts <- expand.grid(x = gx, y = gy)
+lake_mask <- lengths(sf::st_within(
+  sf::st_as_sf(gpts, coords = c("x", "y"), crs = 3857), lake_union_3857)) > 0L
+nxf <- length(gx); nyf <- length(gy)
+M <- t(matrix(lake_mask, nrow = nyf, ncol = nxf))
+# squared distance (in grid steps) to the nearest lake cell
+d2 <- matrix(Inf, nyf, nxf)
+li <- which(M, arr.ind = TRUE)
+for (i in seq_len(nrow(li))) {
+  dr <- seq_len(nyf) - li[i, 1]
+  d2 <- pmin(d2, outer(dr, seq_len(nxf) - li[i, 2],
+    function(a, b) a^2 + b^2))
+}
+dist_f <- sqrt(d2) * flow_res
+dist_f[M > 0] <- 0
+# one-pixel (sigma ~ 1) Gaussian pass on each axis, mirrored edges
+gpass1d <- function(v) {
+  n <- length(v)
+  j <- function(i) pmin(n, pmax(1L, i))
+  j1 <- j(seq_len(n) - 1L); j2 <- j(seq_len(n)); j3 <- j(seq_len(n) + 1L)
+  v[j1] / 4 + v[j2] / 2 + v[j3] / 4
+}
+dist_f <- apply(dist_f, 2, gpass1d)
+dist_f <- t(apply(dist_f, 1, gpass1d))
+# unit vectors pointing at the lake (negative gradient of distance)
+txf <- matrix(0, nyf, nxf); tyf <- matrix(0, nyf, nxf)
+txf[, 2:(nxf - 1L)] <- -(dist_f[, 3:nxf] - dist_f[, 1:(nxf - 2L)]) / (2 * flow_res)
+txf[, 1L] <- if (nxf > 1L) -(dist_f[, 2L] - dist_f[, 1L]) / flow_res else 0
+txf[, nxf] <- if (nxf > 1L) -(dist_f[, nxf] - dist_f[, nxf - 1L]) / flow_res else 0
+tyf[2:(nyf - 1L), ] <- -(dist_f[3:nyf, ] - dist_f[1:(nyf - 2L), ]) / (2 * flow_res)
+tyf[1L, ] <- if (nyf > 1L) -(dist_f[2L, ] - dist_f[1L, ]) / flow_res else 0
+tyf[nyf, ] <- if (nyf > 1L) -(dist_f[nyf, ] - dist_f[nyf - 1L, ]) / flow_res else 0
+normf <- sqrt(txf^2 + tyf^2)
+txf <- txf / normf; tyf <- tyf / normf
+txf[normf <= 1e-12] <- NA_real_
+tyf[normf <= 1e-12] <- NA_real_
+txf[M > 0] <- NA_real_
+tyf[M > 0] <- NA_real_
+# radial field toward the roost (no mask)
+rx <- gpts$x - ROOST_XY[1]; ry <- gpts$y - ROOST_XY[2]
+nr <- sqrt(rx^2 + ry^2)
+txr <- -rx / nr; tyr <- -ry / nr
+# Arrow length: the Python quiver with unit vectors and scale 30 draws
+# ~1/30 in shafts per 3.4 in of panel, i.e. ~1% of the panel width.
+arrow_len_f <- 0.010 * diff(xlim_flow)
+# expand.grid order: x index fastest, so as.vector(M) matches the point
+# rows; the fields must be transposed first for the same reason.
+lake_dir <- data.frame(x = gpts$x, y = gpts$y,
+  xend = gpts$x + arrow_len_f * as.vector(t(txf)), yend = gpts$y + arrow_len_f * as.vector(t(tyf)),
+  in_lake = lake_mask)
+lake_dir <- lake_dir[!lake_dir$in_lake & is.finite(lake_dir$xend), , drop = FALSE]
+roost_dir <- data.frame(x = gpts$x, y = gpts$y,
+  xend = gpts$x + arrow_len_f * txr, yend = gpts$y + arrow_len_f * tyr)
+roost_dir <- roost_dir[is.finite(roost_dir$xend), , drop = FALSE]
+
+p_flow_home <- map_panel(bm_flow, "Home (roost flow)", title_size = 14,
+  aspect = 0.41) +
+  geom_segment(data = roost_dir, inherit.aes = FALSE,
+    aes(x = x, y = y, xend = xend, yend = yend),
+    arrow = grid::arrow(length = grid::unit(0.05, "inches"), type = "closed"),
+    linewidth = 0.14, alpha = 0.95, colour = "#ffffff") +
+  add_roost_marker(r_roost_f) +
+  add_x_markers(TRANS_XY, r_trans_f)
+p_flow_agam <- map_panel(bm_flow, "Agamon Hula Lake", title_size = 14,
+  aspect = 0.41, lake = TRUE, lake_alpha = 0.35, lake_lw = 1.2) +
+  geom_segment(data = lake_dir, inherit.aes = FALSE,
+    aes(x = x, y = y, xend = xend, yend = yend),
+    arrow = grid::arrow(length = grid::unit(0.05, "inches"), type = "closed"),
+    linewidth = 0.14, alpha = 0.95, colour = "#ffffff") +
+  add_roost_marker(r_roost_f) +
+  add_x_markers(TRANS_XY, r_trans_f)
+p_flow_legend <- legend_panel(data.frame(
+  n = c(1, 2), kind = c("star", "x"),
+  label = c("Roost", "Translocation")),
+  cell_w = 1.9, cell_h = 7.3)
+p_flow <- (p_flow_home | p_flow_agam | p_flow_legend) +
+  plot_layout(widths = c(0.38, 0.38, 0.24)) +
+  theme(plot.margin = margin(2, 2, 2, 2))
+save_figure(p_flow, "destination_flow_fields_smoothed_distance", width = 8, height = 9)
 
 ```
 
@@ -773,37 +1394,46 @@ descriptive_data$treatment <- factor(descriptive_data$treatment, levels = 1:4)
 # need not exclude rows with missing along-field destination distances.
 tag_observed <- split(descriptive_data, descriptive_data$tag)
 kde_data <- do.call(rbind, lapply(tag_observed, function(g) {
-  data.frame(theta = theta_grid, density = kde_vm(g$HeadingRadians),
-    tag = as.character(g$tag[1]), treatment = g$treatment[1], destination = g$destination[1])
+  data.frame(theta = theta_grid, density = kde_vm(g$HeadingRadians, kappa = 15),
+    tag = as.character(g$tag[1]), treatment = g$treatment[1])
 }))
-# Per-tag polar KDE panels, in the Python twin's look: 0 deg at right with
-# the counter-clockwise orientation, one tab10-colored curve per tag, the
-# two density rings (r = 1 at density 0, r = 2 at density 1), four grey
-# direction spokes, and a darker 0-deg segment from r = 1 to r = 2.
+# Panel order in treatment blocks, tags ascending within each block; the
+# same grouping the per-tag estimates below use for their colour.
+tag_meta <- do.call(rbind, lapply(tag_observed, function(g) {
+  data.frame(tag = as.character(g$tag[1]), treatment = g$treatment[1],
+    stringsAsFactors = FALSE)
+}))
+tag_meta <- tag_meta[order(tag_meta$treatment, as.numeric(tag_meta$tag)), ]
+# Per-tag polar KDE panels: 0 deg at right with the counter-clockwise
+# orientation, one curve per tag in the treatment colour, the two density
+# rings (r = 1 at density 0, r = 2 at density 1), four grey direction
+# spokes, and a darker 0-deg segment from r = 1 to r = 2.
 xmap_polar <- function(a) (pi / 2 - a) %% (2 * pi)
 kde_data$theta_x <- xmap_polar(kde_data$theta)
-kde_data$taglabel <- paste0("tag ", as.character(kde_data$tag))
+kde_data$taglabel <- factor(paste0("tag ", kde_data$tag),
+  levels = paste0("tag ", as.character(tag_meta$tag)))
 rmax_polar <- 1 + max(1, max(kde_data$density)) + 0.2
 pg_a <- seq(0, 2 * pi, length.out = 361L)
 polar_rings <- data.frame(theta = rep(xmap_polar(pg_a), 2),
-  y = c(rep(1, 361L), rep(2, 361L)), ring = rep(c(1, 2), each = 361L))
-spoke_a <- c(0, pi / 2, pi, 3 * pi / 2)
+  y = c(rep(1, 361L), rep(2, 361L)), ring = rep(1:2, each = 361L))
+spoke_a <- c(-pi / 2, 0, pi / 2, pi)
 polar_spokes <- data.frame(theta = rep(xmap_polar(spoke_a), each = 2),
-  y = rep(c(1, rmax_polar), 4), sp = spoke_a[rep(1:4, each = 2)])
+  y = rep(c(1, rmax_polar), 4), sp = rep(seq_along(spoke_a), each = 2))
 polar_zero <- data.frame(theta = c(xmap_polar(0), xmap_polar(0)), y = c(1, 2))
-nc_polar <- ceiling(sqrt(length(unique(kde_data$tag))))
+nc_polar <- ceiling(sqrt(nrow(tag_meta)))
 p_polar_data <- ggplot(kde_data, aes(theta_x, 1 + density, colour = treatment,
     group = interaction(treatment, tag))) +
   geom_path(linewidth = 0.7, alpha = 0.95) +
   geom_path(data = polar_rings, inherit.aes = FALSE, aes(theta, y, group = ring),
-    colour = "grey40", linewidth = 0.25, alpha = 0.65) +
+    colour = "#999999", linewidth = 0.32, alpha = 0.65) +
   geom_path(data = polar_spokes, inherit.aes = FALSE, aes(theta, y, group = sp),
-    colour = "grey25", linewidth = 0.2, alpha = 0.7) +
+    colour = "#bfbfbf", linewidth = 0.28, alpha = 0.7) +
   geom_path(data = polar_zero, inherit.aes = FALSE, aes(theta, y),
-    colour = "grey35", linewidth = 0.6, alpha = 0.95) +
+    colour = "#a6a6a6", linewidth = 0.57, alpha = 0.95) +
   facet_wrap(~ taglabel, ncol = nc_polar) +
   scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0),
-    breaks = xmap_polar(spoke_a), labels = c("0°", "90°", "±180°", "-90°")) +
+    breaks = xmap_polar(c(0, pi / 2, pi, -pi / 2)), labels = c("0°", "90°",
+    "±180°", "-90°")) +
   coord_polar() +
   scale_y_continuous(limits = c(0, rmax_polar), expand = c(0, 0)) +
   scale_colour_manual(values = treatment_colors, name = NULL) +
@@ -813,7 +1443,7 @@ p_polar_data <- ggplot(kde_data, aes(theta_x, 1 + density, colour = treatment,
     axis.text.y = element_blank(),
     axis.text.x = element_text(size = 6, colour = "grey25"),
     panel.grid = element_blank(), panel.border = element_blank(),
-    strip.background = element_blank(), strip.text = element_text(size = 7)) +
+    strip.background = element_blank(), strip.text = element_text(size = 9)) +
   labs(x = "", y = "")
 estimate_kappa <- function(rbar, n) {
   rbar <- min(max(rbar, 0), 0.999999999)
@@ -840,21 +1470,62 @@ descriptive <- do.call(rbind, lapply(tag_observed, function(g) {
     n = length(a), Rbar = rbar, kappa_hat = estimate_kappa(rbar, length(a)),
     alignment0 = mean(cos(a)))
 }))
-descriptive_plot <- function(variable, label) {
-  s <- do.call(rbind, lapply(split(descriptive, descriptive$treatment), function(g) {
-    q <- quantile(g[[variable]], c(0.025, 0.25, 0.5, 0.75, 0.975), names = FALSE)
-    data.frame(treatment = g$treatment[1], low = q[1], q25 = q[2], median = q[3], q75 = q[4], high = q[5])
-  }))
-  ggplot(s, aes(treatment, median, colour = treatment)) +
-    geom_linerange(aes(ymin = low, ymax = high), linewidth = 0.4) +
-    geom_linerange(aes(ymin = q25, ymax = q75), linewidth = 2) + geom_point(size = 2) +
-    scale_colour_manual(values = treatment_colors) +
-    scale_x_discrete(labels = treatment_labels) + labs(x = "", y = label) +
-    theme(legend.position = "none", axis.text.x = element_text(angle = 20, hjust = 1))
+# Axis labels: comma parts of the raw treatment name, sorted, "control"
+# dropped when other components are present, first letter of each part
+# upper-cased ("Anosmia, Eye cover, Magnet").
+fmt_treat_name <- function(s) {
+  parts <- trimws(strsplit(tolower(s), ",", fixed = TRUE)[[1]])
+  parts <- parts[nchar(parts) > 0]
+  if (length(parts) > 1L && "control" %in% parts) parts <- parts[parts != "control"]
+  if (!length(parts)) parts <- "control"
+  parts <- paste0(toupper(substring(sort(parts), 1, 1)),
+    substring(sort(parts), 2))
+  paste(parts, collapse = ", ")
 }
-p_kappa_desc <- descriptive_plot("kappa_hat", "per-tag kappa estimate")
-p_R_desc <- descriptive_plot("Rbar", "per-tag mean resultant length")
-p_align_desc <- descriptive_plot("alignment0", "per-tag alignment E[cos(theta)]")
+treat_name_fmt <- vapply(tnames, fmt_treat_name, character(1))
+# One panel per treatment: the per-tag estimates as jittered dots, the
+# median as a filled circle, and the 25-75 percentile range as a bar.
+desc_plot <- function(variable, label, ylim, grid_y = FALSE) {
+  set.seed(0)
+  blocks <- split(descriptive, descriptive$treatment)
+  jit <- lapply(blocks, function(g) runif(nrow(g), -0.10, 0.10))
+  dots <- do.call(rbind, lapply(seq_along(blocks), function(i) {
+    data.frame(x = (i - 1) + jit[[i]], y = blocks[[i]][[variable]],
+      treatment = blocks[[i]]$treatment[1])
+  }))
+  # Dots beyond the fixed axis limits are clipped at the edge, as in the
+  # source; dropping them keeps the render identical and quiet.
+  dots <- dots[is.finite(dots$y) & dots$y >= ylim[1] & dots$y <= ylim[2], ]
+  stats <- do.call(rbind, lapply(seq_along(blocks), function(i) {
+    g <- blocks[[i]]
+    q <- quantile(g[[variable]], c(0.25, 0.50, 0.75), names = FALSE)
+    data.frame(x = i - 1, treatment = g$treatment[1],
+      med = q[2], lo = q[1], hi = q[3])
+  }))
+  p <- ggplot(dots, aes(x, y, colour = treatment, group = treatment)) +
+    geom_point(shape = 16, size = 1.23, alpha = 0.9) +
+    geom_linerange(data = stats, aes(y = med, ymin = lo, ymax = hi),
+      colour = "black", linewidth = 0.35) +
+    geom_point(data = stats, aes(y = med, fill = treatment),
+      shape = 21, size = 1.76, colour = "black") +
+    scale_colour_manual(values = treatment_colors, name = NULL) +
+    scale_fill_manual(values = treatment_colors, name = NULL) +
+    guides(colour = "none", fill = "none") +
+    scale_x_continuous(breaks = 0:(length(blocks) - 1L),
+      labels = treat_name_fmt, expand = c(0.2, 0.2)) +
+    scale_y_continuous(limits = ylim, expand = c(0, 0)) +
+    labs(x = "", y = label) +
+    theme_classic(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 25, hjust = 1))
+  if (grid_y) {
+    p <- p + theme(panel.grid.major.y = element_line(linewidth = 0.2,
+      colour = "grey80"))
+  }
+  p
+}
+p_kappa_desc <- desc_plot("kappa_hat", "Estimated kappa", c(0, 10), grid_y = TRUE)
+p_R_desc <- desc_plot("Rbar", "Mean\nresultant length", c(-0.05, 1.05))
+p_align_desc <- desc_plot("alignment0", "Alignment\nE[cos(y)]", c(0, 1.02))
 
 ```
 
@@ -924,8 +1595,12 @@ base_form <- bf(HeadingRadians ~ mu,
   kappa ~ 0 + Intercept + treat2 + treat3 + treat4 + (1 | tag),
   family = unwrap_von_mises)
 base_priors <- (
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "beta0",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
+  # The direction coefficients are unconstrained reals, matching the
+  # Python twin's circ_mod parameterization: its von Mises coefficient
+  # priors are periodic over the real line and carry no +-pi bounds; a
+  # uniform prior is NOT used (bounded uniform boxes pin NUTS chains
+  # against the +-pi walls). Each coefficient's prior is its von Mises
+  # log density, added as an explicit target term.
   set_prior("target += unwrap_von_mises_lpdf(b_beta0[1] | 0, 1)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_beta0[2:4] | 0, 2)", check = FALSE) +
   prior("normal(0, 0.18257418583505536)", class = "sd", nlpar = "tagshift") +
@@ -941,26 +1616,27 @@ base_priors <- (
 base_stanvars <- stan_unwrap_fun + modulo_circular_fun + vector_vm
 base_stan <- make_stancode(base_form, data = df_track, prior = base_priors,
                            stanvars = base_stanvars)
-stopifnot(grepl("unwrap_von_mises_vect_lpdf", base_stan, fixed = TRUE),
-          grepl("lower=-3.14159", gsub(" ", "", base_stan), fixed = TRUE),
-          grepl("upper=3.14159", gsub(" ", "", base_stan), fixed = TRUE))
+stopifnot(grepl("vector[K_beta0] b_beta0;", base_stan, fixed = TRUE),
+          !grepl("uniform_lpdf", base_stan, fixed = TRUE),
+          grepl("unwrap_von_mises_vect_lpdf", base_stan, fixed = TRUE))
 cat(base_stan)
 # Check the generated parameters block and coefficient order before init:
-# b_beta0 has four bounded entries: Intercept, treat2, treat3, treat4.
+# b_beta0 has four unbounded entries: Intercept, treat2, treat3, treat4.
 base_standata <- make_standata(base_form, data = df_track, prior = base_priors,
                               stanvars = base_stanvars)
 base_parameter_block <- regmatches(base_stan,
   regexpr("(?m)^parameters\\s*\\{[^}]*\\}", base_stan, perl = TRUE))
 base_parameter_block <- gsub("[[:space:]]", "", base_parameter_block)
 stopifnot(length(base_parameter_block) == 1L,
-  grepl(paste0("vector<lower=-3\\.14159[0-9]*,upper=3\\.14159[0-9]*>",
-    "\\[K_beta0\\]b_beta0;"), base_parameter_block),
+  # Unbounded circular coefficient vector: plain real vector (the
+  # Python circ_mod geometry), no +-pi bounds or uniform factors.
+  grepl("vector[K_beta0]b_beta0;", base_parameter_block, fixed = TRUE),
   base_standata$K_beta0 == 4L,
   identical(colnames(base_standata$X_beta0),
     c("Intercept", "treat2", "treat3", "treat4")))
 
-# Bounded angular coefficients can strand chains in distinct 2*pi-equivalent
-# wrap classes when heading sums straddle the seam. Seed all chains in one
+# Unbounded angular coefficients carry 2*pi-equivalent posterior wrap
+# classes when heading sums straddle the seam. Seed all chains in one
 # class with data-derived anchors and jitter too small to cross a seam.
 # Jitter is added AFTER wrapping; initialization changes only the sampler
 # path, never the posterior. Initialize only b_beta0 here; Gaussian tagshift
@@ -979,7 +1655,7 @@ mk_init <- function(anchor_seed) {
   list(b_beta0 = as.numeric(c(mu_anchor, treat_anchor) + j(base_standata$K_beta0)))
 }
 set.seed(123)
-fit_vm <- unwrap_load_fit_cache("bats_fit_vm", SEED, ITER, WARMUP)
+fit_vm <- unwrap_load_fit_cache("bats_fit_vm_v2", SEED, ITER, WARMUP)
 if (is.null(fit_vm)) {
   fit_vm <- brm(base_form, data = df_track, prior = base_priors,
     stanvars = base_stanvars, backend = "cmdstanr",
@@ -987,7 +1663,7 @@ if (is.null(fit_vm)) {
     seed = SEED,
     init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
     control = list(adapt_delta = 0.97))
-  unwrap_save_fit_cache("bats_fit_vm", fit_vm, SEED, ITER, WARMUP)
+  unwrap_save_fit_cache("bats_fit_vm_v2", fit_vm, SEED, ITER, WARMUP)
 }
 base_parameters <- posterior::variables(posterior::as_draws_array(fit_vm))
 base_angular <- base_parameters[grepl("^b_beta0_", base_parameters)]
@@ -1056,12 +1732,12 @@ mix_form <- bf(HeadingRadians ~ mu,
   pgoal ~ 0 + Intercept + treat2 + treat3 + treat4 + (1 | tag),
   family = unwrap_vmu)
 mix_priors <- (
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "mu0",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "mutreat",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "mutag",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
+  # The direction coefficients are unconstrained reals, matching the
+  # Python twin's circ_mod parameterization: its von Mises coefficient
+  # priors are periodic over the real line and carry no +-pi bounds; a
+  # uniform prior is NOT used (bounded uniform boxes pin NUTS chains
+  # against the +-pi walls). Each coefficient's prior is its von Mises
+  # log density, added as an explicit target term.
   set_prior("target += unwrap_von_mises_lpdf(b_mu0[1] | 0, 1)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_mutreat | 0, 2)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_mutag | 0, kmu_tag)", check = FALSE) +
@@ -1077,10 +1753,10 @@ mix_priors <- (
   prior("normal(0, 1)", class = "b", coef = "treat4", dpar = "pgoal") +
   prior("normal(0, 1)", class = "sd", dpar = "pgoal")
 )
-# Uniform factors add constants only. Explicit von Mises targets avoid
-# nonexistent custom-prior CDFs when brms normalizes bounded priors.
 # PyMC's sigmoid([eta,-eta]) is (plogis(eta),1-plogis(eta)), not a
 # two-logit softmax. The pgoal formula therefore uses eta, not 2*eta.
+# (The uniform factor in the likelihood is the EXACT circular-uniform
+# mixture component -log(2*pi), not a prior.)
 mix_stanvars <- base_stanvars + mixture_functions + mixture_hyper
 mix_stan <- make_stancode(mix_form, data = df_track, prior = mix_priors,
                           stanvars = mix_stanvars)
@@ -1097,10 +1773,12 @@ mix_parameter_block <- regmatches(mix_stan,
   regexpr("(?m)^parameters\\s*\\{[^}]*\\}", mix_stan, perl = TRUE))
 mix_parameter_block <- gsub("[[:space:]]", "", mix_parameter_block)
 stopifnot(length(mix_parameter_block) == 1L,
+  # Unbounded circular coefficient vectors: plain real vectors (the
+  # Python circ_mod geometry), no +-pi bounds or uniform factors.
   all(vapply(c("mu0", "mutreat", "mutag"), function(p) {
-    grepl(paste0("vector<lower=-3\\.14159[0-9]*,upper=3\\.14159[0-9]*>",
-      "\\[K_", p, "\\]b_", p, ";"), mix_parameter_block)
+    grepl(paste0("vector[K_", p, "]b_", p, ";"), mix_parameter_block, fixed = TRUE)
   }, logical(1))),
+  !grepl("uniform_lpdf", mix_stan, fixed = TRUE),
   grepl("real<lower=0>kmu_tag;", mix_parameter_block, fixed = TRUE),
   mix_standata$K_mu0 == 1L, mix_standata$K_mutreat == 3L,
   mix_standata$K_mutag == nlevels(df_track$tag),
@@ -1109,8 +1787,8 @@ stopifnot(length(mix_parameter_block) == 1L,
   isTRUE(all.equal(mix_standata$X_mutag,
     model.matrix(~ 0 + tag, data = df_track), check.attributes = FALSE)))
 
-# Bounded angular coefficients can strand chains in distinct 2*pi-equivalent
-# wrap classes when heading sums straddle the seam. Seed all chains in one
+# Unbounded angular coefficients carry 2*pi-equivalent posterior wrap
+# classes when heading sums straddle the seam. Seed all chains in one
 # class with data-derived anchors and jitter too small to cross a seam.
 # Jitter is added AFTER wrapping; initialization changes only the sampler
 # path, never the posterior. Initialize b_mu0, b_mutreat, b_mutag, and kmu_tag
@@ -1144,7 +1822,7 @@ mk_init <- function(anchor_seed) {
     kmu_tag = 30)
 }
 set.seed(123)
-fit_mix <- unwrap_load_fit_cache("bats_fit_mix", SEED, ITER, WARMUP)
+fit_mix <- unwrap_load_fit_cache("bats_fit_mix_v2", SEED, ITER, WARMUP)
 if (is.null(fit_mix)) {
   fit_mix <- brm(mix_form, data = df_track, prior = mix_priors,
     stanvars = mix_stanvars, backend = "cmdstanr",
@@ -1152,7 +1830,7 @@ if (is.null(fit_mix)) {
     seed = SEED,
     init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
     control = list(adapt_delta = 0.97))
-  unwrap_save_fit_cache("bats_fit_mix", fit_mix, SEED, ITER, WARMUP)
+  unwrap_save_fit_cache("bats_fit_mix_v2", fit_mix, SEED, ITER, WARMUP)
 }
 mix_parameters <- posterior::variables(posterior::as_draws_array(fit_mix))
 mix_angular <- mix_parameters[grepl("^b_(mu0|mutreat|mutag)_", mix_parameters)]
@@ -1254,7 +1932,7 @@ delta_row <- function(ii, label) {
 }
 delta_df <- rbind(delta_row(seq_len(nrow(df_track)), "Total"),
   do.call(rbind, lapply(levels(df_track$treatment), function(t) {
-    delta_row(which(df_track$treatment == t), treatment_labels[[t]])
+    delta_row(which(df_track$treatment == t), treatment_nice[[t]])
   })))
 print(delta_df)
 delta_individual <- do.call(rbind, lapply(split(seq_len(nrow(df_track)), df_track$tag), function(ii) {
@@ -1265,7 +1943,7 @@ delta_individual <- do.call(rbind, lapply(split(seq_len(nrow(df_track)), df_trac
 # top, dashed line at the best total ELPD, no grid, bottom/left axes only.
 total_elpd_panel <- function(vline = TRUE, xlabel = "PSIS-LOO ELPD") {
   best <- res_total$elpd[which.max(res_total$elpd)]
-  p <- ggplot(res_total, aes(elpd, reorder(model, -elpd))) +
+  p <- ggplot(res_total, aes(elpd, reorder(model, elpd))) +
     geom_errorbar(aes(xmin = elpd - se_elpd, xmax = elpd + se_elpd),
       orientation = "y", width = 0.15, linewidth = 0.35) +
     geom_point(size = 2)
@@ -1273,34 +1951,73 @@ total_elpd_panel <- function(vline = TRUE, xlabel = "PSIS-LOO ELPD") {
   p + theme_classic(base_size = 9) +
     labs(x = xlabel, y = "")
 }
-p_total <- total_elpd_panel()
+p_total <- total_elpd_panel(FALSE, "ELPD")
 # Total + per-treatment deltas: Total row on top (black), treatments in
 # tab10 below, named y ticks, dashed line at zero.
-delta_df$yrow <- c(5L, 4L, 3L, 2L, 1L)  # Total on top, treatments 1-4 below
-delta_df$rcol <- ifelse(delta_df$label == "Total", "black",
-  treatment_colors[as.character(levels(df_track$treatment))])
-p_delta <- ggplot(delta_df, aes(delta_elpd, yrow)) +
+delta_df$ypos <- seq(0L, 4L * 1.35, by = 1.35)  # Total row 0, treatments below
+delta_df$rcol <- c("black", treatment_colors[as.character(levels(df_track$treatment))])
+p_delta <- ggplot(delta_df, aes(delta_elpd, ypos)) +
   geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd, xmax = delta_elpd + se_delta_elpd,
-    colour = rcol), orientation = "y", width = 0.15, linewidth = 0.35) +
-  geom_point(aes(colour = rcol), size = 2) +
+    colour = rcol), orientation = "y", width = 0.18, linewidth = 0.35) +
+  geom_point(aes(colour = rcol), size = 2.2) +
   geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
-  scale_y_continuous(breaks = 5:1, labels = delta_df$label) +
+  scale_y_reverse(limits = c(-0.41, 4 * 1.35 + 0.41),
+    breaks = delta_df$ypos, labels = delta_df$label, expand = c(0, 0)) +
+  scale_x_continuous(expand = expansion(mult = c(0.06, 0.06))) +
   scale_colour_identity(guide = "none") +
   theme_classic(base_size = 9) +
-  labs(x = "ELPD difference (vMU - vM)", y = "")
+  labs(x = "ELPD difference", y = "")
+# Bracket panel for the combined summaries: colorblind treatment rows,
+# only the "Total" tick, a left-hand bracket over the treatment rows and
+# a left margin wide enough to hold the "Within-treatment" label.
+brk <- delta_df
+brk$rcol <- c("black", treatment_colors_cb[as.character(levels(df_track$treatment))])
+gx <- range(c(brk$delta_elpd - brk$se_delta_elpd, brk$delta_elpd + brk$se_delta_elpd))
+padx <- 0.06 * diff(gx)
+xlim_b <- c(gx[1] - padx - 0.30 * diff(range(gx)), gx[2] + padx)
+xb <- xlim_b[1] + 0.004 * diff(xlim_b)
+cap_w <- 0.020 * diff(xlim_b)
+p_bracket <- ggplot(brk, aes(delta_elpd, ypos)) +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
+  geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd, xmax = delta_elpd + se_delta_elpd,
+    colour = rcol), orientation = "y", width = 0.18, linewidth = 0.35) +
+  geom_point(aes(colour = rcol), size = 2.2) +
+  annotate("segment", x = xb, y = 1.35, xend = xb, yend = 4 * 1.35,
+    linewidth = 0.35, colour = "black") +
+  annotate("segment", x = xb, y = 1.35, xend = xb + cap_w, yend = 1.35,
+    linewidth = 0.35, colour = "black") +
+  annotate("segment", x = xb, y = 4 * 1.35, xend = xb + cap_w, yend = 4 * 1.35,
+    linewidth = 0.35, colour = "black") +
+  annotate("text", x = xb + cap_w + 0.012 * diff(xlim_b), y = 2.7,
+    label = "Within-treatment", size = 3.4, colour = "black",
+    hjust = 0, vjust = 0.5) +
+  scale_y_reverse(limits = c(-0.54, 4 * 1.35 + 0.54), breaks = 0,
+    labels = "Total", expand = c(0, 0)) +
+  scale_x_continuous(limits = xlim_b) +
+  scale_colour_identity(guide = "none") +
+  theme_classic(base_size = 9) +
+  labs(x = "ELPD difference", y = "")
+p_combined3 <- patchwork::wrap_plots(p_total, p_bracket, ncol = 1,
+  heights = c(1.25, 1.35))
 # Per-animal deltas, one colorblind panel per treatment (named).
-delta_individual$tlabel <- treatment_labels[as.character(delta_individual$treatment)]
+tlabels_all <- levels(df_track$treatment)
+delta_individual$tlabel <- factor(treatment_nice[as.character(delta_individual$treatment)],
+  levels = treatment_nice[levels(df_track$treatment)])
+di_grid <- range(c(delta_individual$delta_elpd - delta_individual$se_delta_elpd,
+  delta_individual$delta_elpd + delta_individual$se_delta_elpd))
+di_pad <- 0.06 * diff(di_grid)
 p_delta_individual <- ggplot(delta_individual,
   aes(delta_elpd, reorder(tag, delta_elpd), colour = treatment)) +
   geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd, xmax = delta_elpd + se_delta_elpd),
-    orientation = "y", width = 0.15, linewidth = 0.25) +
-  geom_point(size = 1.2) +
+    orientation = "y", width = 0.15, linewidth = 0.3) +
+  geom_point(size = 1.4) +
   facet_wrap(~ tlabel, ncol = 4, scales = "free_y") +
   geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
-  scale_colour_manual(values = treatment_colors_cb) +
-  labs(x = "delta ELPD per animal", y = "tag") +
-  theme_classic(base_size = 8) + theme(legend.position = "none",
-    strip.background = element_blank(), strip.text = element_text(size = 8))
+  scale_colour_manual(values = treatment_colors_cb[tlabels_all], guide = "none") +
+  scale_x_continuous(limits = di_grid - c(di_pad, -di_pad), expand = c(0, 0)) +
+  labs(x = "ELPD difference (vMU - vM)", y = "") +
+  theme_classic(base_size = 8) + theme(strip.background = element_blank(),
+    strip.text = element_text(size = 9))
 
 ```
 
@@ -1337,31 +2054,67 @@ parameter_summary <- function(par, grid) {
 pop_summary <- parameter_summary(pop_mix, population_grid)
 tag_summary <- parameter_summary(tag_mix, tag_grid)
 vm_summary <- parameter_summary(pop_vm, population_grid)
-mean_hdi_plot <- function(table, quantity, label, reference = NULL) {
+# Twin look: colorblind rows, hidden treatment ticks/labels, twin x label
+# and reference line. (Python plot_mean_hdi_horizontal, no-labels variant.)
+mean_hdi_plot <- function(table, quantity, label, reference = NULL, xlimits = NULL,
+  flip = FALSE) {
   x <- table[table$quantity == quantity, ]
   p <- ggplot(x, aes(mean, treatment, colour = treatment)) +
-    geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.15) +
-    geom_point() + scale_colour_manual(values = treatment_colors) +
-    scale_y_discrete(limits = rev(levels(df_track$treatment)), labels = treatment_labels) +
+    geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.18,
+      linewidth = 0.4) +
+    geom_point(size = 1.9) +
+    scale_colour_manual(values = treatment_colors_cb[tlabels_all], guide = "none") +
+    scale_y_discrete(
+      limits = if (flip) levels(df_track$treatment)
+               else rev(levels(df_track$treatment)), labels = "") +
     labs(x = label, y = "") +
-    theme(legend.position = "none")
+    theme_classic(base_size = 9) +
+    theme(axis.text.y = element_blank())
   if (!is.null(reference)) p <- p + geom_vline(xintercept = reference, linetype = "dashed")
+  if (!is.null(xlimits)) p <- p + scale_x_continuous(limits = xlimits, expand = c(0, 0))
   p
 }
-tag_hdi_plot <- function(quantity, label, reference = NULL) {
+# Twin look: one row of four named panels, animals sorted by value within
+# each, a light-gray population HDI band with a solid population-mean
+# line, optional dashed reference, one shared x-axis + figure label.
+tag_hdi_plot <- function(quantity, label, reference = NULL, xlimits = NULL) {
   x <- tag_summary[tag_summary$quantity == quantity, ]
-  p <- ggplot(x, aes(mean, reorder(tag, mean), colour = treatment)) +
-    geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.2, linewidth = 0.25) +
-    geom_point(size = 1) + facet_wrap(~ treatment, scales = "free_y") +
-    scale_colour_manual(values = treatment_colors) + labs(x = label, y = "tag") +
-    theme(legend.position = "none")
-  population <- pop_summary[pop_summary$quantity == quantity, ]
-  p <- p + geom_rect(data = population,
-    aes(xmin = low, xmax = high, ymin = -Inf, ymax = Inf),
-    inherit.aes = FALSE, fill = "grey50", alpha = 0.12) +
-    geom_vline(data = population, aes(xintercept = mean), linewidth = 0.3)
-  if (!is.null(reference)) p <- p + geom_vline(xintercept = reference, linetype = "dashed")
-  p
+  pop <- pop_summary[pop_summary$quantity == quantity, ]
+  lv <- tlabels_all
+  if (is.null(xlimits)) {
+    gr <- range(c(min(x$low, pop$low), max(x$high, pop$high)))
+    if (!is.null(reference)) gr <- range(c(gr, reference))
+    pd <- 0.06 * diff(gr)
+    xlimits <- gr - c(pd, -pd)
+  }
+  panels <- lapply(lv, function(t) {
+    sub <- x[x$treatment == t, ]
+    sub <- sub[order(sub$mean, decreasing = TRUE), ]
+    ny <- nrow(sub)
+    poprow <- pop[pop$treatment == t, ]
+    panel <- ggplot(sub, aes(mean, y = seq_len(ny))) +
+      annotate("rect", xmin = poprow$low, xmax = poprow$high,
+        ymin = 0.5, ymax = ny + 0.5,
+        fill = "#d9d9d9", colour = NA, inherit.aes = FALSE) +
+      geom_vline(xintercept = poprow$mean, linewidth = 0.3, colour = "#000000") +
+      geom_errorbar(aes(xmin = low, xmax = high, colour = treatment),
+        orientation = "y", width = 0.22, linewidth = 0.3) +
+      geom_point(aes(colour = treatment), size = 1.5) +
+      scale_colour_manual(values = treatment_colors_cb[tlabels_all], guide = "none") +
+      scale_y_reverse(limits = c(0.5, ny + 0.5), expand = c(0, 0),
+        breaks = seq_len(ny), labels = as.character(sub$tag)) +
+      scale_x_continuous(limits = xlimits, expand = c(0, 0)) +
+      labs(title = treatment_nice[[t]], x = label, y = "") +
+      theme_classic(base_size = 8) +
+      theme(plot.title = element_text(size = 9, hjust = 0.5))
+    if (!is.null(reference)) {
+      panel <- panel + geom_vline(xintercept = reference,
+        linetype = "dashed", linewidth = 0.3)
+    }
+    panel
+  })
+  patchwork::wrap_plots(panels[[1]], panels[[2]], panels[[3]], panels[[4]],
+    ncol = 4)
 }
 # Baseline coefficient panels: actual intercept/contrasts, not conditional
 # response parameters. Angular intervals are centered on their circular mean.
@@ -1373,11 +2126,55 @@ base_coef <- do.call(rbind, lapply(base_coef_names, function(name) {
   data.frame(parameter = name, component = if (angular) "mu (rad)" else "kappa (pre-softplus)",
     as.list(interval(base_draws[[name]], angular = angular)))
 }))
-p_base_coef <- ggplot(base_coef, aes(mean, parameter)) +
-  geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.2) +
-  geom_point() + geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~ component, scales = "free") + labs(x = "posterior mean and 95% HDI", y = "")
-p_base_density <- mean_hdi_plot(vm_summary, "dens0_dir", "vM density at goal (per radian)", 1 / (2 * pi))
+# Twin layout: one panel; "Control (Intercept)" + formatted rows colored
+# tab10; mu diamonds above each row (circular wrap) and kappa triangles
+# below; dashed zero line; mu/kappa legend at the lower right.
+coef_lab <- c("Control (Intercept)", treatment_nice[tlabels_all[-1]])
+coef_pt <- do.call(rbind, lapply(seq_along(tlabels_all), function(i) {
+  mn <- paste0("b_beta0_", c("Intercept", paste0("treat", 2:4))[i])
+  kn <- paste0("b_kappa_", c("Intercept", paste0("treat", 2:4))[i])
+  mid <- as.list(interval(base_draws[[mn]], angular = TRUE))
+  kid <- as.list(interval(base_draws[[kn]]))
+  rbind(data.frame(label = coef_lab[i], treatment = tlabels_all[i],
+      comp = "mu", x = mid$mean, low = mid$low, high = mid$high, y = i - 0.16),
+    data.frame(label = coef_lab[i], treatment = tlabels_all[i],
+      comp = "kappa", x = kid$mean, low = kid$low, high = kid$high, y = i + 0.16))
+}))
+# Explicit x limits (ggplot2's default 5% multiplicative padding) give the
+# hand-drawn legend box stable data coordinates.
+cb_raw <- range(c(coef_pt$low, coef_pt$high))
+cspan_c <- diff(cb_raw)
+cband_lim <- cb_raw + c(-0.05, 0.05) * cspan_c
+p_base_coef <- ggplot(coef_pt, aes(x, y)) +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
+  geom_errorbarh(aes(xmin = low, xmax = high, colour = treatment),
+    height = 0.18, linewidth = 0.3) +
+  geom_point(aes(colour = treatment, shape = comp), size = 1.9) +
+  scale_shape_manual(values = c(mu = 11, kappa = 17), guide = "none") +
+  scale_colour_manual(values = treatment_colors[tlabels_all], guide = "none") +
+  scale_y_reverse(limits = c(0.5, length(coef_lab) + 0.5),
+    breaks = seq_along(coef_lab), labels = coef_lab, expand = c(0, 0)) +
+  scale_x_continuous(limits = cband_lim, expand = c(0, 0)) +
+  # Framed legend, drawn by hand (this ggplot2 build drops
+  # legend.position = "bottomright" without an error).
+  annotate("rect", xmin = cband_lim[1] + 0.55 * cspan_c,
+    xmax = cband_lim[2] - 0.04 * cspan_c, ymin = 2.95, ymax = 4.35,
+    fill = "white", colour = "grey40", linewidth = 0.4) +
+  annotate("point", x = cband_lim[1] + 0.63 * cspan_c, y = 3.35,
+    shape = 11, size = 2.6) +
+  annotate("text", x = cband_lim[1] + 0.82 * cspan_c, y = 3.35,
+    label = "\u03bc", hjust = 0.5, vjust = 0.5, size = 3.0) +
+  annotate("point", x = cband_lim[1] + 0.63 * cspan_c, y = 3.98,
+    shape = 17, size = 2.6) +
+  annotate("text", x = cband_lim[1] + 0.82 * cspan_c, y = 3.98,
+    label = "\u03ba", hjust = 0.5, vjust = 0.5, size = 3.0) +
+  theme_classic(base_size = 9) +
+  labs(x = "Coefficient value", y = "")
+vd <- vm_summary[vm_summary$quantity == "dens0_dir", ]
+vd_lim <- range(c(min(vd$low, 1 / (2 * pi)), max(vd$high, 1 / (2 * pi))))
+padvd <- 0.10 * diff(vd_lim)
+p_base_density <- mean_hdi_plot(vm_summary, "dens0_dir", "Predictive density",
+  1 / (2 * pi), vd_lim - c(padvd, -padvd))
 
 theta <- seq(0, 2 * pi, length.out = 361)
 polar_pdf <- do.call(rbind, lapply(seq_len(nrow(population_grid)), function(j) {
@@ -1404,28 +2201,63 @@ p_mixture_polar <- ggplot(polar_pdf, aes(theta, r_med, colour = treatment, group
   geom_ribbon(aes(ymin = r_low, ymax = r_high, fill = treatment), alpha = 0.35, colour = NA) +
   geom_path(linewidth = 0.5) +
   geom_path(data = mix_ring(1), inherit.aes = FALSE, aes(theta, r),
-    colour = "grey40", linewidth = 0.25) +
+    colour = "grey55", linewidth = 0.25) +
   geom_path(data = mix_ring(2), inherit.aes = FALSE, aes(theta, r),
-    colour = "grey40", linewidth = 0.25) +
+    colour = "grey75", linewidth = 0.25) +
   geom_path(data = data.frame(theta = c(0, 0), r = c(1, rmax_mix)),
-    inherit.aes = FALSE, aes(theta, r), colour = "grey15", linewidth = 0.3) +
+    inherit.aes = FALSE, aes(theta, r), colour = "grey70", linewidth = 0.3) +
   facet_wrap(~ treatment) +
   scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0), breaks = NULL) +
   coord_polar() +
   scale_y_continuous(limits = c(0, rmax_mix), expand = c(0, 0)) +
   scale_colour_manual(values = treatment_colors_cb) +
   scale_fill_manual(values = treatment_colors_cb) +
-  labs(x = "", y = "") + theme(legend.position = "none")
-p_weight <- mean_hdi_plot(pop_summary, "p", "Mixture weight", 0.5)
-p_kappa <- mean_hdi_plot(pop_summary, "kappa", "Directed concentration kappa")
-p_mix_density <- mean_hdi_plot(pop_summary, "dens0_mix", "Mixture density at goal", 1 / (2 * pi))
-p_dir_density <- mean_hdi_plot(pop_summary, "dens0_dir", "Directed-component density at goal", 1 / (2 * pi))
-p_mass <- mean_hdi_plot(pop_summary, "mass45", "Mixture mass within 45 degrees of goal", 0.25)
-p_align <- mean_hdi_plot(pop_summary, "align0", "Mixture alignment E[cos(theta)]")
-p_mu <- mean_hdi_plot(pop_summary, "mu", "Directed mean angle (rad)")
-p_mrl <- mean_hdi_plot(pop_summary, "mrl", "Directed mean resultant length")
+  labs(x = "", y = "") +
+  theme(legend.position = "none", strip.text = element_blank(),
+    strip.background = element_blank(), axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(), panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank())
+# Circular mean angle in degrees (interval in radians, scaled for display).
+mudeg_pt <- do.call(rbind, lapply(seq_len(nrow(population_grid)), function(j) {
+  md <- as.list(interval(pop_mix$mu[j, ], angular = TRUE))
+  data.frame(treatment = population_grid$treatment[j], quantity = "mu_deg",
+    mean = md$mean * 180 / pi, low = md$low * 180 / pi, high = md$high * 180 / pi)
+}))
 dens_xlim <- c(0, 1.05 * max(pop_summary$high[pop_summary$quantity == "dens0_dir"],
   vm_summary$high[vm_summary$quantity == "dens0_dir"]))
+p_weight <- mean_hdi_plot(pop_summary, "p", "Mixture weight", 0.5, c(0, 1))
+p_kappa <- mean_hdi_plot(pop_summary, "kappa", "Concentration (\u03ba)")
+p_mix_density <- mean_hdi_plot(pop_summary, "dens0_mix",
+  "Predictive density (mixture)", 1 / (2 * pi), dens_xlim)
+p_dir_density <- mean_hdi_plot(pop_summary, "dens0_dir",
+  "Predictive density (directed component)", 1 / (2 * pi), dens_xlim)
+p_mass <- mean_hdi_plot(pop_summary, "mass45", "Predictive mass (\u00b145\u00b0)",
+  0.25, c(0, 1))
+p_align <- mean_hdi_plot(pop_summary, "align0", "Alignment", NULL, c(0, 1))
+p_mu_deg <- mean_hdi_plot(mudeg_pt, "mu_deg", "Mean angle (deg)", 0)
+p_mrl <- mean_hdi_plot(pop_summary, "mrl", "MRL (directed component)", 0, c(0, 1))
+# The 2x2 twin places treatment rows control-on-bottom: flipped copies of
+# the four quadrant plots (the standalone saves keep control-on-top).
+p_mu_deg_f <- mean_hdi_plot(mudeg_pt, "mu_deg", "Mean angle (deg)", 0, flip = TRUE)
+p_weight_f <- mean_hdi_plot(pop_summary, "p", "Mixture weight", 0.5, c(0, 1),
+  flip = TRUE)
+p_mrl_f <- mean_hdi_plot(pop_summary, "mrl", "MRL (directed component)", 0, c(0, 1),
+  flip = TRUE)
+p_dir_density_f <- mean_hdi_plot(pop_summary, "dens0_dir",
+  "Predictive density (directed component)", 1 / (2 * pi), dens_xlim, flip = TRUE)
+# Matched vMU-vs-vM comparison: shared x limits over both summaries
+# (including the uniform line) plus the 10% twin padding.
+shm <- c(min(vd_lim[1], vd_lim[2],
+    min(pop_summary$low[pop_summary$quantity == "dens0_dir"], 1 / (2 * pi))),
+  max(vd_lim[2], max(pop_summary$high[pop_summary$quantity == "dens0_dir"],
+    1 / (2 * pi))))
+padshm <- 0.10 * diff(shm)
+shm_lim <- shm - c(padshm, -padshm)
+# 3-panel predictive limit: mixture summary + uniform line, 10% padding.
+plim <- range(c(pop_summary$low[pop_summary$quantity == "dens0_mix"],
+  pop_summary$high[pop_summary$quantity == "dens0_mix"], 1 / (2 * pi)))
+padpl <- 0.10 * diff(plim)
+plim <- plim - c(padpl, -padpl)
 
 ```
 
@@ -1434,7 +2266,7 @@ Treatment coefficients for the mu and kappa submodels (vM baseline).
 
 ```{r}
 #| cell-id: "goldshtein-bats-051"
-save_figure(p_base_coef, "treatment_coefficients_mu_kappa", 9, 5)
+save_figure(p_base_coef, "treatment_coefficients_mu_kappa", 3.0, 2.8)
 
 ```
 
@@ -1444,13 +2276,13 @@ treatment for the vM baseline.
 
 ```{r}
 #| cell-id: "goldshtein-bats-053"
-save_figure(p_base_density, "treatment_pred_density_at0_mu_kappa", 9, 5)
+save_figure(p_base_density, "treatment_pred_density_at0_mu_kappa", 3.0, 1.9)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-054"
-save_figure(p_total, "psisloo_total_elpd_all_models", 3.6, 1.6)
+save_figure(p_total, "psisloo_total_elpd_all_models", 3.4, 1.4)
 
 ```
 
@@ -1461,7 +2293,7 @@ it is the evidence for a non-trivial undirected component.
 
 ```{r}
 #| cell-id: "goldshtein-bats-056"
-save_figure(p_delta, "psisloo_delta_total_and_by_treatment_vMU_minus_vM", 3.6, 2.3)
+save_figure(p_delta, "psisloo_delta_total_and_by_treatment_vMU_minus_vM", 3.4, 1.55)
 
 ```
 
@@ -1470,40 +2302,10 @@ Total ELPD by model (vMU vs vM), best first.
 
 ```{r}
 #| cell-id: "goldshtein-bats-058"
-# Combined (Python twin look): total ELPD panel on top; below, the total
-# delta point with a "Within-treatment" bracket over the per-treatment
-# deltas (colorblind), and a dashed line at zero.
-brk <- delta_df
-brk$rcol <- ifelse(brk$label == "Total", "black",
-  treatment_colors_cb[as.character(levels(df_track$treatment))])
-gx <- range(c(brk$delta_elpd - brk$se_delta_elpd, brk$delta_elpd + brk$se_delta_elpd))
-padx <- 0.12 * diff(gx)
-xlim_b <- range(gx) - c(padx, -padx)
-xb <- xlim_b[1] + 0.008 * diff(xlim_b)
-p_bracket <- ggplot(brk, aes(delta_elpd, yrow)) +
-  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
-  geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd, xmax = delta_elpd + se_delta_elpd,
-    colour = rcol), orientation = "y", width = 0.15, linewidth = 0.35) +
-  geom_point(aes(colour = rcol), size = 2) +
-  annotate("segment", x = xb, y = 1, xend = xb, yend = 4,
-    linewidth = 0.35, colour = "black") +
-  annotate("segment", x = xb, y = 4, xend = xb + 0.02 * diff(xlim_b), yend = 4,
-    linewidth = 0.35, colour = "black") +
-  annotate("segment", x = xb, y = 1, xend = xb + 0.02 * diff(xlim_b), yend = 1,
-    linewidth = 0.35, colour = "black") +
-  # Plain text just right of the zero line: one treatment delta is
-  # negative (unlike the Python twin), so left of zero is occupied and
-  # a boxed label at the panel edge clips.
-  geom_text(data = data.frame(xlab = 0.6), aes(x = xlab, y = 2.5), hjust = 0,
-    label = "Within-treatment", size = 3, colour = "black") +
-  scale_y_continuous(breaks = 5, labels = "Total") +
-  scale_x_continuous(limits = xlim_b) +
-  scale_colour_identity(guide = "none") +
-  theme_classic(base_size = 9) +
-  labs(x = "ELPD difference", y = "")
-p_combined <- patchwork::wrap_plots(total_elpd_panel(FALSE, "ELPD"), p_bracket,
-  ncol = 1, heights = c(2, 3))
-save_figure(p_combined, "psisloo_combined", 4, 3.6)
+# Combined two-panel figure (Python twin look): total ELPD by model on
+# top, the total delta point plus a "Within-treatment" bracket over the
+# per-treatment deltas (colorblind) below.
+save_figure(p_combined3, "psisloo_combined", 3.6, 3.0)
 
 ```
 
@@ -1513,7 +2315,7 @@ in a subset of animals.
 
 ```{r}
 #| cell-id: "goldshtein-bats-060"
-save_figure(p_delta_individual, "psisloo_delta_by_individual_by_treatment_vMU_minus_vM", 12, 8)
+save_figure(p_delta_individual, "psisloo_delta_by_individual_by_treatment_vMU_minus_vM", 10, 6)
 
 ```
 
@@ -1535,37 +2337,37 @@ alignment to $0^\circ$, and goal-directed $\kappa$, each with posterior means an
 
 ```{r}
 #| cell-id: "goldshtein-bats-064"
-save_figure(p_weight, "fullmodel_mixture_weight_by_treatment_mean_hdi", 9, 5)
+save_figure(p_weight, "fullmodel_mixture_weight_by_treatment_mean_hdi", 3.0, 1.9)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-065"
-save_figure(p_kappa, "fullmodel_kappa_by_treatment_mean_hdi", 9, 5)
+save_figure(p_kappa, "fullmodel_kappa_by_treatment_mean_hdi", 3.0, 1.9)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-066"
-save_figure(p_mix_density, "fullmodel_predictive_density_at_0_mixture_by_treatment_mean_hdi", 9, 5)
+save_figure(p_mix_density, "fullmodel_predictive_density_at_0_mixture_by_treatment_mean_hdi", 3.0, 1.9)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-067"
-save_figure(p_dir_density, "fullmodel_predictive_density_at_0_directed_component_by_treatment_mean_hdi", 9, 5)
+save_figure(p_dir_density, "fullmodel_predictive_density_at_0_directed_component_by_treatment_mean_hdi", 3.0, 1.9)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-068"
-save_figure(p_mass, "fullmodel_predictive_mass_pm45deg_by_treatment_mean_hdi", 9, 5)
+save_figure(p_mass, "fullmodel_predictive_mass_pm45deg_by_treatment_mean_hdi", 3.0, 1.9)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-069"
-save_figure(p_align, "fullmodel_alignment_to_zero_by_treatment_mean_hdi", 9, 5)
+save_figure(p_align, "fullmodel_alignment_to_zero_by_treatment_mean_hdi", 3.0, 1.9)
 
 ```
 
@@ -1575,7 +2377,16 @@ parameters.
 
 ```{r}
 #| cell-id: "goldshtein-bats-071"
-save_figure(patchwork::wrap_plots(p_delta, p_mu, p_weight, p_mrl, p_dir_density, ncol = 2), "psisloo_plus_params_2x2", 12, 10)
+# Combined summary (Python twin): the delta-bracket panel on top with
+# the population vMU parameters in a 2x2 block below (mean angle in
+# degrees, mixture weight, MRL, directed-component predictive density);
+# bottom panels hide the treatment labels so rows align across columns.
+p_2x2 <- patchwork::wrap_plots(
+  p_bracket,
+  (p_mu_deg_f | p_weight_f) / (p_mrl_f | p_dir_density_f),
+  ncol = 1)
+p_2x2 <- p_2x2 + plot_layout(heights = c(1.45, 1.225, 1.225))
+save_figure(p_2x2, "psisloo_plus_params_2x2", 6.8, 8.6)
 
 ```
 
@@ -1585,13 +2396,34 @@ baseline figure above).
 
 ```{r}
 #| cell-id: "goldshtein-bats-073"
-save_figure(patchwork::wrap_plots(p_dir_density + coord_cartesian(xlim = dens_xlim), p_base_density + coord_cartesian(xlim = dens_xlim), ncol = 1), "predictive_density_two_model_comparison_matched_vmu_directed_vs_vm", 9, 8)
+# Matched two-panel comparison (Python twin): the vMU model's
+# directed-component-only predictive density at the goal (top) vs the
+# von Mises baseline (bottom); shared x limits, hidden treatment labels,
+# dashed uniform-density reference.
+p_vmu_dens <- mean_hdi_plot(pop_summary, "dens0_dir", "Predictive density",
+  1 / (2 * pi), shm_lim) +
+  labs(title = "von Mises-Uniform (directed component only)") +
+  theme(plot.title = element_text(size = 8, hjust = 0.5),
+    axis.text.x = element_blank(), axis.ticks.x = element_blank())
+p_vm_dens <- mean_hdi_plot(vm_summary, "dens0_dir", "Predictive density",
+  1 / (2 * pi), shm_lim) +
+  labs(title = "von Mises") +
+  theme(plot.title = element_text(size = 8, hjust = 0.5))
+save_figure(patchwork::wrap_plots(p_vmu_dens, p_vm_dens, ncol = 1),
+  "predictive_density_two_model_comparison_matched_vmu_directed_vs_vm",
+  3.6, 3.1)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-074"
-save_figure(patchwork::wrap_plots(p_total, p_delta, p_mix_density, ncol = 1), "psisloo_plus_predictive_density_3panel", 9, 10)
+# Three-panel summary (Python twin): total ELPD by model, the delta
+# ELPD bracket panel, and the vMU mixture predictive density at the goal
+# (hidden treatment labels, dashed uniform reference).
+p_p3 <- mean_hdi_plot(pop_summary, "dens0_mix", "Predictive density",
+  1 / (2 * pi), plim)
+p_3panel <- patchwork::wrap_plots(p_total, p_bracket, p_p3, ncol = 1)
+save_figure(p_3panel, "psisloo_plus_predictive_density_3panel", 3.6, 4.5)
 
 ```
 
@@ -1603,25 +2435,25 @@ alignment, and $\kappa$. This is where pronounced between-animal heterogeneity b
 
 ```{r}
 #| cell-id: "goldshtein-bats-076"
-save_figure(tag_hdi_plot("p", "Mixture weight", 0.5), "fullmodel_taglevel_mixture_weight_by_treatment_mean_hdi", 12, 8)
+save_figure(tag_hdi_plot("p", "Mixture weight", 0.5), "fullmodel_taglevel_mixture_weight_by_treatment_mean_hdi", 10, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-077"
-save_figure(tag_hdi_plot("kappa", "Directed concentration kappa"), "fullmodel_taglevel_kappa_by_treatment_mean_hdi", 12, 8)
+save_figure(tag_hdi_plot("kappa", "Directed concentration kappa"), "fullmodel_taglevel_kappa_by_treatment_mean_hdi", 10, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-078"
-save_figure(tag_hdi_plot("dens0_mix", "Mixture density at goal", 1 / (2 * pi)), "fullmodel_taglevel_predictive_density_at_0_by_treatment_mean_hdi", 12, 8)
+save_figure(tag_hdi_plot("dens0_mix", "Mixture density at goal", 1 / (2 * pi)), "fullmodel_taglevel_predictive_density_at_0_by_treatment_mean_hdi", 10, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-079"
-save_figure(tag_hdi_plot("align0", "Mixture alignment"), "fullmodel_taglevel_alignment_to_zero_by_treatment_mean_hdi", 12, 8)
+save_figure(tag_hdi_plot("align0", "Mixture alignment"), "fullmodel_taglevel_alignment_to_zero_by_treatment_mean_hdi", 10, 6)
 
 ```
 
@@ -1709,36 +2541,71 @@ population_ppc$treatment <- factor(population_ppc$treatment, levels = 1:4)
 # bands only, as in the Python twin.
 ppc_plot <- population_ppc[population_ppc$kind == "KDE", , drop = FALSE]
 ppc_plot$key <- ifelse(ppc_plot$source == "observed bootstrap", "Data", "Model")
-ppc_plot$tlabel <- treatment_labels[as.character(ppc_plot$treatment)]
-ppc_plot$fcol <- ifelse(ppc_plot$key == "Data", "black",
-  treatment_colors_cb[as.character(ppc_plot$treatment)])
+# Facet titles mirror the Python twin's format_treatment_title: comma
+# parts stay in source order, Control is dropped from mixed names, and
+# every word is initial-cased.
+treat_title_part <- function(pp) {
+  ws <- strsplit(tolower(pp), " ", fixed = TRUE)[[1]]
+  ws <- ws[ws != ""]
+  paste0(toupper(substring(ws, 1L, 1L)), substring(ws, 2L), collapse = " ")
+}
+treat_title <- function(code) {
+  nm <- treatment_labels[as.character(code)]
+  if (is.na(nm)) nm <- as.character(code)
+  nm <- trimws(nm)
+  if (!nzchar(nm)) return(as.character(code))
+  parts <- trimws(unlist(strsplit(nm, ",", fixed = TRUE)))
+  parts <- parts[nzchar(parts)]
+  if (length(parts) > 1L) parts <- parts[tolower(parts) != "control"]
+  if (!length(parts)) return(as.character(code))
+  paste(vapply(parts, treat_title_part, character(1)), collapse = ", ")
+}
+tlabel_vec <- vapply(as.character(levels(df_track$treatment)), treat_title,
+  character(1))
+ppc_plot$tlabel <- factor(tlabel_vec[as.character(ppc_plot$treatment)],
+  levels = tlabel_vec)
 edge_ppc <- 0.55
 amp_ppc <- 0.5
 rmax_ppc <- edge_ppc + amp_ppc * 1.15
-ppc_plot$ymed <- pmin(edge_ppc + amp_ppc * ppc_plot$median, rmax_ppc)
-ppc_plot$ylow <- pmin(edge_ppc + amp_ppc * ppc_plot$low, rmax_ppc)
-ppc_plot$yhi <- pmin(edge_ppc + amp_ppc * ppc_plot$high, rmax_ppc)
+ppc_plot$ymed <- pmin(edge_ppc + ppc_plot$median, rmax_ppc)
+ppc_plot$ylow <- pmin(edge_ppc + ppc_plot$low, rmax_ppc)
+ppc_plot$yhi <- pmin(edge_ppc + ppc_plot$high, rmax_ppc)
 polar_ring360 <- function(r) {
   a <- seq(0, 2 * pi, length.out = 361L)
   data.frame(x = a, y = r)
 }
+# The model rows carry their treatment's colorblind colour through the
+# treatment code; the data rows carry "Data" (black). The colour and
+# fill maps are therefore named identically to the data, stay hidden
+# from the legend, and the legend shows the Data/Model line styles.
+ppc_plot$cmap <- ifelse(ppc_plot$key == "Data", "Data",
+  as.character(ppc_plot$treatment))
+tcol_pop <- c(Data = "black", setNames(treatment_colors_cb[
+  levels(df_track$treatment)], as.character(levels(df_track$treatment))))
+ppc_obs <- ppc_plot[ppc_plot$source == "observed bootstrap", , drop = FALSE]
+ppc_mod <- ppc_plot[ppc_plot$source == "posterior predictive", , drop = FALSE]
 p_population_ppc <- ggplot(ppc_plot, aes(x, ymed)) +
-  geom_ribbon(aes(ymin = ylow, ymax = yhi, group = interaction(key, tlabel)),
-    fill = ppc_plot$fcol, alpha = 0.25, colour = NA) +
-  geom_line(aes(colour = key, linetype = key, group = interaction(key, tlabel)),
-    linewidth = 0.35) +
+  geom_ribbon(aes(ymin = ylow, ymax = yhi, group = interaction(key, tlabel),
+    fill = cmap), alpha = 0.25, colour = NA) +
+  geom_line(data = ppc_obs, aes(group = interaction(key, tlabel),
+    linetype = key), colour = "black", linewidth = 0.3) +
+  geom_line(data = ppc_mod, aes(group = interaction(key, tlabel),
+    linetype = key, colour = cmap), linewidth = 0.3) +
   geom_path(data = polar_ring360(edge_ppc), inherit.aes = FALSE, aes(x, y),
-    colour = "grey65", linewidth = 0.25) +
+    colour = "#595959", linewidth = 0.25) +
   geom_path(data = polar_ring360(edge_ppc + amp_ppc), inherit.aes = FALSE, aes(x, y),
-    colour = "grey15", linewidth = 0.25) +
+    colour = "#d9d9d9", linewidth = 0.25) +
   geom_path(data = data.frame(x = c(0, 0), y = c(edge_ppc, edge_ppc + amp_ppc)),
-    inherit.aes = FALSE, aes(x, y), colour = "grey15", linewidth = 0.3) +
+    inherit.aes = FALSE, aes(x, y), colour = "#d9d9d9", linewidth = 0.3) +
+  annotate("text", x = 0, y = edge_ppc + amp_ppc + 0.035,
+    label = "0\u00b0", size = 2.0) +
   facet_wrap(~ tlabel, ncol = 4) +
   scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0),
     breaks = 0, labels = "0°") +
   coord_polar() +
   scale_y_continuous(limits = c(0, rmax_ppc), expand = c(0, 0)) +
-  scale_colour_manual(values = c(Data = "black", Model = "black"), name = NULL) +
+  scale_colour_manual(values = tcol_pop, name = NULL, guide = "none") +
+  scale_fill_manual(values = tcol_pop, name = NULL, guide = "none") +
   scale_linetype_manual(values = c(Data = "dashed", Model = "solid"), name = NULL) +
   theme_minimal(base_size = 9) +
   theme(axis.line = element_blank(), axis.ticks = element_blank(),
@@ -1746,8 +2613,9 @@ p_population_ppc <- ggplot(ppc_plot, aes(x, ymed)) +
     axis.text.x = element_text(size = 6, colour = "grey25"),
     panel.grid = element_blank(), panel.border = element_blank(),
     strip.background = element_blank(), strip.text = element_text(size = 9),
-    legend.position = "bottom", legend.key = element_blank(),
-    legend.text = element_text(size = 8)) +
+    legend.position = "bottom", legend.background = element_rect(
+      fill = "white", colour = "grey60"),
+    legend.key = element_blank(), legend.text = element_text(size = 8)) +
   labs(x = "", y = "")
 
 individual_ppc <- do.call(rbind, parallel::mclapply(seq_along(tag_rows), function(j) {
@@ -1772,10 +2640,30 @@ individual_ppc <- do.call(rbind, parallel::mclapply(seq_along(tag_rows), functio
 ind_edge <- 0.55
 ind_rmax <- ind_edge + 1.01
 ind <- individual_ppc
-ind$taglabel <- paste0("tag ", as.character(ind$tag))
+# Twin panel order: treatment blocks (sorted treatment code), tags
+# ascending within each block; the stable-sorted twin order is the one the
+# grid reads off.
+ind$taglabel <- as.character(ind$tag)
+tags_by_treatment <- unlist(Map(
+  function(t) {
+    z <- as.character(tag_grid$tag[as.character(tag_grid$treatment) == t])
+    z[order(as.numeric(z))]
+  },
+  levels(df_track$treatment)))
+ind$taglabel <- factor(ind$taglabel,
+  levels = intersect(unique(tags_by_treatment), unique(ind$taglabel)))
+titlecase_t <- function(s) {
+  parts <- strsplit(tolower(s), " ", fixed = TRUE)[[1]]
+  paste0(toupper(substring(parts, 1L, 1L)), substring(parts, 2L),
+    collapse = " ")
+}
+# The factor level names double as the display labels: manual scales
+# match the data by level name, so the values and the scale keys must
+# be byte-identical.
+key_treat <- vapply(tnames, titlecase_t, character(1))
 ind$key <- ifelse(ind$source == "observed bootstrap", "Data",
-  treatment_labels[as.character(ind$treatment)])
-ind$key <- factor(ind$key, levels = c("Data", "Model", tnames))
+  key_treat[match(as.character(ind$treatment), levels(df_track$treatment))])
+ind$key <- factor(ind$key, levels = c("Data", "Model", key_treat))
 ind$fcol <- ifelse(ind$source == "observed bootstrap", "grey20",
   treatment_colors_cb[as.character(ind$treatment)])
 # Peak normalization follows the Python twin: radius = 0.55 + 1 *
@@ -1797,20 +2685,20 @@ p_individual_ppc <- ggplot(ind, aes(x, ymed)) +
   geom_line(data = ind_ppc, aes(group = tag, colour = key, linetype = key),
     linewidth = 0.4) +
   geom_path(data = polar_ring360(ind_edge), inherit.aes = FALSE, aes(x, y),
-    colour = "grey20", linewidth = 0.2) +
+    colour = "#cccccc", linewidth = 0.2) +
   geom_path(data = polar_ring360(ind_edge + 0.5), inherit.aes = FALSE, aes(x, y),
-    colour = "grey14", linewidth = 0.2) +
+    colour = "#dbdbdb", linewidth = 0.2) +
   geom_path(data = data.frame(x = c(0, 0), y = c(ind_edge, ind_rmax)),
-    inherit.aes = FALSE, aes(x, y), colour = "grey15", linewidth = 0.3) +
+    inherit.aes = FALSE, aes(x, y), colour = "#d9d9d9", linewidth = 0.3) +
   facet_wrap(~ taglabel, ncol = 8) +
   scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0),
     breaks = 0, labels = "0°") +
   coord_polar() +
   scale_y_continuous(limits = c(0, ind_rmax), expand = c(0, 0)) +
   scale_colour_manual(values = c(Data = "black", Model = "black",
-    setNames(treatment_colors_cb[levels(df_track$treatment)], tnames)), name = NULL) +
+    setNames(treatment_colors_cb[levels(df_track$treatment)], key_treat)), name = NULL) +
   scale_linetype_manual(values = c(Data = "dashed", Model = "solid",
-    setNames(rep("solid", length(tnames)), tnames))) +
+    setNames(rep("solid", length(tnames)), key_treat))) +
   theme_minimal(base_size = 9) +
   theme(axis.line = element_blank(), axis.ticks = element_blank(),
     axis.text.y = element_blank(),
@@ -1818,9 +2706,56 @@ p_individual_ppc <- ggplot(ind, aes(x, ymed)) +
     panel.grid = element_blank(), panel.border = element_blank(),
     strip.background = element_blank(),
     strip.text = element_text(size = 7, face = "bold"),
-    legend.position = "bottom", legend.key = element_blank(),
-    legend.text = element_text(size = 8)) +
+    legend.position = "none") +
   labs(x = "", y = "")
+
+# One framed legend row under the grid (the twin of the shared Python
+# fig.legend): Data (dashed), Model (solid) and the named treatments in
+# one row, sized against the 6.9 in page width.
+# Legend labels mirror the Python twin's format_treatment_nicely:
+# every word initial-cased, empty names read as Control.
+leg_treat <- vapply(tnames, function(nm) {
+  nm <- trimws(as.character(nm))
+  if (!nzchar(nm)) return("Control")
+  titlecase_t(nm)
+}, character(1))
+leg_items <- data.frame(
+  label = c("Data", "Model", leg_treat),
+  colour = c("black", "black",
+    as.character(treatment_colors_cb[levels(df_track$treatment)])),
+  dashed = c(TRUE, FALSE, rep(FALSE, length(tnames))),
+  stringsAsFactors = FALSE)
+key_in <- 0.18; gkt_in <- 0.06; gi_in <- 0.14
+# strwidth measures at the default 12 pt; scale to the 8 pt glyphs.
+tw_in <- strwidth(leg_items$label, units = "inches") * (8 / 12)
+tot_in <- sum(tw_in) + nrow(leg_items) * (key_in + gkt_in) +
+  (nrow(leg_items) - 1) * gi_in
+starts_in <- (6.9 - tot_in) / 2 +
+  cumsum(c(0, key_in + gkt_in + tw_in[-nrow(leg_items)] + gi_in))
+leg_kids <- list(grid::rectGrob(x = unit(0.5, "npc"), y = unit(0.5, "npc"),
+  width = unit(1, "npc"), height = unit(1, "npc"), hjust = 0.5, vjust = 0.5,
+  gp = grid::gpar(fill = "white", col = "grey60", lwd = 0.3)))
+for (i in seq_len(nrow(leg_items))) {
+  it <- leg_items[i, ]
+  xs <- starts_in[i]
+  leg_kids <- c(leg_kids, list(
+    grid::segmentsGrob(x0 = unit(xs, "inches"), y0 = unit(0.5, "npc"),
+      x1 = unit(xs + key_in, "inches"), y1 = unit(0.5, "npc"),
+      default.units = "mixed",
+      gp = grid::gpar(col = it$colour, lwd = 1.1,
+        lty = if (it$dashed) "dashed" else "solid")),
+    grid::textGrob(it$label, x = unit(xs + key_in + gkt_in, "inches"),
+      y = unit(0.5, "npc"), just = "left",
+      gp = grid::gpar(fontsize = 8))))
+}
+leg_grob <- grid::gTree(children = do.call(grid::gList, leg_kids))
+base_ppc_grob <- ggplotGrob(p_individual_ppc)
+base_rows <- max(base_ppc_grob$layout$b)
+gt_ind <- gtable::gtable_add_rows(base_ppc_grob,
+  heights = unit(0.5, "in"), pos = base_rows + 1)
+gt_ind <- gtable::gtable_add_grob(gt_ind, leg_grob, t = base_rows + 1,
+  l = 1, r = max(base_ppc_grob$layout$r))
+p_individual_ppc <- gt_ind
 
 ```
 
@@ -1832,10 +2767,12 @@ save_figure(p_population_ppc, "bat_population_ppc_by_treatment", 10.5, 3.4)
 
 Individual PPC: bootstrap vs posterior KDE of the goal-directed component per animal.
 
+These figures (and the trajectory maps above) use free CARTO basemaps; when no API key is set they fall back to a flat neutral cartographic style, so the animal positions and flight segments still read cleanly offline.
+
 
 ```{r}
 #| cell-id: "goldshtein-bats-084"
-save_figure(p_individual_ppc, "bat_individual_ppc_bootstrap_vs_ppc_kde", 8, 9)
+save_figure(p_individual_ppc, "bat_individual_ppc_bootstrap_vs_ppc_kde", 6.9, 7.7)
 
 ```
 
@@ -1874,93 +2811,168 @@ df_track$p_goal_post_hi <- resp_hdi[, 2]
 # The maps' source joins by per-tag step index; join by (tag,time) here to
 # avoid shifting probabilities at rows removed from the modeling table.
 key <- function(tag, time) paste(tag, sprintf("%.12f", time), sep = ":")
-stopifnot(!anyDuplicated(key(df_track$tag, df_track$time)))
-join <- match(key(segments$tag, segments$time), key(df_track$tag, df_track$time))
-prob_segments <- segments
-prob_segments$p <- df_track$p_goal_post_mean[join]
-prob_segments$tlabel <- treatment_labels[as.character(prob_segments$treatment)]
-field_x <- range(prob_segments$x)
-field_y <- range(prob_segments$y)
-# Metric scale bar (roughly a quarter of the panel width, rounded) and a
-# north arrow in the bottom corners, as in the Python map. Annotation
-# layers span every facet, so the chrome is carried by per-panel data
-# rows instead, over the panel range (tracks plus the lake outline).
-sb_lens <- c(50, 100, 200, 250, 500, 1000, 2000, 5000, 10000)
-sb_len <- max(sb_lens[sb_lens <= 0.25 * diff(field_x)])
-sb_lab <- if (sb_len >= 1000) paste0(sb_len / 1000, " km") else paste0(sb_len, " m")
-lake_xy <- as.data.frame(sf::st_coordinates(lake_m))
-panel_x <- range(c(prob_segments$x, prob_segments$xend, lake_xy[[1]]))
-panel_y <- range(c(prob_segments$y, prob_segments$yend, lake_xy[[2]]))
-y0 <- panel_y[1] + 0.045 * diff(panel_y)
-pan <- data.frame(tlabel = tnames,
-  bar_x = panel_x[1] + 0.05 * diff(panel_x), bar_y = y0,
-  bar_xend = panel_x[1] + 0.05 * diff(panel_x) + sb_len, bar_yend = y0,
-  t1_x = panel_x[1] + 0.05 * diff(panel_x),
-  t1_y1 = y0 - 0.008 * diff(panel_y), t1_y2 = y0 + 0.008 * diff(panel_y),
-  lab_x = panel_x[1] + 0.05 * diff(panel_x) + sb_len / 2,
-  lab_y = y0 - 0.02 * diff(panel_y),
-  ns_x = panel_x[2] - 0.055 * diff(panel_x), ns_y1 = y0,
-  ns_y2 = y0 + 0.03 * diff(panel_y))
-borders <- do.call(rbind, lapply(split(prob_segments, prob_segments$treatment),
-  function(g) data.frame(tlabel = g$tlabel[1], treatment = g$treatment[1],
-    xmin = min(c(g$x, g$xend)), xmax = max(c(g$x, g$xend)),
-    ymin = min(c(g$y, g$yend)), ymax = max(c(g$y, g$yend)))))
-# One translocation marker per tag, at its first position (release point).
-transloc <- do.call(rbind, lapply(split(track_w_treat, track_w_treat$tag), function(g) {
-  g <- g[order(g$time), ]
-  data.frame(tlabel = treatment_labels[as.character(g$treatment[1])],
-    x = g$x_m[1], y = g$y_m[1])
-}))
-p_probability_map <- map_base() +
-  geom_segment(data = prob_segments, aes(x, y, xend = xend, yend = yend, colour = p, linetype = gap),
-    linewidth = 0.4, alpha = 0.9)
-# One colour-blind border layer per treatment keeps the constant colours
-# out of the continuous probability scale.
-for (i in seq_len(nrow(borders))) {
-  p_probability_map <- p_probability_map +
-    geom_rect(data = borders[i, , drop = FALSE], inherit.aes = FALSE,
-      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-      colour = treatment_colors_cb[as.character(borders$treatment[i])],
-      fill = NA, linewidth = 0.9)
-}
-p_probability_map <- p_probability_map +
-  geom_point(data = transloc, aes(x = x, y = y), shape = 18, size = 3.5,
-    colour = "black", fill = "white") +
-  geom_segment(data = pan, inherit.aes = FALSE,
-    aes(x = bar_x, y = bar_y, xend = bar_xend, yend = bar_yend),
-    linewidth = 0.9, colour = "black") +
-  geom_segment(data = pan, inherit.aes = FALSE,
-    aes(x = t1_x, y = t1_y1, xend = t1_x, yend = t1_y2),
-    linewidth = 0.6, colour = "black") +
-  geom_segment(data = pan, inherit.aes = FALSE,
-    aes(x = ns_x, y = ns_y1, xend = ns_x, yend = ns_y2),
-    linewidth = 0.7, colour = "black") +
-  geom_point(data = pan, inherit.aes = FALSE, aes(ns_x, ns_y2), shape = 13, size = 2.8,
-    colour = "black") +
-  geom_text(data = pan, inherit.aes = FALSE, aes(lab_x, lab_y, label = sb_lab),
-    size = 3.5, colour = "black") +
-  geom_text(data = pan, inherit.aes = FALSE,
-    aes(ns_x, ns_y2 + 0.012 * diff(panel_y), label = "N"), size = 3.5, colour = "black") +
-  facet_wrap(~ tlabel, ncol = 4) +
-  scale_colour_viridis_c(limits = c(0, 1), na.value = "grey70") +
-  scale_linetype_manual(values = c("0" = "solid", "1" = "dashed")) +
-  guides(linetype = "none",
-    colour = guide_colorbar(title = "Directed-component probability",
-      title.position = "top")) +
-  theme(legend.position = "bottom", legend.direction = "horizontal",
-    strip.background = element_blank(), strip.text = element_text(size = 9, face = "bold"))
+stopifnot(!anyDuplicated(key(track_w_treat$tag, track_w_treat$time)))
+track_w_treat$p_pg <- NA_real_
+j <- match(key(track_w_treat$tag, track_w_treat$time), key(df_track$tag, df_track$time))
+ok <- !is.na(j)
+if (!any(ok)) stop("p_goal overlay: no map points matched the modeling table (key-format bug?)")
+track_w_treat$p_pg[ok] <- df_track$p_goal_post_mean[j[ok]]
+cat("p_goal overlay: ", sum(ok), " of ", length(j), " map points matched the modeling table\n")
+segs_pg <- segments_3857(track_w_treat, pcol = "p_pg")
+segs_pg <- segs_pg[is.finite(segs_pg$p), , drop = FALSE]
+segs_pg$p <- pmin(1, pmax(0, segs_pg$p))
+ext_pg <- map_extent(c(list(seg_bounds(segs_pg)), site_bounds), pad = 0.06)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-087"
-save_figure(p_probability_map, "treatment_panels_tracks_pgoal", 10, 7.5)
+# Tracks colored by the per-step goal-directed probability (viridis),
+# one panel per treatment on light CartoDB Positron tiles with colored
+# panel borders, scale + compass on the rightmost panel, a thin right-
+# side colourbar and the bottom figure legend - the Python p_goal twin.
+bm_pg <- basemap_panel_img(ext_pg["xmin"], ext_pg["ymin"],
+  ext_pg["xmax"], ext_pg["ymax"], "light_all", 15, "#fafaf8")
+# The equal-aspect subplot boxes of the 8x6 figure are ~1.67 x 5.58 in.
+ae_pg <- aspect_extent(bm_pg, 1.67 / 5.58)
+xlim_pg <- ae_pg$xlim; ylim_pg <- ae_pg$ylim
+r_roost_p <- marker_radius_m(200, 1.67, diff(xlim_pg))
+r_trans_p <- marker_radius_m(120, 1.67, diff(xlim_pg))
+
+panel_pg <- function(tt, border_col) {
+  sd <- segs_pg[as.character(segs_pg$treatment) == tt, , drop = FALSE]
+  # Border as a data-level rect added LAST: the flat basemap cover would
+  # otherwise swallow half of a theme-drawn panel border.
+  p <- map_panel(bm_pg, aspect = 1.67 / 5.58,
+    lake = TRUE, lake_alpha = 0.25, lake_lw = 1.0)
+  p +
+    geom_segment(data = sd[sd$gap, ], inherit.aes = FALSE,
+      aes(x = x, y = y, xend = xend, yend = yend, colour = p),
+      linetype = "dashed", linewidth = 0.95 * 0.3528, alpha = 0.80) +
+    geom_segment(data = sd[!sd$gap, ], inherit.aes = FALSE,
+      aes(x = x, y = y, xend = xend, yend = yend, colour = p),
+      linewidth = 1.0 * 0.3528, alpha = 0.92) +
+    scale_colour_viridis_c(limits = c(0, 1)) +
+    guides(colour = "none") +
+    add_roost_marker(r_roost_p) +
+    add_x_markers(TRANS_XY, r_trans_p) +
+    geom_rect(inherit.aes = FALSE,
+      data = data.frame(xmin = xlim_pg[1], xmax = xlim_pg[2],
+        ymin = ylim_pg[1], ymax = ylim_pg[2]),
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+      fill = NA, colour = border_col, linewidth = 0.78)
+}
+p_pg_1 <- panel_pg("1", treatment_colors_cb["1"])
+p_pg_2 <- panel_pg("2", treatment_colors_cb["2"])
+p_pg_3 <- panel_pg("3", treatment_colors_cb["3"])
+p_pg_4 <- panel_pg("4", treatment_colors_cb["4"])
+p_pg_4 <- add_scale_compass(p_pg_4, xlim_pg, ylim_pg,
+  variant = "pgoal", panel_w_in = 1.48, panel_h_in = 4.95)
+# Thin vertical colourbar (Python: figure axes [0.922, 0.20, 0.012,
+# 0.62], label "Directed-component probability").
+pb <- seq_len(240)
+cbar_rows <- data.frame(x = 0.30, y = 0.19 + 0.62 * (pb - 0.5) / 240,
+  v = (pb - 0.5) / 240)
+p_cbar <- ggplot(cbar_rows, aes(x, y, fill = v)) +
+  geom_tile(width = 0.13, height = 0.62 / 240) +
+  scale_fill_viridis_c(limits = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1.35), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 1), expand = c(0, 0))
+for (v in c(0, 0.25, 0.5, 0.75, 1)) {
+  yv <- 0.19 + 0.62 * v
+  p_cbar <- p_cbar +
+    annotate("segment", x = 0.375, y = yv, xend = 0.40, yend = yv,
+      linewidth = 0.15, colour = "#000000") +
+    annotate("text", x = 0.42, y = yv, label = format(v, trim = TRUE),
+      size = 2.2, hjust = 0, vjust = 0.5)
+}
+p_cbar <- p_cbar +
+  annotate("text", x = 0.68, y = 0.5,
+    label = "Directed-component\nprobability", size = 2.8, angle = 90,
+    hjust = 0.5, vjust = 0.5) +
+  theme_void() +
+  guides(fill = "none")
+p_pg_legend <- legend_panel(data.frame(
+  kind = c("swatch", "star", "x", "dash"),
+  label = c("Lake", "Roost", "Translocation", "Signal Dropout")),
+  cell_w = 7.4, cell_h = 0.84)
+p_prob_top <- (p_pg_1 | p_pg_2 | p_pg_3 | p_pg_4) / p_pg_legend
+p_prob_top <- p_prob_top + plot_layout(heights = c(1, 0.17))
+p_probability_map <- p_prob_top | p_cbar
+p_probability_map <- p_probability_map +
+  plot_layout(widths = c(1, 0.05)) +
+  theme(plot.margin = margin(1, 1, 1, 1))
+save_figure(p_probability_map, "treatment_panels_tracks_pgoal", width = 8, height = 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-088"
-save_figure(p_probability_map, "treatment_panels_tracks_pgoal_small_bigfont", 8, 6)
+# Compact p_goal tracks: smaller figure, the same four treatment panels,
+# a wide horizontal colourbar below (no legend) - the Python
+# small-fig / bigger-font p_goal twin.
+ae_pg_s <- aspect_extent(bm_pg, 1.34 / 3.59)
+xlim_pg_s <- ae_pg_s$xlim; ylim_pg_s <- ae_pg_s$ylim
+r_roost_ps <- marker_radius_m(105, 1.34, diff(xlim_pg_s))
+r_trans_ps <- marker_radius_m(62, 1.34, diff(xlim_pg_s))
+
+panel_pg_s <- function(tt, border_col) {
+  sd <- segs_pg[as.character(segs_pg$treatment) == tt, , drop = FALSE]
+  # Border as a data-level rect added LAST (see panel_pg above).
+  map_panel(bm_pg, aspect = 1.34 / 3.59,
+    lake = TRUE, lake_alpha = 0.25, lake_lw = 0.8) +
+    geom_segment(data = sd[sd$gap, ], inherit.aes = FALSE,
+      aes(x = x, y = y, xend = xend, yend = yend, colour = p),
+      linetype = "dashed", linewidth = 0.76 * 0.3528, alpha = 0.75) +
+    geom_segment(data = sd[!sd$gap, ], inherit.aes = FALSE,
+      aes(x = x, y = y, xend = xend, yend = yend, colour = p),
+      linewidth = 0.8 * 0.3528, alpha = 0.90) +
+    scale_colour_viridis_c(limits = c(0, 1)) +
+    guides(colour = "none") +
+    add_roost_marker(r_roost_ps) +
+    add_x_markers(TRANS_XY, r_trans_ps) +
+    geom_rect(inherit.aes = FALSE,
+      data = data.frame(xmin = xlim_pg_s[1], xmax = xlim_pg_s[2],
+        ymin = ylim_pg_s[1], ymax = ylim_pg_s[2]),
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+      fill = NA, colour = border_col, linewidth = 0.53)
+}
+p_pgs_1 <- panel_pg_s("1", treatment_colors_cb["1"])
+p_pgs_2 <- panel_pg_s("2", treatment_colors_cb["2"])
+p_pgs_3 <- panel_pg_s("3", treatment_colors_cb["3"])
+p_pgs_4 <- panel_pg_s("4", treatment_colors_cb["4"])
+p_pgs_4 <- add_scale_compass(p_pgs_4, xlim_pg_s, ylim_pg_s,
+  variant = "pgoal_small", panel_w_in = 1.33, panel_h_in = 3.49)
+# Wide horizontal colourbar (Python: figure axes [0.20, 0.060, 0.60,
+# 0.034]).
+pb <- seq_len(240)
+cbar_h_rows <- data.frame(x = 0.20 + 0.60 * (pb - 0.5) / 240, y = 0.62,
+  v = (pb - 0.5) / 240)
+p_cbar_h <- ggplot(cbar_h_rows, aes(x, y, fill = v)) +
+  geom_tile(width = 0.60 / 240, height = 0.24) +
+  scale_fill_viridis_c(limits = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1.5), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 1), expand = c(0, 0))
+for (v in c(0, 0.25, 0.5, 0.75, 1)) {
+  xv <- 0.20 + 0.60 * v
+  p_cbar_h <- p_cbar_h +
+    annotate("segment", x = xv, y = 0.49, xend = xv, yend = 0.44,
+      linewidth = 0.15, colour = "#000000") +
+    annotate("text", x = xv, y = 0.40, label = format(v, trim = TRUE),
+      size = 2.2, hjust = 0.5, vjust = 1)
+}
+p_cbar_h <- p_cbar_h +
+  annotate("text", x = 0.83, y = 0.62,
+    label = "Directed-component probability", size = 2.8, hjust = 0,
+    vjust = 0.5) +
+  theme_void() +
+  guides(fill = "none")
+p_prob_top_s <- (p_pgs_1 | p_pgs_2 | p_pgs_3 | p_pgs_4) / p_cbar_h
+p_prob_top_s <- p_prob_top_s + plot_layout(heights = c(1, 0.15))
+p_probability_map_small <- p_prob_top_s +
+  theme(plot.margin = margin(1, 1, 1, 1))
+save_figure(p_probability_map_small, "treatment_panels_tracks_pgoal_small_bigfont",
+  width = 5.6, height = 4.2)
 
 ```
 
@@ -2039,29 +3051,33 @@ make_curves <- function(kind) {
 }
 distance_curves <- make_curves("distance")
 end_curves <- make_curves("steps_from_end")
-curve_plot <- function(curves, individual = FALSE, reverse = FALSE) {
-  x <- if (individual) curves$individual else curves$population
+# Full-size twin (Python plot_population_curve_smooth): colorblind bands
+# + lines, dashed 0.5 reference, boxed right legend with formatted
+# treatment names, y on [0, 1].
+curve_plot_full <- function(curves, reverse = FALSE) {
+  x <- curves$population
   x$treatment <- factor(x$treatment, levels = 1:4)
-  x$tlabel <- treatment_labels[as.character(x$treatment)]
   lv <- levels(x$treatment)
-  # Colorblind treatment colours with a named legend, 0.5 reference line,
-  # p(goal | step) on [0, 1], no grid, bottom/left axes only (Python look).
   p <- ggplot(x, aes(x, mean, colour = treatment, fill = treatment,
-    group = if (individual) tag else treatment)) +
+    group = treatment)) +
     geom_ribbon(aes(ymin = low, ymax = high),
-      alpha = if (individual) 0.10 else 0.20, colour = NA, linewidth = 0) +
-    geom_line(linewidth = if (individual) 0.3 else 0.5,
-      alpha = if (individual) 0.75 else 1) +
+      alpha = 0.20, colour = NA, linewidth = 0) +
+    geom_line(linewidth = 0.5) +
     geom_hline(yintercept = 0.5, colour = "grey90", linetype = "dashed", linewidth = 0.3) +
-    scale_colour_manual(values = treatment_colors_cb[lv], labels = tnames, name = NULL) +
+    scale_colour_manual(values = treatment_colors_cb[lv],
+      labels = treatment_nice[lv], name = NULL) +
     scale_fill_manual(values = treatment_colors_cb[lv], name = NULL) +
     scale_y_continuous(limits = c(0, 1), expand = c(0, 0.02)) +
     guides(fill = "none") +
     labs(x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
-      y = if (individual) "p(goal | step)" else "Population mean p(goal | step)") +
+      y = "Mean directed-component probability") +
     theme_classic(base_size = 9) +
-    theme(legend.position = "bottom", legend.text = element_text(size = 8))
-  if (individual) p <- p + facet_wrap(~ tlabel, ncol = 2)
+    theme(legend.position = "right",
+      legend.background = element_rect(fill = "white", colour = "grey30"),
+      legend.key = element_blank(),
+      legend.text = element_text(size = 8, colour = "black"),
+      legend.margin = margin(0, 0, 0, -10, "mm"),
+      legend.spacing.y = unit(1.3, "lines"))
   if (reverse) {
     p <- p + scale_x_reverse(labels = function(v) format(abs(v), big.mark = ","))
   } else {
@@ -2070,34 +3086,95 @@ curve_plot <- function(curves, individual = FALSE, reverse = FALSE) {
   }
   p
 }
-p_curve_distance <- curve_plot(distance_curves, reverse = TRUE)
-p_curve_end <- curve_plot(end_curves)
-p_tag_distance <- curve_plot(distance_curves, individual = TRUE, reverse = TRUE)
-p_tag_end <- curve_plot(end_curves, individual = TRUE)
+# Compact (paper-width) twin: same curves, no legend, smaller text.
+curve_plot_compact <- function(curves, reverse = FALSE) {
+  x <- curves$population
+  x$treatment <- factor(x$treatment, levels = 1:4)
+  lv <- levels(x$treatment)
+  p <- ggplot(x, aes(x, mean, colour = treatment, fill = treatment,
+    group = treatment)) +
+    geom_ribbon(aes(ymin = low, ymax = high),
+      alpha = 0.18, colour = NA, linewidth = 0) +
+    geom_line(linewidth = 0.45) +
+    geom_hline(yintercept = 0.5, colour = "grey88", linetype = "dashed", linewidth = 0.3) +
+    scale_colour_manual(values = treatment_colors_cb[lv], name = NULL) +
+    scale_fill_manual(values = treatment_colors_cb[lv], name = NULL) +
+    scale_y_continuous(limits = c(0, 1), expand = c(0, 0.02)) +
+    guides(colour = "none", fill = "none") +
+    labs(x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
+      y = "Directed-component\nprobability") +
+    theme_classic(base_size = 7) +
+    theme(legend.position = "none")
+  if (reverse) {
+    p <- p + scale_x_reverse(labels = function(v) format(abs(v), big.mark = ","))
+  } else {
+    p <- p + scale_x_continuous(limits = c(-110 * 60, 0),
+      labels = function(v) format(abs(v), big.mark = ","))
+  }
+  p
+}
+# Per-animal 2x2 grid (Python plot_tag_curves_faceted_4panel): one panel
+# per treatment, animals drawn in the treatment color, 0.5 reference,
+# absolute comma-formatted ticks, y label only on the left column.
+tag_curve_plot <- function(curves, reverse = FALSE) {
+  x <- curves$individual
+  x$treatment <- factor(x$treatment, levels = 1:4)
+  lv <- levels(x$treatment)
+  xlabs <- function(v) format(abs(v), big.mark = ",")
+  panels <- lapply(seq_along(lv), function(k) {
+    t <- lv[k]
+    sub <- x[x$treatment == t, ]
+    p <- ggplot(sub, aes(x, mean, group = tag)) +
+      geom_ribbon(aes(ymin = low, ymax = high),
+        fill = treatment_colors_cb[t], alpha = 0.10, colour = NA, linewidth = 0) +
+      geom_line(colour = treatment_colors_cb[t], alpha = 0.75, linewidth = 0.35) +
+      geom_hline(yintercept = 0.5, colour = "grey90", linetype = "dashed", linewidth = 0.3) +
+      scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+      labs(title = treatment_nice[[t]],
+        x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
+        y = if (k == 1L || k == 3L) "Directed-component probability" else "") +
+      theme_classic(base_size = 8) +
+      theme(plot.title = element_text(size = 9, hjust = 0.5))
+    if (reverse) {
+      p <- p + scale_x_reverse(labels = xlabs)
+    } else {
+      p <- p + scale_x_continuous(limits = c(-110 * 60, 0), labels = xlabs)
+    }
+    p
+  })
+  patchwork::wrap_plots(panels[[1]], panels[[2]], panels[[3]], panels[[4]],
+    ncol = 2)
+}
+p_curve_distance <- curve_plot_full(distance_curves, reverse = TRUE)
+p_curve_end <- curve_plot_full(end_curves)
+p_curve_distance_c <- curve_plot_compact(distance_curves, reverse = TRUE)
+p_curve_end_c <- curve_plot_compact(end_curves)
+p_tag_distance <- tag_curve_plot(distance_curves, reverse = TRUE)
+p_tag_end <- tag_curve_plot(end_curves)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-091"
-save_figure(p_curve_distance, "p_goal_pop_kernel_distance_TRUNC_SMOOTH", 10, 5)
+save_figure(p_curve_distance, "p_goal_pop_kernel_distance_TRUNC_SMOOTH", 5.0, 3.0)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-092"
-save_figure(p_curve_end, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH", 6, 3.5)
+save_figure(p_curve_end, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH", 5.0, 3.0)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-093"
-save_figure(p_curve_distance, "p_goal_pop_kernel_distance_TRUNC_SMOOTH_compact", 6, 4)
+save_figure(p_curve_distance_c, "p_goal_pop_kernel_distance_TRUNC_SMOOTH_compact", 4.2, 1.55)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-094"
-save_figure(p_curve_end, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact", 6, 4)
+save_figure(p_curve_end_c, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact", 4.2, 1.55)
 
 ```
 
@@ -2107,13 +3184,13 @@ to goal-directed travel.
 
 ```{r}
 #| cell-id: "goldshtein-bats-096"
-save_figure(p_tag_distance, "p_goal_tag_kernel_distance_faceted_TRUNC", 11, 8)
+save_figure(p_tag_distance, "p_goal_tag_kernel_distance_faceted_TRUNC", 8, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-097"
-save_figure(p_tag_end, "p_goal_tag_kernel_distFromEndM_faceted_TRUNC", 11, 8)
+save_figure(p_tag_end, "p_goal_tag_kernel_distFromEndM_faceted_TRUNC", 8, 6)
 
 ```
 
