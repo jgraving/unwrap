@@ -1339,6 +1339,28 @@ p_individual_ppc <- ggplot(ppc_curves, aes(theta, 1 + model, group = individual)
   coord_polar(start = pi / 2, direction = -1) +
   facet_wrap(~ individual, ncol = 7) + theme_void(base_size = 8) +
   theme(strip.text = element_text(size = 8), panel.spacing = grid::unit(0.5, "lines"))
+
+# Figure legend matching the Python twin: one-vertex line per key, so the
+# legend entries come from the manual scales and nothing is drawn on the
+# panels (manual guide overrides would warn on dev ggplot2; this does not).
+ppc_key <- data.frame(theta = rep(0, 4), r = rep(0, 4),
+  key = factor(rep(c("Kernel (bootstrap 95%)", "Model (posterior 95%)"), each = 2L),
+               levels = c("Kernel (bootstrap 95%)", "Model (posterior 95%)")))
+
+p_individual_ppc <- p_individual_ppc +
+  geom_line(data = ppc_key,
+    aes(x = theta, y = r, colour = key, linetype = key, group = key),
+    inherit.aes = FALSE, linewidth = 0.4) +
+  scale_colour_manual(name = NULL,
+    values = c("Kernel (bootstrap 95%)" = "grey20", "Model (posterior 95%)" = RED)) +
+  scale_linetype_manual(name = NULL,
+    values = c("Kernel (bootstrap 95%)" = "dashed", "Model (posterior 95%)" = "solid")) +
+  guides(colour = guide_legend(nrow = 2), linetype = guide_legend(nrow = 2)) +
+  theme(legend.position = "top", legend.justification = "right",
+        legend.key.width = grid::unit(1.1, "cm"),
+        legend.key.height = grid::unit(0.25, "cm"),
+        legend.text = element_text(size = 8),
+        legend.spacing = grid::unit(0.4, "lines"))
 save_figure(p_individual_ppc, "locust_directional_individual_ppc", 14, 16)
 ```
 
@@ -1606,16 +1628,27 @@ make_hyp_table <- function(arrays, mode, pooled = FALSE) {
       probability = mean(p[i, ] > f[i, ]), row.names = NULL)
   }))
 }
-population_dots <- function(table, label, baseline, invert = FALSE) {
+population_dots <- function(table, label, baseline, invert = FALSE,
+                          baseline_label = NULL) {
   levels <- if (invert) c("Optic flow", "Vec. encoding")
           else c("Vec. encoding", "Optic flow")
-  ggplot(table, aes(center, factor(hypothesis, levels = levels),
+  p <- ggplot(table, aes(center, factor(hypothesis, levels = levels),
           colour = hypothesis, shape = hypothesis)) +
     geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.15) +
     geom_point(size = 2.5) + geom_vline(xintercept = baseline, linetype = "dashed") +
     scale_colour_manual(values = HYP_COLORS) +
     scale_shape_manual(values = c("Optic flow" = 16, "Vec. encoding" = 15)) +
     labs(x = label, y = "") + theme(legend.position = "none")
+  if (!is.null(baseline_label)) {
+    # Python rotates a label next to the dashed baseline; vjust = 1 puts
+    # the text body to the left of the anchor once angle = 90.
+    p <- p +
+      annotate("text",
+               x = baseline - diff(range(table$center)) * 0.015, y = 1.5,
+               label = baseline_label, angle = 90, hjust = 0.5, vjust = 1,
+               size = 2.8)
+  }
+  p
 }
 individual_dots <- function(table, label, baseline, limits = NULL) {
   labels <- unique(table$individual)
@@ -1641,7 +1674,8 @@ individual_dots <- function(table, label, baseline, limits = NULL) {
 }
 pop_density_table <- make_hyp_table(hyp_pop, "density")
 print(pop_density_table)
-save_figure(population_dots(pop_density_table, "Predictive density", 1 / (2 * pi)),
+save_figure(population_dots(pop_density_table, "Predictive density", 1 / (2 * pi),
+  baseline_label = "Uniform"),
   "locust_directional_hypothesis_horizontal", 6, 3)
 ```
 
@@ -1649,7 +1683,8 @@ save_figure(population_dots(pop_density_table, "Predictive density", 1 / (2 * pi
 #| cell-id: "locust-r-040"
 pop_elpd_table <- make_hyp_table(hyp_pop, "elpd")
 print(pop_elpd_table)
-save_figure(population_dots(pop_elpd_table, "Mean log predictive density at hypothesis", -log(2 * pi)),
+save_figure(population_dots(pop_elpd_table, "Mean log predictive density at hypothesis",
+  -log(2 * pi), baseline_label = "Uniform"),
   "locust_directional_hypothesis_horizontal_elpd", 6, 3)
 
 ```
