@@ -378,7 +378,7 @@ n_rows_g <- length(orders_g)
 n_cols_g <- length(densities_g)
 stopifnot(all(table(merged_df$order, merged_df$density) > 0))
 cell_title <- function(o, d)
-  paste0("Density = ", d, "\nOrder = ", format(o, nsmall = 1))
+  paste0("Density = ", format(d, nsmall = 1, trim = TRUE), "\nOrder = ", format(o, nsmall = 1))
 gtitle_levels <- unlist(lapply(orders_g, function(o)
   vapply(densities_g, function(d) cell_title(o, d), character(1))))
 merged_df$gcol <- cell_color2(match(merged_df$order, orders_g) - 1L,
@@ -386,10 +386,12 @@ merged_df$gcol <- cell_color2(match(merged_df$order, orders_g) - 1L,
 merged_df$gtitle <- factor(cell_title(merged_df$order, merged_df$density),
   levels = gtitle_levels)
 key_grid <- expand.grid(rr = 0:(n_rows_g - 1), cc = 0:(n_cols_g - 1))
-key_grid$ypos <- n_rows_g - key_grid$rr
+key_grid$ypos <- n_rows_g - 1L - key_grid$rr
 key_grid$col <- cell_color2(key_grid$rr, key_grid$cc, n_rows_g, n_cols_g)
 p_key <- ggplot(key_grid, aes(x = cc + 0.5, y = ypos + 0.5, fill = col)) +
   geom_tile() +
+  annotate("rect", xmin = 0, xmax = n_cols_g, ymin = 0, ymax = n_rows_g,
+    fill = NA, colour = "black", linewidth = 0.28) +
   scale_fill_identity(guide = "none") +
   scale_x_continuous(limits = c(-2, n_cols_g), expand = c(0, 0)) +
   scale_y_continuous(limits = c(-6.5, n_rows_g + 6.5), expand = c(0, 0)) +
@@ -413,11 +415,14 @@ grid_thm <- function() theme_classic(base_size = 8) +
     plot.margin = margin(1, 1, 1, 1, "pt"))
 p_paths <- ggplot(merged_df, aes(X, Y, group = fname, colour = gcol)) +
   geom_path(linewidth = 0.28, alpha = 0.75) +
-  geom_hline(yintercept = 0, colour = "black", linewidth = 0.35) +
-  facet_wrap(~ gtitle, ncol = n_cols_g) +
+  annotate("segment", x = 0, xend = 8, y = 0, yend = 0,
+    colour = "black", linewidth = 0.35) +
+  facet_wrap(~ gtitle, ncol = n_cols_g, axes = "all") +
   scale_colour_identity(guide = "none") +
-  scale_x_continuous(limits = c(-8, 8), breaks = c(-8, 0, 8)) +
-  scale_y_continuous(limits = c(-8, 8), breaks = c(-8, 0, 8)) +
+  scale_x_continuous(limits = c(-8, 8), breaks = c(-8, 0, 8),
+    expand = c(0, 0)) +
+  scale_y_continuous(limits = c(-8, 8), breaks = c(-8, 0, 8),
+    expand = c(0, 0)) +
   coord_equal() +
   labs(x = "", y = "") +
   grid_thm()
@@ -464,7 +469,8 @@ p_vectors <- ggplot(vectors, aes(group = fname)) +
   scale_y_continuous(limits = c(-Lvec, Lvec), breaks = NULL) +
   coord_equal() +
   labs(x = "", y = "") +
-  grid_thm()
+  grid_thm() +
+  theme(axis.line = element_blank())
 save_figure(patchwork::wrap_plots(p_vectors, p_key, widths = c(8.6, 1.35)),
   "mean_vectors_order_by_density_grid", 8.5, 7.5)
 
@@ -534,7 +540,8 @@ for (r in 0:(n_rows_s - 1)) {
         c(y0[i], y0[i] + cumsum(step_L_s * sin(angles)))))
     }
     walks[[wi]] <- data.frame(o = r + 1L, d = c2 + 1L,
-      i = seq_len(n_traj), x = pts[, 1], y = pts[, 2])
+      i = rep(seq_len(n_traj), each = n_steps_s + 1L),
+      x = pts[, 1], y = pts[, 2])
   }
 }
 schematic <- do.call(rbind, walks)
@@ -543,7 +550,7 @@ schematic$o_lab <- factor(orders_s[schematic$o],
 schematic$d_lab <- factor(densities_s[schematic$d],
   levels = densities_s, labels = format(densities_s))
 schematic$cell <- mapply(cell_color_s, schematic$o - 1L, schematic$d - 1L)
-schematic$lw <- ifelse(schematic$d >= 16, 0.11, 0.19)
+schematic$lw <- ifelse(densities_s[schematic$d] >= 16, 0.11, 0.19)
 
 border_thm <- element_rect(colour = "black", linewidth = 0.28, fill = NA)
 p_panels <- list()
@@ -551,12 +558,12 @@ for (r in 0:(n_rows_s - 1)) {
   for (c2 in 0:(n_cols_s - 1)) {
     sub <- schematic[schematic$o == r + 1L & schematic$d == c2 + 1L, ,
       drop = FALSE]
-    p <- ggplot(sub[sub$d < 16, , drop = FALSE],
+    p <- ggplot(sub[densities_s[sub$d] < 16, , drop = FALSE],
       aes(x, y, group = i, colour = cell)) +
-      geom_line(data = sub[sub$d >= 16, , drop = FALSE],
+      geom_path(data = sub[densities_s[sub$d] >= 16, , drop = FALSE],
         aes(x, y, group = i, colour = cell),
         linewidth = 0.11, alpha = 0.85) +
-      geom_line(linewidth = 0.19, alpha = 0.85) +
+      geom_path(linewidth = 0.19, alpha = 0.85) +
       scale_colour_identity(guide = "none") +
       scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
       scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
@@ -584,10 +591,12 @@ p_gutter <- ggplot(gutter_df) +
   labs(title = "") +
   theme(plot.margin = margin(1.5, 2, 1.5, 2, "pt"))
 key_grid <- expand.grid(rr = 0:(n_rows_s - 1), cc = 0:(n_cols_s - 1))
-key_grid$ypos <- n_rows_s - key_grid$rr
+key_grid$ypos <- n_rows_s - 1L - key_grid$rr
 key_grid$col <- mapply(cell_color_s, key_grid$rr, key_grid$cc)
 p_key <- ggplot(key_grid, aes(x = cc + 0.5, y = ypos + 0.5, fill = col)) +
   geom_tile() +
+  annotate("rect", xmin = 0, xmax = n_cols_s, ymin = 0, ymax = n_rows_s,
+    fill = NA, colour = "black", linewidth = 0.28) +
   scale_fill_identity(guide = "none") +
   scale_x_continuous(limits = c(-2, n_cols_s), expand = c(0, 0)) +
   scale_y_continuous(limits = c(-6.5, n_rows_s + 6.5),
@@ -639,8 +648,8 @@ sc_orders <- c(1.0, 0.8, 0.6, 0.4, 0.2, 0.0)
 sc_denss <- c(64, 32, 16, 8, 4, 1)
 sc_reds <- c("64" = "#7E0610", "32" = "#AC1117", "16" = "#CA181D",
   "8" = "#E83429", "4" = "#F6583E", "1" = "#FB7A5A")
-sc_purps <- c("1" = "#470F84", "0.8" = "#582F93", "0.6" = "#6950A3",
-  "0.4" = "#7B74B5", "0.2" = "#928FC3", "0" = "#AAA8D0")
+sc_purps <- c("1.0" = "#470F84", "0.8" = "#582F93", "0.6" = "#6950A3",
+  "0.4" = "#7B74B5", "0.2" = "#928FC3", "0.0" = "#AAA8D0")
 sc_A1 <- function(k)
   besselI(k, 1, expon.scaled = TRUE) / besselI(k, 0, expon.scaled = TRUE)
 sc_kappa <- function(o) {
@@ -951,18 +960,9 @@ span_sel <- x_hi_sel - x_lo_sel
 p_selection <- ggplot(sweep_df,
   aes(x = delta_elpd, y = ypos, colour = group_name, fill = group_name)) +
   geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.35) +
-  geom_segment(aes(xend = delta_elpd + se_delta_elpd, yend = ypos),
-    linewidth = 0.35) +
-  geom_segment(aes(xend = delta_elpd - se_delta_elpd, yend = ypos),
-    linewidth = 0.35) +
-  geom_segment(aes(xend = delta_elpd + se_delta_elpd, yend = ypos - 0.12),
-    linewidth = 0.35) +
-  geom_segment(aes(xend = delta_elpd + se_delta_elpd, yend = ypos + 0.12),
-    linewidth = 0.35) +
-  geom_segment(aes(xend = delta_elpd - se_delta_elpd, yend = ypos - 0.12),
-    linewidth = 0.35) +
-  geom_segment(aes(xend = delta_elpd - se_delta_elpd, yend = ypos + 0.12),
-    linewidth = 0.35) +
+  geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd,
+    xmax = delta_elpd + se_delta_elpd), orientation = "y",
+    width = 0.24, linewidth = 0.35) +
   geom_point(aes(shape = group_name), size = 1.7) +
   scale_colour_manual(values = c("Order included" = "#1F77B4",
     "Order excluded" = "#FF7F0E"), guide = "none") +
@@ -1247,7 +1247,7 @@ polar_deco <- function(p) {
       breaks = NULL) +
     scale_y_continuous(limits = c(0, RMAX_polar), expand = c(0, 0),
       breaks = NULL) +
-    coord_polar()
+    coord_polar(start = -pi / 2, direction = -1)
 }
 p_row_orders <- polar_deco(ggplot(pdf_summary,
   aes(theta, r_med,
@@ -1299,22 +1299,22 @@ p_coefficients <- ggplot(cs, aes(mean, ypos, colour = comp)) +
   geom_point(aes(shape = comp), size = 1.7) +
   scale_colour_manual(values = c(mu = "#8C564B", kappa = "#2CA02C"),
     guide = "none") +
-  scale_shape_manual(values = c(mu = 11, kappa = 17), guide = "none") +
+  scale_shape_manual(values = c(mu = 18, kappa = 17), guide = "none") +
   scale_x_continuous(limits = c(x_lo_c, x_hi_c)) +
   scale_y_reverse(limits = c(4.7, -0.6), breaks = 1:4,
     labels = coef_label, expand = c(0, 0)) +
   # Framed upper-right legend, drawn by hand (this ggplot2 build drops
   # "upperleft"/"bottomright" positions without an error).
   annotate("rect", xmin = x_lo_c + 0.62 * cspan_c,
-    xmax = x_lo_c + 0.97 * cspan_c, ymin = 4.02, ymax = 4.62,
+    xmax = x_lo_c + 0.97 * cspan_c, ymin = -0.5, ymax = 0.1,
     fill = "white", colour = "black", linewidth = 0.3) +
-  annotate("point", x = x_lo_c + 0.665 * cspan_c, y = 4.45, shape = 11,
+  annotate("point", x = x_lo_c + 0.665 * cspan_c, y = -0.35, shape = 18,
     colour = "#8C564B", size = 2.1) +
-  annotate("text", x = x_lo_c + 0.73 * cspan_c, y = 4.45, label = "\u03bc",
+  annotate("text", x = x_lo_c + 0.73 * cspan_c, y = -0.35, label = "\u03bc",
     hjust = 0, vjust = 0.5, size = 2.6) +
-  annotate("point", x = x_lo_c + 0.665 * cspan_c, y = 4.15, shape = 17,
+  annotate("point", x = x_lo_c + 0.665 * cspan_c, y = -0.05, shape = 17,
     colour = "#2CA02C", size = 2.1) +
-  annotate("text", x = x_lo_c + 0.73 * cspan_c, y = 4.15, label = "\u03ba",
+  annotate("text", x = x_lo_c + 0.73 * cspan_c, y = -0.05, label = "\u03ba",
     hjust = 0, vjust = 0.5, size = 2.6) +
   labs(x = "Coefficient value", y = "") +
   theme_classic(base_size = 8)
@@ -1359,20 +1359,20 @@ p_coef_comp <- ggplot(cs, aes(mean, ypos, colour = comp)) +
   geom_point(aes(shape = comp), size = 1.5) +
   scale_colour_manual(values = c(mu = "#8C564B", kappa = "#2CA02C"),
     guide = "none") +
-  scale_shape_manual(values = c(mu = 11, kappa = 17), guide = "none") +
+  scale_shape_manual(values = c(mu = 18, kappa = 17), guide = "none") +
   scale_x_continuous(limits = c(x_lo_cc, x_hi_cc)) +
   scale_y_reverse(limits = c(4.6, -0.6), breaks = 1:4,
     labels = coef_label, expand = c(0, 0)) +
   annotate("rect", xmin = x_lo_cc + 0.60 * cc_span,
-    xmax = x_lo_cc + 0.96 * cc_span, ymin = 3.98, ymax = 4.48,
+    xmax = x_lo_cc + 0.96 * cc_span, ymin = -0.5, ymax = 0.1,
     fill = "white", colour = "black", linewidth = 0.3) +
-  annotate("point", x = x_lo_cc + 0.65 * cc_span, y = 4.29, shape = 11,
+  annotate("point", x = x_lo_cc + 0.65 * cc_span, y = -0.35, shape = 18,
     colour = "#8C564B", size = 1.9) +
-  annotate("text", x = x_lo_cc + 0.73 * cc_span, y = 4.29, label = "\u03bc",
+  annotate("text", x = x_lo_cc + 0.73 * cc_span, y = -0.35, label = "\u03bc",
     hjust = 0, vjust = 0.5, size = 2.0) +
-  annotate("point", x = x_lo_cc + 0.65 * cc_span, y = 4.07, shape = 17,
+  annotate("point", x = x_lo_cc + 0.65 * cc_span, y = -0.05, shape = 17,
     colour = "#2CA02C", size = 1.9) +
-  annotate("text", x = x_lo_cc + 0.73 * cc_span, y = 4.07, label = "\u03ba",
+  annotate("text", x = x_lo_cc + 0.73 * cc_span, y = -0.05, label = "\u03ba",
     hjust = 0, vjust = 0.5, size = 2.0) +
   labs(x = "Coefficient value", y = "") +
   theme_classic(base_size = 7)
@@ -1420,7 +1420,7 @@ ncols_ppc <- length(order_levels_ppc)
 model_red <- "#D62728"
 fmt_num <- function(v) format(v, digits = 15, trim = TRUE)
 ppc_panel <- function(sub, show_y, top_row, left_col, last_panel, o, d) {
-  sub <- sub[order(sub$animal_id), , drop = FALSE]
+  sub <- sub[order(as.character(sub$animal_id)), , drop = FALSE]
   aids <- unique(sub$animal_id)
   n_an <- length(aids)
   xpos <- match(sub$animal_id, aids) +
@@ -1456,9 +1456,9 @@ ppc_panel <- function(sub, show_y, top_row, left_col, last_panel, o, d) {
       breaks = seq_len(n_an), labels = aids, expand = c(0, 0)) +
     scale_y_continuous(limits = c(-1.05, 1.05), expand = c(0, 0),
       breaks = seq(-1, 1, by = 0.5)) +
-    labs(y = if (left_col) paste0("Density=", fmt_num(d),
+    labs(x = NULL, y = if (left_col) paste0("Density=", fmt_num(d),
       "\nAlignment") else "") +
-    theme_minimal(base_size = 7) +
+    theme_classic(base_size = 7) +
     theme(axis.text.x = element_text(size = 5.5, angle = 90, hjust = 1,
       vjust = 0.5),
       axis.title.y = element_text(size = 7),
@@ -1549,7 +1549,7 @@ dens_reds <- c("64" = "#980C13", "32" = "#B81419", "16" = "#D32020",
   "8" = "#ED392B", "4" = "#F75B40", "1" = "#FB7A5A")
 order_purples <- c("1" = "#4F1F8B", "0.8" = "#5F3C99", "0.6" = "#6F5BA8",
   "0.4" = "#7F7BB9", "0.2" = "#9490C3", "0" = "#AAA8D0")
-msize <- function(n) (2.6 + 0.12 * sqrt(n)) * 0.055
+msize <- function(n) (2.6 + 0.12 * sqrt(n)) * 25.4 / 72.27
 pcc_thm <- function(bottom) {
   theme_classic(base_size = 8) +
     theme(axis.line = element_line(colour = "black", linewidth = 0.28),
@@ -1566,24 +1566,34 @@ p_cell_left <- lapply(seq_along(dens_row), function(r) {
   sub$col <- dens_reds[d]
   p <- ggplot(sub, aes(mean, mean, colour = col)) +
     geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.35) +
-    geom_segment(aes(x = xd, y = mean, xend = xd, yend = low),
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, y = mean, xend = xd, yend = low),
       linewidth = 0.32) +
-    geom_segment(aes(x = xd, y = mean, xend = xd, yend = high),
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, y = mean, xend = xd, yend = high),
       linewidth = 0.32) +
-    geom_segment(aes(x = xd - 0.02, y = low, xend = xd + 0.02, yend = low),
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd - 0.02, y = low, xend = xd + 0.02, yend = low),
       linewidth = 0.32) +
-    geom_segment(aes(x = xd - 0.02, y = high, xend = xd + 0.02, yend = high),
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd - 0.02, y = high, xend = xd + 0.02, yend = high),
       linewidth = 0.32) +
-    geom_point(aes(x = xd, size = msize(n_an)), shape = 1, fill = "white") +
-    geom_segment(aes(x = xm, y = mean, xend = xm, yend = low),
+    geom_point(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, size = msize(n_an)), shape = 1, fill = "white") +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, y = mean, xend = xm, yend = low),
       linewidth = 0.35) +
-    geom_segment(aes(x = xm, y = mean, xend = xm, yend = high),
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, y = mean, xend = xm, yend = high),
       linewidth = 0.35) +
-    geom_segment(aes(x = xm - 0.02, y = low, xend = xm + 0.02, yend = low),
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm - 0.02, y = low, xend = xm + 0.02, yend = low),
       linewidth = 0.35) +
-    geom_segment(aes(x = xm - 0.02, y = high, xend = xm + 0.02, yend = high),
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm - 0.02, y = high, xend = xm + 0.02, yend = high),
       linewidth = 0.35) +
-    geom_point(aes(x = xm, size = msize(n_an) * sqrt(0.9)), shape = 16) +
+    geom_point(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, size = msize(n_an) * sqrt(0.9)), shape = 16) +
     scale_colour_identity(guide = "none") +
     scale_x_continuous(limits = c(-0.05, 1.05),
       breaks = seq(0, 1, by = 0.2),
@@ -1593,7 +1603,7 @@ p_cell_left <- lapply(seq_along(dens_row), function(r) {
     labs(title = paste0("Density = ", d),
       x = if (r == length(dens_row)) "Order" else "",
       y = if (r == 1L) "Alignment" else "") +
-    guides(size = "none")
+    scale_size_identity(guide = "none")
   p
 })
 p_cell_right <- lapply(seq_along(order_row), function(r) {
@@ -1604,24 +1614,34 @@ p_cell_right <- lapply(seq_along(order_row), function(r) {
   sub$col <- order_purples[format(o, nsmall = 0)]
   p <- ggplot(sub, aes(mean, mean, colour = col)) +
     geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.35) +
-    geom_segment(aes(x = xd, y = mean, xend = xd, yend = low),
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, y = mean, xend = xd, yend = low),
       linewidth = 0.32) +
-    geom_segment(aes(x = xd, y = mean, xend = xd, yend = high),
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, y = mean, xend = xd, yend = high),
       linewidth = 0.32) +
-    geom_segment(aes(x = xd / 1.02, y = low, xend = xd * 1.02, yend = low),
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd / 1.02, y = low, xend = xd * 1.02, yend = low),
       linewidth = 0.32) +
-    geom_segment(aes(x = xd / 1.02, y = high, xend = xd * 1.02, yend = high),
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd / 1.02, y = high, xend = xd * 1.02, yend = high),
       linewidth = 0.32) +
-    geom_point(aes(x = xd, size = msize(n_an)), shape = 1, fill = "white") +
-    geom_segment(aes(x = xm, y = mean, xend = xm, yend = high),
+    geom_point(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, size = msize(n_an)), shape = 1, fill = "white") +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, y = mean, xend = xm, yend = high),
       linewidth = 0.35) +
-    geom_segment(aes(x = xm, y = mean, xend = xm, yend = low),
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, y = mean, xend = xm, yend = low),
       linewidth = 0.35) +
-    geom_segment(aes(x = xm / 1.02, y = high, xend = xm * 1.02, yend = high),
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm / 1.02, y = high, xend = xm * 1.02, yend = high),
       linewidth = 0.35) +
-    geom_segment(aes(x = xm / 1.02, y = low, xend = xm * 1.02, yend = low),
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm / 1.02, y = low, xend = xm * 1.02, yend = low),
       linewidth = 0.35) +
-    geom_point(aes(x = xm, size = msize(n_an) * sqrt(0.9)), shape = 16) +
+    geom_point(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, size = msize(n_an) * sqrt(0.9)), shape = 16) +
     scale_colour_identity(guide = "none") +
     scale_x_continuous(
       transform = scales::trans_new("log2", log2, function(x) 2 ^ x),
@@ -1631,7 +1651,7 @@ p_cell_right <- lapply(seq_along(order_row), function(r) {
     labs(title = paste0("Order = ", format(o, nsmall = 0)),
       x = if (r == length(order_row)) "Density" else "",
       y = "") +
-    guides(size = "none")
+    scale_size_identity(guide = "none")
   if (r == length(order_row)) {
     # framed Model/Data legend in the bottom-right panel, drawn by hand in
     # data coordinates (legend positions in corners are dropped silently

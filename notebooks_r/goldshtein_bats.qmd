@@ -612,7 +612,7 @@ stopifnot(nrow(df_track) == 4942L, nlevels(df_track$tag) == 67L,
 treatment_labels <- setNames(vapply(levels(df_track$treatment), function(t) {
   as.character(df_track$treatmentName[which(df_track$treatment == t)[1]])
 }, character(1)), levels(df_track$treatment))
-treatment_colors <- setNames(c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728"), levels(df_track$treatment))
+treatment_colors <- setNames(c("#0173B2", "#DE8F05", "#029E73", "#D55E00"), levels(df_track$treatment))
 # The seaborn "colorblind" (Paul Tol) palette in the same treatment order,
 # for the figures whose Python twin uses it (PPC, predictive curves, deltas).
 treatment_colors_cb <- setNames(c("#0173B2", "#DE8F05", "#029E73", "#D55E00"), levels(df_track$treatment))
@@ -810,7 +810,7 @@ ROOST_XY <- as.numeric(sf::st_coordinates(roost_3857)[1, ])
 trans_3857 <- sf::st_transform(
   sf::st_sfc(sf::st_point(c(35.592712, 33.135136)),
     sf::st_point(c(35.604462, 33.081932)), crs = 4326), 3857)
-TRANS_XY <- t(sf::st_coordinates(trans_3857))
+TRANS_XY <- sf::st_coordinates(trans_3857)[, c("X", "Y"), drop = FALSE]
 lake_3857 <- sf::st_transform(lake, 3857)
 lake_union_3857 <- sf::st_union(lake_3857)
 
@@ -1328,9 +1328,10 @@ tyf[M > 0] <- NA_real_
 rx <- gpts$x - ROOST_XY[1]; ry <- gpts$y - ROOST_XY[2]
 nr <- sqrt(rx^2 + ry^2)
 txr <- -rx / nr; tyr <- -ry / nr
-# Arrow length: the Python quiver with unit vectors and scale 30 draws
-# ~1/30 in shafts per 3.4 in of panel, i.e. ~1% of the panel width.
-arrow_len_f <- 0.010 * diff(xlim_flow)
+# Arrow length: the Python quiver with unit vectors and scale 30
+# (default scale_units = "width") draws each unit vector 1/30 of
+# the panel width, so the whole arrow (shaft + head) is this long.
+arrow_len_f <- diff(xlim_flow) / 30
 # expand.grid order: x index fastest, so as.vector(M) matches the point
 # rows; the fields must be transposed first for the same reason.
 lake_dir <- data.frame(x = gpts$x, y = gpts$y,
@@ -1345,16 +1346,16 @@ p_flow_home <- map_panel(bm_flow, "Home (roost flow)", title_size = 14,
   aspect = 0.41) +
   geom_segment(data = roost_dir, inherit.aes = FALSE,
     aes(x = x, y = y, xend = xend, yend = yend),
-    arrow = grid::arrow(length = grid::unit(0.05, "inches"), type = "closed"),
-    linewidth = 0.14, alpha = 0.95, colour = "#ffffff") +
+    arrow = grid::arrow(length = grid::unit(0.04, "inches"), type = "closed"),
+    linewidth = 0.35, alpha = 0.95, colour = "#ffffff") +
   add_roost_marker(r_roost_f) +
   add_x_markers(TRANS_XY, r_trans_f)
 p_flow_agam <- map_panel(bm_flow, "Agamon Hula Lake", title_size = 14,
   aspect = 0.41, lake = TRUE, lake_alpha = 0.35, lake_lw = 1.2) +
   geom_segment(data = lake_dir, inherit.aes = FALSE,
     aes(x = x, y = y, xend = xend, yend = yend),
-    arrow = grid::arrow(length = grid::unit(0.05, "inches"), type = "closed"),
-    linewidth = 0.14, alpha = 0.95, colour = "#ffffff") +
+    arrow = grid::arrow(length = grid::unit(0.04, "inches"), type = "closed"),
+    linewidth = 0.35, alpha = 0.95, colour = "#ffffff") +
   add_roost_marker(r_roost_f) +
   add_x_markers(TRANS_XY, r_trans_f)
 p_flow_legend <- legend_panel(data.frame(
@@ -1423,7 +1424,7 @@ polar_zero <- data.frame(theta = c(xmap_polar(0), xmap_polar(0)), y = c(1, 2))
 nc_polar <- ceiling(sqrt(nrow(tag_meta)))
 p_polar_data <- ggplot(kde_data, aes(theta_x, 1 + density, colour = treatment,
     group = interaction(treatment, tag))) +
-  geom_path(linewidth = 0.7, alpha = 0.95) +
+  geom_line(linewidth = 0.7, alpha = 0.95) +
   geom_path(data = polar_rings, inherit.aes = FALSE, aes(theta, y, group = ring),
     colour = "#999999", linewidth = 0.32, alpha = 0.65) +
   geom_path(data = polar_spokes, inherit.aes = FALSE, aes(theta, y, group = sp),
@@ -1504,8 +1505,8 @@ desc_plot <- function(variable, label, ylim, grid_y = FALSE) {
   }))
   p <- ggplot(dots, aes(x, y, colour = treatment, group = treatment)) +
     geom_point(shape = 16, size = 1.23, alpha = 0.9) +
-    geom_linerange(data = stats, aes(y = med, ymin = lo, ymax = hi),
-      colour = "black", linewidth = 0.35) +
+    geom_errorbar(data = stats, aes(y = med, ymin = lo, ymax = hi),
+      colour = "black", linewidth = 0.35, width = 0.14) +
     geom_point(data = stats, aes(y = med, fill = treatment),
       shape = 21, size = 1.76, colour = "black") +
     scale_colour_manual(values = treatment_colors, name = NULL) +
@@ -1513,7 +1514,8 @@ desc_plot <- function(variable, label, ylim, grid_y = FALSE) {
     guides(colour = "none", fill = "none") +
     scale_x_continuous(breaks = 0:(length(blocks) - 1L),
       labels = treat_name_fmt, expand = c(0.2, 0.2)) +
-    scale_y_continuous(limits = ylim, expand = c(0, 0)) +
+    scale_y_continuous(limits = ylim, expand = c(0, 0),
+      breaks = if (variable == "kappa_hat") c(0, 5, 10) else c(0, 0.5, 1)) +
     labs(x = "", y = label) +
     theme_classic(base_size = 10) +
     theme(axis.text.x = element_text(angle = 25, hjust = 1))
@@ -1523,7 +1525,7 @@ desc_plot <- function(variable, label, ylim, grid_y = FALSE) {
   }
   p
 }
-p_kappa_desc <- desc_plot("kappa_hat", "Estimated kappa", c(0, 10), grid_y = TRUE)
+p_kappa_desc <- desc_plot("kappa_hat", expression("Estimated " * hat(kappa)), c(0, 10), grid_y = TRUE)
 p_R_desc <- desc_plot("Rbar", "Mean\nresultant length", c(-0.05, 1.05))
 p_align_desc <- desc_plot("alignment0", "Alignment\nE[cos(y)]", c(0, 1.02))
 
@@ -1540,7 +1542,7 @@ $\hat\kappa$ (concentration) by treatment, median with percentile bands.
 
 ```{r}
 #| cell-id: "goldshtein-bats-032"
-save_figure(p_kappa_desc, "kappa_hat_by_treatment_median_percentiles", 8, 4)
+save_figure(p_kappa_desc, "kappa_hat_by_treatment_median_percentiles", 2.6, 2.2)
 
 ```
 
@@ -1549,7 +1551,7 @@ Mean resultant length $\vec{R}$ by treatment, median with percentile bands.
 
 ```{r}
 #| cell-id: "goldshtein-bats-034"
-save_figure(p_R_desc, "rbar_by_treatment_median_percentiles", 8, 4)
+save_figure(p_R_desc, "rbar_by_treatment_median_percentiles", 2.6, 2.2)
 
 ```
 
@@ -1558,7 +1560,7 @@ Alignment of individual mean bearings to $0^\circ$ by treatment, median with per
 
 ```{r}
 #| cell-id: "goldshtein-bats-036"
-save_figure(p_align_desc, "alignment0_by_treatment_median_percentiles", 8, 4)
+save_figure(p_align_desc, "alignment0_by_treatment_median_percentiles", 2.6, 2.2)
 
 ```
 
@@ -1988,14 +1990,16 @@ p_bracket <- ggplot(brk, aes(delta_elpd, ypos)) +
     linewidth = 0.35, colour = "black") +
   annotate("segment", x = xb, y = 4 * 1.35, xend = xb + cap_w, yend = 4 * 1.35,
     linewidth = 0.35, colour = "black") +
-  annotate("text", x = xb + cap_w + 0.012 * diff(xlim_b), y = 2.7,
-    label = "Within-treatment", size = 3.4, colour = "black",
-    hjust = 0, vjust = 0.5) +
+  annotate("text", x = xb - 0.012 * diff(xlim_b), y = 2.7,
+    label = "Within-treatment", size = 2.8, colour = "black",
+    hjust = 1, vjust = 0.5) +
   scale_y_reverse(limits = c(-0.54, 4 * 1.35 + 0.54), breaks = 0,
     labels = "Total", expand = c(0, 0)) +
-  scale_x_continuous(limits = xlim_b) +
+  scale_x_continuous(limits = xlim_b, oob = scales::oob_keep) +
+  coord_cartesian(clip = "off") +
   scale_colour_identity(guide = "none") +
   theme_classic(base_size = 9) +
+  theme(plot.margin = margin(5, 5, 20, 0.95 * 72)) +
   labs(x = "ELPD difference", y = "")
 p_combined3 <- patchwork::wrap_plots(p_total, p_bracket, ncol = 1,
   heights = c(1.25, 1.35))
@@ -2069,7 +2073,8 @@ mean_hdi_plot <- function(table, quantity, label, reference = NULL, xlimits = NU
                else rev(levels(df_track$treatment)), labels = "") +
     labs(x = label, y = "") +
     theme_classic(base_size = 9) +
-    theme(axis.text.y = element_blank())
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+      plot.margin = margin(5.5, 12, 5.5, 5.5))
   if (!is.null(reference)) p <- p + geom_vline(xintercept = reference, linetype = "dashed")
   if (!is.null(xlimits)) p <- p + scale_x_continuous(limits = xlimits, expand = c(0, 0))
   p
@@ -2114,7 +2119,7 @@ tag_hdi_plot <- function(quantity, label, reference = NULL, xlimits = NULL) {
     panel
   })
   patchwork::wrap_plots(panels[[1]], panels[[2]], panels[[3]], panels[[4]],
-    ncol = 4)
+    ncol = 4, axis_titles = "collect_x")
 }
 # Baseline coefficient panels: actual intercept/contrasts, not conditional
 # response parameters. Angular intervals are centered on their circular mean.
@@ -2150,7 +2155,7 @@ p_base_coef <- ggplot(coef_pt, aes(x, y)) +
   geom_errorbarh(aes(xmin = low, xmax = high, colour = treatment),
     height = 0.18, linewidth = 0.3) +
   geom_point(aes(colour = treatment, shape = comp), size = 1.9) +
-  scale_shape_manual(values = c(mu = 11, kappa = 17), guide = "none") +
+  scale_shape_manual(values = c(mu = 18, kappa = 17), guide = "none") +
   scale_colour_manual(values = treatment_colors[tlabels_all], guide = "none") +
   scale_y_reverse(limits = c(0.5, length(coef_lab) + 0.5),
     breaks = seq_along(coef_lab), labels = coef_lab, expand = c(0, 0)) +
@@ -2161,7 +2166,7 @@ p_base_coef <- ggplot(coef_pt, aes(x, y)) +
     xmax = cband_lim[2] - 0.04 * cspan_c, ymin = 2.95, ymax = 4.35,
     fill = "white", colour = "grey40", linewidth = 0.4) +
   annotate("point", x = cband_lim[1] + 0.63 * cspan_c, y = 3.35,
-    shape = 11, size = 2.6) +
+    shape = 18, size = 2.6) +
   annotate("text", x = cband_lim[1] + 0.82 * cspan_c, y = 3.35,
     label = "\u03bc", hjust = 0.5, vjust = 0.5, size = 3.0) +
   annotate("point", x = cband_lim[1] + 0.63 * cspan_c, y = 3.98,
@@ -2244,7 +2249,7 @@ p_weight_f <- mean_hdi_plot(pop_summary, "p", "Mixture weight", 0.5, c(0, 1),
 p_mrl_f <- mean_hdi_plot(pop_summary, "mrl", "MRL (directed component)", 0, c(0, 1),
   flip = TRUE)
 p_dir_density_f <- mean_hdi_plot(pop_summary, "dens0_dir",
-  "Predictive density (directed component)", 1 / (2 * pi), dens_xlim, flip = TRUE)
+  "Predictive density", 1 / (2 * pi), dens_xlim, flip = TRUE)
 # Matched vMU-vs-vM comparison: shared x limits over both summaries
 # (including the uniform line) plus the 10% twin padding.
 shm <- c(min(vd_lim[1], vd_lim[2],
@@ -2385,7 +2390,7 @@ p_2x2 <- patchwork::wrap_plots(
   p_bracket,
   (p_mu_deg_f | p_weight_f) / (p_mrl_f | p_dir_density_f),
   ncol = 1)
-p_2x2 <- p_2x2 + plot_layout(heights = c(1.45, 1.225, 1.225))
+p_2x2 <- p_2x2 + plot_layout(heights = c(1.45, 2.45))
 save_figure(p_2x2, "psisloo_plus_params_2x2", 6.8, 8.6)
 
 ```
@@ -2435,25 +2440,25 @@ alignment, and $\kappa$. This is where pronounced between-animal heterogeneity b
 
 ```{r}
 #| cell-id: "goldshtein-bats-076"
-save_figure(tag_hdi_plot("p", "Mixture weight", 0.5), "fullmodel_taglevel_mixture_weight_by_treatment_mean_hdi", 10, 6)
+save_figure(tag_hdi_plot("p", "Mixture weight", 0.5, xlimits = c(0, 1)), "fullmodel_taglevel_mixture_weight_by_treatment_mean_hdi", 10, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-077"
-save_figure(tag_hdi_plot("kappa", "Directed concentration kappa"), "fullmodel_taglevel_kappa_by_treatment_mean_hdi", 10, 6)
+save_figure(tag_hdi_plot("kappa", expression("Concentration (" * kappa * ")")), "fullmodel_taglevel_kappa_by_treatment_mean_hdi", 10, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-078"
-save_figure(tag_hdi_plot("dens0_mix", "Mixture density at goal", 1 / (2 * pi)), "fullmodel_taglevel_predictive_density_at_0_by_treatment_mean_hdi", 10, 6)
+save_figure(tag_hdi_plot("dens0_mix", "Predictive density", 1 / (2 * pi)), "fullmodel_taglevel_predictive_density_at_0_by_treatment_mean_hdi", 10, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-079"
-save_figure(tag_hdi_plot("align0", "Mixture alignment"), "fullmodel_taglevel_alignment_to_zero_by_treatment_mean_hdi", 10, 6)
+save_figure(tag_hdi_plot("align0", "Alignment", xlimits = c(0, 1)), "fullmodel_taglevel_alignment_to_zero_by_treatment_mean_hdi", 10, 6)
 
 ```
 
@@ -2725,35 +2730,48 @@ leg_items <- data.frame(
     as.character(treatment_colors_cb[levels(df_track$treatment)])),
   dashed = c(TRUE, FALSE, rep(FALSE, length(tnames))),
   stringsAsFactors = FALSE)
-key_in <- 0.18; gkt_in <- 0.06; gi_in <- 0.14
-# strwidth measures at the default 12 pt; scale to the 8 pt glyphs.
-tw_in <- strwidth(leg_items$label, units = "inches") * (8 / 12)
-tot_in <- sum(tw_in) + nrow(leg_items) * (key_in + gkt_in) +
-  (nrow(leg_items) - 1) * gi_in
-starts_in <- (6.9 - tot_in) / 2 +
-  cumsum(c(0, key_in + gkt_in + tw_in[-nrow(leg_items)] + gi_in))
-leg_kids <- list(grid::rectGrob(x = unit(0.5, "npc"), y = unit(0.5, "npc"),
-  width = unit(1, "npc"), height = unit(1, "npc"), hjust = 0.5, vjust = 0.5,
-  gp = grid::gpar(fill = "white", col = "grey60", lwd = 0.3)))
+# Hand-drawn one-row legend (the Python twin's fig.legend: six framed
+# keys). A one-row gtable with explicit inch units has a deterministic
+# width that centres itself in the full-width legend row; a gTree of
+# absolute-inch children does not (its extent is viewport-dependent),
+# which clipped the last key on the narrower 67-tag grid.
+tw_in <- strwidth(leg_items$label, units = "inches") * (8 / 12)  # 8 pt glyphs
+lbl_pad <- 0.04  # room for glyph anti-aliasing past the measured width
+key_in <- 0.18; gkt_in <- 0.05; gi_in <- 0.10; leg_pad <- 0.08
+row_in <- sum(tw_in) + nrow(leg_items) * (key_in + gkt_in) +
+  (nrow(leg_items) - 1) * gi_in + nrow(leg_items) * lbl_pad
+if (2 * leg_pad + row_in > 5.7) {
+  key_in <- 0.14; gi_in <- 0.06
+  row_in <- sum(tw_in) + nrow(leg_items) * (key_in + gkt_in) +
+    (nrow(leg_items) - 1) * gi_in + nrow(leg_items) * lbl_pad
+}
+ws <- leg_pad
+for (i in seq_len(nrow(leg_items))) {
+  ws <- c(ws, key_in, gkt_in, tw_in[i] + lbl_pad)
+  if (i < nrow(leg_items)) ws <- c(ws, gi_in)
+}
+ws <- c(ws, leg_pad)
+leg_gtable <- gtable::gtable(widths = unit(ws, "in"), heights = unit(0.34, "in"))
+leg_gtable <- gtable::gtable_add_grob(leg_gtable,
+  grid::rectGrob(gp = grid::gpar(fill = "white", col = "grey60", lwd = 0.3)),
+  t = 1, l = 1, r = length(ws))
 for (i in seq_len(nrow(leg_items))) {
   it <- leg_items[i, ]
-  xs <- starts_in[i]
-  leg_kids <- c(leg_kids, list(
-    grid::segmentsGrob(x0 = unit(xs, "inches"), y0 = unit(0.5, "npc"),
-      x1 = unit(xs + key_in, "inches"), y1 = unit(0.5, "npc"),
-      default.units = "mixed",
+  ckey <- 1 + (i - 1) * 4 + 1  # columns: pad + per item (key, gap, label, gap)
+  leg_gtable <- gtable::gtable_add_grob(leg_gtable,
+    grid::segmentsGrob(x0 = unit(0, "npc"), x1 = unit(1, "npc"),
+      y0 = unit(0.5, "npc"), y1 = unit(0.5, "npc"), default.units = "npc",
       gp = grid::gpar(col = it$colour, lwd = 1.1,
-        lty = if (it$dashed) "dashed" else "solid")),
-    grid::textGrob(it$label, x = unit(xs + key_in + gkt_in, "inches"),
-      y = unit(0.5, "npc"), just = "left",
-      gp = grid::gpar(fontsize = 8))))
+        lty = if (it$dashed) "dashed" else "solid")), t = 1, l = ckey)
+  leg_gtable <- gtable::gtable_add_grob(leg_gtable,
+    grid::textGrob(it$label, x = unit(0, "npc"), y = unit(0.5, "npc"),
+      just = "left", gp = grid::gpar(fontsize = 8)), t = 1, l = ckey + 2)
 }
-leg_grob <- grid::gTree(children = do.call(grid::gList, leg_kids))
 base_ppc_grob <- ggplotGrob(p_individual_ppc)
 base_rows <- max(base_ppc_grob$layout$b)
 gt_ind <- gtable::gtable_add_rows(base_ppc_grob,
   heights = unit(0.5, "in"), pos = base_rows + 1)
-gt_ind <- gtable::gtable_add_grob(gt_ind, leg_grob, t = base_rows + 1,
+gt_ind <- gtable::gtable_add_grob(gt_ind, leg_gtable, t = base_rows + 1,
   l = 1, r = max(base_ppc_grob$layout$r))
 p_individual_ppc <- gt_ind
 
@@ -2878,17 +2896,17 @@ p_cbar <- ggplot(cbar_rows, aes(x, y, fill = v)) +
   scale_fill_viridis_c(limits = c(0, 1)) +
   scale_x_continuous(limits = c(0, 1.35), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0))
-for (v in c(0, 0.25, 0.5, 0.75, 1)) {
+for (v in seq(0, 1, by = 0.2)) {
   yv <- 0.19 + 0.62 * v
   p_cbar <- p_cbar +
     annotate("segment", x = 0.375, y = yv, xend = 0.40, yend = yv,
       linewidth = 0.15, colour = "#000000") +
-    annotate("text", x = 0.42, y = yv, label = format(v, trim = TRUE),
+    annotate("text", x = 0.42, y = yv, label = sprintf("%.1f", v),
       size = 2.2, hjust = 0, vjust = 0.5)
 }
 p_cbar <- p_cbar +
-  annotate("text", x = 0.68, y = 0.5,
-    label = "Directed-component\nprobability", size = 2.8, angle = 90,
+  annotate("text", x = 1.10, y = 0.5,
+    label = "Directed-component probability", size = 2.8, angle = 90,
     hjust = 0.5, vjust = 0.5) +
   theme_void() +
   guides(fill = "none")
@@ -2900,7 +2918,7 @@ p_prob_top <- (p_pg_1 | p_pg_2 | p_pg_3 | p_pg_4) / p_pg_legend
 p_prob_top <- p_prob_top + plot_layout(heights = c(1, 0.17))
 p_probability_map <- p_prob_top | p_cbar
 p_probability_map <- p_probability_map +
-  plot_layout(widths = c(1, 0.05)) +
+  plot_layout(widths = c(1, 0.09)) +
   theme(plot.margin = margin(1, 1, 1, 1))
 save_figure(p_probability_map, "treatment_panels_tracks_pgoal", width = 8, height = 6)
 
@@ -2951,20 +2969,20 @@ cbar_h_rows <- data.frame(x = 0.20 + 0.60 * (pb - 0.5) / 240, y = 0.62,
 p_cbar_h <- ggplot(cbar_h_rows, aes(x, y, fill = v)) +
   geom_tile(width = 0.60 / 240, height = 0.24) +
   scale_fill_viridis_c(limits = c(0, 1)) +
-  scale_x_continuous(limits = c(0, 1.5), expand = c(0, 0)) +
+  scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0))
-for (v in c(0, 0.25, 0.5, 0.75, 1)) {
+for (v in seq(0, 1, by = 0.2)) {
   xv <- 0.20 + 0.60 * v
   p_cbar_h <- p_cbar_h +
     annotate("segment", x = xv, y = 0.49, xend = xv, yend = 0.44,
       linewidth = 0.15, colour = "#000000") +
-    annotate("text", x = xv, y = 0.40, label = format(v, trim = TRUE),
+    annotate("text", x = xv, y = 0.40, label = sprintf("%.1f", v),
       size = 2.2, hjust = 0.5, vjust = 1)
 }
 p_cbar_h <- p_cbar_h +
-  annotate("text", x = 0.83, y = 0.62,
-    label = "Directed-component probability", size = 2.8, hjust = 0,
-    vjust = 0.5) +
+  annotate("text", x = 0.5, y = 0.05,
+    label = "Directed-component probability", size = 2.8, hjust = 0.5,
+    vjust = 0) +
   theme_void() +
   guides(fill = "none")
 p_prob_top_s <- (p_pgs_1 | p_pgs_2 | p_pgs_3 | p_pgs_4) / p_cbar_h
@@ -3067,7 +3085,8 @@ curve_plot_full <- function(curves, reverse = FALSE) {
     scale_colour_manual(values = treatment_colors_cb[lv],
       labels = treatment_nice[lv], name = NULL) +
     scale_fill_manual(values = treatment_colors_cb[lv], name = NULL) +
-    scale_y_continuous(limits = c(0, 1), expand = c(0, 0.02)) +
+    scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+      labels = function(v) sprintf("%.1f", v), expand = c(0, 0.02)) +
     guides(fill = "none") +
     labs(x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
       y = "Mean directed-component probability") +
@@ -3076,10 +3095,10 @@ curve_plot_full <- function(curves, reverse = FALSE) {
       legend.background = element_rect(fill = "white", colour = "grey30"),
       legend.key = element_blank(),
       legend.text = element_text(size = 8, colour = "black"),
-      legend.margin = margin(0, 0, 0, -10, "mm"),
+      legend.margin = margin(2, 2, 2, 2, "mm"),
       legend.spacing.y = unit(1.3, "lines"))
   if (reverse) {
-    p <- p + scale_x_reverse(labels = function(v) format(abs(v), big.mark = ","))
+    p <- p + scale_x_reverse(labels = function(v) format(v, trim = TRUE, scientific = FALSE))
   } else {
     p <- p + scale_x_continuous(limits = c(-110 * 60, 0),
       labels = function(v) format(abs(v), big.mark = ","))
@@ -3106,7 +3125,7 @@ curve_plot_compact <- function(curves, reverse = FALSE) {
     theme_classic(base_size = 7) +
     theme(legend.position = "none")
   if (reverse) {
-    p <- p + scale_x_reverse(labels = function(v) format(abs(v), big.mark = ","))
+    p <- p + scale_x_reverse(labels = function(v) format(v, trim = TRUE, scientific = FALSE))
   } else {
     p <- p + scale_x_continuous(limits = c(-110 * 60, 0),
       labels = function(v) format(abs(v), big.mark = ","))
@@ -3129,14 +3148,16 @@ tag_curve_plot <- function(curves, reverse = FALSE) {
         fill = treatment_colors_cb[t], alpha = 0.10, colour = NA, linewidth = 0) +
       geom_line(colour = treatment_colors_cb[t], alpha = 0.75, linewidth = 0.35) +
       geom_hline(yintercept = 0.5, colour = "grey90", linetype = "dashed", linewidth = 0.3) +
-      scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+      scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+        labels = function(v) sprintf("%.1f", v), expand = c(0, 0)) +
       labs(title = treatment_nice[[t]],
         x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
         y = if (k == 1L || k == 3L) "Directed-component probability" else "") +
       theme_classic(base_size = 8) +
-      theme(plot.title = element_text(size = 9, hjust = 0.5))
+      theme(plot.title = element_text(size = 9, hjust = 0.5),
+        axis.text.y = if (k %% 2L == 0L) element_blank() else element_text())
     if (reverse) {
-      p <- p + scale_x_reverse(labels = xlabs)
+      p <- p + scale_x_reverse(labels = function(v) format(v, trim = TRUE, scientific = FALSE))
     } else {
       p <- p + scale_x_continuous(limits = c(-110 * 60, 0), labels = xlabs)
     }
@@ -3156,25 +3177,25 @@ p_tag_end <- tag_curve_plot(end_curves)
 
 ```{r}
 #| cell-id: "goldshtein-bats-091"
-save_figure(p_curve_distance, "p_goal_pop_kernel_distance_TRUNC_SMOOTH", 5.0, 3.0)
+save_figure(p_curve_distance, "p_goal_pop_kernel_distance_TRUNC_SMOOTH", 4.4, 2.6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-092"
-save_figure(p_curve_end, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH", 5.0, 3.0)
+save_figure(p_curve_end, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH", 4.4, 2.6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-093"
-save_figure(p_curve_distance_c, "p_goal_pop_kernel_distance_TRUNC_SMOOTH_compact", 4.2, 1.55)
+save_figure(p_curve_distance_c, "p_goal_pop_kernel_distance_TRUNC_SMOOTH_compact", 3.4, 1.2)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-094"
-save_figure(p_curve_end_c, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact", 4.2, 1.55)
+save_figure(p_curve_end_c, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact", 3.4, 1.2)
 
 ```
 
