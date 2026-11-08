@@ -53,7 +53,6 @@ Run the cells in order from `notebooks_r/` or the repository root.
 
 Running the notebook records versions, diagnostics, inline PNGs, and vector PDFs.
 
-
 ```{r}
 #| cell-id: "locust-r-002"
 # Setup: check that this notebook's stack is available. The examples
@@ -85,7 +84,6 @@ if (!cmdstan_ok)
 versions <- c(R = as.character(getRversion()),
   vapply(c(required, "cmdstanr"), function(p) as.character(packageVersion(p)), character(1)))
 versions
-
 ```
 
 ```{r}
@@ -98,7 +96,6 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(patchwork)
 })
-
 ```
 
 ```{r}
@@ -112,13 +109,15 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) {
 }
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "notebooks_r", "locust_direction_preprocess.R"))
+source(file.path(repo_root, "notebooks_r", "locust_posthoc.R"))
+source(file.path(repo_root, "notebooks_r", "locust_direction_plots.R"))
 ```
 
 ```{r}
 #| cell-id: "locust-r-006"
 FIG_DIR <- file.path(repo_root, "figures", "locust_direction_mixture_model")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
-
 ```
 
 ```{r}
@@ -133,7 +132,6 @@ show_figure <- function(plot, name, width, height, res = 110) {
   # display channel to write to outside Jupyter.
   plot
 }
-
 ```
 
 ```{r}
@@ -169,98 +167,6 @@ N_PREDICTIVE <- if (quick_run) 25L else 100L
 Figures render inline and save vector PDFs under `figures/locust_direction_mixture_model/`.
 Orange marks the bimodal/vectorial model and blue the
 unimodal/optic-flow model; red is the predictive model density.
-
-
-```{r}
-#| cell-id: "locust-r-010"
-wrap <- function(x) (x + pi) %% (2 * pi) - pi
-circ_mean <- function(x) atan2(mean(sin(x)), mean(cos(x)))
-resultant <- function(x) Mod(mean(exp(1i * x)))
-softplus <- function(x) pmax(x, 0) + log1p(exp(-abs(x)))
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) -
-    log(besselI(kappa, 0, expon.scaled = TRUE))
-}
-log_add <- function(a, b) {
-  m <- pmax(a, b)
-  m + log(exp(a - m) + exp(b - m))
-}
-A1_safe <- function(kappa) {
-  besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE)
-}
-hdi <- function(x, prob = 0.95) {
-  x <- sort(as.numeric(x))
-  stopifnot(length(x) > 1L, all(is.finite(x)))
-  gap <- min(length(x) - 1L, floor(prob * length(x)))
-  starts <- seq_len(length(x) - gap)
-  j <- starts[which.min(x[starts + gap] - x[starts])]
-  c(low = x[j], high = x[j + gap])
-}
-# Every prediction/density matrix in this notebook is [grid x draws].
-vm_grid <- function(theta, mu, kappa) {
-  stopifnot(length(mu) == length(kappa))
-  G <- length(theta)
-  K <- matrix(rep(kappa, each = G), nrow = G)
-  delta <- outer(theta, mu, "-")
-  exp(K * (cos(delta) - 1) - log(2 * pi) -
-    matrix(rep(log(besselI(kappa, 0, expon.scaled = TRUE)), each = G), nrow = G))
-}
-mixture_grid <- function(theta, mu, kappa, weight) {
-  stopifnot(nrow(mu) == 2L, identical(dim(mu), dim(kappa)),
-            ncol(mu) == length(weight))
-  W <- matrix(rep(weight, each = length(theta)), nrow = length(theta))
-  W * vm_grid(theta, mu[1, ], kappa[1, ]) +
-    (1 - W) * vm_grid(theta, mu[2, ], kappa[2, ])
-}
-clip_mixture_weight <- function(w) {
-  w1 <- pmax(w, 1e-12)
-  w2 <- pmax(1 - w, 1e-12)
-  w1 / (w1 + w2)
-}
-mixture_at <- function(theta, state, clip = FALSE) {
-  W <- state$weight
-  stopifnot(is.matrix(W), identical(dim(W), dim(state$muone)))
-  if (clip) {
-    W <- clip_mixture_weight(W)
-    log_w1 <- log(W)
-    log_w2 <- log1p(-W)
-  } else {
-    log_w1 <- -softplus(-state$eta)
-    log_w2 <- -softplus(state$eta)
-  }
-  log_add(log_w1 + vm_logpdf(theta, state$muone, state$kone),
-          log_w2 + vm_logpdf(theta, state$mutwo, state$ktwo))
-}
-BLUE <- "#1F77B4"
-ORANGE <- "#FF7F0E"
-RED <- "#D62728"
-HYP_COLORS <- c("Optic flow" = BLUE, "Vec. encoding" = ORANGE)
-angle_breaks <- c(-pi, -pi / 2, 0, pi / 2, pi)
-angle_labels <- c("-pi", "-pi/2", "0", "pi/2", "pi")
-
-circular_kde <- function(theta, y, bw) {
-  # The grid is passed as an explicit circular object: density.circular
-  # would otherwise coerce the raw numeric grid internally, which emits
-  # a default-value coercion warning on every call (thousands of them in
-  # the bootstrap cells).
-  y <- circular::circular(wrap(y), units = "radians", template = "none",
-                          modulo = "asis")
-  z <- circular::circular(theta, units = "radians", template = "none",
-                          modulo = "asis")
-  circular::density.circular(y, z = z, bw = bw, kernel = "vonmises")$y
-}
-kde_basis <- function(theta, y, bw) {
-  # The KDE is linear in observation weights. Repeating a single angle
-  # twice keeps density.circular's kernel matrix two dimensional and
-  # gives the same kernel as that angle alone.
-  vapply(y, function(yi) circular_kde(theta, rep(yi, 2L), bw),
-         numeric(length(theta)))
-}
-density_frame <- function(theta, draws) {
-  qs <- t(apply(draws, 1, quantile, probs = c(0.025, 0.5, 0.975)))
-  data.frame(theta = theta, low = qs[, 1], center = qs[, 2], high = qs[, 3])
-}
-```
 
 ## Data loading & exploration
 
@@ -322,39 +228,6 @@ head(raw)
 
 ```{r}
 #| cell-id: "locust-r-013"
-rediscretize_trajectory <- function(x, y, step_length = 6 * 0.04, tolerance = 0.0001) {
-  if (length(x) < 2L) return(data.frame(X = x, Y = y))
-  counts <- pmax(as.integer(sqrt(diff(x)^2 + diff(y)^2) / tolerance), 2L)
-  n_dense <- sum(counts) - length(counts) + 1L
-  dense_x <- dense_y <- numeric(n_dense)
-  cursor <- 1L
-  for (i in seq_along(counts)) {
-    sx <- seq(x[i], x[i + 1L], length.out = counts[i])
-    sy <- seq(y[i], y[i + 1L], length.out = counts[i])
-    if (i > 1L) {
-      sx <- sx[-1L]
-      sy <- sy[-1L]
-    }
-    take <- cursor + seq_along(sx) - 1L
-    dense_x[take] <- sx
-    dense_y[take] <- sy
-    cursor <- cursor + length(sx)
-  }
-  new_x <- x[1]
-  new_y <- y[1]
-  while (length(dense_x) > 0L) {
-    distances <- sqrt((dense_x - tail(new_x, 1))^2 + (dense_y - tail(new_y, 1))^2)
-    j <- which.min(abs(distances - step_length))
-    if (distances[j] < step_length - tolerance) break
-    new_x <- c(new_x, dense_x[j])
-    new_y <- c(new_y, dense_y[j])
-    keep <- seq.int(j, length(dense_x))
-    dense_x <- dense_x[keep]
-    dense_y <- dense_y[keep]
-    if (j == 1L) break
-  }
-  data.frame(X = new_x, Y = new_y)
-}
 rows_by_animal <- split(seq_len(nrow(raw)), factor(raw$fname, levels = raw_ids))
 step_tables <- lapply(seq_along(raw_ids), function(i) {
   g <- raw[rows_by_animal[[i]], ]
@@ -395,24 +268,8 @@ segments <- do.call(rbind, lapply(split(df, df$animal), function(g) {
   data.frame(animal_id = g$animal_id[-1L], iteration = g$iteration[-1L],
     x = g$X[-n], y = g$Y[-n], xend = g$X[-1L], yend = g$Y[-1L])
 }))
-tab20 <- c("#1F77B4", "#AEC7E8", "#FF7F0E", "#FFBB78", "#2CA02C", "#98DF8A",
-           "#D62728", "#FF9896", "#9467BD", "#C5B0D5", "#8C564B", "#C49C94",
-           "#E377C2", "#F7B6D2", "#7F7F7F", "#C7C7C7", "#BCBD22", "#DBDB8D",
-           "#17BECF", "#9EDAE5")
-trajectory_panel <- function(limit, points = FALSE) {
-  p <- ggplot(segments, aes(x, y, colour = factor(animal_id %% 20L))) +
-    geom_segment(aes(xend = xend, yend = yend), linewidth = 0.25) +
-    scale_colour_manual(values = tab20) +
-    coord_equal(xlim = c(-limit, limit), ylim = c(-limit, limit)) +
-    labs(x = "X Coordinate (meters)", y = "Y Coordinate (meters)") +
-    theme(legend.position = "none")
-  if (points) p <- p + geom_point(data = df,
-    aes(X, Y, colour = factor(animal_id %% 20L)), inherit.aes = FALSE, size = 0.6)
-  p
-}
 p_trajectories <- trajectory_panel(30) + trajectory_panel(5, points = TRUE)
 save_figure(p_trajectories, "locust_directional_trajectories", 12, 6)
-
 ```
 
 ```{r}
@@ -432,17 +289,7 @@ raw_densities$individual <- factor(raw_densities$individual,
 # 3 o'clock zero of the mathematical orientation.
 peak_max_hist <- max(raw_densities$density)
 raw_densities$radius <- 1 + raw_densities$density / peak_max_hist
-p_observed <- ggplot(raw_densities) +
-  geom_rect(aes(xmin = left, xmax = right, ymin = 1, ymax = radius), fill = "grey35") +
-  geom_hline(yintercept = c(1, 2), colour = "grey40", linewidth = 0.25) +
-  geom_segment(data = data.frame(x = 0, xend = 0, y = 1, yend = 2.01),
-    inherit.aes = FALSE,
-    aes(x = x, xend = xend, y = y, yend = yend),
-    colour = "grey20", linewidth = 0.25) +
-  scale_x_continuous(limits = c(-pi, pi), expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0, 2.05), expand = c(0, 0)) +
-  coord_polar(start = pi / 2, direction = -1) +
-  facet_wrap(~ individual, ncol = 7) + theme_void(base_size = 8)
+p_observed <- observed_polar_grid(raw_densities)
 save_figure(p_observed, "locust_directional_observed_polar_grid", 14, 16)
 ```
 
@@ -551,7 +398,6 @@ $$
 Setting all offsets to zero, $\mathbf{b}_i = \mathbf{0}$, $\mathbf{a}_i = \mathbf{0}$, $c_i = 0$, recovers the **population mixture**
 $\Theta_0 = \{\boldsymbol{\mu}_0,\boldsymbol{\kappa}_0,\omega_0\}$.
 
-
 ### R implementation and prior correspondence
 
 Stan samples both unsorted population means and derives one component
@@ -585,7 +431,6 @@ Mises priors. Gaussian group terms are independent and non-centered. All
 coefficient priors refer to uncentered intercepts. The generated Stan is
 printed with the model definition, where the bounds, dimensions, target
 terms, and links can be checked.
-
 
 ```{r}
 #| cell-id: "locust-r-017"
@@ -641,15 +486,12 @@ mix_form <- bf(direction ~ mu,
   kappatwo ~ 0 + Intercept + (1 | animal),
   eta ~ 0 + Intercept + (1 | animal),
   family = locust_mix)
+# Circular component means are UNCONSTRAINED reals; circularity enters only
+# through the wrapped (mod 2*pi) von Mises target lines added to the Stan
+# code below - the same convention as the Python twin, which declares
+# pm.VonMises priors on unwrapped parameters and wraps at use
+# (circular_modulo), with no uniform(-pi, pi) bound.
 mix_priors <- (
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "popone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "poptwo",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devtwo",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
   set_prior("target += unwrap_von_mises_lpdf(b_popone[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_lpdf(b_poptwo[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_devone | 0, kmu_one)", check = FALSE) +
@@ -671,9 +513,9 @@ check_angle_design <- function(stan, design, coefficients) {
   stopifnot(length(parameter_block) == 1L)
   for (name in names(coefficients)) {
     expected <- coefficients[[name]]
-    declaration <- paste0("vector<lower=-3\\.14159[0-9]*,upper=3\\.14159[0-9]*>",
-      "\\[K_", name, "\\]b_", name, ";")
+    declaration <- paste0("vector\\[K_", name, "\\]b_", name, ";")
     stopifnot(grepl(declaration, parameter_block),
+      !grepl("lower=-3\\.14159", parameter_block),
       identical(colnames(design[[paste0("X_", name)]]), expected),
       design[[paste0("K_", name)]] == length(expected))
   }
@@ -692,12 +534,15 @@ stopifnot(grepl("first_component=b_popone[1]<=b_poptwo[1]?1:2;", compact_mix_sta
           grepl("target\\+=locust_mix_lpdf\\([^;]+,first_component\\);", compact_mix_stan),
           grepl("unwrap_von_mises_vect_lpdf(b_devone|0,kmu_one)", compact_mix_stan, fixed = TRUE),
           grepl("unwrap_von_mises_vect_lpdf(b_devtwo|0,kmu_two)", compact_mix_stan, fixed = TRUE))
-cat(mix_stan)
+cat("Bimodal model: Stan code validated -", mix_design$K_popone, "popone +",
+    mix_design$K_devone, "devone coefficients, unbounded and wrapped in the",
+    "likelihood (no uniform(-pi, pi) prior or bound). \n")
+
 ```
 
 ### Fit the bimodal model
 
-NUTS on bounded circular vectors can start chains in separate wrap classes.
+NUTS on circular parameters can start chains in separate wrap classes.
 The population anchors are the circular means of two clusters on the unit
 circle. Animal anchors are wrapped deviations from the corresponding
 population anchor, or zero if the animal has no steps in that cluster.
@@ -746,154 +591,26 @@ mk_init <- function(anchor_seed) {
 }
 init_mix <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
 set.seed(SEED)
-fit_bimodal <- unwrap_load_fit_cache("locust_mix_bimodal", SEED, ITER, WARMUP)
+# Fit-cache name is versioned (unbounded): the v1 model constrained the
+# circular coefficients to (-pi, pi) with uniform priors; this model does not.
+fit_bimodal <- unwrap_load_fit_cache("locust_mix_bimodal_unbounded", SEED, ITER, WARMUP)
 if (is.null(fit_bimodal)) {
   fit_bimodal <- brm(mix_form, data = df, prior = mix_priors, stanvars = mix_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
     cores = CHAINS, seed = SEED, init = init_mix,
     control = list(adapt_delta = 0.97, max_treedepth = 12))
-  unwrap_save_fit_cache("locust_mix_bimodal", fit_bimodal, SEED, ITER, WARMUP)
+  unwrap_save_fit_cache("locust_mix_bimodal_unbounded", fit_bimodal, SEED, ITER, WARMUP)
 }
 ```
 
 ```{r}
 #| cell-id: "locust-r-020"
 animal_grid <- data.frame(animal = factor(levels(df$animal), levels = levels(df$animal)))
-extract_state <- function(fit, bimodal = TRUE) {
-  draws <- posterior::as_draws_array(fit)
-  draw_index <- expand.grid(.iteration = seq_len(dim(draws)[1]),
-    .chain = seq_len(dim(draws)[2]), KEEP.OUT.ATTRS = FALSE)
-  get <- function(name) {
-    stopifnot(name %in% posterior::variables(draws))
-    as.numeric(draws[, , name])
-  }
-  predict_matrix <- function(dpar, transform = FALSE) {
-    x <- t(posterior_linpred(fit, newdata = animal_grid,
-                            dpar = dpar, transform = transform))
-    stopifnot(identical(dim(x), c(num_individuals, nrow(draw_index))))
-    x
-  }
-  m1 <- wrap(predict_matrix("mu"))
-  k1 <- predict_matrix("kappa", transform = TRUE)
-  p1 <- get("b_popone_Intercept")
-  kp1 <- softplus(get("b_kappa_Intercept"))
-  if (!bimodal) {
-    return(list(draws = draw_index, muone = m1, kone = k1,
-      pop_muone = matrix(wrap(p1), nrow = 1L),
-      pop_kone = matrix(kp1, nrow = 1L),
-      quantities = c(list(mu_pop = wrap(p1), mu_kappa = get("kmu_one"),
-        kappa_log_pop = get("b_kappa_Intercept"), kappa_pop = kp1,
-        kappa_sigma = get("sd_animal__kappa_Intercept")),
-        setNames(lapply(seq_len(num_individuals), function(i) m1[i, ]),
-                 paste0("mu[", seq_len(num_individuals), "]")),
-        setNames(lapply(seq_len(num_individuals), function(i) k1[i, ]),
-                 paste0("kappa[", seq_len(num_individuals), "]")))))
-  }
-  m2 <- wrap(predict_matrix("mutwo"))
-  k2 <- predict_matrix("kappatwo", transform = TRUE)
-  eta <- predict_matrix("eta")
-  p2 <- get("b_poptwo_Intercept")
-  kp2 <- softplus(get("b_kappatwo_Intercept"))
-  eta_pop <- get("b_eta_Intercept")
-  first_component <- get("first_component")
-  stopifnot(all(first_component %in% 1:2),
-            all((first_component == 2) == (p1 > p2)))
-  swap <- first_component == 2
-  # Read the saved Stan index for all summaries and predictive draws.
-  reorder_pair <- function(a, b) {
-    stopifnot(identical(dim(a), dim(b)), ncol(a) == length(swap))
-    first <- a
-    second <- b
-    first[, swap] <- b[, swap, drop = FALSE]
-    second[, swap] <- a[, swap, drop = FALSE]
-    list(first, second)
-  }
-  means <- reorder_pair(m1, m2)
-  kappas <- reorder_pair(k1, k2)
-  pop_means <- reorder_pair(matrix(p1, nrow = 1L), matrix(p2, nrow = 1L))
-  pop_kappas <- reorder_pair(matrix(kp1, nrow = 1L), matrix(kp2, nrow = 1L))
-  pool_k <- reorder_pair(matrix(get("kmu_one"), nrow = 1L),
-                         matrix(get("kmu_two"), nrow = 1L))
-  sigma_k <- reorder_pair(matrix(get("sd_animal__kappa_Intercept"), nrow = 1L),
-                          matrix(get("sd_animal__kappatwo_Intercept"), nrow = 1L))
-  eta[, swap] <- -eta[, swap, drop = FALSE]
-  eta_pop[swap] <- -eta_pop[swap]
-  w <- plogis(eta)
-  wp <- plogis(eta_pop)
-  quantities <- list(logit_sigma = get("sd_animal__eta_Intercept"),
-                     weights_pop = wp)
-  for (k in 1:2) {
-    quantities[[paste0("mu_pop[", k, "]")]] <- as.numeric(pop_means[[k]])
-    quantities[[paste0("mu_kappa[", k, "]")]] <- as.numeric(pool_k[[k]])
-    quantities[[paste0("kappa_pop[", k, "]")]] <- as.numeric(pop_kappas[[k]])
-    quantities[[paste0("kappa_sigma[", k, "]")]] <- as.numeric(sigma_k[[k]])
-    for (i in seq_len(num_individuals)) {
-      quantities[[paste0("mu[", i, ",", k, "]")]] <- means[[k]][i, ]
-      quantities[[paste0("kappa[", i, ",", k, "]")]] <- kappas[[k]][i, ]
-    }
-  }
-  for (i in seq_len(num_individuals)) quantities[[paste0("weights[", i, "]")]] <- w[i, ]
-  list(draws = draw_index, muone = means[[1]], mutwo = means[[2]],
-       kone = kappas[[1]], ktwo = kappas[[2]], weight = w, eta = eta,
-       pop_muone = pop_means[[1]], pop_mutwo = pop_means[[2]],
-       pop_kone = pop_kappas[[1]], pop_ktwo = pop_kappas[[2]],
-       pop_weight = matrix(wp, nrow = 1L), pop_eta = matrix(eta_pop, nrow = 1L),
-       quantities = quantities)
-}
 chain_matrix <- function(x, draws) {
   stopifnot(length(x) == nrow(draws))
   ids <- split(seq_len(nrow(draws)), draws[[".chain"]])
   stopifnot(length(ids) >= 2L, length(unique(lengths(ids))) == 1L)
   do.call(cbind, lapply(ids, function(ii) x[ii[order(draws[[".iteration"]][ii])]]))
-}
-diagnose_fit <- function(fit, state) {
-  # Same retained-flag probe as the P1 helpers; absence is not zero.
-  divergences <- tryCatch({
-    samples <- fit$fit@sim$samples
-    if (is.null(samples) || !length(samples)) {
-      NA_real_
-    } else {
-      flags <- lapply(samples, function(ch) ch[["divergent"]])
-      if (any(vapply(flags, is.null, logical(1)))) NA_real_ else sum(unlist(flags))
-    }
-  }, error = function(e) NA_real_)
-  if (is.na(divergences)) {
-    cat("Divergences: not retained in this fit object.\n")
-  } else {
-    cat("Divergences:", divergences, "\n")
-  }
-  table <- do.call(rbind, lapply(names(state$quantities), function(p) {
-    x <- chain_matrix(state$quantities[[p]], state$draws)
-    stopifnot(all(is.finite(x)))
-    angular <- grepl("^mu(\\[|_pop($|\\[))", p)
-    z <- if (angular) wrap(x - circ_mean(x)) else x
-    data.frame(parameter = p,
-      mean = if (angular) circ_mean(x) else mean(x),
-      sd = if (angular) sqrt(-2 * log(min(1, resultant(x)))) else sd(as.numeric(x)),
-      rhat = if (angular) Rhat_unwrap(x, method = "sine") else posterior::rhat(x),
-      ess_bulk = posterior::ess_bulk(z), row.names = NULL)
-  }))
-  # Angular R-hat uses the Rhat_unwrap sine/cosine convention. Every ESS
-  # and R-hat calculation receives an [iteration x chain] matrix.
-  failed <- table[!is.finite(table$rhat) | table$rhat >= 1.01 |
-    !is.finite(table$ess_bulk) | table$ess_bulk <= 400, , drop = FALSE]
-  print(failed, row.names = FALSE)
-  stopifnot(nrow(failed) == 0L, is.na(divergences) || divergences == 0)
-  table
-}
-trace_plot <- function(state, parameters) {
-  long <- do.call(rbind, lapply(parameters, function(p) {
-    x <- state$quantities[[p]]
-    stopifnot(!is.null(x))
-    if (grepl("^mu(\\[|_pop($|\\[))", p)) x <- wrap(x - circ_mean(x))
-    data.frame(parameter = p, iteration = state$draws[[".iteration"]],
-               chain = factor(state$draws[[".chain"]]), value = x)
-  }))
-  ggplot(long, aes(iteration, value, colour = chain, group = chain)) +
-    geom_line(linewidth = 0.25, alpha = 0.65) +
-    facet_wrap(~ parameter, scales = "free_y", ncol = 2) +
-    labs(x = "retained iteration", y = "draw (angular traces centered)") +
-    theme(legend.position = "bottom")
 }
 state_bimodal <- extract_state(fit_bimodal)
 summary_bimodal <- diagnose_fit(fit_bimodal, state_bimodal)
@@ -904,7 +621,6 @@ summary_bimodal <- diagnose_fit(fit_bimodal, state_bimodal)
 save_figure(trace_plot(state_bimodal,
   c("mu_pop[1]", "mu_pop[2]", "kappa_pop[1]", "kappa_pop[2]", "weights_pop", "logit_sigma")),
   "bimodal_trace", 9, 7)
-
 ```
 
 ## Hierarchical unimodal von Mises model
@@ -932,7 +648,6 @@ As in the bimodal case, we separate population-level structure from individual-l
 
 This unimodal hierarchical model provides a simpler baseline in which each animal has a single preferred direction $\mu_i$ and concentration $\kappa_i$, regularized toward shared population values $(\mu_0,\kappa_0)$. It is used as a comparison point for the more flexible bimodal mixture model to assess whether the data warrant modeling two distinct directional modes.
 
-
 ```{r}
 #| cell-id: "locust-r-023"
 uni_hyper <- stanvar(scode = "real<lower=0> kmu_one;", block = "parameters")
@@ -940,11 +655,10 @@ uni_form <- bf(direction ~ mu,
   nlf(mu ~ popone + devone),
   popone ~ 1, devone ~ 0 + animal,
   kappa ~ 0 + Intercept + (1 | animal), family = locust_vm)
+# Unconstrained circular parameters + wrapped (mod 2*pi) von Mises Stan
+# target lines, mirroring the Python unimodal twin (pm.VonMises prior on an
+# unwrapped parameter, wrapped via circular_modulo at use).
 uni_priors <- (
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "popone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
   set_prior("target += unwrap_von_mises_lpdf(b_popone[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_devone | 0, kmu_one)", check = FALSE) +
   set_prior("target += lognormal_lpdf(kmu_one | log(10), 0.1)", check = FALSE) +
@@ -962,7 +676,10 @@ compact_uni_stan <- gsub("[[:space:]]", "", uni_stan)
 stopifnot(grepl("target+=locust_vm_lpdf", compact_uni_stan, fixed = TRUE),
           grepl("unwrap_von_mises_vect_lpdf(b_devone|0,kmu_one)", compact_uni_stan, fixed = TRUE),
           grepl("lognormal_lpdf(kmu_one|log(10),0.1)", compact_uni_stan, fixed = TRUE))
-cat(uni_stan)
+cat("Unimodal model: Stan code validated -", uni_design$K_popone, "popone +",
+    uni_design$K_devone, "devone coefficients, unbounded and wrapped in the",
+    "likelihood (no uniform(-pi, pi) prior or bound). \n")
+
 ```
 
 The unimodal fit starts from the pooled circular mean if it leaves room
@@ -995,13 +712,13 @@ mk_init <- function(anchor_seed) {
 }
 init_uni <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
 set.seed(SEED)
-fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal", SEED, ITER, WARMUP)
+fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal_unbounded", SEED, ITER, WARMUP)
 if (is.null(fit_unimodal)) {
   fit_unimodal <- brm(uni_form, data = df, prior = uni_priors, stanvars = uni_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
     cores = CHAINS, seed = SEED, init = init_uni,
     control = list(adapt_delta = 0.97, max_treedepth = 12))
-  unwrap_save_fit_cache("locust_mix_unimodal", fit_unimodal, SEED, ITER, WARMUP)
+  unwrap_save_fit_cache("locust_mix_unimodal_unbounded", fit_unimodal, SEED, ITER, WARMUP)
 }
 state_unimodal <- extract_state(fit_unimodal, bimodal = FALSE)
 summary_unimodal <- diagnose_fit(fit_unimodal, state_unimodal)
@@ -1011,7 +728,6 @@ summary_unimodal <- diagnose_fit(fit_unimodal, state_unimodal)
 #| cell-id: "locust-r-026"
 save_figure(trace_plot(state_unimodal,
   c("mu_pop", "mu_kappa", "kappa_pop", "kappa_sigma")), "unimodal_trace", 9, 5)
-
 ```
 
 ## Model comparison: bimodal vs. unimodal
@@ -1030,37 +746,8 @@ paired-difference table additionally reports
 $\sqrt{N\,\operatorname{var}(\Delta_{\text{pointwise}})}$, the
 scale of the 2,435 per-step ELPD differences.
 
-
 ```{r}
 #| cell-id: "locust-r-028"
-explicit_loo <- function(state, bimodal = TRUE, chunk_size = 128L) {
-  S <- nrow(state$draws)
-  ll <- matrix(NA_real_, nrow = S, ncol = nrow(df))
-  for (start in seq.int(1L, nrow(df), by = chunk_size)) {
-    ii <- seq.int(start, min(start + chunk_size - 1L, nrow(df)))
-    a <- df$animal_id[ii] + 1L
-    y <- matrix(rep(df$direction[ii], S), nrow = length(ii))
-    l1 <- vm_logpdf(y, state$muone[a, , drop = FALSE], state$kone[a, , drop = FALSE])
-    if (bimodal) {
-      eta <- state$eta[a, , drop = FALSE]
-      l2 <- vm_logpdf(y, state$mutwo[a, , drop = FALSE], state$ktwo[a, , drop = FALSE])
-      ll[, ii] <- t(log_add(-softplus(-eta) + l1, -softplus(eta) + l2))
-    } else {
-      ll[, ii] <- t(l1)
-    }
-  }
-  stopifnot(all(is.finite(ll)))
-  # Scale each likelihood column before exponentiating; relative_eff is
-  # invariant to this scaling. Preserve chain IDs rather than flattening.
-  likelihood <- exp(sweep(ll, 2, apply(ll, 2, max), "-"))
-  r_eff <- loo::relative_eff(likelihood, chain_id = state$draws[[".chain"]])
-  # The full Pareto-k table is printed below and its summary columns are
-  # carried in the ELPD table, so suppress loo()'s redundant high-k nag.
-  result <- suppressWarnings(loo::loo(ll, r_eff = r_eff))
-  print(result)
-  print(loo::pareto_k_table(result))
-  result
-}
 loo_bimodal <- explicit_loo(state_bimodal)
 loo_unimodal <- explicit_loo(state_unimodal, bimodal = FALSE)
 models <- list(Bimodal = loo_bimodal, Unimodal = loo_unimodal)
@@ -1076,13 +763,7 @@ print(data.frame(comparison = "Bimodal - Unimodal", delta_elpd = sum(delta_point
                  se = sqrt(length(delta_pointwise) * var(delta_pointwise))))
 model_labels <- c(Bimodal = "Bimodal\n(Vec. encoding)",
                   Unimodal = "Unimodal\n(Optic flow)")
-p_elpd <- ggplot(elpd_table, aes(elpd, factor(model, levels = c("Bimodal", "Unimodal")),
-                                 colour = model, shape = model)) +
-  scale_y_discrete(labels = model_labels) +
-  geom_errorbar(aes(xmin = elpd - se, xmax = elpd + se), orientation = "y", width = 0.15) +
-  geom_point(size = 2.5) + scale_colour_manual(values = c(Bimodal = ORANGE, Unimodal = BLUE)) +
-  scale_shape_manual(values = c(Bimodal = 15, Unimodal = 16)) +
-  labs(x = "PSIS-LOO ELPD +/-1 SE", y = "") + theme(legend.position = "none")
+p_elpd <- elpd_comparison_plot(elpd_table)
 save_figure(p_elpd, "locust_bimodal_unimodal_elpd", 6, 3)
 ```
 
@@ -1095,25 +776,10 @@ elpd_individual <- do.call(rbind, lapply(seq_len(num_individuals), function(i) {
     unimodal = sum(loo_unimodal$pointwise[ii, "elpd_loo"]),
     delta = sum(delta_pointwise[ii]), se = 0)
 }))
-print(elpd_individual)
-individual_levels <- rev(as.character(seq_len(num_individuals)))
-elpd_long <- rbind(data.frame(individual = elpd_individual$individual,
-                             value = elpd_individual$bimodal, model = "Bimodal"),
-                   data.frame(individual = elpd_individual$individual,
-                             value = elpd_individual$unimodal, model = "Unimodal"))
-p_elpd_individual <- ggplot(elpd_long,
-  aes(value, factor(individual, levels = individual_levels), colour = model, shape = model)) +
-  geom_point(position = position_dodge(width = 0.5), size = 1.8) +
-  scale_colour_manual(values = c(Bimodal = ORANGE, Unimodal = BLUE)) +
-  scale_shape_manual(values = c(Bimodal = 15, Unimodal = 16)) +
-  labs(x = "PSIS-LOO ELPD contribution", y = "Individual") + theme(legend.position = "bottom")
-p_delta <- ggplot(elpd_individual,
-  aes(delta, factor(individual, levels = individual_levels))) +
-  geom_point(size = 1.8) + geom_vline(xintercept = 0, linetype = "dashed") +
-  labs(x = "Delta ELPD (Bimodal - Unimodal)", y = "")
-save_figure(p_elpd_individual + p_delta,
-  "locust_elpd_by_individual_ab", 10, 12)
-
+cat("Individual ELPD: bimodal better for", sum(elpd_individual$delta < 0),
+    "of", num_individuals, "animals.\n")
+p_elpd_ab <- elpd_individual_plot(elpd_individual, num_individuals)
+save_figure(p_elpd_ab, "locust_elpd_by_individual_ab", 10, 12)
 ```
 
 ## Posterior predictive check: model density vs. non-parametric estimates
@@ -1123,7 +789,6 @@ a hierarchical-bootstrap circular histogram (animals resampled with replacement)
 and a von Mises kernel density estimate (KDE) with a bootstrap interval.
 Together they show how well the fitted model reproduces the dominant
 population-level directional pattern.
-
 
 The validation plots use the bimodal population parameters with the animal
 offsets set to zero. The observed-sample density bootstraps animals with
@@ -1179,37 +844,6 @@ hist_density <- density_frame(bin_centers, boot_hist)
 kde_density <- density_frame(theta_grid, boot_kde)
 rm(hist_kernel, kde_kernel, boot_hist, boot_kde)
 invisible(gc())
-model_layer <- function() {
-  ggplot(model_density, aes(theta, center)) +
-    geom_ribbon(aes(ymin = low, ymax = high), fill = RED, alpha = 0.25) +
-    geom_line(colour = RED, linewidth = 0.6) +
-    scale_x_continuous(breaks = angle_breaks, labels = angle_labels,
-                       limits = c(-pi, pi), expand = c(0, 0)) +
-    labs(x = "Direction (radians)", y = "Density")
-}
-# Hand-drawn Model/Histogram/Kernel legend, matching the Python patch+line
-# legend handlers. Built with annotate() (no ggplot2 legend-key geoms) so it
-# emits no warning streams; placed as a right-hand patchwork column.
-val_legend <- function(framed = FALSE) {
-  lp <- ggplot(data.frame(y = c(8, 6.5, 5)), aes(x = 1, y = 0)) +
-    annotate("rect", xmin = 0.8, xmax = 1.4, ymin = 7.7, ymax = 8.3, fill = RED, alpha = 0.25) +
-    annotate("segment", x = 0.8, y = 8, xend = 1.4, yend = 8, colour = RED, linewidth = 0.6) +
-    annotate("point", x = 1.1, y = 6.5, size = 2.5, colour = "black") +
-    annotate("rect", xmin = 0.8, xmax = 1.4, ymin = 4.7, ymax = 5.3, fill = "black", alpha = 0.15) +
-    annotate("segment", x = 0.8, y = 5, xend = 1.4, yend = 5, colour = "black", linetype = "dashed", linewidth = 0.5) +
-    scale_y_continuous(breaks = c(8, 6.5, 5), labels = c("Model", "Histogram", "Kernel"),
-                       expand = c(0, 0)) +
-    scale_x_continuous(breaks = NULL, expand = c(0, 0)) +
-    coord_cartesian(xlim = c(0.7, 1.5), ylim = c(0, 10), clip = "off") +
-    theme_void() +
-    theme(axis.text.y = element_text(size = 9, colour = "black", hjust = 0,
-                                     margin = margin(0, 0, 0, 3, "pt")))
-  if (framed) {
-    lp <- lp + annotate("rect", xmin = 0.62, xmax = 1.58, ymin = 4.45, ymax = 8.55,
-                        colour = "grey50", fill = NA, linewidth = 0.3)
-  }
-  lp
-}
 p_hist <- model_layer() +
   geom_errorbar(data = hist_density, aes(ymin = low, ymax = high), width = 0.06) +
   geom_point(data = hist_density, size = 1.5)
@@ -1223,38 +857,14 @@ save_figure(p_validation_cartesian, "population_directional_validation_cartesian
 
 ```{r}
 #| cell-id: "locust-r-033"
-# Angle ticks use the twin's degree labels (locust_direction_plots.py):
-# the mathematical orientation (0 at 3 o'clock, counter-clockwise) is the
-# twin default for this x range, and the density-zero ring at radius 0.5
-# is drawn as a black circle, as in the twin.
-edge_radius <- 0.5
-p_validation_polar <- ggplot(model_density, aes(theta, edge_radius + center)) +
-  geom_ribbon(aes(ymin = edge_radius + low, ymax = edge_radius + high), fill = RED, alpha = 0.25) +
-  geom_line(colour = RED, linewidth = 0.6) +
-  geom_ribbon(data = kde_density, aes(ymin = edge_radius + low, ymax = edge_radius + high),
-              fill = "black", alpha = 0.15) +
-  geom_line(data = kde_density, linetype = "dashed", linewidth = 0.5) +
-  geom_errorbar(data = hist_density, aes(ymin = edge_radius + low, ymax = edge_radius + high), width = 0.02) +
-  geom_point(data = hist_density, size = 1.3) +
-  geom_hline(yintercept = edge_radius, colour = "black", linewidth = 0.5) +
-  scale_x_continuous(limits = c(-pi, pi),
-                     breaks = c(-pi / 2, 0, pi / 2, pi),
-                     labels = c("-90°", "0°", " 90°", "±180°     "),
-                     expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0, edge_radius + max(model_density$high, kde_density$high) * 1.2)) +
-  coord_polar(start = pi / 2, direction = -1) +
-  # The twin shows no axis labels; keep blank radius tick labels like it.
-  labs(x = "", y = "") +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-p_validation_polar <- p_validation_polar | val_legend(framed = TRUE)
-p_validation_polar <- p_validation_polar + plot_layout(widths = c(4, 1))
+p_validation_polar <- population_polar_plot(model_density, kde_density,
+  hist_density)
 save_figure(p_validation_polar, "population_directional_validation", 7, 7)
 ```
 
 ## Individual-level posterior predictive checks
 
 The individual-level posterior predictive check compares each animal's observed headings with the posterior predictive density of the fitted model. Arrows mark the two mixture-component mean directions, scaled by each component's contribution to the expected resultant vector (its mixture weight times its mean resultant length); inward residuals scale the pointwise lack of fit against the local predictive density.
-
 
 The component arrows and the plug-in mean direction use the wrapped
 arithmetic mean of the component means (arithmetic angle mean followed by
@@ -1264,103 +874,14 @@ inverse plug-in density normalized by its trapezoidal integral, and point
 outward for observations and inward for residuals. Animal labels are 1–52
 in the figures, corresponding to dense data IDs 0–51.
 
-
 ```{r}
 #| cell-id: "locust-r-036"
-individual_theta <- -pi + (0:359) * (2 * pi / 360)
-individual_curves <- vector("list", num_individuals)
-individual_ticks <- vector("list", num_individuals)
-individual_arrows <- vector("list", num_individuals)
-for (i in seq_len(num_individuals)) {
-  y <- wrap(df$direction[rows_by_animal[[i]]])
-  mu <- rbind(state_bimodal$muone[i, ], state_bimodal$mutwo[i, ])
-  kappa <- rbind(state_bimodal$kone[i, ], state_bimodal$ktwo[i, ])
-  weight <- state_bimodal$weight[i, ]
-  pdf <- mixture_grid(individual_theta, mu, kappa, clip_mixture_weight(weight))
-  bounds <- t(apply(pdf, 1, quantile, probs = c(0.025, 0.975)))
-  # Source semantics: PDF of posterior mean parameters, not mean PDF.
-  mu_mean <- wrap(rowMeans(mu))
-  kappa_mean <- rowMeans(kappa)
-  w_mean <- clip_mixture_weight(mean(weight))
-  plugin <- as.numeric(mixture_grid(individual_theta,
-    matrix(mu_mean, ncol = 1L), matrix(kappa_mean, ncol = 1L), w_mean))
-  kernel <- kde_basis(individual_theta, y, bw = 15)
-  boot <- matrix(0, nrow = length(individual_theta), ncol = N_BOOT_KDE)
-  set.seed(123L + 10000L + i - 1L)
-  for (b in seq_len(N_BOOT_KDE)) {
-    boot[, b] <- rowMeans(kernel[, sample.int(length(y), length(y), replace = TRUE), drop = FALSE])
-  }
-  kde <- t(apply(boot, 1, quantile, probs = c(0.025, 0.5, 0.975)))
-  curve <- data.frame(individual = i, theta = individual_theta,
-    model = plugin, model_low = bounds[, 1], model_high = bounds[, 2],
-    kde_low = kde[, 1], kde = kde[, 2], kde_high = kde[, 3])
-  # Close the periodic curve explicitly with the first grid value.
-  end <- curve[1, ]
-  end$theta <- pi
-  individual_curves[[i]] <- rbind(curve, end)
-  inv_grid <- 1 / plugin
-  integral <- sum(diff(individual_theta) *
-                  (head(inv_grid, -1L) + tail(inv_grid, -1L)) / 2)
-  at_data <- as.numeric(mixture_grid(y, matrix(mu_mean, ncol = 1L),
-                                     matrix(kappa_mean, ncol = 1L), w_mean))
-  individual_ticks[[i]] <- data.frame(individual = i, theta = y,
-    residual = -1 / (at_data * (integral + 1e-12)))
-  individual_arrows[[i]] <- data.frame(individual = i, theta = mu_mean,
-    length = c(w_mean, 1 - w_mean) * A1_safe(kappa_mean))
-}
-ppc_curves <- do.call(rbind, individual_curves)
-ppc_ticks <- do.call(rbind, individual_ticks)
-ppc_arrows <- do.call(rbind, individual_arrows)
-ppc_levels <- seq_len(num_individuals)
-for (name in c("ppc_curves", "ppc_ticks", "ppc_arrows")) {
-  object <- get(name)
-  object$individual <- factor(object$individual, levels = ppc_levels,
-                              labels = paste("Individual", ppc_levels))
-  assign(name, object)
-}
-rmax <- max(2, 1 + max(ppc_curves$model_high, ppc_curves$kde_high) * 1.15)
-p_individual_ppc <- ggplot(ppc_curves, aes(theta, 1 + model, group = individual)) +
-  geom_hline(yintercept = c(1, 2), colour = "grey40", linewidth = 0.25) +
-  geom_vline(xintercept = c(-pi, -pi / 2, 0, pi / 2), colour = "grey70", linetype = "dashed", linewidth = 0.2) +
-  geom_ribbon(aes(ymin = 1 + kde_low, ymax = 1 + kde_high), fill = "grey50", alpha = 0.25) +
-  geom_line(aes(y = 1 + kde), colour = "grey20", linetype = "dashed", linewidth = 0.4) +
-  geom_ribbon(aes(ymin = 1 + model_low, ymax = 1 + model_high), fill = RED, alpha = 0.35) +
-  geom_line(colour = RED, linewidth = 0.5) +
-  geom_segment(data = ppc_ticks,
-    aes(x = theta, xend = theta, y = 1, yend = 1.1), inherit.aes = FALSE, linewidth = 0.2) +
-  geom_segment(data = ppc_ticks,
-    aes(x = theta, xend = theta, y = 1, yend = pmax(0, 1 + residual)),
-    inherit.aes = FALSE, colour = "#17BECF", linewidth = 0.2) +
-  geom_segment(data = ppc_arrows,
-    aes(x = theta, xend = theta, y = 0, yend = length), inherit.aes = FALSE,
-    colour = RED, linewidth = 0.4, arrow = grid::arrow(length = grid::unit(0.05, "inches"))) +
-  scale_x_continuous(limits = c(-pi, pi), expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0, rmax), expand = c(0, 0)) +
-  coord_polar(start = pi / 2, direction = -1) +
-  facet_wrap(~ individual, ncol = 7) + theme_void(base_size = 8) +
-  theme(strip.text = element_text(size = 8), panel.spacing = grid::unit(0.5, "lines"))
-
-# Figure legend matching the Python twin: one-vertex line per key, so the
-# legend entries come from the manual scales and nothing is drawn on the
-# panels (manual guide overrides would warn on dev ggplot2; this does not).
-ppc_key <- data.frame(theta = rep(0, 4), r = rep(0, 4),
-  key = factor(rep(c("Kernel (bootstrap 95%)", "Model (posterior 95%)"), each = 2L),
-               levels = c("Kernel (bootstrap 95%)", "Model (posterior 95%)")))
-
-p_individual_ppc <- p_individual_ppc +
-  geom_line(data = ppc_key,
-    aes(x = theta, y = r, colour = key, linetype = key, group = key),
-    inherit.aes = FALSE, linewidth = 0.4) +
-  scale_colour_manual(name = NULL,
-    values = c("Kernel (bootstrap 95%)" = "grey20", "Model (posterior 95%)" = RED)) +
-  scale_linetype_manual(name = NULL,
-    values = c("Kernel (bootstrap 95%)" = "dashed", "Model (posterior 95%)" = "solid")) +
-  guides(colour = guide_legend(nrow = 2), linetype = guide_legend(nrow = 2)) +
-  theme(legend.position = "top", legend.justification = "right",
-        legend.key.width = grid::unit(1.1, "cm"),
-        legend.key.height = grid::unit(0.25, "cm"),
-        legend.text = element_text(size = 8),
-        legend.spacing = grid::unit(0.4, "lines"))
+ppc_layers <- individual_ppc_layers(state_bimodal, df, rows_by_animal,
+  num_individuals, N_BOOT_KDE)
+ppc_curves <- ppc_layers$curves
+ppc_ticks <- ppc_layers$ticks
+ppc_arrows <- ppc_layers$arrows
+p_individual_ppc <- individual_ppc_plot(ppc_curves, ppc_ticks, ppc_arrows)
 save_figure(p_individual_ppc, "locust_directional_individual_ppc", 14, 16)
 ```
 
@@ -1377,109 +898,10 @@ animal-specific densities. These checks complement the analytic-density figures 
 
 ```{r}
 #| cell-id: "p3-ppc-draws"
-# The 52 animal sections of the predictive check are independent, so
-# they run on a PSOCK cluster (fresh child R processes) instead of
-# in the kernel. Workers are seeded per (model, animal), so results do
-# not depend on the core count. (The earlier parallelize attempt used
-# parallel::mclapply, whose fork is not safe under IRkernel: workers
-# inherit the kernel's live ZMQ socket and the fork corrupts it. This
-# also re-seeds the PPC draw streams relative to the original
-# shared-stream implementation; the values move by Monte Carlo noise
-# only, and the in-notebook gates are on the fit, not on these draws.
-# The workers are plain top-level functions, which serialize as
-# ~50-byte closures over the globalenv; all data flows through the
-# explicit parLapply arguments.)
-ppc_worker <- function(i, state, draws, n, theta_grid, bins, bin_widths,
-                       bin_centers, rng_seed) {
-  wrap <- function(x) (x + pi) %% (2 * pi) - pi
-  circular_kde <- function(theta, y, bw) {
-    yc <- circular::circular(wrap(y), units = "radians", template = "none",
-                             modulo = "asis")
-    z <- circular::circular(theta, units = "radians", template = "none",
-                            modulo = "asis")
-    circular::density.circular(yc, z = z, bw = bw,
-                               kernel = "vonmises")$y
-  }
-  bin_heading_density <- function(y) {
-    b <- findInterval(wrap(y), bins, rightmost.closed = TRUE)
-    tabulate(b, nbins = length(bin_centers)) /
-      (length(y) * bin_widths)
-  }
-  draw_vm <- function(n, mu, kappa) {
-    if (!n) return(numeric())
-    vmu <- circular::circular(mu, units = "radians", template = "none",
-                              modulo = "2pi")
-    as.numeric(circular::rvonmises(n, vmu, kappa,
-      control.circular = list(units = "radians", template = "none",
-                              modulo = "2pi")))
-  }
-  if (is.null(state$weight)) {
-    rep_head <- function(draw) {
-      wrap(draw_vm(n, state$muone[i, draw], state$kone[i, draw]))
-    }
-  } else {
-    rep_head <- function(draw) {
-      first <- rbinom(1, n, state$weight[i, draw])
-      wrap(c(draw_vm(first, state$muone[i, draw], state$kone[i, draw]),
-             draw_vm(n - first, state$mutwo[i, draw], state$ktwo[i,
-               draw])))
-    }
-  }
-  set.seed(rng_seed)
-  y_rep <- lapply(draws, rep_head)
-  list(hist = vapply(y_rep, bin_heading_density,
-                     numeric(length(bin_centers))),
-    population = vapply(y_rep, function(y) {
-      circular_kde(theta_grid, y, bw = 30)
-    }, numeric(length(theta_grid))),
-    individual = vapply(y_rep, function(y) {
-      circular_kde(theta_grid, y, bw = 15)
-    }, numeric(length(theta_grid))))
-}
-ppc_task <- function(i, state, draws, n_all, theta_grid, bins,
-                     bin_widths, bin_centers, rng_tag) {
-  ppc_worker(i, state, draws, n_all[i], theta_grid, bins, bin_widths,
-             bin_centers, rng_tag + i)
-}
-predictive_checks <- function(state, model, model_tag) {
-  draws <- sample.int(nrow(state$draws), N_PREDICTIVE)
-  n_all <- vapply(rows_by_animal, length, integer(1L))
-  ppc_cores <- min(8L, max(2L, parallel::detectCores()))
-  cl <- parallel::makePSOCKcluster(ppc_cores)
-  on.exit(parallel::stopCluster(cl), add = TRUE)
-  parallel::clusterEvalQ(cl, quote({
-    .libPaths(c(Filter(nzchar, c(Sys.getenv("R_LIBS_USER"),
-      Sys.getenv("R_LIBS_SITE"))), .libPaths()))
-  }))
-  parallel::clusterExport(cl, c("ppc_worker", "ppc_task"),
-                          envir = globalenv())
-  individuals <- parallel::parLapply(
-    cl, seq_len(num_individuals), ppc_task,
-    state = state, draws = draws, n_all = n_all, theta_grid = theta_grid,
-    bins = bins, bin_widths = bin_width, bin_centers = bin_centers,
-    rng_tag = SEED + 90000L + 1000L * model_tag)
-  pop_hist <- matrix(0, nrow = length(bin_centers), ncol = length(draws))
-  pop_kde <- matrix(0, nrow = length(theta_grid), ncol = length(draws))
-  for (ind in individuals) {
-    pop_hist <- pop_hist + ind$hist / num_individuals
-    pop_kde <- pop_kde + ind$population / num_individuals
-  }
-  stopifnot(all(abs(colSums(pop_hist) * bin_width - 1) < 1e-10))
-  population <- rbind(
-    transform(density_frame(bin_centers, pop_hist), estimate = "Histogram"),
-    transform(density_frame(theta_grid, pop_kde), estimate = "Von Mises KDE"))
-  individual <- do.call(rbind, lapply(seq_along(individuals), function(i) {
-    transform(density_frame(theta_grid, individuals[[i]]$individual),
-              individual = paste("Individual", i))
-  }))
-  list(population = transform(population, model = model),
-       individual = transform(individual, model = model))
-}
 set.seed(SEED + 1L)
 ppc_bimodal <- predictive_checks(state_bimodal, "Bimodal", model_tag = 1L)
 set.seed(SEED + 2L)
 ppc_unimodal <- predictive_checks(state_unimodal, "Unimodal", model_tag = 2L)
-
 ```
 
 ```{r}
@@ -1572,7 +994,6 @@ $$
 
 The same evaluation is repeated per animal, using each animal's posterior parameter vector instead of $\Theta_0$.
 
-
 The following figures evaluate density at the hypotheses and compare
 weight-only alignment scores; these are distinct from the held-out-step
 PSIS-LOO scores above. The hypothesis panels labeled “ELPD” report the mean
@@ -1590,88 +1011,8 @@ from this pooled row.
 
 ```{r}
 #| cell-id: "locust-r-039"
-hypothesis_arrays <- function(state, clip = FALSE) {
-  forward <- mixture_at(0, state, clip)
-  left <- mixture_at(-pi / 2, state, clip)
-  right <- mixture_at(pi / 2, state, clip)
-  list(forward = forward, perpendicular = log_add(left, right) - log(2))
-}
 hyp_pop <- hypothesis_arrays(population_state)
 hyp_ind <- hypothesis_arrays(state_bimodal, clip = TRUE)
-interval_row <- function(x, mode = c("density", "elpd", "alignment")) {
-  mode <- match.arg(mode)
-  if (mode == "elpd") {
-    center <- mean(x)
-    error <- 1.96 * sd(x) / sqrt(length(x))
-    return(c(center = center, low = center - error, high = center + error))
-  }
-  bounds <- hdi(x)
-  if (mode == "density") {
-    return(c(center = exp(median(x)), low = exp(unname(bounds[1])), high = exp(unname(bounds[2]))))
-  }
-  c(center = mean(x), low = unname(bounds[1]), high = unname(bounds[2]))
-}
-make_hyp_table <- function(arrays, mode, pooled = FALSE) {
-  f <- arrays$forward
-  p <- arrays$perpendicular
-  stopifnot(is.matrix(f), identical(dim(f), dim(p)))
-  labels <- as.character(seq_len(nrow(f)))
-  if (pooled) {
-    f <- rbind(f, colMeans(f))
-    p <- rbind(p, colMeans(p))
-    labels <- c(labels, "Pooled")
-  }
-  do.call(rbind, lapply(seq_len(nrow(f)), function(i) {
-    z <- rbind(interval_row(f[i, ], mode), interval_row(p[i, ], mode))
-    data.frame(individual = labels[i], hypothesis = c("Optic flow", "Vec. encoding"),
-      center = z[, 1], low = z[, 2], high = z[, 3],
-      probability = mean(p[i, ] > f[i, ]), row.names = NULL)
-  }))
-}
-population_dots <- function(table, label, baseline, invert = FALSE,
-                          baseline_label = NULL) {
-  levels <- if (invert) c("Optic flow", "Vec. encoding")
-          else c("Vec. encoding", "Optic flow")
-  p <- ggplot(table, aes(center, factor(hypothesis, levels = levels),
-          colour = hypothesis, shape = hypothesis)) +
-    geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.15) +
-    geom_point(size = 2.5) + geom_vline(xintercept = baseline, linetype = "dashed") +
-    scale_colour_manual(values = HYP_COLORS) +
-    scale_shape_manual(values = c("Optic flow" = 16, "Vec. encoding" = 15)) +
-    labs(x = label, y = "") + theme(legend.position = "none")
-  if (!is.null(baseline_label)) {
-    # Python rotates a label next to the dashed baseline; vjust = 1 puts
-    # the text body to the left of the anchor once angle = 90.
-    p <- p +
-      annotate("text",
-               x = baseline - diff(range(table$center)) * 0.015, y = 1.5,
-               label = baseline_label, angle = 90, hjust = 0.5, vjust = 1,
-               size = 2.8)
-  }
-  p
-}
-individual_dots <- function(table, label, baseline, limits = NULL) {
-  labels <- unique(table$individual)
-  table$individual <- factor(table$individual, levels = rev(labels))
-  dodge <- position_dodge(width = 0.5)
-  main <- ggplot(table, aes(center, individual, colour = hypothesis, shape = hypothesis)) +
-    geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.2, position = dodge) +
-    geom_point(size = 1.6, position = dodge) +
-    geom_vline(xintercept = baseline, linetype = "dashed") +
-    scale_colour_manual(values = HYP_COLORS) +
-    scale_shape_manual(values = c("Optic flow" = 16, "Vec. encoding" = 15)) +
-    labs(x = label, y = "Individual", tag = "a.") +
-    theme(legend.position = "top",
-          legend.background = element_rect(fill = "white", colour = "grey50"))
-  if (!is.null(limits)) main <- main + coord_cartesian(xlim = limits)
-  probs <- table[!duplicated(table$individual), ]
-  probability <- ggplot(probs, aes(probability, individual)) +
-    geom_point(size = 1.6) + geom_vline(xintercept = 0.5, linetype = "dashed") +
-    geom_vline(xintercept = 1) + scale_x_continuous(limits = c(0, 1.02)) +
-    labs(x = "P(Vec. encoding > Optic flow)", y = "", tag = "b.") +
-    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-  main + probability + plot_layout(widths = c(1.35, 1))
-}
 pop_density_table <- make_hyp_table(hyp_pop, "density")
 print(pop_density_table)
 save_figure(population_dots(pop_density_table, "Predictive density", 1 / (2 * pi),
@@ -1686,13 +1027,15 @@ print(pop_elpd_table)
 save_figure(population_dots(pop_elpd_table, "Mean log predictive density at hypothesis",
   -log(2 * pi), baseline_label = "Uniform"),
   "locust_directional_hypothesis_horizontal_elpd", 6, 3)
-
 ```
 
 ```{r}
 #| cell-id: "locust-r-041"
 individual_density_table <- make_hyp_table(hyp_ind, "density", pooled = TRUE)
-print(individual_density_table)
+pooled_row <- individual_density_table[individual_density_table$individual == "Pooled", ]
+pooled_row <- pooled_row[order(individual_density_table$hypothesis), , drop = FALSE]
+cat("Pooled row - Optic flow center:", signif(pooled_row$center[1], 3),
+    "| Vec. encoding center:", signif(pooled_row$center[2], 3), "\n")
 save_figure(individual_dots(individual_density_table, "Predictive density", 1 / (2 * pi)),
   "locust_directional_hypothesis_individual_ab", 10, 13)
 
@@ -1701,7 +1044,10 @@ save_figure(individual_dots(individual_density_table, "Predictive density", 1 / 
 ```{r}
 #| cell-id: "locust-r-042"
 individual_elpd_table <- make_hyp_table(hyp_ind, "elpd", pooled = TRUE)
-print(individual_elpd_table)
+pooled_row <- individual_elpd_table[individual_elpd_table$individual == "Pooled", ]
+pooled_row <- pooled_row[order(individual_elpd_table$hypothesis), , drop = FALSE]
+cat("Pooled row - Optic flow center:", signif(pooled_row$center[1], 3),
+    "| Vec. encoding center:", signif(pooled_row$center[2], 3), "\n")
 save_figure(individual_dots(individual_elpd_table, "Mean log predictive density at hypothesis", -log(2 * pi)),
   "locust_directional_hypothesis_individual_elpd_ab", 10, 13)
 
@@ -1709,13 +1055,6 @@ save_figure(individual_dots(individual_elpd_table, "Mean log predictive density 
 
 ```{r}
 #| cell-id: "locust-r-043"
-alignment_arrays <- function(state) {
-  w <- state$weight
-  stopifnot(is.matrix(w), identical(dim(w), dim(state$muone)))
-  list(forward = w * cos(state$muone) + (1 - w) * cos(state$mutwo),
-       perpendicular = w * cos(2 * (state$muone - pi / 2)) +
-         (1 - w) * cos(2 * (state$mutwo - pi / 2)))
-}
 # Weight-only alignment is the source estimand; no A1(kappa) factor.
 align_pop <- alignment_arrays(population_state)
 align_ind <- alignment_arrays(state_bimodal)
@@ -1725,13 +1064,15 @@ save_figure(population_dots(pop_alignment_table, "Posterior mean alignment", 0,
   invert = TRUE) +
               coord_cartesian(xlim = c(-0.05, 1)),
   "locust_directional_alignment_horizontal", 6, 3)
-
 ```
 
 ```{r}
 #| cell-id: "locust-r-044"
 individual_alignment_table <- make_hyp_table(align_ind, "alignment")
-print(individual_alignment_table)
+pooled_row <- individual_alignment_table[individual_alignment_table$individual == "Pooled", ]
+pooled_row <- pooled_row[order(individual_alignment_table$hypothesis), , drop = FALSE]
+cat("Pooled row - Optic flow center:", signif(pooled_row$center[1], 3),
+    "| Vec. encoding center:", signif(pooled_row$center[2], 3), "\n")
 save_figure(individual_dots(individual_alignment_table, "Posterior mean alignment", 0,
                             limits = c(-1, 1)),
   "locust_directional_alignment_individual_ab", 10, 13)
