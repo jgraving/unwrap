@@ -84,6 +84,8 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) ".." else
     stop("Run this notebook from notebooks_r/ or from the repository root.")
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "notebooks_r", "beetles_posthoc.R"))
+source(file.path(repo_root, "notebooks_r", "beetles_plots.R"))
 
 # The figure code writes to the repository-relative figures directory.
 FIG_DIR <- file.path(repo_root, "figures", "beetles")
@@ -137,63 +139,8 @@ All angular calculations use radians and circular summaries.
 
 ```{r}
 #| cell-id: "beetles-05"
-circ_mean <- function(a) atan2(mean(sin(a)), mean(cos(a)))
-resultant <- function(a) Mod(mean(exp(1i * a)))
-circ_sd <- function(a, m = circ_mean(a)) {
-  sqrt(-2 * log(min(1, Mod(mean(exp(1i * (a - m)))))))
-}
-# Scaled Bessel functions avoid overflow when concentrations are large.
-A1_safe <- function(k) {
-  out <- besselI(k, 1, expon.scaled = TRUE) /
-    besselI(k, 0, expon.scaled = TRUE)
-  if (is.matrix(k)) dim(out) <- dim(k)
-  out
-}
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) -
-    log(besselI(kappa, 0, expon.scaled = TRUE))
-}
-hdi <- function(x, prob = 0.95) {
-  x <- sort(as.numeric(x))
-  stopifnot(length(x) > 1L, all(is.finite(x)))
-  gap <- min(length(x) - 1L, floor(prob * length(x)))
-  starts <- seq_len(length(x) - gap)
-  j <- starts[which.min(x[starts + gap] - x[starts])]
-  c(low = x[j], high = x[j + gap])
-}
-interval_row <- function(x, angular = FALSE, prob = 0.95) {
-  m <- if (angular) circ_mean(x) else mean(x)
-  # Unwrap angular intervals around their circular mean before drawing;
-  # display endpoints can lie just beyond +/-pi to avoid a false long arc.
-  z <- if (angular) m + mod_circular(x - m) else x
-  c(mean = m, hdi(z, prob))
-}
-inverse_A1 <- function(r) {
-  if (r <= 0) {
-    return(0)
-  }
-  if (r >= 1) {
-    return(Inf)
-  }
-  upper <- max(2, 1 / (1 - r))
-  uniroot(function(k) A1_safe(k) - r, c(0, upper), tol = 1e-9)$root
-}
-# Exact tutorial sampler convention: scalar mu/kappa, then wrap the draw.
-vmu <- function(m) circular::circular(
-    m, units = "radians", template = "none", modulo = "2pi")
-vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
-simulate_angles <- function(mu, kappa) {
-  stopifnot(is.matrix(mu), identical(dim(mu), dim(kappa)))
-  replicated <- matrix(0, nrow = nrow(mu), ncol = ncol(mu))
-  for (d in seq_len(nrow(mu))) {
-    for (i in seq_len(ncol(mu))) {
-      replicated[d, i] <- as.numeric(circular::rvonmises(1,
-        mu = vmu(mu[d, i]), kappa = kappa[d, i],
-        control.circular = vm_ctrl))
-    }
-  }
-  mod_circular(replicated)
-}
+
+
 save_figure <- function(plot, name, width = 8, height = 4) {
   ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
          width = width, height = height)
@@ -267,69 +214,7 @@ head(data)
 # the angle axis runs clockwise with a label every 45 degrees.
 raw_plot <- transform(data, theta = HeadingRadians %% (2 * pi), radius = Trial)
 radial_max <- 10
-circ_sd_norm <- function(a) {
-  as.numeric(circular::sd.circular(vmu(a), high = pi, low = -pi,
-    normalize = TRUE))[1]
-}
-blocks <- do.call(rbind, lapply(split(data, list(data$Individual,
-  data$condition), drop = TRUE), function(g) {
-  a <- c(circ_mean(g$HeadingRadians),
-    as.numeric(circular::median.circular(vmu(g$HeadingRadians)))[1])
-  data.frame(Individual = g$Individual[1], condition = g$condition[1],
-    theta = a %% (2 * pi), radius = 0, radius_end = radial_max,
-    wedge_center = a[1], wedge_sd = circ_sd_norm(g$HeadingRadians),
-    statistic = c("circular mean", "circular median"))
-}))
-# Wedge sector mean +/- sd, split into at most two polygons across the
-# (0, 2 pi) seam. Each polygon carries its Individual so every panel only
-# draws the two wedges of its own beetle; without that column ggplot paints
-# all twenty wedges into every panel.
-wedges <- do.call(rbind, lapply(which(blocks$statistic == "circular mean"), function(k) {
-  lo <- (blocks$wedge_center[k] - blocks$wedge_sd[k]) %% (2 * pi)
-  hi <- (blocks$wedge_center[k] + blocks$wedge_sd[k]) %% (2 * pi)
-  chunks <- if (lo < hi) {
-    list(seq(lo, hi, length.out = 100L))
-  } else {
-    list(seq(lo, 2 * pi, length.out = 50L), c(0, seq(0, hi, length.out = 49L)))
-  }
-  do.call(rbind, lapply(seq_along(chunks), function(j) {
-    th <- chunks[[j]]
-    data.frame(Individual = blocks$Individual[k],
-      theta = c(th[1L], th, th[length(th)]),
-      radius = c(0, rep(radial_max, length(th)), 0),
-      condition = blocks$condition[k], group = 10L * k + j)
-  }))
-}))
-ring_labels <- data.frame(theta = pi / 8,
-  radius = seq(2, radial_max, by = 2L),
-  lab = as.character(seq(2, radial_max, by = 2L)))
-p_data <- ggplot(raw_plot, aes(theta, radius, colour = condition)) +
-  geom_point(alpha = 0.6, size = 2) +
-  geom_polygon(data = wedges, aes(theta, radius, group = group,
-    fill = condition), inherit.aes = FALSE, alpha = 0.2, colour = NA) +
-  geom_segment(data = blocks,
-    aes(x = theta, xend = theta, y = radius, yend = radius_end,
-        colour = condition, linetype = statistic),
-    inherit.aes = FALSE, linewidth = 0.8) +
-  scale_x_continuous(limits = c(0, 2 * pi),
-    breaks = (0:7) * pi / 4,
-    labels = c("0°", "45°", "90°", "135°",
-      "180°", "225°", "270°", "315°"),
-    expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0, radial_max + 1),
-    breaks = seq(2, radial_max, by = 2), expand = c(0, 0)) +
-  geom_text(data = ring_labels, aes(theta, radius, label = lab),
-    inherit.aes = FALSE, size = 3.2) +
-  coord_polar() +
-  facet_wrap(~ Individual, ncol = 2,
-    labeller = as_labeller(setNames(
-      paste0("Individual ", seq_len(nlevels(data$Individual))),
-      levels(data$Individual)))) +
-  scale_colour_manual(values = condition_colors, name = NULL) +
-  scale_fill_manual(values = condition_colors, name = NULL) +
-  labs(x = "", y = "") +
-  theme(legend.position = "right",
-    axis.text.y = element_blank(), axis.ticks.y = element_blank())
+p_data <- data_polar_plot(raw_plot, data, radial_max, condition_colors)
 save_figure(p_data, "data_individual_polar_grid", 10, 18)
 
 ```
@@ -508,43 +393,7 @@ hyperparameters, before interpreting the posterior.
 
 ```{r}
 #| cell-id: "beetles-14"
-diagnose_fit <- function(fit, circular_parameters = character()) {
-  # NUTS divergences. Not every brms/cmdstanr combination keeps the
-  # per-iteration divergence flag in the fit object, so probe for it and
-  # report what the fit object actually carries (the R-hat and ESS values
-  # below are the primary convergence checks either way).
-  divergences <- tryCatch({
-    div_flags <- lapply(fit$fit@sim$samples, function(ch) ch[["divergent"]])
-    if (any(vapply(div_flags, is.null, logical(1)))) NA_real_
-    else sum(unlist(div_flags))
-  }, error = function(e) NA_real_)
-  if (is.na(divergences)) {
-      cat("Divergences: not retained in this fit object (see R-hat/ESS below).\n")
-  } else {
-      cat("Divergences:", divergences, "\n")
-  }
-  available <- posterior::variables(posterior::as_draws_array(fit))
-  parameters <- available[grepl("^(b_|sd_|r_|kmu_)", available)]
-  draws_array <- posterior::subset_draws(posterior::as_draws_array(fit),
-                                         variable = parameters)
-  out <- do.call(rbind, lapply(parameters, function(p) {
-    # Preserve iteration x chain shape: flattening loses between-chain
-    # information and would make the R-hat/ESS checks misleading.
-    x <- as.matrix(draws_array[, , p])
-    angular <- p %in% circular_parameters
-    z <- if (angular) mod_circular(x - circ_mean(x)) else x
-    stopifnot(all(is.finite(x)))
-    data.frame(parameter = p,
-      mean = if (angular) circ_mean(x) else mean(x),
-      sd = if (angular) circ_sd(x) else sd(as.numeric(x)),
-      rhat = if (angular) Rhat_unwrap(x, method = "sine") else posterior::rhat(x),
-      ess_bulk = posterior::ess_bulk(z),
-      row.names = NULL, check.names = FALSE)
-  }))
-  out$rhat <- round(out$rhat, 4)
-  out$ess_bulk <- round(out$ess_bulk, 1)
-  out
-}
+
 
 available <- posterior::variables(posterior::as_draws_array(fit))
 circular_parameters <- available[grepl("^b_(beta0|bias0|bias1)_", available)]
@@ -564,22 +413,7 @@ summary_frame[!is.finite(summary_frame$rhat) | summary_frame$rhat >= 1.01 |
 #| cell-id: "beetles-16"
 trace_parameters <- c("b_beta0_Intercept", "b_beta0_Light",
   "b_kappa_Intercept", "b_kappa_Light", "kmu_intercept", "kmu_slope")
-
-# as_draws_df is wide: explicitly assemble a long trace table.
-draws_df <- posterior::as_draws_df(posterior::subset_draws(
-    posterior::as_draws_array(fit), variable = trace_parameters))
-trace_df <- do.call(rbind, lapply(trace_parameters, function(p) {
-  value <- as.numeric(draws_df[[p]])
-  if (p %in% circular_parameters) value <- mod_circular(value - circ_mean(value))
-  data.frame(parameter = p, value = value,
-             iteration = draws_df[[".iteration"]],
-             chain = factor(draws_df[[".chain"]]))
-}))
-p_trace <- ggplot(trace_df, aes(iteration, value, colour = chain)) +
-  geom_line(alpha = 0.6, linewidth = 0.25) +
-  facet_wrap(~ parameter, scales = "free_y", ncol = 2) +
-  labs(x = "retained iteration", y = "draw (angular traces centered)") +
-  theme(legend.position = "bottom")
+p_trace <- trace_plot(fit, trace_parameters, circular_parameters)
 save_figure(p_trace, "trace", 9, 6)
 
 ```
@@ -595,42 +429,21 @@ between-individual alignment. These are separate quantities.
 
 ```{r}
 #| cell-id: "beetles-18"
-ids <- levels(data$Individual)
-prediction_data <- expand.grid(Individual = ids, Light = c(0, 1),
-                               KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-prediction_data$Individual <- factor(prediction_data$Individual, levels = ids)
-prediction_data$condition <- factor(prediction_data$Light,
-                                     levels = c(0, 1), labels = condition_labels)
-# Draw x individual-condition matrices. Evaluate each fitted distributional
-# predictor explicitly; no arithmetic averaging across the angular seam.
-mu <- mod_circular(posterior_linpred(fit, newdata = prediction_data,
-                                     transform = FALSE, dpar = "mu"))
-kappa <- posterior_linpred(fit, newdata = prediction_data,
-                           transform = TRUE, dpar = "kappa")
-stopifnot(identical(dim(mu), dim(kappa)), all(kappa > 0))
-J <- length(ids)
-pre <- seq_len(J)
-post <- J + pre
-group_alignment <- cbind(
-  Mod(rowMeans(exp(1i * mu[, pre, drop = FALSE]))),
-  Mod(rowMeans(exp(1i * mu[, post, drop = FALSE]))))
-individual_summary <- do.call(rbind, lapply(seq_len(nrow(prediction_data)), function(j) {
-  rbind(data.frame(id = as.character(prediction_data$Individual[j]),
-    condition = prediction_data$condition[j], quantity = "mean direction (rad)",
-    as.list(interval_row(mu[, j], angular = TRUE))),
-    data.frame(id = as.character(prediction_data$Individual[j]),
-    condition = prediction_data$condition[j], quantity = "within-individual R(kappa)",
-    as.list(interval_row(A1_safe(kappa[, j])))))
-}))
-p_individual <- ggplot(individual_summary,
-  aes(id, mean, colour = condition, group = condition)) +
-  geom_pointrange(aes(ymin = low, ymax = high),
-    position = position_dodge(width = 0.5), linewidth = 0.25) +
-  facet_wrap(~ quantity, scales = "free_y", ncol = 1) +
-  scale_colour_manual(values = condition_colors) +
-  labs(x = "individual", y = "posterior mean and 95% HDI") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1),
-        legend.position = "bottom")
+# Draw x individual-condition matrices from the fitted model; the
+# per-draw direction and concentration matrices feed the summary
+# panels, the alignment statistic and the PPC cells below (twin of
+# the Python posthoc computation).
+posterior <- posterior_directions(fit, data, condition_labels)
+ids <- posterior$ids
+prediction_data <- posterior$prediction_data
+mu <- posterior$mu
+kappa <- posterior$kappa
+J <- posterior$J
+pre <- posterior$pre
+post <- posterior$post
+group_alignment <- posterior$group_alignment
+individual_summary <- posterior$individual_summary
+p_individual <- individual_plot(individual_summary, condition_colors)
 save_figure(p_individual, "individual_posteriors", 10, 6)
 
 ```
@@ -671,28 +484,8 @@ ind_means <- do.call(rbind, lapply(split(data, list(data$Individual,
     theta = circ_mean(g$HeadingRadians) %% (2 * pi),
     condition = g$condition[1])))
 ind_means$r <- r_pts
-p_mu <- ggplot(mu_kde, aes(theta, r, colour = condition)) +
-  geom_ribbon(aes(ymin = base, ymax = r, fill = condition),
-    alpha = 0.22, colour = NA) +
-  geom_line(linewidth = 0.7) +
-  geom_path(data = data.frame(theta = theta %% (2 * pi), r = r_pts),
-    inherit.aes = FALSE, aes(theta, r), colour = "#BFBFBF", linewidth = 0.32) +
-  geom_line(data = flood_arc, inherit.aes = FALSE, aes(theta, r),
-    colour = "black", linewidth = 0.4, alpha = 0.75) +
-  geom_segment(data = flood_ticks, inherit.aes = FALSE,
-    aes(x = theta, xend = theta, y = lo, yend = hi),
-    colour = "black", linewidth = 0.4, alpha = 0.75) +
-  geom_point(data = ind_means, inherit.aes = FALSE,
-    aes(theta, r, colour = condition), size = 3.5, alpha = 0.95) +
-  scale_x_continuous(limits = c(0, 2 * pi), expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0, r_pts * 1.1), expand = c(0, 0)) +
-  coord_polar() +
-  scale_colour_manual(values = condition_colors) +
-  scale_fill_manual(values = condition_colors) +
-  labs(x = "", y = "") +
-  theme(legend.position = "none", axis.text = element_blank(),
-    axis.ticks = element_blank(), panel.grid = element_blank(),
-    panel.border = element_blank())
+p_mu <- polar_mu_kde_plot(mu_kde, theta, r_pts, flood_arc, flood_ticks,
+  ind_means, condition_colors)
 save_figure(p_mu, "treat_polar_mu_kde_clean", 3.0, 3.0)
 
 # Python's main treatment figure uses the fixed-effect (zero individual
@@ -722,71 +515,11 @@ treatment_statistics <- list("within-individual R(kappa)" = within_R,
 # mass) and the ON-minus-Off change in that mass. Vertical error bars
 # per condition (Off grey / On gold), mean marker + 89% HDI with caps,
 # value on a 0-1 y axis.
-off_idx <- 1L
-on_idx <- 2L
-cond2_colors <- c(Off = condition_colors[["light OFF"]],
-  On = condition_colors[["light ON"]])
-add_hdi <- function(samples, cond, pos) {
-  iv <- interval_row(samples, prob = 0.89)
-  data.frame(pos = pos, cond = cond, value = iv[["mean"]],
-    low = iv[["low"]], high = iv[["high"]], kind = "post")
-}
-# Per-row fills keyed on the actual row keys, so single-condition
-# panels (e.g. the "On - Off" treatment effect) work with a 1-entry cols.
-hdi_fill_values <- function(rows, cols) {
-  vals <- vapply(rows$key, function(k) {
-    if (startsWith(k, "boot_")) "white" else cols[[sub("^post_", "", k)]]
-  }, character(1))
-  names(vals) <- rows$key
-  vals
-}
-hdi_bar <- function(rows, title, ylab, cols, xlims) {
-  rows$key <- paste(rows$kind, rows$cond, sep = "_")
-  p <- ggplot(rows, aes(x = pos, y = value, colour = cond, fill = key)) +
-    geom_errorbar(aes(ymin = low, ymax = high), width = 0.16,
-      linewidth = 0.3) +
-    geom_point(shape = 16, size = 1.5) +
-    scale_x_continuous(limits = xlims, breaks = unique(rows$pos),
-      labels = rows$cond[order(rows$pos)], expand = c(0, 0)) +
-    scale_y_continuous(limits = c(0, 1), expand = c(0, 0),
-      breaks = seq(0, 1, by = 0.2),
-      labels = function(v) format(v, digits = 1)) +
-    scale_colour_manual(values = cols, guide = "none") +
-    scale_fill_manual(values = hdi_fill_values(rows, cols), guide = "none") +
-    labs(x = "", y = ylab, title = title) +
-    theme_classic(base_size = 10) +
-    theme(plot.title = element_text(hjust = 0.5, size = 11))
-  p
-}
-within_df <- rbind(add_hdi(A1_safe(population_kappa[, off_idx]), "Off", 1L),
-                   add_hdi(A1_safe(population_kappa[, on_idx]), "On", 2L))
-between_df <- rbind(add_hdi(group_alignment[, off_idx], "Off", 1L),
-                    add_hdi(group_alignment[, on_idx], "On", 2L))
-mass_df <- rbind(add_hdi(flood_mass[, off_idx], "Off", 1L),
-                 add_hdi(flood_mass[, on_idx], "On", 2L))
-delta_df <- add_hdi(flood_mass[, on_idx] - flood_mass[, off_idx],
-  "On - Off", 1L)
-xlim2 <- c(0.75, 2.25)
-xlim1 <- c(0.25, 1.75)
-p_conc_within <- hdi_bar(within_df, "Within-individual\nconcentration",
-  "Mean resultant length", cond2_colors, xlim2)
-p_conc_between <- hdi_bar(between_df, "Between-individual\nconcentration",
-  "Mean resultant length", cond2_colors, xlim2)
-p_conc_attract <- hdi_bar(mass_df, "Floodlight\nattraction",
-  "Predictive mass (+-45 deg)", cond2_colors, xlim2) +
-  geom_hline(yintercept = 0.25, linetype = "dashed", linewidth = 0.35) +
-  annotate("text", x = 2.22, y = 0.22, label = "Uniform",
-    hjust = 1, vjust = 1, size = 3.3, colour = "black")
-p_conc_delta <- hdi_bar(delta_df, "Floodlight\ntreatment effect",
-  "Difference in\npredictive mass (+-45 deg)",
-  c("On - Off" = cond2_colors[["On"]]), xlim1)
-p_concentration <- patchwork::wrap_plots(p_conc_within, p_conc_between,
-  p_conc_attract, p_conc_delta, ncol = 4)
+p_concentration <- treatment_hdi_row(population_kappa, group_alignment,
+  flood_mass, condition_colors)
 save_figure(p_concentration, "treat_concentration_plus_floodlight", 8, 3)
 mass_delta <- data.frame(delta = mass[, 2] - mass[, 1])
-p_mass_delta <- ggplot(mass_delta, aes(delta)) + geom_density(fill = "#D9A521", alpha = 0.5) +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  labs(x = "change in floodlight-sector probability (ON - OFF)", y = "density")
+p_mass_delta <- mass_delta_plot(mass_delta)
 save_figure(p_mass_delta, "floodlight_mass_change", 6, 3)
 
 ```
@@ -854,207 +587,22 @@ ys <- lapply(seq_len(nrow(prediction_data)), function(j) {
     data$Light == prediction_data$Light[j]]
 })
 stopifnot(all(lengths(ys) > 0L))
-bootstrap_pair <- function(y, B) {
-  z <- replicate(B, mean(exp(1i * y[sample.int(length(y), length(y), replace = TRUE)])))
-  list(mu = Arg(z), R = Mod(z))
-}
+# The data-bootstrap vs posterior comparison (Python's supplemental
+# PPC) runs in the sourced posthoc script; the seed stays here.
 set.seed(SEED + 10L)
-boot_individual <- lapply(ys, bootstrap_pair, B = B_INDIV)
-boot_group_mu <- boot_group_R <- matrix(0, nrow = B_GROUP, ncol = 2)
-for (b in seq_len(B_GROUP)) {
-  selected <- sample.int(J, J, replace = TRUE)
-  for (c in 1:2) {
-    jj <- selected + (c - 1L) * J
-    directions <- vapply(jj, function(j) {
-      y <- ys[[j]]
-      circ_mean(y[sample.int(length(y), length(y), replace = TRUE)])
-    }, numeric(1))
-    boot_group_mu[b, c] <- circ_mean(directions)
-    boot_group_R[b, c] <- resultant(directions)
-  }
-}
-fixed <- as.data.frame(posterior::as_draws_df(fit))
-population_mu <- cbind(mod_circular(fixed$b_beta0_Intercept),
-  mod_circular(fixed$b_beta0_Intercept + fixed$b_beta0_Light))
-ppc_group <- do.call(rbind, lapply(1:2, function(c) {
-  rbind(
-    data.frame(condition = condition_labels[c], source = "data bootstrap",
-      quantity = "group mean direction (rad)",
-      as.list(interval_row(boot_group_mu[, c], TRUE))),
-    data.frame(condition = condition_labels[c], source = "posterior",
-      quantity = "group mean direction (rad)",
-      as.list(interval_row(population_mu[, c], TRUE))),
-    data.frame(condition = condition_labels[c], source = "data bootstrap",
-      quantity = "between-individual alignment",
-      as.list(interval_row(boot_group_R[, c]))),
-    data.frame(condition = condition_labels[c], source = "posterior",
-      quantity = "between-individual alignment",
-      as.list(interval_row(group_alignment[, c]))))
-}))
+ppc_boot <- ppc_bootstrap_stats(fit, prediction_data, ys, J,
+  B_GROUP, B_INDIV, condition_labels, group_alignment)
 # Python-twin supplemental PPC (beetle_posterior_predictive_check):
 # group mean direction (a) and group alignment (b) by condition on top,
 # per-individual mean direction (c = OFF, d = ON) and per-individual
 # concentration (e = OFF, f = ON) below. Bootstrap = open marker,
 # posterior = filled; light OFF grey, light ON gold; circular intervals
 # wrapped to 0-360 degrees with minimal-arc error widths.
-to360 <- function(rad) (rad * 180 / pi + 360) %% 360
-dir_iv <- function(samples) interval_row(samples, angular = TRUE)
-lin_iv <- function(samples) interval_row(samples)
-ppc_cond_colors <- c(Off = condition_colors[["light OFF"]],
-  On = condition_colors[["light ON"]])
-ppc_fill_vals <- c(boot_Off = "white", post_Off = ppc_cond_colors[["Off"]],
-  boot_On = "white", post_On = ppc_cond_colors[["On"]])
-mu_row <- function(iv, cond, y, kind) {
-  m <- iv["mean"]; lo <- iv["low"]; hi <- iv["high"]
-  w <- c(abs(mod_circular(m - lo)), abs(mod_circular(hi - m))) * 180 / pi
-  x <- to360(m)
-  data.frame(cond = cond, y = y, x = x, xlo = x - w[1], xhi = x + w[2],
-    kind = kind)
-}
-lin_row <- function(iv, cond, y, kind) {
-  data.frame(cond = cond, y = y, x = iv["mean"], xlo = iv["low"],
-    xhi = iv["high"], kind = kind)
-}
-add_key <- function(d) {
-  d$key <- paste(d$kind, d$cond, sep = "_")
-  d
-}
-df_gmu <- rbind(
-  mu_row(dir_iv(boot_group_mu[, off_idx]), "Off", -0.12, "boot"),
-  mu_row(dir_iv(population_mu[, off_idx]), "Off", 0.12, "post"),
-  mu_row(dir_iv(boot_group_mu[, on_idx]), "On", 1 - 0.12, "boot"),
-  mu_row(dir_iv(population_mu[, on_idx]), "On", 1 + 0.12, "post"))
-df_gr <- rbind(
-  lin_row(lin_iv(boot_group_R[, off_idx]), "Off", -0.12, "boot"),
-  lin_row(lin_iv(group_alignment[, off_idx]), "Off", 0.12, "post"),
-  lin_row(lin_iv(boot_group_R[, on_idx]), "On", 1 - 0.12, "boot"),
-  lin_row(lin_iv(group_alignment[, on_idx]), "On", 1 + 0.12, "post"))
-top_y <- scale_y_continuous(limits = c(-0.35, 1.35), expand = c(0, 0),
-  breaks = c(0, 1), labels = c("OFF", "ON"))
-panel_label <- function(txt, x, y) annotate("text", x = x, y = y,
-  label = txt, size = 3.6, fontface = "bold", hjust = 0, vjust = 1,
-  colour = "black")
-p_g_mu <- ggplot(add_key(df_gmu), aes(x = x, y = y)) +
-  geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.3) +
-  geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.3) +
-  geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.5) +
-  scale_colour_manual(values = ppc_cond_colors, guide = "none") +
-  scale_fill_manual(values = ppc_fill_vals, guide = "none") +
-  scale_shape_manual(values = c(Off = 22, On = 21), guide = "none") +
-  scale_x_continuous(limits = c(0, 360), breaks = c(0, 90, 180, 270, 360)) +
-  top_y +
-  labs(x = "Group mean direction (deg)", y = "",
-    title = "Group mean direction") +
-  panel_label("a.", 4, 1.32) +
-  theme_classic(base_size = 10) +
-  theme(plot.title = element_text(hjust = 0.5, size = 11.5),
-    legend.position = "none", clip = "on")
-p_gr <- ggplot(add_key(df_gr), aes(x = x, y = y)) +
-  geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.3) +
-  geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.3) +
-  geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.5) +
-  scale_colour_manual(values = ppc_cond_colors, guide = "none") +
-  scale_fill_manual(values = ppc_fill_vals, guide = "none") +
-  scale_shape_manual(values = c(Off = 22, On = 21), guide = "none") +
-  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
-  top_y +
-  labs(x = "Mean resultant length", y = "", title = "Group alignment") +
-  panel_label("b.", 0.02, 1.32) +
-  theme_classic(base_size = 10) +
-  theme(plot.title = element_text(hjust = 0.5, size = 11.5),
-    legend.position = "none", clip = "on")
-# Per-individual rows: open bootstrap (y - 0.14) under filled posterior
-# (y + 0.14) for every beetle in every condition.
-ind_mu_off <- ind_mu_on <- NULL
-ind_r_off <- ind_r_on <- NULL
-po_pick <- function(id, cond, qty) {
-  x <- individual_summary[individual_summary$id == id &
-    individual_summary$condition == cond & individual_summary$quantity == qty, ]
-  stopifnot(nrow(x) == 1L)
-  c(mean = x$mean[1], low = x$low[1], high = x$high[1])
-}
-for (t in seq_len(J)) {
-  id <- as.character(ids[t])
-  ind_mu_off <- rbind(ind_mu_off,
-    mu_row(dir_iv(boot_individual[[t]]$mu), "Off", t - 0.14, "boot"),
-    mu_row(po_pick(id, condition_labels[1], "mean direction (rad)"),
-      "Off", t + 0.14, "post"))
-  ind_r_off <- rbind(ind_r_off,
-    lin_row(lin_iv(boot_individual[[t]]$R), "Off", t - 0.14, "boot"),
-    lin_row(po_pick(id, condition_labels[1], "within-individual R(kappa)"),
-      "Off", t + 0.14, "post"))
-  ind_mu_on <- rbind(ind_mu_on,
-    mu_row(dir_iv(boot_individual[[J + t]]$mu), "On", t - 0.14, "boot"),
-    mu_row(po_pick(id, condition_labels[2], "mean direction (rad)"),
-      "On", t + 0.14, "post"))
-  ind_r_on <- rbind(ind_r_on,
-    lin_row(lin_iv(boot_individual[[J + t]]$R), "On", t - 0.14, "boot"),
-    lin_row(po_pick(id, condition_labels[2], "within-individual R(kappa)"),
-      "On", t + 0.14, "post"))
-}
-nT <- J
-ind_y <- function(show_labels) scale_y_reverse(
-  limits = c(0.25, nT + 0.75), expand = c(0, 0),
-  breaks = seq_len(nT),
-  labels = if (show_labels) as.character(ids) else NULL)
-ind_grid <- geom_hline(yintercept = seq(0.5, nT - 0.5, by = 1),
-  colour = "#e6e6e6", linewidth = 0.15)
-ind_mu_panel <- function(rows, lab, show_labels, xlab) {
-  ggplot(add_key(rows), aes(x = x, y = y)) +
-    ind_grid +
-    geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25) +
-    geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25) +
-    geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.9) +
-    scale_colour_manual(values = ppc_cond_colors, guide = "none") +
-    scale_fill_manual(values = ppc_fill_vals, guide = "none") +
-    scale_shape_manual(values = c(Off = 22, On = 21), guide = "none") +
-    scale_x_continuous(limits = c(0, 360), breaks = c(0, 180, 360)) +
-    ind_y(show_labels) +
-    labs(x = xlab, y = "") +
-    panel_label(lab, 3, 0.3) +
-    theme_classic(base_size = 9) +
-    theme(legend.position = "none", clip = "on")
-}
-ind_r_panel <- function(rows, lab, show_labels, xlab) {
-  ggplot(add_key(rows), aes(x = x, y = y)) +
-    ind_grid +
-    geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25) +
-    geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25) +
-    geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.9) +
-    scale_colour_manual(values = ppc_cond_colors, guide = "none") +
-    scale_fill_manual(values = ppc_fill_vals, guide = "none") +
-    scale_shape_manual(values = c(Off = 22, On = 21), guide = "none") +
-    scale_x_continuous(expand = c(0.05, 0.05)) +
-    ind_y(show_labels) +
-    labs(x = xlab, y = "") +
-    panel_label(lab, 0.55, 0.3) +
-    theme_classic(base_size = 9) +
-    theme(legend.position = "none", clip = "on")
-}
-p_c <- ind_mu_panel(ind_mu_off, "c.", TRUE, "")
-p_d <- ind_mu_panel(ind_mu_on, "d.", FALSE, "Individual mean direction (deg)")
-p_e <- ind_r_panel(ind_r_off, "e.", FALSE, "")
-p_f <- ind_r_panel(ind_r_on, "f.", FALSE, "Individual concentration (R)")
-# Manual figure legend row (the Python fig.legend items).
-leg_items <- data.frame(
-  x = c(0.7, 2.9, 5.0, 7.0),
-  label = c("Bootstrap (data)", "Posterior (model)", "Light OFF", "Light ON"))
-p_leg <- ggplot(leg_items, aes(x = x, y = 1)) +
-  geom_point(shape = c(21, 21, 15, 16),
-    colour = c("black", "black", ppc_cond_colors[["Off"]],
-      ppc_cond_colors[["On"]]),
-    fill = c("white", "black", ppc_cond_colors[["Off"]],
-      ppc_cond_colors[["On"]]),
-    size = 2.2) +
-  geom_text(aes(x = x + 0.34, y = 1, label = label),
-    hjust = 0, size = 3.6, colour = "black") +
-  scale_x_continuous(limits = c(0, 8.4), expand = c(0, 0)) +
-  theme_void(base_size = 10)
-ppc_twin <- ((p_g_mu | p_gr) /
-    (p_c | p_d | p_e | p_f) / p_leg) +
-  patchwork::plot_layout(heights = c(0.55, 1.2, 0.16))
+ppc_twin <- ppc_twin_plot(J, ids, individual_summary,
+  ppc_boot$boot_individual, ppc_boot$boot_group_mu, ppc_boot$boot_group_R,
+  ppc_boot$population_mu, group_alignment, condition_labels, condition_colors)
 save_figure(ppc_twin, "beetle_posterior_predictive_check", 8.8,
-  max(3.4, 0.28 * nT + 2.2))
+  max(3.4, 0.28 * J + 2.2))
 
 ```
 
@@ -1070,22 +618,8 @@ as well as uncertainty in the response parameters.
 # Limit simulation draws only; MCMC fitting still uses the budgets above.
 set.seed(SEED + 20L)
 draw_ids <- sample.int(nrow(mu), min(nrow(mu), if (quick_run) 100L else 400L))
-rep_stats <- do.call(rbind, lapply(seq_along(ys), function(j) {
-  rep_mu <- matrix(mu[draw_ids, j], nrow = length(draw_ids), ncol = length(ys[[j]]))
-  rep_kappa <- matrix(kappa[draw_ids, j], nrow = length(draw_ids), ncol = length(ys[[j]]))
-  yrep <- simulate_angles(rep_mu, rep_kappa)
-  data.frame(id = as.character(prediction_data$Individual[j]),
-    condition = prediction_data$condition[j],
-    as.list(interval_row(apply(yrep, 1, resultant))),
-    observed = resultant(ys[[j]]))
-}))
-p_replicates <- ggplot(rep_stats, aes(id, mean, colour = condition)) +
-  geom_pointrange(aes(ymin = low, ymax = high)) +
-  geom_point(aes(y = observed), shape = 1) +
-  facet_wrap(~ condition) + scale_colour_manual(values = condition_colors) +
-  labs(x = "individual", y = "replicated R, 95% HDI; open = observed") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1),
-        legend.position = "bottom")
+rep_stats <- replicated_stats(mu, kappa, ys, draw_ids, prediction_data)
+p_replicates <- replicated_r_plot(rep_stats, condition_colors)
 save_figure(p_replicates, "ppc_replicated", 10, 4)
 
 ```
