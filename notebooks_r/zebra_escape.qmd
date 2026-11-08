@@ -156,6 +156,31 @@ Python analysis. All angular calculations use radians and circular summaries.
 
 ```{r}
 #| cell-id: "zebra-escape-05"
+# Display conventions from the Python figures; the required palette is set
+# in the data cell. These helpers change only plotting copies of summaries.
+condition_shapes <- c("pre-approach" = 15, "post-approach" = 16)
+ppc_shapes <- c("pre-approach / data bootstrap" = 0,
+  "pre-approach / posterior" = 15,
+  "post-approach / data bootstrap" = 1,
+  "post-approach / posterior" = 16)
+ppc_display <- function(x) {
+  angular <- grepl("direction", x$quantity, fixed = TRUE)
+  x[angular, c("mean", "low", "high")] <-
+    x[angular, c("mean", "low", "high")] * 180 / pi
+  x$quantity <- sub("(rad)", "(deg)", x$quantity, fixed = TRUE)
+  x$condition <- factor(x$condition, levels = condition_labels)
+  x
+}
+ppc_display_support <- function(x) {
+  # Reference axes cover a full angular turn and the mathematical R domain.
+  # Train each facet without censoring intervals that cross the angular seam.
+  lo <- hi <- x[!duplicated(x[c("quantity", "condition")]), , drop = FALSE]
+  angular <- grepl("direction", lo$quantity, fixed = TRUE)
+  lo$mean <- ifelse(angular, -180, 0)
+  hi$mean <- ifelse(angular, 180, 1)
+  rbind(lo, hi)
+}
+
 save_figure <- function(plot, name, width = 8, height = 4) {
   ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
          width = width, height = height)
@@ -426,7 +451,13 @@ pre <- posterior$pre
 post <- posterior$post
 group_alignment <- posterior$group_alignment
 individual_summary <- posterior$individual_summary
-p_individual <- individual_plot(individual_summary, condition_colors)
+# Keep the per-track tile layout, but retain Python's condition markers
+# and the full mathematical R(kappa) domain in the concentration facet.
+r_support <- data.frame(id = individual_summary$id[1],
+  quantity = "within-individual R(kappa)", mean = c(0, 1))
+p_individual <- individual_plot(individual_summary, condition_colors) +
+  aes(shape = condition) + scale_shape_manual(values = condition_shapes) +
+  geom_blank(data = r_support, aes(id, mean), inherit.aes = FALSE)
 save_figure(p_individual, "individual_posteriors", 10, 6)
 
 ```
@@ -449,7 +480,7 @@ theta <- seq(-pi, pi, length.out = 201)
 group_kde <- do.call(rbind, lapply(1:2, function(c) {
   data.frame(theta = theta %% (2 * pi),
     density = vapply(theta, function(t) mean(exp(vm_logpdf(t, group_mu[, c], 500))), numeric(1)),
-    condition = condition_labels[c])
+    condition = factor(condition_labels[c], levels = condition_labels))
 }))
 track_kde <- do.call(rbind, lapply(seq_len(nrow(prediction_data)), function(j) {
   data.frame(theta = theta %% (2 * pi),
@@ -461,16 +492,23 @@ group_kde$r <- 1 + group_kde$density / max_kde
 track_kde$r <- 1 + track_kde$density / max_kde
 empirical_group <- do.call(rbind, lapply(1:2, function(c) data.frame(
   theta = circ_mean(group_mu[, c]) %% (2 * pi), r = 2.25,
-  condition = condition_labels[c],
+  condition = factor(condition_labels[c], levels = condition_labels),
   shape = if (c == 2L) "filled circle" else "filled square")))
 p_group_mu <- polar_direction_plot(group_kde, empirical_group,
-  "group mean direction (rad)", condition_colors)
+  "group mean direction", condition_colors) +
+  # ggplot2's zero start is north and direction = 1 is clockwise.
+  coord_polar(start = 0, direction = 1) +
+  scale_shape_manual(values = c("filled square" = 15, "filled circle" = 16))
 save_figure(p_group_mu, "group_direction", 5, 5)
 alignment_df <- do.call(rbind, lapply(1:2, function(c) {
-  data.frame(condition = condition_labels[c],
+  data.frame(condition = factor(condition_labels[c], levels = condition_labels),
     as.list(interval_row(group_alignment[, c])))
 }))
-p_alignment <- alignment_plot(alignment_df, condition_colors)
+p_alignment <- alignment_plot(alignment_df, condition_colors) +
+  aes(shape = condition) + scale_shape_manual(values = condition_shapes) +
+  scale_x_discrete(limits = condition_labels) +
+  # Python explicitly uses the full resultant-length domain, not a zoom.
+  scale_y_continuous(limits = c(0, 1), breaks = c(0, 0.5, 1))
 save_figure(p_alignment, "group_alignment", 5, 4)
 
 # Per-track polar direction posteriors, with empirical circular means.
@@ -481,7 +519,9 @@ empirical <- do.call(rbind, lapply(split(data, list(data$Track, data$condition),
     shape = if (g$condition[1] == condition_labels[2]) "filled circle" else
       "filled square")))
 p_track_mu <- polar_direction_plot(track_kde, empirical,
-  "track mean direction (rad)", condition_colors, track = TRUE)
+  "track mean direction", condition_colors, track = TRUE) +
+  coord_polar(start = 0, direction = 1) +
+  scale_shape_manual(values = c("filled square" = 15, "filled circle" = 16))
 save_figure(p_track_mu, "track_direction_polar", 11, 9)
 
 ```
@@ -515,10 +555,24 @@ stopifnot(all(lengths(ys) > 0L))
 set.seed(SEED + 10L)
 ppc_boot <- ppc_bootstrap_stats(fit, prediction_data, ys, J,
   B_GROUP, B_INDIV, condition_labels, group_alignment, individual_summary)
-p_group_ppc <- group_ppc_plot(ppc_boot$ppc_group, condition_colors)
+ppc_group_display <- ppc_display(ppc_boot$ppc_group)
+p_group_ppc <- group_ppc_plot(ppc_group_display, condition_colors) +
+  aes(shape = interaction(condition, source, sep = " / ")) +
+  scale_shape_manual(values = ppc_shapes, name = "condition / source") +
+  scale_x_discrete(limits = condition_labels) +
+  geom_blank(data = ppc_display_support(ppc_group_display),
+    aes(condition, mean), inherit.aes = FALSE)
 save_figure(p_group_ppc, "ppc_group", 8, 4)
 
-p_ind_ppc <- individual_ppc_plot(ppc_boot$ppc_individual)
+ppc_individual_display <- ppc_display(ppc_boot$ppc_individual)
+p_ind_ppc <- individual_ppc_plot(ppc_individual_display) +
+  # Colour encodes condition; open/filled markers encode data/posterior.
+  aes(colour = condition,
+    shape = interaction(condition, source, sep = " / "), group = source) +
+  scale_colour_manual(values = condition_colors, breaks = condition_labels) +
+  scale_shape_manual(values = ppc_shapes, name = "condition / source") +
+  geom_blank(data = ppc_display_support(ppc_individual_display),
+    aes(id, mean), inherit.aes = FALSE)
 save_figure(p_ind_ppc, "ppc_individual", 11, 7)
 
 ```
