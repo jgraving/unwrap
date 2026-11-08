@@ -711,14 +711,23 @@ mk_init <- function(anchor_seed) {
        b_devone = as.numeric(anchor_offsets + j(uni_design$K_devone)))
 }
 init_uni <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
+# The 1-component baseline mirrors the Python twin's draw budget exactly
+# (pm.sample(1000, tune=2000, target_accept=0.9) per chain: 2000 warmup +
+# 1000 draw). The bimodal keeps its full (already-cached) budget. The
+# 1-component wrapped-mean ridge mixes slowly under cmdstan, so running it
+# at the 2.67x-bumped notebook budget was unnecessary and very expensive;
+# matching the twin's budget keeps the run-time tractable.
+uni_warmup <- 2000L
+uni_draws <- 1000L
+uni_iter <- uni_warmup + uni_draws
 set.seed(SEED)
-fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal_unbounded", SEED, ITER, WARMUP)
+fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal_unbounded", SEED, uni_iter, uni_warmup)
 if (is.null(fit_unimodal)) {
   fit_unimodal <- brm(uni_form, data = df, prior = uni_priors, stanvars = uni_stanvars,
-    backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
+    backend = "cmdstanr", chains = CHAINS, iter = uni_iter, warmup = uni_warmup,
     cores = CHAINS, seed = SEED, init = init_uni,
     control = list(adapt_delta = 0.97, max_treedepth = 12))
-  unwrap_save_fit_cache("locust_mix_unimodal_unbounded", fit_unimodal, SEED, ITER, WARMUP)
+  unwrap_save_fit_cache("locust_mix_unimodal_unbounded", fit_unimodal, SEED, uni_iter, uni_warmup)
 }
 state_unimodal <- extract_state(fit_unimodal, bimodal = FALSE)
 summary_unimodal <- diagnose_fit(fit_unimodal, state_unimodal)
