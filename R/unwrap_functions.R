@@ -950,8 +950,9 @@ unwrap_load_fit_cache <- function(name, seed, iter, warmup) {
     identical(as.numeric(meta$iter), as.numeric(iter)) &&
     identical(as.numeric(meta$warmup), as.numeric(warmup))
   if (ok && !is.na(meta$n_fixed)) {
+    # `==` (not identical): length() is integer, the stored count numeric.
     ok <- tryCatch(
-      identical(length(fixef(entry)), as.numeric(meta$n_fixed)),
+      length(fixef(entry)) == as.numeric(meta$n_fixed),
       error = function(e) FALSE)
   }
   if (!ok) {

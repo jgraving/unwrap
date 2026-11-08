@@ -154,8 +154,7 @@ c(R = as.character(getRversion()),
 ## Figure style
 
 Figures render inline and save vector PDFs under
-`figures/locust_density_order/`. The condition colors match those of the
-Python analysis. All angular calculations use radians and circular summaries.
+`figures/locust_density_order/`. All angular calculations use radians and circular summaries.
 
 
 ```{r}
@@ -346,56 +345,394 @@ stopifnot(nlevels(merged_df$animal_id) == 440L, nrow(merged_df) == 18641L)
 
 ```
 
+Re-discretizing gives the notebook's first two figures: the raw path of
+every locust (top) and each animal's mean displacement vector (bottom). Each
+panel is one of the 36 (order, density) conditions, titled by its cell; the
+trajectory panels all share one \u00b18 m window and the vector panels one
+shared scale, so cells read directly against each other. The square key on
+the right maps a condition's colour to its row (order) and column (density);
+the black line marks the 0-degree stimulus direction.
+
+
 ```{r}
 #| cell-id: "locust-density-order-09"
-# Observed trajectories, one panel per experimental cell.
-p_paths <- ggplot(merged_df, aes(X, Y, group = animal_id, colour = order)) +
-  geom_path(alpha = 0.5, linewidth = 0.25) +
-  facet_grid(order ~ density, scales = "free") +
-  scale_colour_gradient(low = "#4477AA", high = "#CC6677") +
-  labs(x = "X (m)", y = "Y (m)") + theme(legend.position = "none")
-save_figure(p_paths, "trajectories_order_by_density_grid", 12, 10)
+# Data grids: one panel per (order, density) condition, colored by the
+# shared deep-purple 2D map (black -> red along order, black -> blue along
+# density, channelwise max) with the square 2D key on the right. Each panel
+# title names its condition; every trajectory panel shares one +/-8 m window
+# and every vector panel one shared scale, so cells compare at a glance.
+cell_color2 <- function(r, c2, n_rows, n_cols, tmin = 0.10, tmax = 0.95,
+  blue = c(0.10, 0.25, 1.00), red = c(1.00, 0.15, 0.15), gamma = 1.15) {
+  to <- tmin + (tmax - tmin) * (r / max(n_rows - 1, 1)) ^ gamma
+  td <- tmin + (tmax - tmin) * (c2 / max(n_cols - 1, 1)) ^ gamma
+  # Channelwise max, per-channel (no matrix ops: keeps scalar and
+  # vectorised calls warning-free and dimension-stable).
+  rr <- pmax(0, pmin(1, pmax(to * red[1], td * blue[1])))
+  gg <- pmax(0, pmin(1, pmax(to * red[2], td * blue[2])))
+  bb <- pmax(0, pmin(1, pmax(to * red[3], td * blue[3])))
+  sprintf("#%02X%02X%02X", round(rr * 255), round(gg * 255), round(bb * 255))
+}
+orders_g <- sort(unique(merged_df$order))       # low at top -> high at bottom
+densities_g <- sort(unique(merged_df$density))  # low at left -> high at right
+n_rows_g <- length(orders_g)
+n_cols_g <- length(densities_g)
+stopifnot(all(table(merged_df$order, merged_df$density) > 0))
+cell_title <- function(o, d)
+  paste0("Density = ", format(d, nsmall = 1, trim = TRUE), "\nOrder = ", format(o, nsmall = 1))
+gtitle_levels <- unlist(lapply(orders_g, function(o)
+  vapply(densities_g, function(d) cell_title(o, d), character(1))))
+merged_df$gcol <- cell_color2(match(merged_df$order, orders_g) - 1L,
+  match(merged_df$density, densities_g) - 1L, n_rows_g, n_cols_g)
+merged_df$gtitle <- factor(cell_title(merged_df$order, merged_df$density),
+  levels = gtitle_levels)
+key_grid <- expand.grid(rr = 0:(n_rows_g - 1), cc = 0:(n_cols_g - 1))
+key_grid$ypos <- n_rows_g - 1L - key_grid$rr
+key_grid$col <- cell_color2(key_grid$rr, key_grid$cc, n_rows_g, n_cols_g)
+p_key <- ggplot(key_grid, aes(x = cc + 0.5, y = ypos + 0.5, fill = col)) +
+  geom_tile() +
+  annotate("rect", xmin = 0, xmax = n_cols_g, ymin = 0, ymax = n_rows_g,
+    fill = NA, colour = "black", linewidth = 0.28) +
+  scale_fill_identity(guide = "none") +
+  scale_x_continuous(limits = c(-2, n_cols_g), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(-6.5, n_rows_g + 6.5), expand = c(0, 0)) +
+  annotate("text", x = 0.5, y = -0.85, label = "low", size = 2.3) +
+  annotate("text", x = n_cols_g - 0.5, y = -0.85, label = "high", size = 2.3) +
+  annotate("text", x = n_cols_g / 2, y = -1.5, label = "Density", size = 2.3) +
+  annotate("text", x = -0.60, y = n_rows_g - 0.5, label = "low", hjust = 1,
+    size = 2.3) +
+  annotate("text", x = -0.60, y = 0.5, label = "high", hjust = 1, size = 2.3) +
+  annotate("text", x = -1.60, y = n_rows_g / 2, label = "Order", angle = 90,
+    size = 2.3) +
+  coord_equal() +
+  theme_void(base_size = 7) +
+  theme(plot.margin = margin(1.5, 1.5, 1.5, 1.5, "pt"))
+grid_thm <- function() theme_classic(base_size = 8) +
+  theme(strip.text = element_text(size = 8, hjust = 0.5, lineheight = 0.95),
+    strip.background = element_blank(),
+    axis.line = element_line(colour = "black", linewidth = 0.28),
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = margin(1, 1, 1, 1, "pt"))
+p_paths <- ggplot(merged_df, aes(X, Y, group = fname, colour = gcol)) +
+  geom_path(linewidth = 0.28, alpha = 0.75) +
+  annotate("segment", x = 0, xend = 8, y = 0, yend = 0,
+    colour = "black", linewidth = 0.35) +
+  facet_wrap(~ gtitle, ncol = n_cols_g, axes = "all") +
+  scale_colour_identity(guide = "none") +
+  scale_x_continuous(limits = c(-8, 8), breaks = c(-8, 0, 8),
+    expand = c(0, 0)) +
+  scale_y_continuous(limits = c(-8, 8), breaks = c(-8, 0, 8),
+    expand = c(0, 0)) +
+  coord_equal() +
+  labs(x = "", y = "") +
+  grid_thm()
+save_figure(patchwork::wrap_plots(p_paths, p_key, widths = c(8.6, 1.35)),
+  "trajectories_order_by_density_grid", 9.4, 8.4)
+# Mean displacement per animal in step-length units (r = 1 = one 0.24 m
+# step), inside the unit circle; one shared window across all panels.
+nice_ceil <- function(v) {
+  if (v <= 0) return(1.0)
+  v <- v * 1.10
+  e <- floor(log10(v))
+  f <- v / 10 ^ e
+  for (n in c(1.0, 2.0, 2.5, 5.0, 10.0)) if (f <= n) return(n * 10 ^ e)
+  10.0 * 10 ^ e
+}
 vectors <- aggregate(cbind(dX, dY) ~ order + density + fname,
-                     data = merged_df, FUN = mean)
-vectors$vx <- vectors$dX / (6 * 0.04)
-vectors$vy <- vectors$dY / (6 * 0.04)
-circle <- data.frame(x = cos(seq(-pi, pi, length.out = 201)),
-                     y = sin(seq(-pi, pi, length.out = 201)))
-p_vectors <- ggplot(vectors) +
-  geom_path(data = circle, aes(x, y), inherit.aes = FALSE, colour = "grey70") +
-  geom_segment(aes(x = 0, y = 0, xend = vx, yend = vy, colour = order),
-                alpha = 0.6, linewidth = 0.3) +
-  facet_grid(order ~ density) + coord_equal() +
-  labs(x = "mean step / step length", y = "") + theme(legend.position = "none")
-save_figure(p_vectors, "mean_vectors_order_by_density_grid", 12, 10)
+  data = merged_df, FUN = mean)
+step_L_m <- 6 * 0.04
+Lvec <- max(nice_ceil(max(abs(vectors$dX), abs(vectors$dY)) / step_L_m), 1.15)
+vectors$vx <- vectors$dX / step_L_m
+vectors$vy <- vectors$dY / step_L_m
+vectors$gcol <- cell_color2(match(vectors$order, orders_g) - 1L,
+  match(vectors$density, densities_g) - 1L, n_rows_g, n_cols_g)
+vectors$gtitle <- factor(cell_title(vectors$order, vectors$density),
+  levels = gtitle_levels)
+circle <- data.frame(x = cos(seq(0, 2 * pi, length.out = 257)),
+  y = sin(seq(0, 2 * pi, length.out = 257)))
+zero_seg <- data.frame(x = 0, xend = 1, y = 0, yend = 0)
+zero_tick <- data.frame(x = 0.96, xend = 1.02, y = 0, yend = 0)
+p_vectors <- ggplot(vectors, aes(group = fname)) +
+  geom_path(data = circle, aes(x, y), inherit.aes = FALSE, colour = "black",
+    linewidth = 0.28) +
+  geom_segment(aes(x = 0, y = 0, xend = vx, yend = vy, colour = gcol),
+    linewidth = 0.39, alpha = 0.8) +
+  geom_point(data = data.frame(x = 0, y = 0), aes(x, y), inherit.aes = FALSE,
+    size = 0.12, colour = "black") +
+  geom_segment(data = zero_seg, aes(x = x, y = y, xend = xend, yend = yend), inherit.aes = FALSE,
+    colour = "black", linewidth = 0.32) +
+  geom_segment(data = zero_tick, aes(x = x, y = y, xend = xend, yend = yend), inherit.aes = FALSE,
+    colour = "black", linewidth = 0.35, lineend = "round") +
+  facet_wrap(~ gtitle, ncol = n_cols_g) +
+  scale_colour_identity(guide = "none") +
+  scale_x_continuous(limits = c(-Lvec, Lvec), breaks = NULL) +
+  scale_y_continuous(limits = c(-Lvec, Lvec), breaks = NULL) +
+  coord_equal() +
+  labs(x = "", y = "") +
+  grid_thm() +
+  theme(axis.line = element_blank())
+save_figure(patchwork::wrap_plots(p_vectors, p_key, widths = c(8.6, 1.35)),
+  "mean_vectors_order_by_density_grid", 8.5, 7.5)
 
 ```
 
-The synthetic schematic separates the two stimulus dimensions: density
-controls the number of virtual neighbors; order controls coherence of
-their headings. The schematic is illustrative and never enters a fit.
+The synthetic 6 x 6 stimulus grid previews the whole experiment: one panel
+per condition, where the walk density and the walk coherence follow the
+panel position, so reading from the top-left panel to the bottom-right moves
+from sparse-disordered to dense-ordered stimuli. Each panel's colour comes
+from the shared 2D key introduced above the data grids.
 
 
 ```{r}
 #| cell-id: "locust-density-order-11"
+# Python twin: synthetic 6 x 6 order-density stimulus grid (7 x 6 figure).
+# Rows = order (0.0 top -> 1.0 bottom), columns = density (1 left -> 64
+# right); each panel shows density walks of 60 steps (length 0.04),
+# von Mises about 0 degrees with kappa = inverse_A1(order) (order 1 is
+# straight). Panel colors come from the shared deep-purple 2D map
+# (black -> red along order + black -> blue along density, channelwise
+# max), with the 2D color key on the right.
 set.seed(SEED)
+# These level vectors are consumed by the screening cells below (c15+);
+# the schematic keeps using them as well.
 density_levels <- c(1, 4, 8, 16, 32, 64)
 order_levels <- seq(0, 1, by = 0.2)
-stimulus_grid <- expand.grid(order = order_levels, density = density_levels)
-schematic <- do.call(rbind, lapply(seq_len(nrow(stimulus_grid)), function(i) {
-  n <- stimulus_grid$density[i]
-  o <- stimulus_grid$order[i]
-  theta <- runif(n, -pi, pi) * (1 - o)
-  x <- runif(n)
-  y <- runif(n)
-  data.frame(order = o, density = n, x = x, y = y,
-             xend = x + 0.1 * cos(theta), yend = y + 0.1 * sin(theta))
-}))
-p_stimulus <- ggplot(schematic, aes(x, y)) + geom_point(size = 0.5) +
-  geom_segment(aes(xend = xend, yend = yend), linewidth = 0.25) +
-  facet_grid(order ~ density) + coord_equal() +
-  labs(x = "virtual density increases across columns", y = "virtual order increases down rows")
-save_figure(p_stimulus, "order_density_pairwise_trajectories_only", 12, 10)
+orders_s <- order_levels
+densities_s <- density_levels
+n_rows_s <- length(orders_s)
+n_cols_s <- length(densities_s)
+n_steps_s <- 60L
+step_L_s <- 0.04
+cell_color_s <- function(r, c2) {
+  to <- 0.10 + 0.85 * (r / (n_rows_s - 1)) ^ 1.15
+  td <- 0.10 + 0.85 * (c2 / (n_cols_s - 1)) ^ 1.15
+  rgb <- pmax(0, pmin(1, pmax(to * c(1.00, 0.15, 0.15),
+    td * c(0.10, 0.25, 1.00))))
+  sprintf("#%02X%02X%02X", round(rgb[1] * 255), round(rgb[2] * 255),
+    round(rgb[3] * 255))
+}
+walks <- vector("list", n_rows_s * n_cols_s)
+wi <- 0L
+for (r in 0:(n_rows_s - 1)) {
+  for (c2 in 0:(n_cols_s - 1)) {
+    o <- orders_s[r + 1L]
+    n_traj <- densities_s[c2 + 1L]
+    wi <- wi + 1L
+    set.seed(123 + 1000L * r + 10L * c2)
+    if (o == 0) {
+      x0 <- runif(n_traj, 0.10, 0.90)
+      y0 <- runif(n_traj, 0.10, 0.90)
+    } else {
+      x0 <- rep(0, n_traj)
+      y0 <- if (n_traj == 1L) 0.5 else seq(0.05, 0.95, length.out = n_traj)
+    }
+    k <- inverse_A1(o)
+    pts <- matrix(0, nrow = 0, ncol = 2)
+    for (i in seq_len(n_traj)) {
+      if (o == 1) {
+        angles <- rep(0, n_steps_s)
+      } else {
+        angles <- mod_circular(as.numeric(circular::rvonmises(n_steps_s,
+          mu = vmu(0.0), kappa = k, control.circular = vm_ctrl)))
+      }
+      pts <- rbind(pts, cbind(
+        c(x0[i], x0[i] + cumsum(step_L_s * cos(angles))),
+        c(y0[i], y0[i] + cumsum(step_L_s * sin(angles)))))
+    }
+    walks[[wi]] <- data.frame(o = r + 1L, d = c2 + 1L,
+      i = rep(seq_len(n_traj), each = n_steps_s + 1L),
+      x = pts[, 1], y = pts[, 2])
+  }
+}
+schematic <- do.call(rbind, walks)
+schematic$o_lab <- factor(orders_s[schematic$o],
+  levels = orders_s, labels = format(orders_s, nsmall = 1))
+schematic$d_lab <- factor(densities_s[schematic$d],
+  levels = densities_s, labels = format(densities_s))
+schematic$cell <- mapply(cell_color_s, schematic$o - 1L, schematic$d - 1L)
+schematic$lw <- ifelse(densities_s[schematic$d] >= 16, 0.11, 0.19)
+
+border_thm <- element_rect(colour = "black", linewidth = 0.28, fill = NA)
+p_panels <- list()
+for (r in 0:(n_rows_s - 1)) {
+  for (c2 in 0:(n_cols_s - 1)) {
+    sub <- schematic[schematic$o == r + 1L & schematic$d == c2 + 1L, ,
+      drop = FALSE]
+    p <- ggplot(sub[densities_s[sub$d] < 16, , drop = FALSE],
+      aes(x, y, group = i, colour = cell)) +
+      geom_path(data = sub[densities_s[sub$d] >= 16, , drop = FALSE],
+        aes(x, y, group = i, colour = cell),
+        linewidth = 0.11, alpha = 0.85) +
+      geom_path(linewidth = 0.19, alpha = 0.85) +
+      scale_colour_identity(guide = "none") +
+      scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+      scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+      coord_equal() +
+      theme_void() +
+      theme(panel.border = border_thm,
+        plot.margin = margin(1.5, 1.5, 1.5, 1.5, "pt"),
+        plot.title = element_text(size = 8, hjust = 0.5))
+    if (r == 0L) {
+      p <- p + labs(title = format(densities_s[c2 + 1L]))
+    }
+    p_panels[[length(p_panels) + 1L]] <- p
+  }
+}
+grid_block <- patchwork::wrap_plots(p_panels, ncol = n_cols_s)
+gutter_df <- data.frame(lbl = format(orders_s, nsmall = 1),
+  y = n_rows_s:1L)
+p_gutter <- ggplot(gutter_df) +
+  geom_text(aes(x = 0.98, y = y, label = lbl), hjust = 1, size = 2.6) +
+  annotate("text", x = 0.30, y = (n_rows_s + 1) / 2,
+    label = "Order", angle = 90, size = 2.6) +
+  scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0.5, n_rows_s + 0.5), expand = c(0, 0)) +
+  theme_void() +
+  labs(title = "") +
+  theme(plot.margin = margin(1.5, 2, 1.5, 2, "pt"))
+key_grid <- expand.grid(rr = 0:(n_rows_s - 1), cc = 0:(n_cols_s - 1))
+key_grid$ypos <- n_rows_s - 1L - key_grid$rr
+key_grid$col <- mapply(cell_color_s, key_grid$rr, key_grid$cc)
+p_key <- ggplot(key_grid, aes(x = cc + 0.5, y = ypos + 0.5, fill = col)) +
+  geom_tile() +
+  annotate("rect", xmin = 0, xmax = n_cols_s, ymin = 0, ymax = n_rows_s,
+    fill = NA, colour = "black", linewidth = 0.28) +
+  scale_fill_identity(guide = "none") +
+  scale_x_continuous(limits = c(-2, n_cols_s), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(-6.5, n_rows_s + 6.5),
+    expand = c(0, 0)) +
+  annotate("text", x = 0.5, y = -0.75, label = "low", size = 2.3) +
+  annotate("text", x = n_cols_s - 0.5, y = -0.75, label = "high",
+    size = 2.3) +
+  annotate("text", x = n_cols_s / 2, y = -1.35, label = "Density",
+    size = 2.3) +
+  annotate("text", x = -0.60, y = n_rows_s - 0.5, label = "low",
+    hjust = 1, size = 2.3) +
+  annotate("text", x = -0.60, y = 0.5, label = "high", hjust = 1,
+    size = 2.3) +
+  annotate("text", x = -1.75, y = n_rows_s / 2, label = "Order",
+    angle = 90, size = 2.3) +
+  coord_equal() +
+  labs(title = "") +
+  theme_void(base_size = 7) +
+  theme(plot.margin = margin(1.5, 1.5, 1.5, 1.5, "pt"))
+p_title <- ggplot(data.frame(), aes(x = 0, y = 0)) +
+  annotate("text", x = 0.5, y = 0.5, label = "Density (m\u207b\u00b2)",
+    size = 3.2) +
+  scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  theme_void()
+p_stimulus <- patchwork::wrap_plots(
+  p_title,
+  patchwork::wrap_plots(p_gutter, grid_block, p_key,
+    widths = c(0.4, 6, 1)),
+  ncol = 1, heights = c(0.07, 1))
+save_figure(p_stimulus, "order_density_pairwise_trajectories_only", 7, 6)
+
+```
+
+A compact schematic of the two stimulus dimensions. On the left, the
+virtual neighbours: the dot count is the density (more neighbours, more
+dots, darker red). On the right, those neighbours' motion: 12 walkers each
+take 100 unit steps, and the order controls how coherent their headings are
+(0 = random directions, 1 = all walking straight to the right). The top row
+is the strongest stimulus. The schematic is illustrative only; it never
+enters a fit.
+
+
+```{r}
+#| cell-id: "9f890a7f"
+# Synthetic stimulus schematic (6 rows x 2 columns): density dots on the
+# left (reds), coherent walkers on the right (purples).
+sc_orders <- c(1.0, 0.8, 0.6, 0.4, 0.2, 0.0)
+sc_denss <- c(64, 32, 16, 8, 4, 1)
+sc_reds <- c("64" = "#7E0610", "32" = "#AC1117", "16" = "#CA181D",
+  "8" = "#E83429", "4" = "#F6583E", "1" = "#FB7A5A")
+sc_purps <- c("1.0" = "#470F84", "0.8" = "#582F93", "0.6" = "#6950A3",
+  "0.4" = "#7B74B5", "0.2" = "#928FC3", "0.0" = "#AAA8D0")
+sc_A1 <- function(k)
+  besselI(k, 1, expon.scaled = TRUE) / besselI(k, 0, expon.scaled = TRUE)
+sc_kappa <- function(o) {
+  if (o <= 0) return(0)
+  if (o >= 1) return(Inf)
+  uniroot(function(k) sc_A1(k) - o, c(1e-8, 500))$root
+}
+sc_n_traj <- 12L
+sc_n_steps <- 100L
+sc_step <- 0.04
+sc_box <- theme_void() +
+  theme(panel.border = element_rect(colour = "black", fill = NA,
+    linewidth = 0.28),
+    plot.margin = margin(1, 1, 1, 1, "pt"))
+set.seed(123)
+p_dots <- vector("list", 6)
+p_walks <- vector("list", 6)
+for (r in seq_len(6)) {
+  d <- sc_denss[r]
+  if (d == 1L) {
+    xs <- 0.5; ys <- 0.5
+  } else if (d == 4L) {
+    g <- expand.grid(c(0.25, 0.75), c(0.25, 0.75))
+    xs <- g$Var1; ys <- g$Var2
+  } else {
+    ns <- ceiling(sqrt(d))
+    axis_seq <- seq(0.1, 0.9, length.out = ns)
+    g <- expand.grid(axis_seq, axis_seq)
+    xs <- g$Var1[seq_len(d)]
+    ys <- g$Var2[seq_len(d)]
+  }
+  xs <- pmin(0.925, pmax(0.075, xs + rnorm(length(xs), 0, 0.025)))
+  ys <- pmin(0.925, pmax(0.075, ys + rnorm(length(ys), 0, 0.025)))
+  p_dots[[r]] <- ggplot(data.frame(x = xs, y = ys), aes(x, y)) +
+    geom_point(size = 0.06, colour = sc_reds[as.character(d)]) +
+    scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    coord_equal() + sc_box
+  o <- sc_orders[r]
+  k <- sc_kappa(o)
+  if (o == 0) {
+    x0 <- runif(sc_n_traj, 0.1, 0.9)
+    y0 <- runif(sc_n_traj, 0.1, 0.9)
+  } else {
+    x0 <- rep(0.05, sc_n_traj)
+    y0 <- seq(0.15, 0.85, length.out = sc_n_traj)
+  }
+  pts <- data.frame()
+  for (i in seq_len(sc_n_traj)) {
+    angles <- if (o == 1) rep(0, sc_n_steps)
+      else as.numeric(circular::rvonmises(sc_n_steps, mu = vmu(0.0),
+        kappa = k, control.circular = vm_ctrl))
+    pts <- rbind(pts, data.frame(
+      i = i,
+      x = c(x0[i], x0[i] + cumsum(sc_step * cos(angles))),
+      y = c(y0[i], y0[i] + cumsum(sc_step * sin(angles)))))
+  }
+  p_walks[[r]] <- ggplot(pts, aes(x, y, group = i)) +
+    geom_path(linewidth = 0.25, colour = sc_purps[sprintf("%.1f", o)]) +
+    scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+    coord_equal() + sc_box
+}
+gutters_l <- data.frame(y = rev(seq_len(6)), lbl = as.character(sc_denss))
+gutters_r <- data.frame(y = rev(seq_len(6)),
+  lbl = format(sc_orders, nsmall = 1))
+p_gut_l <- ggplot(gutters_l) +
+  geom_text(aes(x = 0.9, y = y, label = lbl), hjust = 1, size = 2.4) +
+  scale_y_continuous(limits = c(0.5, 6.5), expand = c(0, 0)) +
+  scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  theme_void()
+p_gut_r <- ggplot(gutters_r) +
+  geom_text(aes(x = 0.1, y = y, label = lbl), hjust = 0, size = 2.4) +
+  scale_y_continuous(limits = c(0.5, 6.5), expand = c(0, 0)) +
+  scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  theme_void()
+p_schematic <- patchwork::wrap_plots(
+  patchwork::wrap_plots(p_gut_l,
+    patchwork::wrap_plots(p_dots, ncol = 1),
+    patchwork::wrap_plots(p_walks, ncol = 1), p_gut_r,
+    widths = c(0.30, 1, 1, 0.38)),
+  ncol = 1)
+save_figure(p_schematic, "order_density_trajectories", 2.2, 6.6)
 
 ```
 
@@ -464,7 +801,7 @@ diagnose_fit <- function(fit, circular_parameters = character()) {
 screen_priors <- function(rhs, centered = TRUE, uniform = FALSE) {
   cls <- if (centered) "Intercept" else "b"
   co <- if (centered) "" else "Intercept"
-  p <- set_prior(if (uniform) "unwrap_von_mises(0, 1e-16)" else
+  p <- set_prior(if (uniform) "unwrap_von_mises(0, 2.220446049250313e-16)" else
     "unwrap_von_mises(0, 1e-6)", class = cls, coef = co) +
     set_prior("normal(log(exp(2) - 1), 1)", class = cls, coef = co, dpar = "kappa")
   if (rhs != "1") {
@@ -496,7 +833,6 @@ if (is.null(screen_fit)) {
   unwrap_save_fit_cache("locust_d_screen_td_to", screen_fit, SEED, SCREEN_ITER, SCREEN_WARMUP)
 }
 diagnose_fit(screen_fit, "b_Intercept")
-
 ```
 
 ```{r}
@@ -564,23 +900,25 @@ explicit_loo <- function(fit, newdata, response = "y") {
 candidate_rhs <- c("Intercept-only" = "1", "Density" = "t_density",
   "Order" = "t_order", "Density + Order" = "t_density + t_order",
   "Density x Order" = "t_density * t_order")
-# EQUIVALENCE NOTE: the sweep's CircularUniform prior is represented by
-# the P0 convention unwrap_von_mises(0, 1e-16), effectively uniform on
-# the circle, avoiding a bounded uniform prior on brms's centered intercept.
-# Review circular support and the intercept convention in generated Stan.
+# EQUIVALENCE NOTE: the sweep's CircularUniform prior is the von Mises
+# (0, kappa) flat-circle convention with kappa = double-precision machine
+# epsilon (2.220446049250313e-16), the exact value of the Python twin's
+# CircularUniformPrior() - a unbounded-direction parameterization, not a
+# bounded uniform prior on brms's centered intercept.
+# Review the intercept convention in the generated Stan.
 sweep_fits <- sweep_loo <- vector("list", length(candidate_rhs))
 names(sweep_fits) <- names(sweep_loo) <- names(candidate_rhs)
 for (name in names(candidate_rhs)) {
   cat("Fitting screening model:", name, "\n")
   rhs <- candidate_rhs[[name]]
-  sweep_fits[[name]] <- unwrap_load_fit_cache(paste0("locust_d_screen_", name), SEED, SCREEN_ITER, SCREEN_WARMUP)
+  sweep_fits[[name]] <- unwrap_load_fit_cache(paste0("locust_d_screen_v2_", name), SEED, SCREEN_ITER, SCREEN_WARMUP)
   if (is.null(sweep_fits[[name]])) {
     sweep_fits[[name]] <- brm(screen_formula(rhs), data = screen_df,
       prior = screen_priors(rhs, uniform = TRUE),
       stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
       chains = CHAINS, iter = SCREEN_ITER, warmup = SCREEN_WARMUP, cores = CHAINS,
       seed = SEED, control = list(adapt_delta = 0.95))
-    unwrap_save_fit_cache(paste0("locust_d_screen_", name), sweep_fits[[name]], SEED, SCREEN_ITER, SCREEN_WARMUP)
+    unwrap_save_fit_cache(paste0("locust_d_screen_v2_", name), sweep_fits[[name]], SEED, SCREEN_ITER, SCREEN_WARMUP)
   }
   print(diagnose_fit(sweep_fits[[name]], "b_Intercept"))
   sweep_loo[[name]] <- explicit_loo(sweep_fits[[name]], screen_df)
@@ -597,18 +935,62 @@ sweep_df <- do.call(rbind, lapply(names(sweep_loo), function(name) {
 }))
 sweep_df <- sweep_df[order(sweep_df$delta_elpd, decreasing = TRUE), ]
 sweep_df
-
 ```
 
 ```{r}
 #| cell-id: "locust-density-order-18"
-p_selection <- ggplot(sweep_df, aes(delta_elpd, reorder(model, delta_elpd))) +
+# Python twin: compact 1.8 x 0.33n delta-ELPD forest of the five-model
+# sweep. Blue circles = order-included models, orange squares =
+# order-excluded, +/-1 SE caps, best model (delta 0) on top, dashed
+# zero line, framed upper-left legend, model names wrapped at width 40.
+wrap_label <- function(s, width = 40)
+  vapply(s, function(x) paste(strwrap(x, width = width), collapse = "\n"),
+    character(1))
+pretty_names <- sweep_df$model
+pretty_names[pretty_names == "Density x Order"] <- "Density \u00d7 Order"
+group_name <- ifelse(grepl("Order", sweep_df$model),
+  "Order included", "Order excluded")
+ypos <- nrow(sweep_df):1L
+# Explicit limits so the annotated legend lands in stable data coordinates on both axes.
+data_lo <- min(sweep_df$delta_elpd - sweep_df$se_delta_elpd)
+data_hi <- max(sweep_df$delta_elpd + sweep_df$se_delta_elpd)
+x_lo_sel <- data_lo - 0.08 * (data_hi - data_lo)
+x_hi_sel <- data_hi + 0.08 * (data_hi - data_lo)
+span_sel <- x_hi_sel - x_lo_sel
+p_selection <- ggplot(sweep_df,
+  aes(x = delta_elpd, y = ypos, colour = group_name, fill = group_name)) +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.35) +
   geom_errorbar(aes(xmin = delta_elpd - se_delta_elpd,
-                    xmax = delta_elpd + se_delta_elpd), orientation = "y", width = 0.2) +
-  geom_point() + geom_vline(xintercept = 0, linetype = "dashed") +
-  labs(x = "delta ELPD versus best (paired +/-1 SE)", y = "")
-save_figure(p_selection, "order_density_model_selection", 7, 4)
-
+    xmax = delta_elpd + se_delta_elpd), orientation = "y",
+    width = 0.24, linewidth = 0.35) +
+  geom_point(aes(shape = group_name), size = 1.7) +
+  scale_colour_manual(values = c("Order included" = "#1F77B4",
+    "Order excluded" = "#FF7F0E"), guide = "none") +
+  scale_fill_manual(values = c("Order included" = "#1F77B4",
+    "Order excluded" = "#FF7F0E"), guide = "none") +
+  scale_shape_manual(values = c("Order included" = 16,
+    "Order excluded" = 15), guide = "none") +
+  scale_x_continuous(limits = c(x_lo_sel, x_hi_sel)) +
+  scale_y_continuous(limits = c(0.45, nrow(sweep_df) + 0.55),
+    breaks = nrow(sweep_df):1L, labels = wrap_label(pretty_names),
+    expand = c(0, 0)) +
+  labs(x = "ELPD difference", y = "") +
+  # Framed upper-left legend (drawn by hand: this ggplot2 build
+  # drops legend.position = "upperleft" without an error).
+  annotate("rect", xmin = x_lo_sel + 0.02 * span_sel,
+    xmax = x_lo_sel + 0.88 * span_sel, ymin = 4.55, ymax = 5.52,
+    fill = "white", colour = "black", linewidth = 0.3) +
+  annotate("point", x = x_lo_sel + 0.055 * span_sel, y = 5.24,
+    shape = 16, colour = "#1F77B4", size = 2.1) +
+  annotate("text", x = x_lo_sel + 0.135 * span_sel, y = 5.24,
+    label = "Order included", hjust = 0, vjust = 0.5, size = 2.2) +
+  annotate("point", x = x_lo_sel + 0.055 * span_sel, y = 4.78,
+    shape = 15, colour = "#FF7F0E", size = 2.1) +
+  annotate("text", x = x_lo_sel + 0.135 * span_sel, y = 4.78,
+    label = "Order excluded", hjust = 0, vjust = 0.5, size = 2.2) +
+  theme_classic(base_size = 8)
+save_figure(p_selection, "order_density_model_selection", 1.8,
+  0.33 * nrow(sweep_df))
 ```
 
 ## 4. Final step-level hierarchical model
@@ -623,8 +1005,8 @@ The direction intercept has `VonMises(0, 3)`, direction main effects
 `Normal(0, pi/2)` and interaction `Normal(0, pi/4)`. Pre-softplus
 concentration intercept: `Normal(inverse_softplus(2), 0.5)`; main effects
 `Normal(0, 0.6)` and interaction `Normal(0, 0.4)`. The individual
-concentration intercept is Normal with a positive scale having the
-Python Normal `(inverse_softplus(1), 0.3)` density. Default internal
+concentration intercept is Normal with a positive scale drawn from
+`Normal(inverse_softplus(1), 0.3)`. Default internal
 predictor centering is retained, including the interaction design column;
 do not manually center the two predictors before taking their product.
 
@@ -648,17 +1030,21 @@ prior_vonmises <- (
   prior("normal(0, 0.4)", class = "b", coef = "t_density:t_order", dpar = "kappa") +
   prior("normal(log(exp(1) - 1), 0.3)", class = "sd", dpar = "kappa")
 )
-# EQUIVALENCE NOTE: PyMC's Normal(..., transform=LogExpM1()) for sigma
-# changes its positive-support coordinate, not the Normal density into a
-# softplus-normal generative prior. brms's positive sd with the same Normal
-# density matches that constrained target (a truncated Normal), rather than
-# softplus(Normal(...)). Confirm this interpretation against the Python fit.
+# SD EQUIVALENCE NOTE (framework exception, random-effect
+# parameterization): Python places Normal(mu = inverse_softplus(1), sigma
+# = 0.3) on a FREE real coordinate and maps it to the positive scale with
+# a softplus link (sigma = softplus(eta)). brms has no link machinery for
+# a random-effect sd: its sd is a plain positive parameter, so the same
+# Normal(mu, sigma) applies directly on the positive scale (truncated at
+# 0). Location and scale are identical on both sides; the difference is
+# confined to the 0-truncation of a Normal whose mode is at
+# softplus(exp(1) - 1) = 1, far from 0 - an admitted framework-forced
+# random-effect difference, not a fitted-quantity discrepancy.
 # EQUIVALENCE NOTE: brms and Bambi internally center design columns while
 # returning ordinary-scale intercept draws. posterior_linpred handles that
 # conversion. Do not reuse the Python posthoc helper's manually centered
 # interaction grid here; check fitted predictions against the PyMC graph.
 prior_vonmises
-
 ```
 
 ```{r}
@@ -737,8 +1123,7 @@ c(p_loo = final_loo$estimates["p_loo", "Estimate"],
 
 Evaluate `mu` and positive `kappa` with the fitted brms predictors.
 Population curves exclude individual deviations, so they describe an
-animal with zero concentration deviation, as in the Python fixed-effect
-prediction surfaces. These curves are not marginal averages over new
+animal with a zero concentration deviation. These curves are not marginal averages over new
 individuals. Predictive density at zero is a density per radian, distinct
 from probability mass in an angular sector.
 
@@ -862,7 +1247,7 @@ polar_deco <- function(p) {
       breaks = NULL) +
     scale_y_continuous(limits = c(0, RMAX_polar), expand = c(0, 0),
       breaks = NULL) +
-    coord_polar()
+    coord_polar(start = -pi / 2, direction = -1)
 }
 p_row_orders <- polar_deco(ggplot(pdf_summary,
   aes(theta, r_med,
@@ -890,21 +1275,57 @@ p_polar <- patchwork::wrap_plots(p_row_orders, p_row_density, ncol = 1)
 save_figure(p_polar, "order_density_polar_pdfs_grid", 11, 10)
 
 coefficient_draws <- as.data.frame(posterior::as_draws_df(fit))
-coefficient_summary <- do.call(rbind, lapply(trace_parameters, function(p) {
-  data.frame(parameter = p, component = if (grepl("b_kappa_", p)) "kappa (pre-softplus)" else "mu",
-    as.list(interval_row(coefficient_draws[[p]], angular = p == "b_Intercept")))
+mu_pars <- trace_parameters[!grepl("b_kappa_", trace_parameters)]
+k_pars <- paste0("b_kappa_", sub("^b_", "", mu_pars))
+coef_label <- c("Intercept", "Density", "Order", "Density \u00d7 Order")
+stopifnot(length(mu_pars) == 4L, all(grepl("b_kappa_", k_pars)))
+cs <- do.call(rbind, lapply(seq_along(mu_pars), function(j) {
+  rbind(data.frame(term = j, comp = "mu",
+    as.list(interval_row(coefficient_draws[[mu_pars[j]]],
+      angular = mu_pars[j] == "b_Intercept"))),
+    data.frame(term = j, comp = "kappa",
+      as.list(interval_row(coefficient_draws[[k_pars[j]]]))))
 }))
-p_coefficients <- ggplot(coefficient_summary, aes(mean, parameter)) +
-  geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.2) +
-  geom_point() + geom_vline(xintercept = 0, linetype = "dashed") +
-  facet_wrap(~ component, scales = "free") + labs(x = "posterior mean and 95% HDI", y = "")
-save_figure(p_coefficients, "order_density_coefficients", 11, 5)
+cs$ypos <- cs$term + ifelse(cs$comp == "kappa", 0.16, -0.16)
+rng_x <- range(c(cs$low, cs$high))
+pad_x <- 0.12 * diff(rng_x)
+x_lo_c <- rng_x[1] - pad_x
+x_hi_c <- rng_x[2] + pad_x
+cspan_c <- x_hi_c - x_lo_c
+p_coefficients <- ggplot(cs, aes(mean, ypos, colour = comp)) +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.35) +
+  geom_errorbar(aes(xmin = low, xmax = high), width = 0.22,
+    linewidth = 0.35) +
+  geom_point(aes(shape = comp), size = 1.7) +
+  scale_colour_manual(values = c(mu = "#8C564B", kappa = "#2CA02C"),
+    guide = "none") +
+  scale_shape_manual(values = c(mu = 18, kappa = 17), guide = "none") +
+  scale_x_continuous(limits = c(x_lo_c, x_hi_c)) +
+  scale_y_reverse(limits = c(4.7, -0.6), breaks = 1:4,
+    labels = coef_label, expand = c(0, 0)) +
+  # Framed upper-right legend, drawn by hand (this ggplot2 build drops
+  # "upperleft"/"bottomright" positions without an error).
+  annotate("rect", xmin = x_lo_c + 0.62 * cspan_c,
+    xmax = x_lo_c + 0.97 * cspan_c, ymin = -0.5, ymax = 0.1,
+    fill = "white", colour = "black", linewidth = 0.3) +
+  annotate("point", x = x_lo_c + 0.665 * cspan_c, y = -0.35, shape = 18,
+    colour = "#8C564B", size = 2.1) +
+  annotate("text", x = x_lo_c + 0.73 * cspan_c, y = -0.35, label = "\u03bc",
+    hjust = 0, vjust = 0.5, size = 2.6) +
+  annotate("point", x = x_lo_c + 0.665 * cspan_c, y = -0.05, shape = 17,
+    colour = "#2CA02C", size = 2.1) +
+  annotate("text", x = x_lo_c + 0.73 * cspan_c, y = -0.05, label = "\u03ba",
+    hjust = 0, vjust = 0.5, size = 2.6) +
+  labs(x = "Coefficient value", y = "") +
+  theme_classic(base_size = 8)
+save_figure(p_coefficients, "order_density_coefficients", 2.6, 3.6)
 
 ```
 
 ## 6. Cell-level and individual posterior predictive checks
 
-Match the Python statistic $\overline{\cos\theta}$: alignment at zero.
+The alignment statistic is $\overline{\cos\theta}$: the mean heading's
+projection onto the zero reference direction.
 Within each observed order-density cell, the empirical hierarchical
 bootstrap resamples animals, then steps within animals, weighting
 animals equally. Conditional predictive replicates use each animal's
@@ -912,6 +1333,54 @@ fitted concentration effect and the original number of steps. Apply the
 same bootstrap to replicated datasets. Individual panels compare a
 within-animal step bootstrap with predictive replicates. Plot 95% HDIs.
 
+
+The model verdict in one figure. Left: the matched-model sweep as delta-ELPD
+relative to the best model (blue circles include order, orange squares
+exclude it; the dashed line is zero). Right: the fixed effects that carry
+that advantage (diamonds = mean-direction terms, triangles = concentration
+terms, with 95% HDIs). Both panels share the inverted row order, so the
+strongest evidence sits on top.
+
+
+```{r}
+#| cell-id: "980010fd"
+# Combined selection + coefficient figure: the sweep forest (left) beside
+# the coefficient posteriors (right); both halves reuse the objects built
+# above and share the inverted row order.
+rng_cc <- range(c(cs$low, cs$high))
+span_cc <- diff(rng_cc)
+x_lo_cc <- rng_cc[1] - 0.10 * span_cc
+x_hi_cc <- rng_cc[2] + 0.10 * span_cc
+cc_span <- x_hi_cc - x_lo_cc
+p_coef_comp <- ggplot(cs, aes(mean, ypos, colour = comp)) +
+  geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.35) +
+  geom_errorbar(aes(xmin = low, xmax = high), width = 0.22,
+    linewidth = 0.35) +
+  geom_point(aes(shape = comp), size = 1.5) +
+  scale_colour_manual(values = c(mu = "#8C564B", kappa = "#2CA02C"),
+    guide = "none") +
+  scale_shape_manual(values = c(mu = 18, kappa = 17), guide = "none") +
+  scale_x_continuous(limits = c(x_lo_cc, x_hi_cc)) +
+  scale_y_reverse(limits = c(4.6, -0.6), breaks = 1:4,
+    labels = coef_label, expand = c(0, 0)) +
+  annotate("rect", xmin = x_lo_cc + 0.60 * cc_span,
+    xmax = x_lo_cc + 0.96 * cc_span, ymin = -0.5, ymax = 0.1,
+    fill = "white", colour = "black", linewidth = 0.3) +
+  annotate("point", x = x_lo_cc + 0.65 * cc_span, y = -0.35, shape = 18,
+    colour = "#8C564B", size = 1.9) +
+  annotate("text", x = x_lo_cc + 0.73 * cc_span, y = -0.35, label = "\u03bc",
+    hjust = 0, vjust = 0.5, size = 2.0) +
+  annotate("point", x = x_lo_cc + 0.65 * cc_span, y = -0.05, shape = 17,
+    colour = "#2CA02C", size = 1.9) +
+  annotate("text", x = x_lo_cc + 0.73 * cc_span, y = -0.05, label = "\u03ba",
+    hjust = 0, vjust = 0.5, size = 2.0) +
+  labs(x = "Coefficient value", y = "") +
+  theme_classic(base_size = 7)
+p_composite <- patchwork::wrap_plots(p_selection, p_coef_comp, ncol = 2)
+save_figure(p_composite,
+  "order_density_model_selection_and_coefficients", 4.0, 1.85)
+
+```
 
 ```{r}
 #| cell-id: "locust-density-order-31"
@@ -938,18 +1407,105 @@ individual_ppc <- do.call(rbind, lapply(seq_along(animal_rows), function(j) {
     data.frame(animal_metadata[j, ], source = "posterior predictive",
     as.list(interval_row(predictive))))
 }))
-p_individual_ppc <- ggplot(individual_ppc,
-  aes(animal_id, mean, colour = source, shape = source)) +
-  geom_pointrange(aes(ymin = low, ymax = high), position = position_dodge(width = 0.4),
-                  linewidth = 0.2) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  facet_grid(order ~ density, scales = "free_x", space = "free_x") +
-  scale_shape_manual(values = c("data bootstrap" = 1, "posterior predictive" = 16)) +
-  labs(x = "animal", y = "alignment (95% HDI)") +
-  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
-        legend.position = "bottom")
-save_figure(p_individual_ppc, "order_density_individual_cell_ppc", 14, 11)
-
+# Python twin: 36-panel individual PPC (rows = density low top -> high
+# bottom, columns = order). Per animal: the within-animal data bootstrap
+# (open black marker + black CI) sits left of the individual-level
+# posterior predictive (filled red marker + red CI); dashed zero,
+# animal ids along x at 90 degrees, shared y on [-1.05, 1.05] with
+# ticks every 0.5, "Model/Data" legend on the bottom-right panel.
+dens_levels_ppc <- sort(unique(individual_ppc$density))
+order_levels_ppc <- sort(unique(individual_ppc$order))
+nrows_ppc <- length(dens_levels_ppc)
+ncols_ppc <- length(order_levels_ppc)
+model_red <- "#D62728"
+fmt_num <- function(v) format(v, digits = 15, trim = TRUE)
+ppc_panel <- function(sub, show_y, top_row, left_col, last_panel, o, d) {
+  sub <- sub[order(as.character(sub$animal_id)), , drop = FALSE]
+  aids <- unique(sub$animal_id)
+  n_an <- length(aids)
+  xpos <- match(sub$animal_id, aids) +
+    ifelse(sub$source == "data bootstrap", -0.14, 0.14)
+  pdata <- data.frame(x = xpos[sub$source == "data bootstrap"],
+    y = sub$mean[sub$source == "data bootstrap"],
+    low = sub$low[sub$source == "data bootstrap"],
+    high = sub$high[sub$source == "data bootstrap"])
+  pmodel <- data.frame(x = xpos[sub$source == "posterior predictive"],
+    y = sub$mean[sub$source == "posterior predictive"],
+    low = sub$low[sub$source == "posterior predictive"],
+    high = sub$high[sub$source == "posterior predictive"])
+  p <- ggplot() +
+    geom_segment(data = pdata, inherit.aes = FALSE,
+      aes(x = x, y = y, xend = x, yend = low),
+      colour = "black", linewidth = 0.32) +
+    geom_segment(data = pdata, inherit.aes = FALSE,
+      aes(x = x, y = y, xend = x, yend = high),
+      colour = "black", linewidth = 0.32) +
+    geom_segment(data = pmodel, inherit.aes = FALSE,
+      aes(x = x, y = y, xend = x, yend = low),
+      colour = model_red, linewidth = 0.35) +
+    geom_segment(data = pmodel, inherit.aes = FALSE,
+      aes(x = x, y = y, xend = x, yend = high),
+      colour = model_red, linewidth = 0.35) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.3) +
+    geom_point(data = pdata, inherit.aes = FALSE, aes(x = x, y = y),
+      shape = 21, colour = "black", fill = "white", size = 1.4) +
+    geom_point(data = pmodel, inherit.aes = FALSE, aes(x = x, y = y),
+      shape = 16, colour = model_red, size = 1.3) +
+    scale_x_continuous(
+      limits = c(0.25, n_an + if (last_panel) 2.4 else 0.75),
+      breaks = seq_len(n_an), labels = aids, expand = c(0, 0)) +
+    scale_y_continuous(limits = c(-1.05, 1.05), expand = c(0, 0),
+      breaks = seq(-1, 1, by = 0.5)) +
+    labs(x = NULL, y = if (left_col) paste0("Density=", fmt_num(d),
+      "\nAlignment") else "") +
+    theme_classic(base_size = 7) +
+    theme(axis.text.x = element_text(size = 5.5, angle = 90, hjust = 1,
+      vjust = 0.5),
+      axis.title.y = element_text(size = 7),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank())
+  if (!show_y) {
+    p <- p + theme(axis.text.y = element_blank(),
+      axis.ticks.y = element_blank())
+  }
+  if (top_row) {
+    p <- p + labs(title = paste0("Order=", fmt_num(o))) +
+      theme(plot.title = element_text(size = 8, hjust = 0.5))
+  }
+  if (last_panel) {
+    lg_x <- n_an + 0.30
+    p <- p +
+      annotate("rect", xmin = lg_x, xmax = lg_x + 1.85,
+        ymin = -1.00, ymax = -0.56,
+        fill = "white", colour = "black", linewidth = 0.3) +
+      annotate("point", x = lg_x + 0.30, y = -0.66, shape = 16,
+        colour = model_red, size = 1.5) +
+      annotate("text", x = lg_x + 0.50, y = -0.66, hjust = 0,
+        vjust = 0, size = 3, colour = "black", label = "Model") +
+      annotate("point", x = lg_x + 0.30, y = -0.90, shape = 21,
+        colour = "black", fill = "white", size = 1.5) +
+      annotate("text", x = lg_x + 0.50, y = -0.90, hjust = 0,
+        vjust = 0, size = 3, colour = "black", label = "Data")
+  }
+  p
+}
+ppc_panels <- list()
+for (ri in seq_len(nrows_ppc)) {
+  for (ci in seq_len(ncols_ppc)) {
+    d <- dens_levels_ppc[ri]
+    o <- order_levels_ppc[ci]
+    sub <- individual_ppc[individual_ppc$density == d &
+      individual_ppc$order == o, , drop = FALSE]
+    ppc_panels[[length(ppc_panels) + 1L]] <- ppc_panel(
+      sub, show_y = (ci == 1L), top_row = (ri == 1L),
+      left_col = (ci == 1L),
+      last_panel = (ri == nrows_ppc && ci == ncols_ppc), o, d)
+  }
+}
+p_individual_ppc <- do.call(patchwork::wrap_plots,
+  c(ppc_panels, list(ncol = ncols_ppc)))
+save_figure(p_individual_ppc, "order_density_individual_cell_ppc",
+  max(6.8, 2.2 * ncols_ppc), max(3.2, 1.8 * nrows_ppc))
 ```
 
 ```{r}
@@ -973,20 +1529,152 @@ cell_ppc <- do.call(rbind, lapply(cell_rows, function(animals) {
     }, numeric(1)))
   })
   g <- animal_metadata[animals[1], c("order", "density")]
-  rbind(data.frame(g, source = "data bootstrap", as.list(interval_row(empirical))),
-    data.frame(g, source = "posterior predictive", as.list(interval_row(predictive))))
+  rbind(data.frame(g, source = "data bootstrap", n_an = length(animals),
+    as.list(interval_row(empirical))),
+    data.frame(g, source = "posterior predictive", n_an = length(animals),
+    as.list(interval_row(predictive))))
 }))
-p_cell_ppc <- ggplot(cell_ppc, aes(order, mean, colour = source, shape = source)) +
-  geom_pointrange(aes(ymin = low, ymax = high), position = position_dodge(width = 0.04)) +
-  facet_wrap(~ density) +
-  scale_shape_manual(values = c("data bootstrap" = 1, "posterior predictive" = 16)) +
-  labs(x = "virtual order", y = "cell alignment (95% HDI)") + theme(legend.position = "bottom")
-save_figure(p_cell_ppc, "order_density_cell_ppc_dots", 10, 6)
-p_alignment_boot <- p_alignment +
-  geom_pointrange(data = cell_ppc[cell_ppc$source == "data bootstrap", ],
-    aes(x = order, y = mean, ymin = low, ymax = high), inherit.aes = FALSE,
-    shape = 1, colour = "firebrick", linewidth = 0.25)
-save_figure(p_alignment_boot, "order_density_alignment_ppc_bootstrap", 10, 6)
+
+# 2 columns x 6 panels, one row per condition: the left column walks
+# x = order inside each density row (reds, densest = darkest) and the right
+# column walks x = density (log 2) inside each order row (purples, most
+# ordered = darkest). Open markers = the data bootstrap, filled markers =
+# the posterior predictive; marker size grows with the animal count in the
+# cell; the dashed line is zero alignment. This build drops a labs call
+# bundled into a theme object when the composite is added to a plot, so the
+# per-panel labels are attached to the plot itself.
+dens_row <- rev(sort(unique(cell_ppc$density)))
+order_row <- rev(sort(unique(cell_ppc$order)))
+dens_reds <- c("64" = "#980C13", "32" = "#B81419", "16" = "#D32020",
+  "8" = "#ED392B", "4" = "#F75B40", "1" = "#FB7A5A")
+order_purples <- c("1" = "#4F1F8B", "0.8" = "#5F3C99", "0.6" = "#6F5BA8",
+  "0.4" = "#7F7BB9", "0.2" = "#9490C3", "0" = "#AAA8D0")
+msize <- function(n) (2.6 + 0.12 * sqrt(n)) * 25.4 / 72.27
+pcc_thm <- function(bottom) {
+  theme_classic(base_size = 8) +
+    theme(axis.line = element_line(colour = "black", linewidth = 0.28),
+      panel.grid = element_blank(),
+      axis.text.x = if (bottom) element_text(size = 7) else element_blank(),
+      plot.title = element_text(size = 8, hjust = 0.5),
+      plot.margin = margin(1, 1, 1, 1, "pt"))
+}
+p_cell_left <- lapply(seq_along(dens_row), function(r) {
+  d <- as.character(dens_row[r])
+  sub <- cell_ppc[cell_ppc$density == dens_row[r], , drop = FALSE]
+  sub$xd <- sub$order - 0.02
+  sub$xm <- sub$order + 0.02
+  sub$col <- dens_reds[d]
+  p <- ggplot(sub, aes(mean, mean, colour = col)) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.35) +
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, y = mean, xend = xd, yend = low),
+      linewidth = 0.32) +
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, y = mean, xend = xd, yend = high),
+      linewidth = 0.32) +
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd - 0.02, y = low, xend = xd + 0.02, yend = low),
+      linewidth = 0.32) +
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd - 0.02, y = high, xend = xd + 0.02, yend = high),
+      linewidth = 0.32) +
+    geom_point(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, size = msize(n_an)), shape = 1, fill = "white") +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, y = mean, xend = xm, yend = low),
+      linewidth = 0.35) +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, y = mean, xend = xm, yend = high),
+      linewidth = 0.35) +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm - 0.02, y = low, xend = xm + 0.02, yend = low),
+      linewidth = 0.35) +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm - 0.02, y = high, xend = xm + 0.02, yend = high),
+      linewidth = 0.35) +
+    geom_point(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, size = msize(n_an) * sqrt(0.9)), shape = 16) +
+    scale_colour_identity(guide = "none") +
+    scale_x_continuous(limits = c(-0.05, 1.05),
+      breaks = seq(0, 1, by = 0.2),
+      labels = format(seq(0, 1, by = 0.2), nsmall = 1)) +
+    scale_y_continuous(limits = c(-0.55, 1.05), breaks = c(-0.5, 0, 0.5, 1)) +
+    pcc_thm(r == length(dens_row)) +
+    labs(title = paste0("Density = ", d),
+      x = if (r == length(dens_row)) "Order" else "",
+      y = if (r == 1L) "Alignment" else "") +
+    scale_size_identity(guide = "none")
+  p
+})
+p_cell_right <- lapply(seq_along(order_row), function(r) {
+  o <- order_row[r]
+  sub <- cell_ppc[cell_ppc$order == o, , drop = FALSE]
+  sub$xd <- sub$density / 1.08
+  sub$xm <- sub$density * 1.08
+  sub$col <- order_purples[format(o, nsmall = 0)]
+  p <- ggplot(sub, aes(mean, mean, colour = col)) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.35) +
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, y = mean, xend = xd, yend = low),
+      linewidth = 0.32) +
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, y = mean, xend = xd, yend = high),
+      linewidth = 0.32) +
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd / 1.02, y = low, xend = xd * 1.02, yend = low),
+      linewidth = 0.32) +
+    geom_segment(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd / 1.02, y = high, xend = xd * 1.02, yend = high),
+      linewidth = 0.32) +
+    geom_point(data = sub[sub$source == "data bootstrap", , drop = FALSE],
+      aes(x = xd, size = msize(n_an)), shape = 1, fill = "white") +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, y = mean, xend = xm, yend = high),
+      linewidth = 0.35) +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, y = mean, xend = xm, yend = low),
+      linewidth = 0.35) +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm / 1.02, y = high, xend = xm * 1.02, yend = high),
+      linewidth = 0.35) +
+    geom_segment(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm / 1.02, y = low, xend = xm * 1.02, yend = low),
+      linewidth = 0.35) +
+    geom_point(data = sub[sub$source == "posterior predictive", , drop = FALSE],
+      aes(x = xm, size = msize(n_an) * sqrt(0.9)), shape = 16) +
+    scale_colour_identity(guide = "none") +
+    scale_x_continuous(
+      transform = scales::trans_new("log2", log2, function(x) 2 ^ x),
+      limits = c(0.8, 75), breaks = c(1, 2, 4, 8, 16, 32, 64)) +
+    scale_y_continuous(limits = c(-0.55, 1.05), breaks = c(-0.5, 0, 0.5, 1)) +
+    pcc_thm(r == length(order_row)) +
+    labs(title = paste0("Order = ", format(o, nsmall = 0)),
+      x = if (r == length(order_row)) "Density" else "",
+      y = "") +
+    scale_size_identity(guide = "none")
+  if (r == length(order_row)) {
+    # framed Model/Data legend in the bottom-right panel, drawn by hand in
+    # data coordinates (legend positions in corners are dropped silently
+    # by this ggplot2 build).
+    p <- p +
+      annotate("rect", xmin = 32, xmax = 74, ymin = 0.48, ymax = 0.99,
+        fill = "white", colour = "black", linewidth = 0.3) +
+      annotate("point", x = 40, y = 0.85, shape = 16, colour = "black",
+        size = 2.2) +
+      annotate("text", x = 48, y = 0.85, label = "Model", hjust = 0,
+        vjust = 0.5, size = 2.2) +
+      annotate("point", x = 40, y = 0.60, shape = 1, colour = "black",
+        fill = "white", size = 2.2) +
+      annotate("text", x = 48, y = 0.60, label = "Data", hjust = 0,
+        vjust = 0.5, size = 2.2)
+  }
+  p
+})
+p_cell_ppc <- patchwork::wrap_plots(
+  patchwork::wrap_plots(p_cell_left, ncol = 1),
+  patchwork::wrap_plots(p_cell_right, ncol = 1),
+  ncol = 2)
+save_figure(p_cell_ppc, "order_density_cell_ppc_dots", 7.4, 7.5)
 
 ```
 

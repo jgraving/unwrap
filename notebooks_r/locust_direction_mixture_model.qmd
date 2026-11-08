@@ -138,7 +138,7 @@ show_figure <- function(plot, name, width, height, res = 110) {
 
 ```{r}
 #| cell-id: "locust-r-008"
-theme_set(theme_minimal(base_size = 12))
+theme_set(theme_classic(base_size = 12))
 save_figure <- function(plot, name, width = 8, height = 5) {
   ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
          width = width, height = height)
@@ -167,8 +167,8 @@ N_PREDICTIVE <- if (quick_run) 25L else 100L
 ## Figure style
 
 Figures render inline and save vector PDFs under `figures/locust_direction_mixture_model/`.
-Colors match the Python twin: orange for bimodal/vectorial, blue for
-unimodal/optic flow, red for predictive model densities.
+Orange marks the bimodal/vectorial model and blue the
+unimodal/optic-flow model; red is the predictive model density.
 
 
 ```{r}
@@ -558,7 +558,7 @@ Stan samples both unsorted population means and derives one component
 order from their linear values on the bounded interval. The likelihood
 uses that order to select each animal's means, concentrations, and
 weights together. The saved first-component index also determines the
-order for population and individual summaries, matching the Python analysis.
+order used for population and individual summaries.
 The free unsorted parameters retain their permutation symmetry. The
 ordered view identifies the labels used in the analysis.
 
@@ -1054,7 +1054,9 @@ explicit_loo <- function(state, bimodal = TRUE, chunk_size = 128L) {
   # invariant to this scaling. Preserve chain IDs rather than flattening.
   likelihood <- exp(sweep(ll, 2, apply(ll, 2, max), "-"))
   r_eff <- loo::relative_eff(likelihood, chain_id = state$draws[[".chain"]])
-  result <- loo::loo(ll, r_eff = r_eff)
+  # The full Pareto-k table is printed below and its summary columns are
+  # carried in the ELPD table, so suppress loo()'s redundant high-k nag.
+  result <- suppressWarnings(loo::loo(ll, r_eff = r_eff))
   print(result)
   print(loo::pareto_k_table(result))
   result
@@ -1072,8 +1074,11 @@ delta_pointwise <- loo_bimodal$pointwise[, "elpd_loo"] - loo_unimodal$pointwise[
 print(elpd_table)
 print(data.frame(comparison = "Bimodal - Unimodal", delta_elpd = sum(delta_pointwise),
                  se = sqrt(length(delta_pointwise) * var(delta_pointwise))))
-p_elpd <- ggplot(elpd_table, aes(elpd, factor(model, levels = c("Unimodal", "Bimodal")),
+model_labels <- c(Bimodal = "Bimodal\n(Vec. encoding)",
+                  Unimodal = "Unimodal\n(Optic flow)")
+p_elpd <- ggplot(elpd_table, aes(elpd, factor(model, levels = c("Bimodal", "Unimodal")),
                                  colour = model, shape = model)) +
+  scale_y_discrete(labels = model_labels) +
   geom_errorbar(aes(xmin = elpd - se, xmax = elpd + se), orientation = "y", width = 0.15) +
   geom_point(size = 2.5) + scale_colour_manual(values = c(Bimodal = ORANGE, Unimodal = BLUE)) +
   scale_shape_manual(values = c(Bimodal = 15, Unimodal = 16)) +
@@ -1126,7 +1131,7 @@ replacement, resamples steps within each selected animal, then averages the
 animal densities with equal weight. The histogram uses 16 bins on a
 360-point grid; the von Mises KDE has kernel concentration 30 for the
 population and 15 for individuals. The bootstrap is redrawn in this
-notebook, so its realization need not match the Python analysis's.
+notebook, so its random realization differs from run to run.
 
 ```{r}
 #| cell-id: "locust-r-032"
@@ -1182,13 +1187,38 @@ model_layer <- function() {
                        limits = c(-pi, pi), expand = c(0, 0)) +
     labs(x = "Direction (radians)", y = "Density")
 }
+# Hand-drawn Model/Histogram/Kernel legend, matching the Python patch+line
+# legend handlers. Built with annotate() (no ggplot2 legend-key geoms) so it
+# emits no warning streams; placed as a right-hand patchwork column.
+val_legend <- function(framed = FALSE) {
+  lp <- ggplot(data.frame(y = c(8, 6.5, 5)), aes(x = 1, y = 0)) +
+    annotate("rect", xmin = 0.8, xmax = 1.4, ymin = 7.7, ymax = 8.3, fill = RED, alpha = 0.25) +
+    annotate("segment", x = 0.8, y = 8, xend = 1.4, yend = 8, colour = RED, linewidth = 0.6) +
+    annotate("point", x = 1.1, y = 6.5, size = 2.5, colour = "black") +
+    annotate("rect", xmin = 0.8, xmax = 1.4, ymin = 4.7, ymax = 5.3, fill = "black", alpha = 0.15) +
+    annotate("segment", x = 0.8, y = 5, xend = 1.4, yend = 5, colour = "black", linetype = "dashed", linewidth = 0.5) +
+    scale_y_continuous(breaks = c(8, 6.5, 5), labels = c("Model", "Histogram", "Kernel"),
+                       expand = c(0, 0)) +
+    scale_x_continuous(breaks = NULL, expand = c(0, 0)) +
+    coord_cartesian(xlim = c(0.7, 1.5), ylim = c(0, 10), clip = "off") +
+    theme_void() +
+    theme(axis.text.y = element_text(size = 9, colour = "black", hjust = 0,
+                                     margin = margin(0, 0, 0, 3, "pt")))
+  if (framed) {
+    lp <- lp + annotate("rect", xmin = 0.62, xmax = 1.58, ymin = 4.45, ymax = 8.55,
+                        colour = "grey50", fill = NA, linewidth = 0.3)
+  }
+  lp
+}
 p_hist <- model_layer() +
   geom_errorbar(data = hist_density, aes(ymin = low, ymax = high), width = 0.06) +
   geom_point(data = hist_density, size = 1.5)
 p_kde <- model_layer() +
   geom_ribbon(data = kde_density, aes(ymin = low, ymax = high), fill = "black", alpha = 0.15) +
   geom_line(data = kde_density, linetype = "dashed", linewidth = 0.5)
-save_figure(p_hist / p_kde, "population_directional_validation_cartesian", 7, 7)
+p_validation_cartesian <- (p_hist / p_kde) | val_legend(framed = FALSE)
+p_validation_cartesian <- p_validation_cartesian + plot_layout(widths = c(4, 1))
+save_figure(p_validation_cartesian, "population_directional_validation_cartesian", 7, 7)
 ```
 
 ```{r}
@@ -1216,6 +1246,8 @@ p_validation_polar <- ggplot(model_density, aes(theta, edge_radius + center)) +
   # The twin shows no axis labels; keep blank radius tick labels like it.
   labs(x = "", y = "") +
   theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+p_validation_polar <- p_validation_polar | val_legend(framed = TRUE)
+p_validation_polar <- p_validation_polar + plot_layout(widths = c(4, 1))
 save_figure(p_validation_polar, "population_directional_validation", 7, 7)
 ```
 
@@ -1307,6 +1339,28 @@ p_individual_ppc <- ggplot(ppc_curves, aes(theta, 1 + model, group = individual)
   coord_polar(start = pi / 2, direction = -1) +
   facet_wrap(~ individual, ncol = 7) + theme_void(base_size = 8) +
   theme(strip.text = element_text(size = 8), panel.spacing = grid::unit(0.5, "lines"))
+
+# Figure legend matching the Python twin: one-vertex line per key, so the
+# legend entries come from the manual scales and nothing is drawn on the
+# panels (manual guide overrides would warn on dev ggplot2; this does not).
+ppc_key <- data.frame(theta = rep(0, 4), r = rep(0, 4),
+  key = factor(rep(c("Kernel (bootstrap 95%)", "Model (posterior 95%)"), each = 2L),
+               levels = c("Kernel (bootstrap 95%)", "Model (posterior 95%)")))
+
+p_individual_ppc <- p_individual_ppc +
+  geom_line(data = ppc_key,
+    aes(x = theta, y = r, colour = key, linetype = key, group = key),
+    inherit.aes = FALSE, linewidth = 0.4) +
+  scale_colour_manual(name = NULL,
+    values = c("Kernel (bootstrap 95%)" = "grey20", "Model (posterior 95%)" = RED)) +
+  scale_linetype_manual(name = NULL,
+    values = c("Kernel (bootstrap 95%)" = "dashed", "Model (posterior 95%)" = "solid")) +
+  guides(colour = guide_legend(nrow = 2), linetype = guide_legend(nrow = 2)) +
+  theme(legend.position = "top", legend.justification = "right",
+        legend.key.width = grid::unit(1.1, "cm"),
+        legend.key.height = grid::unit(0.25, "cm"),
+        legend.text = element_text(size = 8),
+        legend.spacing = grid::unit(0.4, "lines"))
 save_figure(p_individual_ppc, "locust_directional_individual_ppc", 14, 16)
 ```
 
@@ -1574,14 +1628,27 @@ make_hyp_table <- function(arrays, mode, pooled = FALSE) {
       probability = mean(p[i, ] > f[i, ]), row.names = NULL)
   }))
 }
-population_dots <- function(table, label, baseline) {
-  ggplot(table, aes(center, factor(hypothesis, levels = c("Vec. encoding", "Optic flow")),
-                    colour = hypothesis, shape = hypothesis)) +
+population_dots <- function(table, label, baseline, invert = FALSE,
+                          baseline_label = NULL) {
+  levels <- if (invert) c("Optic flow", "Vec. encoding")
+          else c("Vec. encoding", "Optic flow")
+  p <- ggplot(table, aes(center, factor(hypothesis, levels = levels),
+          colour = hypothesis, shape = hypothesis)) +
     geom_errorbar(aes(xmin = low, xmax = high), orientation = "y", width = 0.15) +
     geom_point(size = 2.5) + geom_vline(xintercept = baseline, linetype = "dashed") +
     scale_colour_manual(values = HYP_COLORS) +
     scale_shape_manual(values = c("Optic flow" = 16, "Vec. encoding" = 15)) +
     labs(x = label, y = "") + theme(legend.position = "none")
+  if (!is.null(baseline_label)) {
+    # Python rotates a label next to the dashed baseline; vjust = 1 puts
+    # the text body to the left of the anchor once angle = 90.
+    p <- p +
+      annotate("text",
+               x = baseline - diff(range(table$center)) * 0.015, y = 1.5,
+               label = baseline_label, angle = 90, hjust = 0.5, vjust = 1,
+               size = 2.8)
+  }
+  p
 }
 individual_dots <- function(table, label, baseline, limits = NULL) {
   labels <- unique(table$individual)
@@ -1593,7 +1660,9 @@ individual_dots <- function(table, label, baseline, limits = NULL) {
     geom_vline(xintercept = baseline, linetype = "dashed") +
     scale_colour_manual(values = HYP_COLORS) +
     scale_shape_manual(values = c("Optic flow" = 16, "Vec. encoding" = 15)) +
-    labs(x = label, y = "Individual", tag = "a.") + theme(legend.position = "bottom")
+    labs(x = label, y = "Individual", tag = "a.") +
+    theme(legend.position = "top",
+          legend.background = element_rect(fill = "white", colour = "grey50"))
   if (!is.null(limits)) main <- main + coord_cartesian(xlim = limits)
   probs <- table[!duplicated(table$individual), ]
   probability <- ggplot(probs, aes(probability, individual)) +
@@ -1605,7 +1674,8 @@ individual_dots <- function(table, label, baseline, limits = NULL) {
 }
 pop_density_table <- make_hyp_table(hyp_pop, "density")
 print(pop_density_table)
-save_figure(population_dots(pop_density_table, "Predictive density", 1 / (2 * pi)),
+save_figure(population_dots(pop_density_table, "Predictive density", 1 / (2 * pi),
+  baseline_label = "Uniform"),
   "locust_directional_hypothesis_horizontal", 6, 3)
 ```
 
@@ -1613,7 +1683,8 @@ save_figure(population_dots(pop_density_table, "Predictive density", 1 / (2 * pi
 #| cell-id: "locust-r-040"
 pop_elpd_table <- make_hyp_table(hyp_pop, "elpd")
 print(pop_elpd_table)
-save_figure(population_dots(pop_elpd_table, "Mean log predictive density at hypothesis", -log(2 * pi)),
+save_figure(population_dots(pop_elpd_table, "Mean log predictive density at hypothesis",
+  -log(2 * pi), baseline_label = "Uniform"),
   "locust_directional_hypothesis_horizontal_elpd", 6, 3)
 
 ```
@@ -1650,7 +1721,8 @@ align_pop <- alignment_arrays(population_state)
 align_ind <- alignment_arrays(state_bimodal)
 pop_alignment_table <- make_hyp_table(align_pop, "alignment")
 print(pop_alignment_table)
-save_figure(population_dots(pop_alignment_table, "Posterior mean alignment", 0) +
+save_figure(population_dots(pop_alignment_table, "Posterior mean alignment", 0,
+  invert = TRUE) +
               coord_cartesian(xlim = c(-0.05, 1)),
   "locust_directional_alignment_horizontal", 6, 3)
 

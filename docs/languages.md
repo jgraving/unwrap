@@ -1,7 +1,6 @@
 # R and MATLAB
 
-The Python notebooks are the reference implementations, but they are not the
-only way to run these analyses. Every study in the
+Every study in the
 [biological examples](examples.md) exists as a Python/R pair - the R notebook
 lives next to it under `notebooks_r/` - and the repository ships MATLAB
 examples of the same models. Python installation does not install the other
@@ -14,9 +13,9 @@ The R examples fit circular observations with
 Mises family
 ([`R/unwrap_family.R`](https://github.com/jgraving/unwrap/blob/main/R/unwrap_family.R)),
 with **cmdstanr** and CmdStan as the Stan backend. The circular structure is
-carried by the same links as in the Python models: the modulo link wraps the
-mean predictor onto the circle *inside* the Stan log-density, and softplus
-keeps the concentration positive. Circular coefficients take von Mises
+carried by the same links as in the Python models: the modulo link keeps
+the mean direction on the circle, and softplus keeps the concentration
+positive. Circular coefficients take von Mises
 priors, which can be nearly uniform (small concentration) where no prior
 direction is intended; individual angular offsets use the same construction.
 "Uninformed" is therefore never a flat uniform over an interval - it is a
@@ -24,12 +23,9 @@ von Mises prior with a near-zero concentration.
 
 [`notebooks_r/circular_regression.ipynb`](notebooks_r/circular_regression.ipynb)
 is the R version of the
-[Python tutorial](notebooks/circular_regression.ipynb), and the seven
-research notebooks mirror the
+[Python tutorial](notebooks/circular_regression.ipynb), and the remaining
+notebooks mirror the
 [biological examples](examples.md) and the method examples one for one.
-They use the same observations, formulas, and prior scales as their Python
-counterparts, with circular individual effects represented through brms'
-nonlinear machinery where needed.
 
 To use one, install the one-time environment from the
 [R setup page](getting-started-r.md) (the pinned package environment,
@@ -37,11 +33,11 @@ CmdStan, and, for the Jupyter route, the R kernel), then open the
 example's `.qmd` in RStudio or its `.ipynb` in Jupyter (select the
 **R (`ir`) kernel**) and run the cells in order.
 The first code cell checks the environment and stops, with a pointer to
-the setup page, if anything is missing. As with the Python research
-notebooks, the fits are too long for CI, so the notebooks are not
-executed on every build; a change to a notebook is verified end to end
-by the local [notebook test](development.md#notebook-execution-local-only)
-before it is merged, and the committed outputs come from that run.
+the setup page, if anything is missing. The study fits are long, so the
+committed outputs come from a complete end-to-end run of each notebook
+(see the
+[notebook test](development.md#notebook-execution-local-only) on the
+development page).
 
 ### Standalone scripts
 
