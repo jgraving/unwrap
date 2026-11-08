@@ -1328,9 +1328,10 @@ tyf[M > 0] <- NA_real_
 rx <- gpts$x - ROOST_XY[1]; ry <- gpts$y - ROOST_XY[2]
 nr <- sqrt(rx^2 + ry^2)
 txr <- -rx / nr; tyr <- -ry / nr
-# Arrow length: the Python quiver with unit vectors and scale 30 draws
-# ~1/30 in shafts per 3.4 in of panel, i.e. ~1% of the panel width.
-arrow_len_f <- 0.010 * diff(xlim_flow)
+# Arrow length: the Python quiver with unit vectors and scale 30
+# (default scale_units = "width") draws each unit vector 1/30 of
+# the panel width, so the whole arrow (shaft + head) is this long.
+arrow_len_f <- diff(xlim_flow) / 30
 # expand.grid order: x index fastest, so as.vector(M) matches the point
 # rows; the fields must be transposed first for the same reason.
 lake_dir <- data.frame(x = gpts$x, y = gpts$y,
@@ -1345,16 +1346,16 @@ p_flow_home <- map_panel(bm_flow, "Home (roost flow)", title_size = 14,
   aspect = 0.41) +
   geom_segment(data = roost_dir, inherit.aes = FALSE,
     aes(x = x, y = y, xend = xend, yend = yend),
-    arrow = grid::arrow(length = grid::unit(0.05, "inches"), type = "closed"),
-    linewidth = 0.14, alpha = 0.95, colour = "#ffffff") +
+    arrow = grid::arrow(length = grid::unit(0.04, "inches"), type = "closed"),
+    linewidth = 0.35, alpha = 0.95, colour = "#ffffff") +
   add_roost_marker(r_roost_f) +
   add_x_markers(TRANS_XY, r_trans_f)
 p_flow_agam <- map_panel(bm_flow, "Agamon Hula Lake", title_size = 14,
   aspect = 0.41, lake = TRUE, lake_alpha = 0.35, lake_lw = 1.2) +
   geom_segment(data = lake_dir, inherit.aes = FALSE,
     aes(x = x, y = y, xend = xend, yend = yend),
-    arrow = grid::arrow(length = grid::unit(0.05, "inches"), type = "closed"),
-    linewidth = 0.14, alpha = 0.95, colour = "#ffffff") +
+    arrow = grid::arrow(length = grid::unit(0.04, "inches"), type = "closed"),
+    linewidth = 0.35, alpha = 0.95, colour = "#ffffff") +
   add_roost_marker(r_roost_f) +
   add_x_markers(TRANS_XY, r_trans_f)
 p_flow_legend <- legend_panel(data.frame(
@@ -1990,7 +1991,7 @@ p_bracket <- ggplot(brk, aes(delta_elpd, ypos)) +
   annotate("segment", x = xb, y = 4 * 1.35, xend = xb + cap_w, yend = 4 * 1.35,
     linewidth = 0.35, colour = "black") +
   annotate("text", x = xb - 0.012 * diff(xlim_b), y = 2.7,
-    label = "Within-treatment", size = 3.4, colour = "black",
+    label = "Within-treatment", size = 2.8, colour = "black",
     hjust = 1, vjust = 0.5) +
   scale_y_reverse(limits = c(-0.54, 4 * 1.35 + 0.54), breaks = 0,
     labels = "Total", expand = c(0, 0)) +
@@ -1998,6 +1999,7 @@ p_bracket <- ggplot(brk, aes(delta_elpd, ypos)) +
   coord_cartesian(clip = "off") +
   scale_colour_identity(guide = "none") +
   theme_classic(base_size = 9) +
+  theme(plot.margin = margin(5, 5, 20, 0.95 * 72)) +
   labs(x = "ELPD difference", y = "")
 p_combined3 <- patchwork::wrap_plots(p_total, p_bracket, ncol = 1,
   heights = c(1.25, 1.35))
@@ -2728,35 +2730,48 @@ leg_items <- data.frame(
     as.character(treatment_colors_cb[levels(df_track$treatment)])),
   dashed = c(TRUE, FALSE, rep(FALSE, length(tnames))),
   stringsAsFactors = FALSE)
-key_in <- 0.18; gkt_in <- 0.06; gi_in <- 0.14
-# strwidth measures at the default 12 pt; scale to the 8 pt glyphs.
-tw_in <- strwidth(leg_items$label, units = "inches") * (8 / 12)
-tot_in <- sum(tw_in) + nrow(leg_items) * (key_in + gkt_in) +
-  (nrow(leg_items) - 1) * gi_in
-starts_in <- (6.9 - tot_in) / 2 +
-  cumsum(c(0, key_in + gkt_in + tw_in[-nrow(leg_items)] + gi_in))
-leg_kids <- list(grid::rectGrob(x = unit(0.5, "npc"), y = unit(0.5, "npc"),
-  width = unit(1, "npc"), height = unit(1, "npc"), hjust = 0.5, vjust = 0.5,
-  gp = grid::gpar(fill = "white", col = "grey60", lwd = 0.3)))
+# Hand-drawn one-row legend (the Python twin's fig.legend: six framed
+# keys). A one-row gtable with explicit inch units has a deterministic
+# width that centres itself in the full-width legend row; a gTree of
+# absolute-inch children does not (its extent is viewport-dependent),
+# which clipped the last key on the narrower 67-tag grid.
+tw_in <- strwidth(leg_items$label, units = "inches") * (8 / 12)  # 8 pt glyphs
+lbl_pad <- 0.04  # room for glyph anti-aliasing past the measured width
+key_in <- 0.18; gkt_in <- 0.05; gi_in <- 0.10; leg_pad <- 0.08
+row_in <- sum(tw_in) + nrow(leg_items) * (key_in + gkt_in) +
+  (nrow(leg_items) - 1) * gi_in + nrow(leg_items) * lbl_pad
+if (2 * leg_pad + row_in > 5.7) {
+  key_in <- 0.14; gi_in <- 0.06
+  row_in <- sum(tw_in) + nrow(leg_items) * (key_in + gkt_in) +
+    (nrow(leg_items) - 1) * gi_in + nrow(leg_items) * lbl_pad
+}
+ws <- leg_pad
+for (i in seq_len(nrow(leg_items))) {
+  ws <- c(ws, key_in, gkt_in, tw_in[i] + lbl_pad)
+  if (i < nrow(leg_items)) ws <- c(ws, gi_in)
+}
+ws <- c(ws, leg_pad)
+leg_gtable <- gtable::gtable(widths = unit(ws, "in"), heights = unit(0.34, "in"))
+leg_gtable <- gtable::gtable_add_grob(leg_gtable,
+  grid::rectGrob(gp = grid::gpar(fill = "white", col = "grey60", lwd = 0.3)),
+  t = 1, l = 1, r = length(ws))
 for (i in seq_len(nrow(leg_items))) {
   it <- leg_items[i, ]
-  xs <- starts_in[i]
-  leg_kids <- c(leg_kids, list(
-    grid::segmentsGrob(x0 = unit(xs, "inches"), y0 = unit(0.5, "npc"),
-      x1 = unit(xs + key_in, "inches"), y1 = unit(0.5, "npc"),
-      default.units = "mixed",
+  ckey <- 1 + (i - 1) * 4 + 1  # columns: pad + per item (key, gap, label, gap)
+  leg_gtable <- gtable::gtable_add_grob(leg_gtable,
+    grid::segmentsGrob(x0 = unit(0, "npc"), x1 = unit(1, "npc"),
+      y0 = unit(0.5, "npc"), y1 = unit(0.5, "npc"), default.units = "npc",
       gp = grid::gpar(col = it$colour, lwd = 1.1,
-        lty = if (it$dashed) "dashed" else "solid")),
-    grid::textGrob(it$label, x = unit(xs + key_in + gkt_in, "inches"),
-      y = unit(0.5, "npc"), just = "left",
-      gp = grid::gpar(fontsize = 8))))
+        lty = if (it$dashed) "dashed" else "solid")), t = 1, l = ckey)
+  leg_gtable <- gtable::gtable_add_grob(leg_gtable,
+    grid::textGrob(it$label, x = unit(0, "npc"), y = unit(0.5, "npc"),
+      just = "left", gp = grid::gpar(fontsize = 8)), t = 1, l = ckey + 2)
 }
-leg_grob <- grid::gTree(children = do.call(grid::gList, leg_kids))
 base_ppc_grob <- ggplotGrob(p_individual_ppc)
 base_rows <- max(base_ppc_grob$layout$b)
 gt_ind <- gtable::gtable_add_rows(base_ppc_grob,
   heights = unit(0.5, "in"), pos = base_rows + 1)
-gt_ind <- gtable::gtable_add_grob(gt_ind, leg_grob, t = base_rows + 1,
+gt_ind <- gtable::gtable_add_grob(gt_ind, leg_gtable, t = base_rows + 1,
   l = 1, r = max(base_ppc_grob$layout$r))
 p_individual_ppc <- gt_ind
 
