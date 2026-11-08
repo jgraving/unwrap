@@ -99,6 +99,8 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) ".." else
     stop("Run this notebook from notebooks_r/ or from the repository root.")
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "notebooks_r", "zebra_posthoc.R"))
+source(file.path(repo_root, "notebooks_r", "zebra_plots.R"))
 
 # The figure code writes to the repository-relative figures directory.
 FIG_DIR <- file.path(repo_root, "figures", "zebra_escape")
@@ -154,63 +156,6 @@ Python analysis. All angular calculations use radians and circular summaries.
 
 ```{r}
 #| cell-id: "zebra-escape-05"
-circ_mean <- function(a) atan2(mean(sin(a)), mean(cos(a)))
-resultant <- function(a) Mod(mean(exp(1i * a)))
-circ_sd <- function(a, m = circ_mean(a)) {
-  sqrt(-2 * log(min(1, Mod(mean(exp(1i * (a - m)))))))
-}
-# Scaled Bessel functions avoid overflow when concentrations are large.
-A1_safe <- function(k) {
-  out <- besselI(k, 1, expon.scaled = TRUE) /
-    besselI(k, 0, expon.scaled = TRUE)
-  if (is.matrix(k)) dim(out) <- dim(k)
-  out
-}
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) -
-    log(besselI(kappa, 0, expon.scaled = TRUE))
-}
-hdi <- function(x, prob = 0.95) {
-  x <- sort(as.numeric(x))
-  stopifnot(length(x) > 1L, all(is.finite(x)))
-  gap <- min(length(x) - 1L, floor(prob * length(x)))
-  starts <- seq_len(length(x) - gap)
-  j <- starts[which.min(x[starts + gap] - x[starts])]
-  c(low = x[j], high = x[j + gap])
-}
-interval_row <- function(x, angular = FALSE, prob = 0.95) {
-  m <- if (angular) circ_mean(x) else mean(x)
-  # Unwrap angular intervals around their circular mean before drawing;
-  # display endpoints can lie just beyond +/-pi to avoid a false long arc.
-  z <- if (angular) m + mod_circular(x - m) else x
-  c(mean = m, hdi(z, prob))
-}
-inverse_A1 <- function(r) {
-  if (r <= 0) {
-    return(0)
-  }
-  if (r >= 1) {
-    return(Inf)
-  }
-  upper <- max(2, 1 / (1 - r))
-  uniroot(function(k) A1_safe(k) - r, c(0, upper), tol = 1e-9)$root
-}
-# Exact tutorial sampler convention: scalar mu/kappa, then wrap the draw.
-vmu <- function(m) circular::circular(
-    m, units = "radians", template = "none", modulo = "2pi")
-vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
-simulate_angles <- function(mu, kappa) {
-  stopifnot(is.matrix(mu), identical(dim(mu), dim(kappa)))
-  replicated <- matrix(0, nrow = nrow(mu), ncol = ncol(mu))
-  for (d in seq_len(nrow(mu))) {
-    for (i in seq_len(ncol(mu))) {
-      replicated[d, i] <- as.numeric(circular::rvonmises(1,
-        mu = vmu(mu[d, i]), kappa = kappa[d, i],
-        control.circular = vm_ctrl))
-    }
-  }
-  mod_circular(replicated)
-}
 save_figure <- function(plot, name, width = 8, height = 4) {
   ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
          width = width, height = height)
@@ -432,43 +377,6 @@ and hyperparameters, before interpreting the posterior.
 
 ```{r}
 #| cell-id: "zebra-escape-13"
-diagnose_fit <- function(fit, circular_parameters = character()) {
-  # NUTS divergences. Not every brms/cmdstanr combination keeps the
-  # per-iteration divergence flag in the fit object, so probe for it and
-  # report what the fit object actually carries (the R-hat and ESS values
-  # below are the primary convergence checks either way).
-  divergences <- tryCatch({
-    div_flags <- lapply(fit$fit@sim$samples, function(ch) ch[["divergent"]])
-    if (any(vapply(div_flags, is.null, logical(1)))) NA_real_
-    else sum(unlist(div_flags))
-  }, error = function(e) NA_real_)
-  if (is.na(divergences)) {
-      cat("Divergences: not retained in this fit object (see R-hat/ESS below).\n")
-  } else {
-      cat("Divergences:", divergences, "\n")
-  }
-  available <- posterior::variables(posterior::as_draws_array(fit))
-  parameters <- available[grepl("^(b_|sd_|r_|kmu_)", available)]
-  draws_array <- posterior::subset_draws(posterior::as_draws_array(fit),
-                                         variable = parameters)
-  out <- do.call(rbind, lapply(parameters, function(p) {
-    # Preserve iteration x chain shape: flattening loses between-chain
-    # information and would make the R-hat/ESS checks misleading.
-    x <- as.matrix(draws_array[, , p])
-    angular <- p %in% circular_parameters
-    z <- if (angular) mod_circular(x - circ_mean(x)) else x
-    stopifnot(all(is.finite(x)))
-    data.frame(parameter = p,
-      mean = if (angular) circ_mean(x) else mean(x),
-      sd = if (angular) circ_sd(x) else sd(as.numeric(x)),
-      rhat = if (angular) Rhat_unwrap(x, method = "sine") else posterior::rhat(x),
-      ess_bulk = posterior::ess_bulk(z),
-      row.names = NULL, check.names = FALSE)
-  }))
-  out$rhat <- round(out$rhat, 4)
-  out$ess_bulk <- round(out$ess_bulk, 1)
-  out
-}
 
 available <- posterior::variables(posterior::as_draws_array(fit))
 circular_parameters <- available[grepl("^b_(beta0|bias0|bias1)_", available)]
@@ -489,21 +397,7 @@ summary_frame[!is.finite(summary_frame$rhat) | summary_frame$rhat >= 1.01 |
 trace_parameters <- c("b_beta0_Intercept", "b_beta0_PostStimulus",
   "b_kappa_Intercept", "b_kappa_PostStimulus", "kmu_intercept", "kmu_slope")
 
-# as_draws_df is wide: explicitly assemble a long trace table.
-draws_df <- posterior::as_draws_df(posterior::subset_draws(
-    posterior::as_draws_array(fit), variable = trace_parameters))
-trace_df <- do.call(rbind, lapply(trace_parameters, function(p) {
-  value <- as.numeric(draws_df[[p]])
-  if (p %in% circular_parameters) value <- mod_circular(value - circ_mean(value))
-  data.frame(parameter = p, value = value,
-             iteration = draws_df[[".iteration"]],
-             chain = factor(draws_df[[".chain"]]))
-}))
-p_trace <- ggplot(trace_df, aes(iteration, value, colour = chain)) +
-  geom_line(alpha = 0.6, linewidth = 0.25) +
-  facet_wrap(~ parameter, scales = "free_y", ncol = 2) +
-  labs(x = "retained iteration", y = "draw (angular traces centered)") +
-  theme(legend.position = "bottom")
+p_trace <- trace_plot(fit, trace_parameters, circular_parameters)
 save_figure(p_trace, "trace", 9, 6)
 
 ```
@@ -518,42 +412,21 @@ evaluated on the natural scale after softplus.
 
 ```{r}
 #| cell-id: "zebra-escape-17"
-ids <- levels(data$Track)
-prediction_data <- expand.grid(Track = ids, PostStimulus = c(0, 1),
-                               KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-prediction_data$Track <- factor(prediction_data$Track, levels = ids)
-prediction_data$condition <- factor(prediction_data$PostStimulus,
-                                     levels = c(0, 1), labels = condition_labels)
-# Draw x individual-condition matrices. Evaluate each fitted distributional
-# predictor explicitly; no arithmetic averaging across the angular seam.
-mu <- mod_circular(posterior_linpred(fit, newdata = prediction_data,
-                                     transform = FALSE, dpar = "mu"))
-kappa <- posterior_linpred(fit, newdata = prediction_data,
-                           transform = TRUE, dpar = "kappa")
-stopifnot(identical(dim(mu), dim(kappa)), all(kappa > 0))
-J <- length(ids)
-pre <- seq_len(J)
-post <- J + pre
-group_alignment <- cbind(
-  Mod(rowMeans(exp(1i * mu[, pre, drop = FALSE]))),
-  Mod(rowMeans(exp(1i * mu[, post, drop = FALSE]))))
-individual_summary <- do.call(rbind, lapply(seq_len(nrow(prediction_data)), function(j) {
-  rbind(data.frame(id = as.character(prediction_data$Track[j]),
-    condition = prediction_data$condition[j], quantity = "mean direction (rad)",
-    as.list(interval_row(mu[, j], angular = TRUE))),
-    data.frame(id = as.character(prediction_data$Track[j]),
-    condition = prediction_data$condition[j], quantity = "within-individual R(kappa)",
-    as.list(interval_row(A1_safe(kappa[, j])))))
-}))
-p_individual <- ggplot(individual_summary,
-  aes(id, mean, colour = condition, group = condition)) +
-  geom_pointrange(aes(ymin = low, ymax = high),
-    position = position_dodge(width = 0.5), linewidth = 0.25) +
-  facet_wrap(~ quantity, scales = "free_y", ncol = 1) +
-  scale_colour_manual(values = condition_colors) +
-  labs(x = "individual", y = "posterior mean and 95% HDI") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1),
-        legend.position = "bottom")
+
+
+# Draw x individual-condition matrices from the fitted model; the
+# per-draw direction and concentration matrices feed the summary panels,
+# the alignment statistic and the PPC below (twin of zebra_posthoc.py).
+posterior <- posterior_directions(fit, data, condition_labels)
+prediction_data <- posterior$prediction_data
+mu <- posterior$mu
+kappa <- posterior$kappa
+J <- posterior$J
+pre <- posterior$pre
+post <- posterior$post
+group_alignment <- posterior$group_alignment
+individual_summary <- posterior$individual_summary
+p_individual <- individual_plot(individual_summary, condition_colors)
 save_figure(p_individual, "individual_posteriors", 10, 6)
 
 ```
@@ -586,38 +459,18 @@ track_kde <- do.call(rbind, lapply(seq_len(nrow(prediction_data)), function(j) {
 max_kde <- max(group_kde$density, track_kde$density)
 group_kde$r <- 1 + group_kde$density / max_kde
 track_kde$r <- 1 + track_kde$density / max_kde
-polar_x <- scale_x_continuous(
-  limits = c(0, 2 * pi), expand = c(0, 0),
-  breaks = (0:7) * pi / 4,
-  labels = c("0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°"))
-polar_y <- scale_y_continuous(limits = c(0, 2.5), expand = c(0, 0),
-  breaks = c(1.0, 2.0), labels = c("0", "1.0"))
-polar_theme <- theme(legend.position = "bottom",
-  axis.line = element_blank(), panel.border = element_blank())
-# The point shapes mirror the condition (twin convention: pre = square,
-# post = circle); the shape scale only carries the marker, hide its keys.
-polar_guides <- guides(shape = "none")
 empirical_group <- do.call(rbind, lapply(1:2, function(c) data.frame(
   theta = circ_mean(group_mu[, c]) %% (2 * pi), r = 2.25,
   condition = condition_labels[c],
   shape = if (c == 2L) "filled circle" else "filled square")))
-p_group_mu <- ggplot(group_kde, aes(theta, r, colour = condition)) +
-  geom_line(linewidth = 0.5) +
-  geom_point(data = empirical_group, aes(theta, r, colour = condition,
-    shape = shape), inherit.aes = FALSE, size = 1.2) +
-  coord_polar(start = pi / 2, direction = -1) + polar_x + polar_y +
-  scale_colour_manual(values = condition_colors) +
-  labs(x = "group mean direction (rad)", y = "") + polar_theme +
-  polar_guides
+p_group_mu <- polar_direction_plot(group_kde, empirical_group,
+  "group mean direction (rad)", condition_colors)
 save_figure(p_group_mu, "group_direction", 5, 5)
 alignment_df <- do.call(rbind, lapply(1:2, function(c) {
   data.frame(condition = condition_labels[c],
     as.list(interval_row(group_alignment[, c])))
 }))
-p_alignment <- ggplot(alignment_df, aes(condition, mean, colour = condition)) +
-  geom_pointrange(aes(ymin = low, ymax = high)) +
-  scale_colour_manual(values = condition_colors) +
-  labs(x = "", y = "between-individual alignment (95% HDI)")
+p_alignment <- alignment_plot(alignment_df, condition_colors)
 save_figure(p_alignment, "group_alignment", 5, 4)
 
 # Per-track polar direction posteriors, with empirical circular means.
@@ -627,14 +480,8 @@ empirical <- do.call(rbind, lapply(split(data, list(data$Track, data$condition),
     r = 2.25,
     shape = if (g$condition[1] == condition_labels[2]) "filled circle" else
       "filled square")))
-p_track_mu <- ggplot(track_kde, aes(theta, r, colour = condition)) +
-  geom_line(linewidth = 0.3, alpha = 0.5) +
-  geom_point(data = empirical, aes(theta, r, colour = condition,
-    shape = shape), inherit.aes = FALSE, size = 0.9) +
-  coord_polar(start = pi / 2, direction = -1) + polar_x + polar_y +
-  facet_wrap(~ Track) + scale_colour_manual(values = condition_colors) +
-  labs(x = "track mean direction (rad)", y = "") + polar_theme +
-  polar_guides
+p_track_mu <- polar_direction_plot(track_kde, empirical,
+  "track mean direction (rad)", condition_colors, track = TRUE)
 save_figure(p_track_mu, "track_direction_polar", 11, 9)
 
 ```
@@ -663,76 +510,15 @@ ys <- lapply(seq_len(nrow(prediction_data)), function(j) {
     data$PostStimulus == prediction_data$PostStimulus[j]]
 })
 stopifnot(all(lengths(ys) > 0L))
-bootstrap_pair <- function(y, B) {
-  z <- replicate(B, mean(exp(1i * y[sample.int(length(y), length(y), replace = TRUE)])))
-  list(mu = Arg(z), R = Mod(z))
-}
+# The data-bootstrap vs posterior comparison (Python's supplemental PPC)
+# runs in the sourced posthoc script; the seed stays here.
 set.seed(SEED + 10L)
-boot_individual <- lapply(ys, bootstrap_pair, B = B_INDIV)
-boot_group_mu <- boot_group_R <- matrix(0, nrow = B_GROUP, ncol = 2)
-for (b in seq_len(B_GROUP)) {
-  selected <- sample.int(J, J, replace = TRUE)
-  for (c in 1:2) {
-    jj <- selected + (c - 1L) * J
-    directions <- vapply(jj, function(j) {
-      y <- ys[[j]]
-      circ_mean(y[sample.int(length(y), length(y), replace = TRUE)])
-    }, numeric(1))
-    boot_group_mu[b, c] <- circ_mean(directions)
-    boot_group_R[b, c] <- resultant(directions)
-  }
-}
-fixed <- as.data.frame(posterior::as_draws_df(fit))
-population_mu <- cbind(mod_circular(fixed$b_beta0_Intercept),
-  mod_circular(fixed$b_beta0_Intercept + fixed$b_beta0_PostStimulus))
-ppc_group <- do.call(rbind, lapply(1:2, function(c) {
-  rbind(
-    data.frame(condition = condition_labels[c], source = "data bootstrap",
-      quantity = "group mean direction (rad)",
-      as.list(interval_row(boot_group_mu[, c], TRUE))),
-    data.frame(condition = condition_labels[c], source = "posterior",
-      quantity = "group mean direction (rad)",
-      as.list(interval_row(population_mu[, c], TRUE))),
-    data.frame(condition = condition_labels[c], source = "data bootstrap",
-      quantity = "between-individual alignment",
-      as.list(interval_row(boot_group_R[, c]))),
-    data.frame(condition = condition_labels[c], source = "posterior",
-      quantity = "between-individual alignment",
-      as.list(interval_row(group_alignment[, c]))))
-}))
-p_group_ppc <- ggplot(ppc_group,
-  aes(condition, mean, colour = condition, shape = source)) +
-  geom_pointrange(aes(ymin = low, ymax = high),
-    position = position_dodge(width = 0.35)) +
-  facet_wrap(~ quantity, scales = "free_y") +
-  scale_colour_manual(values = condition_colors) +
-  scale_shape_manual(values = c("data bootstrap" = 1, "posterior" = 16)) +
-  labs(x = "", y = "mean and 95% HDI") + theme(legend.position = "bottom")
+ppc_boot <- ppc_bootstrap_stats(fit, prediction_data, ys, J,
+  B_GROUP, B_INDIV, condition_labels, group_alignment, individual_summary)
+p_group_ppc <- group_ppc_plot(ppc_boot$ppc_group, condition_colors)
 save_figure(p_group_ppc, "ppc_group", 8, 4)
 
-ppc_individual <- do.call(rbind, lapply(seq_along(ys), function(j) {
-  rbind(data.frame(id = as.character(prediction_data$Track[j]),
-    condition = prediction_data$condition[j], source = "data bootstrap",
-    quantity = "mean direction (rad)",
-    as.list(interval_row(boot_individual[[j]]$mu, TRUE))),
-    data.frame(id = as.character(prediction_data$Track[j]),
-    condition = prediction_data$condition[j], source = "data bootstrap",
-    quantity = "within-individual R(kappa)",
-    as.list(interval_row(boot_individual[[j]]$R))),
-    transform(individual_summary[individual_summary$id ==
-      as.character(prediction_data$Track[j]) &
-      individual_summary$condition == prediction_data$condition[j], ],
-      source = "posterior"))
-}))
-p_ind_ppc <- ggplot(ppc_individual,
-  aes(id, mean, colour = source, shape = source)) +
-  geom_pointrange(aes(ymin = low, ymax = high),
-    position = position_dodge(width = 0.4), linewidth = 0.2) +
-  facet_grid(quantity ~ condition, scales = "free_y") +
-  scale_shape_manual(values = c("data bootstrap" = 1, "posterior" = 16)) +
-  labs(x = "individual", y = "mean and 95% HDI") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1),
-        legend.position = "bottom")
+p_ind_ppc <- individual_ppc_plot(ppc_boot$ppc_individual)
 save_figure(p_ind_ppc, "ppc_individual", 11, 7)
 
 ```
@@ -749,22 +535,8 @@ as well as uncertainty in the response parameters.
 # Limit simulation draws only; MCMC fitting still uses the budgets above.
 set.seed(SEED + 20L)
 draw_ids <- sample.int(nrow(mu), min(nrow(mu), if (quick_run) 100L else 400L))
-rep_stats <- do.call(rbind, lapply(seq_along(ys), function(j) {
-  rep_mu <- matrix(mu[draw_ids, j], nrow = length(draw_ids), ncol = length(ys[[j]]))
-  rep_kappa <- matrix(kappa[draw_ids, j], nrow = length(draw_ids), ncol = length(ys[[j]]))
-  yrep <- simulate_angles(rep_mu, rep_kappa)
-  data.frame(id = as.character(prediction_data$Track[j]),
-    condition = prediction_data$condition[j],
-    as.list(interval_row(apply(yrep, 1, resultant))),
-    observed = resultant(ys[[j]]))
-}))
-p_replicates <- ggplot(rep_stats, aes(id, mean, colour = condition)) +
-  geom_pointrange(aes(ymin = low, ymax = high)) +
-  geom_point(aes(y = observed), shape = 1) +
-  facet_wrap(~ condition) + scale_colour_manual(values = condition_colors) +
-  labs(x = "individual", y = "replicated R, 95% HDI; open = observed") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1),
-        legend.position = "bottom")
+rep_stats <- replicated_stats(mu, kappa, ys, draw_ids, prediction_data)
+p_replicates <- replicated_r_plot(rep_stats, condition_colors)
 save_figure(p_replicates, "ppc_replicated", 10, 4)
 
 ```
