@@ -116,8 +116,8 @@ CHAINS <- 4L
 # sampling and Monte Carlo plotting/bootstrapping budgets.
 ITER <- if (quick_run) 3000L else 4000L
 WARMUP <- if (quick_run) 1500L else 2000L
-ADAPT_DELTA <- 0.97
-# The tighter adapt_delta protects the grouped concentration geometry;
+ADAPT_DELTA <- 0.9
+# The acceptance target matches the Python twin (target_accept = 0.9);
 # these are execution budgets, not a claim of verified convergence.
 
 c(R = as.character(getRversion()),
@@ -306,8 +306,8 @@ prior_vonmises
 
 Full sampling uses four chains with 2,000 warmup and 2,000 retained
 draws per chain. Quick mode (`UNWRAP_R_QUICK=1`) uses four chains with
-1,500 warmup and 1,500 retained draws; `adapt_delta = 0.97` allows
-more conservative adaptation for this grouped model.
+1,500 warmup and 1,500 retained draws; `adapt_delta = 0.9` matches
+the Python twin's acceptance target.
 
 Direction coefficients are unconstrained reals, because directions are
 *periodic* rather than bounded on $(-\pi,\pi]$: adding any multiple

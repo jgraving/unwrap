@@ -550,8 +550,8 @@ Small seeded jitter is added after wrapping. Initialization changes only
 the sampler's path, never the posterior.
 
 Full sampling uses four chains of 8,000 iterations with 4,000 warmup
-each (16,000 posterior draws in total), with `adapt_delta = 0.97` and
-`max_treedepth = 12`. Quick mode (`UNWRAP_R_QUICK=1`) keeps that full
+each (16,000 posterior draws in total), with `adapt_delta = 0.9` (the
+Python twin's `target_accept`) and `max_treedepth = 12`. Quick mode (`UNWRAP_R_QUICK=1`) keeps that full
 MCMC budget, because at three-quarters of it the unimodal baseline fit's
 `mu_pop` R-hat reached 1.0109, over the 1.01 hard gate; it instead
 shortens the cheap post-processing, with fewer bootstrap resamples
@@ -598,7 +598,7 @@ if (is.null(fit_bimodal)) {
   fit_bimodal <- brm(mix_form, data = df, prior = mix_priors, stanvars = mix_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
     cores = CHAINS, seed = SEED, init = init_mix,
-    control = list(adapt_delta = 0.97, max_treedepth = 12))
+    control = list(adapt_delta = 0.9, max_treedepth = 12))
   unwrap_save_fit_cache("locust_mix_bimodal_unbounded", fit_bimodal, SEED, ITER, WARMUP)
 }
 ```
@@ -725,7 +725,7 @@ if (is.null(fit_unimodal)) {
   fit_unimodal <- brm(uni_form, data = df, prior = uni_priors, stanvars = uni_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
     cores = CHAINS, seed = SEED, init = init_uni,
-    control = list(adapt_delta = 0.97, max_treedepth = 12))
+    control = list(adapt_delta = 0.9, max_treedepth = 12))
   unwrap_save_fit_cache("locust_mix_unimodal_unbounded", fit_unimodal, SEED, ITER, WARMUP)
 }
 state_unimodal <- extract_state(fit_unimodal, bimodal = FALSE)

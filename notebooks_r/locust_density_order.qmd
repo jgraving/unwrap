@@ -135,8 +135,8 @@ CHAINS <- 4L
 # as the mixture notebook).
 ITER <- 3000L
 WARMUP <- 2000L
-ADAPT_DELTA <- 0.97
-# The tighter adapt_delta protects the grouped concentration geometry;
+ADAPT_DELTA <- 0.9
+# The acceptance target matches the Python twin (target_accept = 0.9);
 # these are execution budgets, not a claim of verified convergence.
 
 c(R = as.character(getRversion()),
@@ -832,7 +832,7 @@ if (is.null(screen_fit)) {
     prior = screen_priors("t_density * t_order", centered = FALSE),
     stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
     chains = CHAINS, iter = SCREEN_ITER, warmup = SCREEN_WARMUP, cores = CHAINS,
-    seed = SEED, control = list(adapt_delta = 0.95))
+    seed = SEED, control = list(adapt_delta = 0.9))
   unwrap_save_fit_cache("locust_d_screen_td_to", screen_fit, SEED, SCREEN_ITER, SCREEN_WARMUP)
 }
 diagnose_fit(screen_fit, "b_Intercept")
@@ -920,7 +920,7 @@ for (name in names(candidate_rhs)) {
       prior = screen_priors(rhs, uniform = TRUE),
       stanvars = stan_unwrap_fun + modulo_circular_fun, backend = "cmdstanr",
       chains = CHAINS, iter = SCREEN_ITER, warmup = SCREEN_WARMUP, cores = CHAINS,
-      seed = SEED, control = list(adapt_delta = 0.95))
+      seed = SEED, control = list(adapt_delta = 0.9))
     unwrap_save_fit_cache(paste0("locust_d_screen_v2_", name), sweep_fits[[name]], SEED, SCREEN_ITER, SCREEN_WARMUP)
   }
   print(diagnose_fit(sweep_fits[[name]], "b_Intercept"))

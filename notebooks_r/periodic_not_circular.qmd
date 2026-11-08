@@ -214,7 +214,7 @@ fit <- unwrap_load_fit_cache("periodic_fit", 42L, ITER, WARMUP)
 if (is.null(fit)) {
   fit <- brm(form, data = data, prior = priors, backend = "cmdstanr",
     chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
-    seed = 42, control = list(adapt_delta = 0.95))
+    seed = 42, control = list(adapt_delta = 0.9))
   unwrap_save_fit_cache("periodic_fit", fit, 42L, ITER, WARMUP)
 }
 parameters <- c("b_Intercept", "b_sin24", "b_cos24",

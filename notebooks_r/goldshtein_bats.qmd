@@ -1666,7 +1666,7 @@ if (is.null(fit_vm)) {
     chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
     seed = SEED,
     init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
-    control = list(adapt_delta = 0.97))
+    control = list(adapt_delta = 0.9))
   unwrap_save_fit_cache("bats_fit_vm_v2", fit_vm, SEED, ITER, WARMUP)
 }
 base_parameters <- posterior::variables(posterior::as_draws_array(fit_vm))
@@ -1833,7 +1833,7 @@ if (is.null(fit_mix)) {
     chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
     seed = SEED,
     init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
-    control = list(adapt_delta = 0.97))
+    control = list(adapt_delta = 0.9))
   unwrap_save_fit_cache("bats_fit_mix_v2", fit_mix, SEED, ITER, WARMUP)
 }
 mix_parameters <- posterior::variables(posterior::as_draws_array(fit_mix))
