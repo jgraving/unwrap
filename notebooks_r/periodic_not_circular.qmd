@@ -98,6 +98,8 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) {
 
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "notebooks_r", "periodic_not_circular_posthoc.R"))
+source(file.path(repo_root, "notebooks_r", "periodic_not_circular_plots.R"))
 
 ```
 
@@ -135,107 +137,6 @@ ITER <- if (quick_run) 3000L else 4000L
 WARMUP <- if (quick_run) 1500L else 2000L
 # These are local execution budgets, not convergence claims. Hard diagnostic
 # gates below apply to both budgets; increase sampling if they fail.
-
-```
-
-```{r}
-#| cell-id: "periodic-not-circular-008"
-wrap <- function(x) atan2(sin(x), cos(x))
-circ_mean <- function(x) atan2(mean(sin(x)), mean(cos(x)))
-resultant <- function(x) Mod(mean(exp(1i * x)))
-softplus_stable <- function(x) pmax(x, 0) + log1p(exp(-abs(x)))
-log1p_exp <- softplus_stable
-A1_safe <- function(k) {
-  z <- besselI(k, 1, expon.scaled = TRUE) / besselI(k, 0, expon.scaled = TRUE)
-  if (!is.null(dim(k))) dim(z) <- dim(k)
-  z
-}
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) - log(besselI(kappa, 0, expon.scaled = TRUE))
-}
-hdi <- function(x, prob = 0.95) {
-  x <- sort(as.numeric(x))
-  stopifnot(length(x) > 1L, all(is.finite(x)))
-  gap <- min(length(x) - 1L, floor(prob * length(x)))
-  ii <- seq_len(length(x) - gap)
-  j <- ii[which.min(x[ii + gap] - x[ii])]
-  c(low = x[j], high = x[j + gap])
-}
-interval <- function(x, angular = FALSE, prob = 0.95) {
-  m <- if (angular) circ_mean(x) else mean(x)
-  z <- if (angular) m + wrap(x - m) else x
-  c(mean = m, hdi(z, prob))
-}
-vmu <- function(m) circular::circular(
-    m, units = "radians", template = "none", modulo = "2pi")
-vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
-draw_vm <- function(mu, kappa) {
-  wrap(as.numeric(circular::rvonmises(1, mu = vmu(mu), kappa = kappa,
-                                     control.circular = vm_ctrl)))
-}
-draw_matrix <- function(fit, parameters) {
-  as.data.frame(posterior::as_draws_df(posterior::subset_draws(
-    posterior::as_draws_array(fit), variable = parameters)))
-}
-
-diagnose_fit <- function(fit, angular = character(), parameters = NULL) {
-  # Probe exactly the flags retained by this brms/backend combination.
-  divergences <- tryCatch({
-    samples <- fit$fit@sim$samples
-    if (is.null(samples) || !length(samples)) {
-      NA_real_
-    } else {
-      div_flags <- lapply(samples, function(ch) ch[["divergent"]])
-      if (any(vapply(div_flags, is.null, logical(1)))) NA_real_
-      else sum(unlist(div_flags))
-    }
-  }, error = function(e) NA_real_)
-  if (is.na(divergences)) {
-    cat("Divergences: not retained in this fit object (see R-hat/ESS below).\n")
-  } else {
-    cat("Divergences:", divergences, "\n")
-    stopifnot(divergences == 0)
-  }
-  a <- posterior::as_draws_array(fit)
-  if (is.null(parameters)) {
-    parameters <- posterior::variables(a)
-    parameters <- parameters[grepl("^(b_|sd_|r_|kmu_)", parameters)]
-  }
-  stopifnot(length(parameters) > 0L)
-  summary_frame <- do.call(rbind, lapply(parameters, function(p) {
-    x <- as.matrix(a[, , p])
-    # as_draws_array keeps the draws_array class, whose [ method does not
-    # drop the parameter slice, so x is retained as one long column
-    # (draws x chains flattened); the rhat/ESS calls below are written
-    # for that layout (as in the P1 notebooks).
-    stopifnot(all(is.finite(x)))
-    is_angle <- p %in% angular
-    z <- if (is_angle) wrap(x - circ_mean(x)) else x
-    data.frame(parameter = p,
-      mean = if (is_angle) circ_mean(x) else mean(x),
-      sd = if (is_angle) sqrt(-2 * log(min(1, resultant(x)))) else sd(as.numeric(x)),
-      rhat = if (is_angle) Rhat_unwrap(x, method = "sine") else posterior::rhat(x),
-      ess_bulk = posterior::ess_bulk(z), row.names = NULL)
-  }))
-  print(summary_frame)
-  stopifnot(all(is.finite(summary_frame$rhat)), all(summary_frame$rhat < 1.01),
-    all(is.finite(summary_frame$ess_bulk)), all(summary_frame$ess_bulk > 400))
-  summary_frame
-}
-trace_plot <- function(fit, parameters, angular = character()) {
-  d <- draw_matrix(fit, parameters)
-  long <- do.call(rbind, lapply(parameters, function(p) {
-    x <- d[[p]]
-    if (p %in% angular) x <- wrap(x - circ_mean(x))
-    data.frame(parameter = p, value = x, iteration = d[[".iteration"]],
-               chain = factor(d[[".chain"]]))
-  }))
-  ggplot(long, aes(iteration, value, colour = chain, group = chain)) +
-    geom_line(linewidth = 0.25, alpha = 0.6) +
-    facet_wrap(~ parameter, scales = "free_y", ncol = 2) +
-    labs(x = "retained iteration", y = "draw (angular traces centered)") +
-    theme(legend.position = "bottom")
-}
 
 ```
 
@@ -307,7 +208,7 @@ WARMUP <- if (quick_run) 750L else 1000L
 # Execution budgets only; the diagnostic gate applies at either budget.
 stan_code <- make_stancode(form, data = data, prior = priors)
 stopifnot(grepl("log1p_exp", stan_code, fixed = TRUE))
-cat(stan_code)
+cat("Beta model: generated Stan code validated (softplus precision present).\n")
 set.seed(42)
 fit <- unwrap_load_fit_cache("periodic_fit", 42L, ITER, WARMUP)
 if (is.null(fit)) {
@@ -319,6 +220,7 @@ if (is.null(fit)) {
 parameters <- c("b_Intercept", "b_sin24", "b_cos24",
                 "b_eta_Intercept", "b_eta_sin24", "b_eta_cos24")
 summary_frame <- diagnose_fit(fit, parameters = parameters)
+summary_frame
 
 ```
 
@@ -341,17 +243,10 @@ lin_phi <- matrix(rep(d$b_eta_Intercept, each = G), nrow = G) +
 mu_draws <- plogis(lin_mu)
 phi_draws <- softplus_stable(lin_phi)
 stopifnot(identical(dim(mu_draws), c(G, nrow(d))), identical(dim(phi_draws), dim(mu_draws)))
-curve_table <- function(draws, truth, panel) {
-  bounds <- t(apply(draws, 1, hdi))
-  data.frame(time, mean = rowMeans(draws), low = bounds[, 1], high = bounds[, 2], truth, panel)
-}
 latent <- rbind(curve_table(mu_draws, mu_true, "mean activity"),
                  curve_table(phi_draws, phi_true, "precision phi"))
-p_latent <- ggplot(latent, aes(time, mean)) +
-  geom_ribbon(aes(ymin = low, ymax = high), fill = "#E69F00", alpha = 0.2) +
-  geom_line() + geom_line(aes(y = truth), linetype = "dashed", colour = "#0072B2") +
-  facet_wrap(~ panel, scales = "free_y") +
-  labs(x = "Time (hours)", y = "fitted mean and 95% HDI; dashed = simulated truth")
+
+p_latent <- latent_curves_plot(time, mu_draws, phi_draws, mu_true, phi_true)
 save_figure(p_latent, "periodic_beta_latent_curves", 9, 4)
 
 ```
@@ -371,24 +266,7 @@ The recovered curve should track the injected sinusoidal shape and, crucially, *
 ```{r}
 #| cell-id: "periodic-not-circular-017"
 set.seed(42)
-use <- seq_len(ncol(mu_draws))
-if (quick_run) use <- use[seq_len(min(length(use), 1000L))]
-yrep <- matrix(0, nrow = G, ncol = length(use))
-for (j in seq_along(use)) {
-  k <- use[j]
-  yrep[, j] <- rbeta(G, mu_draws[, k] * phi_draws[, k],
-                        (1 - mu_draws[, k]) * phi_draws[, k])
-}
-b50 <- t(apply(yrep, 1, hdi, prob = 0.5))
-b90 <- t(apply(yrep, 1, hdi, prob = 0.9))
-ppc <- data.frame(time, median = apply(yrep, 1, median),
-  low50 = b50[, 1], high50 = b50[, 2], low90 = b90[, 1], high90 = b90[, 2])
-p_ppc <- ggplot(ppc, aes(time, median)) +
-  geom_ribbon(aes(ymin = low90, ymax = high90), fill = "#E69F00", alpha = 0.18) +
-  geom_ribbon(aes(ymin = low50, ymax = high50), fill = "#E69F00", alpha = 0.35) +
-  geom_point(data = data, aes(time, activity), inherit.aes = FALSE, size = 0.6, alpha = 0.35) +
-  geom_line(linewidth = 0.6) + scale_x_continuous(breaks = c(0, 6, 12, 18, 24)) +
-  labs(x = "Time (hours)", y = "Activity")
+p_ppc <- ppc_fit(time, data$activity, mu_draws, phi_draws, quick_run)
 save_figure(p_ppc, "periodic_beta_fit", 7, 4)
 
 ```
