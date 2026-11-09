@@ -1,6 +1,6 @@
 ---
 engine: r
-title: "Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing"
+title: "Goal-directed orientation and directional precision in homing bats"
 format: html
 ---
 
@@ -21,29 +21,15 @@ format: html
 knitr::opts_chunk$set(dev = "ragg_png")
 ```
 
-# Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
+# Goal-directed orientation and directional precision in homing bats
 
-This notebook revisits the free-flying bat homing data of A. Goldshtein et al., "Acoustic cognitive map–based navigation in echolocating bats," *Science* **386**(6721), 561-567 (2024); [doi:10.1126/science.adn6269](https://doi.org/10.1126/science.adn6269) - echolocating bats translocated over kilometer scales and tracked back to a known goal. The original study found that bats typically do home successfully even under sensory deprivation, consistent with echolocation being a sufficient and robust navigation modality. The question revisited here is whether that deprivation nonetheless produces detectable changes in **goal-relative orientation** (directional bias and/or directional precision).
+Successful arrival does not describe the whole process of navigation. A bat can reach a familiar destination while taking a circuitous route or making imprecise movements along the way. This notebook reanalyses tracks from [Goldshtein et al. (2024), *Acoustic cognitive map-based navigation in echolocating bats*](https://doi.org/10.1126/science.adn6269), who translocated Kuhl's pipistrelle bats and manipulated visual, magnetic, and olfactory information. The original study demonstrated navigation with echolocation and improved performance when vision was available.
 
-Each flight is a GPS track recorded with an on-animal tag. We reduce each track to a sequence of
-fixed-length movement **steps**, compute a heading per step, and express that heading **relative
-to the instantaneous direction toward the animal's known destination** (its roost or the Agamon–Hula lake region). On this goal-relative scale, a step aimed straight at the goal is
-near $0^\circ$ and a step heading away is near $\pm180^\circ$, so fitted von Mises parameters map
-directly onto goal-directed travel.
+Here we ask how sensory manipulation is reflected in the distribution of movement bearings relative to a recorded destination. Three features can change: the mean orientation of a concentrated directional tendency, the precision of headings around that tendency, and the prevalence of that component among all sampled headings. A bat could retain a strong directional tendency while becoming less precise, so these features should be examined separately.
 
-**Why a mixture:** stepwise headings in these tracks are multimodal. A bat may wander before
-committing to goal-directed travel, and the original study had to split trajectories into a
-localization phase and a homing phase using *post-treatment* features (straightness,
-distance-to-goal). Selecting on such features can entangle treatment effects with the selection
-rule. To avoid that, the main analysis below fits a **von Mises--Uniform mixture (vMU)**: each step
-is drawn either from a directed von Mises component (goal-directed "exploitation") or from an
-undirected component (wandering "exploration"), with treatment and per-animal (tag) random
-effects. This separates trajectory structure from treatment comparisons while using the **full**
-trajectory, with no post-treatment filtering.
+We first fit a single von Mises distribution and then a mixture of a von Mises component and a uniform background. The mixture allows a concentrated pattern to coexist with broadly distributed headings without requiring every heading to belong to the same narrow distribution. We compare predictive performance, check whether replicated headings resemble the observations, and examine how individual headings are attributed to the mixture components along each retained trajectory.
 
-The notebook also fits a simpler **single von Mises treatment model** (brms) first, so the vMU
-result can be read against a non-mixed baseline, and compares the two out-of-sample (PSIS-LOO
-ELPD).
+The analysis uses the full usable tracks for the retained bats, without restricting the fitted data to a behavior-defined homing phase. Component membership remains a statistical inference from the headings. It does not directly observe exploration, recognition of location, or a decision to return home.
 
 
 ## Setup
@@ -285,10 +271,13 @@ trace_plot <- function(fit, parameters, angular = character()) {
 
 ```
 
-## 1. Load the data
+## 1. Study design and recorded trajectories
 
-Per-tag metadata and the raw track file. `meta_df` carries the treatment assignment and the
-destination flags; `raw_track_df` carries the georeferenced track per tag.
+The tracks were obtained with ATLAS reverse GPS tracking. Metadata link each animal to its treatment and recorded destination. The four categories are control, eye cover, eye cover plus magnet, and eye cover plus magnet plus anosmia. Echolocation remained available in all groups.
+
+These categories compare specific combinations of sensory manipulations. They do not form a complete factorial design separating every sensory modality and interaction. Treatment coefficients should therefore be interpreted as contrasts between the observed groups.
+
+The analysis uses the track and metadata tables supplied in [the accompanying data repository](https://github.com/jgraving/unwrap-data). Its sample consists of retained trajectories with a classified destination and usable bearings. Conclusions about those headings are distinct from an analysis of return success among all originally released bats.
 
 
 ```{r}
@@ -328,14 +317,13 @@ head(raw_track_df)
 
 ```
 
-## 2. Spatially resample to fixed step length
+## 2. Representing movement with regularly spaced bearings
 
-`rediscretize_latlon_parallel` resamples each tag's lat/lon trajectory to a **constant step length**
-(60 m) along-track, computing step headings and distances. Gaps in the raw track (a jump larger than
-`gap_factor \times spacing_m`, or a time gap larger than `gap_time_s`) split the track into
-contiguous `segment_id`s, and the first resampled row after a gap is flagged `gap_before=1`. Working
-with fixed step lengths (rather than variable GPS fix intervals) is what lets us treat each step's
-bearing as one circular observation and keeps distance along-track `s_along_m` well defined.
+Each reconstructed trajectory is sampled at intervals of 60 m of cumulative travel. A heading is the bearing between successive sampled positions. On a turning path, the straight-line displacement between those positions can be shorter than 60 m.
+
+This gives observations a common spatial basis: long stretches of travel contribute more headings than short stretches, regardless of how quickly they were traversed. Consequently, a model's component weight describes prevalence among the sampled headings, approximately along traveled distance, rather than a fraction of flight time.
+
+Large tracking gaps start separate resampling segments. Fixed spatial spacing standardizes the observations, but it does not establish independence or guarantee that subsequent heading calculations exclude every gap crossing. The likelihood's conditional-independence assumption and the treatment of gaps remain important qualifications when interpreting the analysis.
 
 
 ```{r}
@@ -392,12 +380,11 @@ stopifnot(nrow(rediscretized) == 5072L, length(unique(rediscretized$tag)) == 67L
 
 ```
 
-### Per-tag metadata + destination label
+### Which destination defines the reference direction?
 
-Collapse the metadata to one row per tag, coerce the destination flags to 0/1, and build a
-`destination` label: `Roost` (flyHome) vs `Agamon` (flyAgamon, the Kinneret/lake region) vs
-Unknown. The per-tag metadata are merged back onto the resampled tracks so every step knows its
-treatment and goal.
+The retained tracks are associated with either the roost or Agamon Lake. The roost is represented by a point, whereas the lake is represented by its outline. These two geometries require different definitions of a local approach direction.
+
+Destination information supplies a common reference for comparing bearings. It describes the destination associated with the recorded track; the statistical model does not independently establish the bat's moment-to-moment intention.
 
 
 ```{r}
@@ -422,21 +409,13 @@ table(track_w_treat$treatment, track_w_treat$destination)
 
 ```
 
-## 3. Goal-relative bearings (distance + bearing to the destination)
+## 3. Bearings relative to the destination
 
-For every resampled step, compute:
+For each movement bearing, we subtract the locally defined direction toward the destination and wrap the difference onto the circle. A relative bearing of $0$ means alignment with that reference direction, $\pm\pi/2$ means movement across it, and $\pm\pi$ means movement in the opposite direction. The values $-\pi$ and $+\pi$ describe the same direction.
 
-- its local metric coordinates (`x_m, y_m`, a projected plane around the arena),
-- its step `bearing_to_...`/`direction`,
-- the **instantaneous direction toward the goal**: for the lake (Agamon) this is the
-  negative-gradient of a smoothed-distance (or harmonic) distance field (`-\nabla u`), so the
-  "best way to reduce distance" from each point, not just a straight line to a single point; for
-  the roost it is the bearing to the roost point,
-- the **goal-relative angle** `flightAngDiffDest_{deg,rad}`: the animal's step bearing **relative to**
-  that goal direction. This is the circular response used in the models below (0 = aimed at goal).
+For the roost, the reference points toward the roost coordinate. For the lake, it follows a harmonic potential field approaching the lake outline. The reference can therefore vary smoothly with position without treating the whole lake as a single central point. This is a geometric construction used to define the response, not a claim about the sensory map implemented by the bat.
 
-This is what places every flight on a common circular scale: steps toward the goal lie near $0^\circ$,
-steps away near $\pm180^\circ$.
+Expressing every heading relative to its own local reference puts flights from different positions and toward different destinations on a common circular scale. A distribution centred near zero indicates orientation toward that reference; its width describes how variable those bearings are.
 
 
 ```{r}
@@ -590,9 +569,18 @@ track_w_treat$flightAngDiffDest_deg <- wrap(step_direction - target_direction) *
 
 ```
 
-## 4. Modeling table and descriptive summaries
+## 4. The observations used by the models
 
-Assemble the modeling frame and check the design.
+The saved preprocessing produces 5,072 resampled trajectory rows. After excluding rows without the quantities needed for fitting, both models use **4,942 headings from 67 bats**. A trajectory row is therefore not automatically a usable heading observation.
+
+| Treatment | Bats | Modeled headings |
+| --- | ---: | ---: |
+| Control | 29 | 1,511 |
+| Eye cover | 14 | 1,199 |
+| Eye cover + magnet | 15 | 1,162 |
+| Eye cover + magnet + anosmia | 9 | 1,070 |
+
+Headings from the same bat share an individual tendency, and animals contribute unequal numbers of observations. Animal-specific effects account for that repeated-measures structure while allowing information to be shared within the model. This does not explicitly model remaining serial dependence between successive headings.
 
 
 ```{r}
@@ -639,23 +627,11 @@ treatment_nice <- setNames(vapply(treatment_labels, fmt_treat_label, character(1
   names(treatment_labels))
 ```
 
-## 5. Trajectory maps (goal-relative context)
+## 5. Reading the trajectories before fitting distributions
 
-Panels of the resampled tracks, colored by destination (roost vs Agamon) and by treatment, with the
-lake polygon (Agamon) overlaid. Useful ground truth for what "aimed at the goal" looks like in each
-condition before we fit any model.
+The maps place the bearings in their spatial context. They show how flight paths differ in route shape, length, and approach to the roost or lake. A turn that looks large on a geographic map can have a different interpretation once it is expressed relative to the changing direction toward a destination.
 
-The panels sit on CartoDB basemap tiles (one 256 px Web-Mercator tile per grid cell,
-composed into a single raster per panel, fetched with the `curl` package):
-`dark_all` for the full destination and flow-field figures,
-`light_nolabels_novector` for the compact destination figure, and `light_all`
-for the per-treatment probability panels. CartoDB basemaps need an API key:
-create a free account at <https://carto.com> (the free tier covers most
-non-commercial use), copy your public key from the account-management page,
-and set it in your shell before starting the notebook
-(`export UNWRAP_CARTO_API_KEY=...`), or paste it at the marker in the first
-map cell (below). Without the key, each panel falls back to a flat fill in
-the reference background color (dark `#262626`, light `#fafaf8`).
+Use these maps to understand the recorded geometry and the coverage of the observations. They do not directly reveal a bat's internal navigation state. The same retained trajectories provide the headings for the subsequent treatment models.
 
 
 ```{r}
@@ -1156,8 +1132,7 @@ save_figure(p_destination, "rediscretized_destination_panels", width = 7, height
 
 ```
 
-Compact per-panel trajectory plots (one panel per treatment / destination combination).
-
+These compact panels show the same retained tracks with the destination geometry made easier to compare. They provide spatial context for the relative bearings.
 
 ```{r}
 #| cell-id: "goldshtein-bats-023"
@@ -1253,15 +1228,15 @@ save_figure(p_destination_compact, "rediscretized_destination_panels_compact",
 
 ```
 
-Per-treatment destination panels (compact).
+The recorded destinations provide the reference for all subsequent heading comparisons. A path's orientation must be assessed relative to that local reference rather than a single geographic bearing.
 
+The fitted analyses retain usable headings from the full available tracks, without restricting them to observations after the recorded localization boundary. The preceding maps should not be read as a separate after-localization subset.
 
-After-localization tracking and destination panels.
+### Local directions of approach
 
+The arrows illustrate how an approach direction can depend on position. The roost example points toward a single location. Around the lake, a spatial field supplies directions approaching its outline.
 
-Destination flow fields: smoothed-distance and harmonic distance fields over the arena, with the
-negative-gradient (goal-approach) direction field that supplies `bearing_to_dest` in the goal-relative
-constructions above.
+The displayed lake illustration uses a smoothed-distance field, whereas the fitted relative bearings use the harmonic field described above. The figure therefore explains the geometric idea without showing exactly the field used for every modeled heading. Neither construction is a measured sensory map or an estimate of the route a bat must follow.
 
 
 ```{r}
@@ -1378,12 +1353,15 @@ save_figure(p_flow, "destination_flow_fields_smoothed_distance", width = 8, heig
 
 ```
 
-### Descriptive circular summaries by treatment
+### What can we see before fitting the hierarchical models?
 
-Per-treatment concentration summaries (descriptive, no model): estimated population concentration
-($\hat\kappa$), mean resultant length ($\vec{R}$), and the alignment of each individual's mean
-bearing to $0^\circ$ (goal direction). These give a first, model-free read on whether treatment
-changes directional bias or precision.
+The circular density plots show the observed heading distributions, including their peaks, spread, and departures from the destination direction. The following summaries describe each bat's full set of relative bearings. They do not yet separate a concentrated component from a diffuse background.
+
+The mean resultant length $\bar R$ is the length of the average unit vector formed from the headings. It approaches one when headings agree closely and becomes small when they cancel. A small value can arise from a broad distribution or opposing directional tendencies; it does not by itself establish uniformity. The approximate von Mises concentration $\hat\kappa$ expresses this overall concentration on the von Mises scale.
+
+Alignment toward the destination is the average $\cos(y)$ across the bat's headings, equivalently $\bar R\cos(\bar y)$ when the mean direction is defined. Positive values indicate an overall tendency toward the reference, negative values a tendency away. This summary combines the mean direction and the concentration of headings.
+
+Each descriptive point represents a bat. Treatment summaries show the median and the 25th to 75th percentiles across bats. These intervals describe variation between recorded animals, rather than confidence or posterior credible intervals for a treatment parameter.
 
 
 ```{r}
@@ -1546,8 +1524,7 @@ save_figure(p_polar_data, "polar_vonmises_kde_all", 11, 10)
 
 ```
 
-$\hat\kappa$ (concentration) by treatment, median with percentile bands.
-
+The approximate concentration for each bat summarizes its full heading distribution. Treatment intervals span the 25th to 75th percentiles across bats, with the median marked. This is not yet the precision of a separated directed component.
 
 ```{r}
 #| cell-id: "goldshtein-bats-032"
@@ -1555,8 +1532,7 @@ save_figure(p_kappa_desc, "kappa_hat_by_treatment_median_percentiles", 2.6, 2.2)
 
 ```
 
-Mean resultant length $\vec{R}$ by treatment, median with percentile bands.
-
+Mean resultant length summarizes agreement among all of a bat's headings on a scale from zero to one. The displayed median and interquartile range describe variation across bats within each treatment.
 
 ```{r}
 #| cell-id: "goldshtein-bats-034"
@@ -1564,8 +1540,7 @@ save_figure(p_R_desc, "rbar_by_treatment_median_percentiles", 2.6, 2.2)
 
 ```
 
-Alignment of individual mean bearings to $0^\circ$ by treatment, median with percentile bands.
-
+Alignment is the mean cosine of each bat's headings relative to the destination. It combines concentration and directional bias. Treatment medians and interquartile ranges summarize variation among bats.
 
 ```{r}
 #| cell-id: "goldshtein-bats-036"
@@ -1573,19 +1548,29 @@ save_figure(p_align_desc, "alignment0_by_treatment_median_percentiles", 2.6, 2.2
 
 ```
 
-## 6. Single von Mises treatment model (baseline)
+## 6. A single von Mises model for treatment differences
 
-Build the modeling table for a **single** von Mises likelihood: response `HeadingRadians` (the
-goal-relative bearing wrapped to $(-\pi, \pi]$), a **treatment** fixed effect, and a **per-tag random
-intercept** (repeated measures). Predictors (`z_log_dist`) are standardized. This is the
-non-mixed baseline; the mixture below will be judged against it.
+The baseline describes each bat's relative bearings with one von Mises distribution. Its mean direction measures directional bias relative to the destination, and its concentration measures the spread of the animal's full heading distribution.
+
+Treatment effects allow both quantities to differ between groups. Animal-specific effects allow bats in the same treatment to differ, with partial pooling stabilizing estimates for animals that contribute less information. The model includes treatment and animal effects; distance is not a predictor in these fitted formulas.
+
+A single concentration must account for both tightly directed travel and broadly distributed headings. This motivates the later mixture, which can separate the precision of a concentrated tendency from how prevalent that component is.
 
 
+For heading $j$ from animal $i$ in treatment $t$, the baseline is
 
-Direction tag shifts are Normal with HalfNormal(1/sqrt(30)) scale; the
-concentration intercept prior is Normal(inverse_softplus(3), 1). The
-von Mises tag hyperprior belongs to the mixture model below. All
-treatment effects use control (1) as reference.
+$$
+y_{ij}\sim\mathcal M(\mu_{it},\kappa_{it}),
+$$
+
+$$
+\mu_{it}=\operatorname{wrap}(\beta_{\mu0}+\beta_{\mu t}+b_{\mu i}),\qquad
+\kappa_{it}=\operatorname{softplus}(\beta_{\kappa0}+\beta_{\kappa t}+b_{\kappa i}).
+$$
+
+Here $\mathcal M$ is the von Mises distribution, and control is the reference treatment, with its treatment contrasts set to zero. Wrapping keeps mean direction on the circle. The softplus link, $\operatorname{softplus}(x)=\log(1+e^x)$, makes concentration positive while allowing additive effects on the underlying scale.
+
+The baseline's angular animal effects are Gaussian deviations on the scale before wrapping, with a HalfNormal prior of scale $1/\sqrt{30}$ on their standard deviation. The concentration intercept has a Normal prior centred at $\operatorname{softplus}^{-1}(3)$ with standard deviation one. These priors regularize individual variation and baseline concentration while allowing the observations to update them. The mixture below uses a different angular hierarchy and concentration prior, so the model comparison concerns the fitted specifications as a whole.
 
 
 ```{r}
@@ -1688,9 +1673,13 @@ save_figure(trace_plot(fit_vm, c("b_beta0_Intercept", "b_kappa_Intercept"), base
 
 ```
 
-### PSIS-LOO comparison (vMU vs vM)
+### A concentrated component and a diffuse background
 
-Out-of-sample comparison of the two fits by PSIS-LOO. The logit-scale posterior of the mixture weight is mapped back to $(0, 1)$, so the directed-component probability $p$ is reported in interpretable terms.
+A heading far from the destination may reflect broad variation that a single narrow von Mises distribution cannot accommodate well. The mixture adds a uniform background, allowing a concentrated tendency and broadly distributed headings to coexist within an animal's distribution. It is not a model with two distinct preferred directions.
+
+The weight $p$ gives the probability of selecting the von Mises component before observing a particular heading. A logit link keeps this weight between zero and one. The following illustration shows how a Gaussian distribution on the logit scale becomes an asymmetric distribution of probabilities.
+
+That illustration is centred at $\operatorname{logit}(0.9)$. It is an illustration of the transformation, not the fitted mixture-weight prior: the model below uses a Normal prior centred at $\operatorname{logit}(0.8)$ with standard deviation one for its population intercept. The interval shown by the illustration must not be read as a posterior result from the bat data.
 
 
 ```{r}
@@ -1700,20 +1689,40 @@ data.frame(quantile = qs, probability = plogis(qnorm(qs, qlogis(0.9), 1)))
 
 ```
 
-### Fit the full von Mises--Uniform mixture
+### The von Mises–uniform mixture
 
-`mix_form` specifies **each step** as
-$\text{Heading} \sim p\,\mathrm{VM}(\mu, \kappa) + (1-p)\,\mathrm{Uniform}$, with
+The mixture describes an animal's heading density as
 
-- $\mu$ = goal-directed mean direction (population `mu0` + per-tag von Mises offsets + treatment
-  offsets),
-- $\kappa$ = goal-directed concentration (softplus-linked, per-tag offsets + treatment offsets),
-- $p$ = probability a step is goal-directed (logit-linked, per-tag offsets + treatment offset).
+$$
+f_{it}(y)=p_{it}\,\mathcal M(y\mid\mu_{it},\kappa_{it})
+          +(1-p_{it})\frac{1}{2\pi},
+$$
 
-The undirected (uniform) component explicitly represents exploratory movement, so a single
-concentration no longer has to absorb both dispersion during homing and wandering — and no
-post-treatment "homing" filter is needed.
+with
 
+$$
+\mathcal M(y\mid\mu,\kappa)
+=\frac{\exp\{\kappa\cos(y-\mu)\}}{2\pi I_0(\kappa)}.
+$$
+
+The mean $\mu$ locates the concentrated component; $\kappa$ describes precision within that component; and $p$ describes its prevalence among sampled headings. The von Mises mean is estimated rather than fixed at zero. A large $p$ therefore needs to be read together with mean direction and concentration before calling a distribution strongly oriented toward the destination.
+
+All three parameters have treatment and animal effects:
+
+$$
+\mu_{it}=\operatorname{wrap}(\mu_0+\beta_{\mu t}+u_i),
+$$
+
+$$
+\kappa_{it}=\operatorname{softplus}(\alpha_\kappa+\beta_{\kappa t}+v_i),\qquad
+p_{it}=\operatorname{logit}^{-1}(\alpha_p+\beta_{pt}+w_i).
+$$
+
+The angular animal deviations $u_i$ have a von Mises distribution centred on zero. Its concentration governs variation in mean directions between bats, which is distinct from the within-component precision $\kappa_{it}$. Concentration and weight effects use Gaussian deviations on their respective transformed scales. Sharing information through these hierarchies retains individual differences while regularizing estimates for less informative tracks.
+
+The mixture's angular pooling concentration has a LogNormal prior with parameters $\log(30)$ and $0.1$. Its concentration-intercept prior is centred at $\operatorname{softplus}^{-1}(5)$, whereas the baseline uses $\operatorname{softplus}^{-1}(3)$. The fitted weight-intercept prior is centred at $\operatorname{logit}(0.8)$. These distinctions matter when comparing the models; adding a uniform component is not their only difference.
+
+The uniform component is a statistical description of headings spread around the circle. It does not identify observed exploration, disorientation, or a random-walk state. The model has no state-transition process and no distance-varying mixture weight. It describes the retained headings without first selecting only those classified as belonging to a homing phase.
 
 
 ```{r}
@@ -1855,7 +1864,19 @@ save_figure(trace_plot(fit_mix, c("b_mu0_Intercept", "b_kappa_Intercept", "b_pgo
 
 ```
 
-Sampling summary for the vMU fit (check ESS / $\hat{R}$ before interpreting).
+### Qualifications to the saved sampling diagnostics
+
+The saved R fits report that divergence information was not retained. In addition, the current diagnostic helper combines chains into one column before calculating its convergence summaries. The printed values therefore do not provide a verified comparison of agreement between the separate chains.
+
+A complete diagnostic check should retain the iteration-by-chain structure and retrieve the sampler's divergence information. Read the saved R summaries with this limitation in mind; a plausible trace or density figure alone cannot establish reliable posterior exploration.
+
+### Predicting another heading from an observed bat
+
+Pareto-smoothed importance-sampling leave-one-out cross-validation (PSIS-LOO) approximates predicting each heading after omitting that observation from the fit. The bat's other headings remain available. This assesses prediction conditional on the observed animals, rather than generalization to an entirely new bat or independent flight.
+
+Expected log predictive density (ELPD) adds those predictive contributions across headings. A higher score indicates better prediction under this comparison. We examine both the total score and where its difference arises among treatments and animals.
+
+The Pareto-$k$ diagnostics assess the reliability of the importance-sampling approximation. In the saved results, neither model has a heading with $k>0.7$ in either language. This is encouraging for the LOO calculation, while the sampling qualifications and possible serial dependence between headings remain separate considerations.
 
 
 ```{r}
@@ -2284,8 +2305,7 @@ plim <- plim - c(padpl, -padpl)
 
 ```
 
-Treatment coefficients for the mu and kappa submodels (vM baseline).
-
+In the baseline coefficient figure, the control row contains intercepts and the other rows show treatment contrasts. Direction coefficients are angular offsets in radians; concentration coefficients act on the scale before the softplus transformation. A concentration contrast is therefore not a direct difference in $\kappa$. Intercept and contrast must be combined before transforming to a treatment's concentration. The bars show posterior uncertainty in those coefficients.
 
 ```{r}
 #| cell-id: "goldshtein-bats-051"
@@ -2293,9 +2313,7 @@ save_figure(p_base_coef, "treatment_coefficients_mu_kappa", 3.0, 2.8)
 
 ```
 
-Posterior predictive density at the goal direction ($0^\circ$, i.e. straight toward the goal) by
-treatment for the vM baseline.
-
+The baseline density at zero combines estimated direction and concentration. It is a density per radian, not the probability of exactly facing the destination or of successfully arriving there. The uniform reference is $1/(2\pi)$. Later panels distinguish this full baseline distribution from the mixture's directed component and from its full mixture.
 
 ```{r}
 #| cell-id: "goldshtein-bats-053"
@@ -2309,9 +2327,11 @@ save_figure(p_total, "psisloo_total_elpd_all_models", 3.4, 1.4)
 
 ```
 
-Compute **$\Delta$ELPD = vMU $-$ vM** with PSIS-LOO, total and stratified by treatment, with the SE of
-the total. A positive value means the mixture predicts goal-relative headings better out of sample;
-it is the evidence for a non-trivial undirected component.
+The plotted difference is $\Delta\mathrm{ELPD}=\mathrm{ELPD}_{\mathrm{mixture}}-\mathrm{ELPD}_{\mathrm{baseline}}$. Positive values favor the mixture for predicting omitted headings. The saved Python comparison gives approximately $+118.8$ with a standard error of $17.2$; the saved R comparison is similar.
+
+The total advantage is concentrated in the control, eye-cover, and eye-cover-plus-magnet groups. The group with all three manipulations has a difference close to zero. The mixture therefore improves prediction overall without improving it in every treatment. A near-zero difference is not evidence that those bats failed to navigate or that all their headings came from one known behavioral state.
+
+These scores compare fitted heading distributions, not mechanisms of navigation. They support using the more flexible distribution where it predicts better; they do not establish that its latent components correspond to particular internal decisions.
 
 
 ```{r}
@@ -2320,8 +2340,7 @@ save_figure(p_delta, "psisloo_delta_total_and_by_treatment_vMU_minus_vM", 3.4, 1
 
 ```
 
-Total ELPD by model (vMU vs vM), best first.
-
+This combined display places the total model scores beside their difference within treatments. Higher ELPD means better prediction of the omitted headings under this validation scheme; the treatment rows are contributions to that comparison, not effects on return success.
 
 ```{r}
 #| cell-id: "goldshtein-bats-058"
@@ -2332,8 +2351,9 @@ save_figure(p_combined3, "psisloo_combined", 3.6, 3.0)
 
 ```
 
-Pointwise $\Delta$ELPD (vMU $-$ vM) by animal and by treatment — the vMU advantage can be concentrated
-in a subset of animals.
+The animal panels show sums of the pointwise ELPD differences within each bat, grouped by treatment. They reveal whether an overall advantage is shared broadly or driven by a subset of tracks. Animals with more observations can contribute more to the total, so the absolute contributions should be read alongside their heading counts.
+
+The reported standard errors use variation among the pointwise differences within the relevant animal, treatment, or total sample. They quantify uncertainty under that calculation; they are not posterior intervals for an individual treatment effect. Residual dependence between successive headings can affect their interpretation.
 
 
 ```{r}
@@ -2342,10 +2362,11 @@ save_figure(p_delta_individual, "psisloo_delta_by_individual_by_treatment_vMU_mi
 
 ```
 
-## 7. vMU population-level summaries
+## 7. What changes between treatments?
 
-Population-level vMU summaries: per-treatment polar densities of the goal-relative bearings, showing
-the directed + undirected mixture.
+The treatment-level mixture figures set animal-specific effects to zero. Each curve therefore describes the model's treatment reference distribution. It is distinct from averaging fitted distributions over the recorded bats or predicting a new bat after integrating over individual variation.
+
+The polar curves show a concentrated directional component together with a broad background. In the saved figures, the main concentration remains near the destination direction in all four treatments. Treatment differences concern its location, its width, and its contribution to the full distribution. The following summaries separate those features so a change in one is not automatically interpreted as a change in the others.
 
 
 ```{r}
@@ -2354,8 +2375,44 @@ save_figure(p_mixture_polar, "vmum_mixture_full_polar_pdfs_population_only", 10,
 
 ```
 
-Per-treatment population **mixture weight** $p$ (probability a step is goal-directed), goal-directed
-alignment to $0^\circ$, and goal-directed $\kappa$, each with posterior means and HDIs.
+### Component prevalence, precision, and orientation toward the destination
+
+The mixture weight $p$ describes how prevalent the von Mises component is among sampled headings. The dashed line at $p=0.5$ marks equal weights for the two components. It is not a uniform-heading baseline: a half-and-half mixture still contains a directional component.
+
+Concentration $\kappa$ measures precision within the von Mises component. Its mean resultant length,
+
+$$
+A(\kappa)=\frac{I_1(\kappa)}{I_0(\kappa)},
+$$
+
+expresses that precision between zero and one. Neither quantity by itself measures how often that component is used or whether its mean points exactly toward the destination.
+
+The full-mixture density at the destination direction combines all three parameters:
+
+$$
+f(0)=p\,\mathcal M(0\mid\mu,\kappa)+(1-p)/(2\pi).
+$$
+
+This is a density per radian, with uniform reference $1/(2\pi)\approx0.159$. The separate directed-component panel shows $\mathcal M(0\mid\mu,\kappa)$ without weighting it by $p$ or adding the background.
+
+The probability of a heading within $45^\circ$ of the reference is instead an integrated quantity:
+
+$$
+P(|Y|\le\pi/4)
+=p\int_{-\pi/4}^{\pi/4}\mathcal M(y\mid\mu,\kappa)\,dy+(1-p)/4.
+$$
+
+Its uniform reference is $0.25$. Density at an exact angle and probability over this angular sector therefore have different units and interpretations. Neither is the probability of eventually reaching the destination.
+
+Finally, expected alignment of the full mixture toward zero is
+
+$$
+E[\cos Y]=p\,A(\kappa)\cos\mu.
+$$
+
+It combines component prevalence, precision, and directional bias. This explains why a high component weight can coexist with modest overall alignment if the concentrated component is broad or displaced from zero.
+
+The panels summarize posterior means and 95% intervals, with circular summaries for angles. These intervals describe uncertainty in fitted parameters or derived quantities, unlike the descriptive interquartile ranges across bats shown earlier.
 
 
 ```{r}
@@ -2394,8 +2451,9 @@ save_figure(p_align, "fullmodel_alignment_to_zero_by_treatment_mean_hdi", 3.0, 1
 
 ```
 
-Combined 2x2 summary plot of the out-of-sample comparison against the population-level vMU
-parameters.
+The combined figure places predictive improvement alongside four treatment summaries: mean direction, mixture weight, mean resultant length of the directed component, and that component's density at zero. The last two panels concern the directed component itself; they do not show the full-mixture resultant length or full-mixture density.
+
+The saved estimates retain a substantial directed component across all treatments. The control distribution is generally more concentrated, while some manipulated groups retain a high component weight despite a broader directed component. This is the value of the decomposition: reduced directional precision need not appear as a reduced prevalence of the directed component. Read the posterior intervals and individual variation before interpreting a precise ordering of treatments.
 
 
 ```{r}
@@ -2413,8 +2471,9 @@ save_figure(p_2x2, "psisloo_plus_params_2x2", 6.8, 8.6)
 
 ```
 
-Per-treatment predicted posterior density at the goal direction for the vMU (analog of the vM
-baseline figure above).
+The matched density panels compare the mixture's directed component with the baseline's single von Mises distribution. A sharper directed component can emerge once broadly distributed headings are represented separately. This comparison is conditional on that decomposition; it is not itself a comparison of the two complete predictive distributions.
+
+Use the full-mixture density panel to assess all modeled headings together and PSIS-LOO to compare predictive performance. The uniform reference remains a density of $1/(2\pi)$ per radian in these plots.
 
 
 ```{r}
@@ -2450,10 +2509,13 @@ save_figure(p_3panel, "psisloo_plus_predictive_density_3panel", 3.6, 4.5)
 
 ```
 
-## 8. Per-animal level
+## 8. How much do individual bats differ?
 
-Helpers plus **per-animal (tag-level)** vMU summaries: each bat's mixture weight, goal-directed
-alignment, and $\kappa$. This is where pronounced between-animal heterogeneity becomes visible.
+The individual panels retain each bat's fitted effects. They show its component weight, precision, density at the destination direction, and expected alignment, with posterior intervals. Two bats in the same treatment can have different mixtures even when they share the same treatment reference distribution.
+
+The gray treatment bands describe uncertainty in that reference with animal effects set to zero. They are not an interval containing a specified fraction of bats. Differences between individual estimates and the reference reflect the fitted animal variation, while the widths of individual intervals also depend on how informative each track is.
+
+After these parameter summaries, the population and individual predictive checks ask whether the fitted model can generate heading distributions resembling those recorded.
 
 
 ```{r}
@@ -2480,9 +2542,15 @@ save_figure(tag_hdi_plot("align0", "Alignment", xlimits = c(0, 1)), "fullmodel_t
 
 ```
 
-### Posterior predictive checks
+### Could the mixture generate similar heading distributions?
 
-The posterior predictive checks (population and individual) resample / bootstrap the goal-relative headings under the vMU and compare them to the observed, per treatment and per animal.
+The predictive checks generate new headings from the full fitted mixture while retaining the observed animals and their numbers of headings. Each posterior draw supplies animal-specific means, concentrations, and weights. A simulated heading is drawn from either the concentrated component or the approximately uniform background, and the resulting observations are summarized with circular kernel density estimates.
+
+The population check also resamples animals within treatments and headings within selected animals. It concatenates those headings before estimating the density. Longer recordings therefore contribute more headings to the displayed distribution; this is not an equal-weight average of individual density curves. The observed bootstrap and replicated-data summaries use the corresponding resampling procedure.
+
+The dashed observed curves and solid model curves show the main peaks and tails, while the bands summarize uncertainty in the bootstrap or replicated density estimates. In the saved panels, the model broadly reproduces the concentration near the destination direction and differences in spread between treatments. Systematic disagreement in peaks or tails would identify aspects of the distribution needing a better description.
+
+These checks assess marginal heading distributions for the observed sample. They do not validate the timing of turns, independence of successive headings, or prediction for new bats. The population bands are pointwise highest-density summaries of the resampled or replicated density values, rather than a simultaneous uncertainty envelope over the entire circle.
 
 
 ```{r}
@@ -2801,9 +2869,9 @@ save_figure(p_population_ppc, "bat_population_ppc_by_treatment", 10.5, 3.4)
 
 ```
 
-Individual PPC: bootstrap vs posterior KDE of the goal-directed component per animal.
+The individual grid compares each animal's observed bootstrap density with densities from replicated headings drawn from its **full mixture**, including both the concentrated and approximately uniform components. It does not isolate only the directed component.
 
-These figures (and the trajectory maps above) use free CARTO basemaps; when no API key is set they fall back to a flat neutral cartographic style, so the animal positions and flight segments still read cleanly offline.
+The 95% bands use pointwise 2.5th and 97.5th percentiles of the bootstrap or replicated estimates. They include variation from finite heading samples and, on the replicated side, uncertainty in fitted parameters. Look for animals whose peak location, spread, or low-density regions are consistently missed. Differences between individual panels can be important even when a treatment-level average looks satisfactory.
 
 
 ```{r}
@@ -2812,12 +2880,19 @@ save_figure(p_individual_ppc, "bat_individual_ppc_bootstrap_vs_ppc_kde", 6.9, 7.
 
 ```
 
-## 9. Goal-directedness along the trajectory
+## 9. Component membership along a recorded trajectory
 
-Posterior probability that each step belongs to the **directed (goal-seeking) component**
-($p_{goal}$), plotted along each trajectory (by distance / progress toward the goal). Directedness is
-expected to be lower early in a flight (localization / exploration) and higher near the endpoint
-(homing).
+The mixture weight $p_i$ describes an animal's component prevalence before looking at a particular heading. Once heading $y_{ij}$ is observed, its modeled probability of belonging to the directed component is
+
+$$
+r_{ij}
+=\frac{p_i\,\mathcal M(y_{ij}\mid\mu_i,\kappa_i)}
+       {p_i\,\mathcal M(y_{ij}\mid\mu_i,\kappa_i)+(1-p_i)/(2\pi)}.
+$$
+
+The quantity plotted as $p_{\mathrm{goal}}$ summarizes this probability over posterior draws. It can vary from heading to heading even though the fitted component weight is constant within an animal. A heading compatible with the fitted concentrated component receives a higher responsibility; an unusual heading can receive a lower one.
+
+This is an attribution made after observing the bearing, not an independent observation of intention or the probability of eventual return. Because the component mean is estimated, its membership also needs to be read alongside its direction relative to zero. Plotting these probabilities along a track describes where observed headings agree with the fitted component; it does not infer a behavioral switching time.
 
 
 ```{r}
@@ -3012,8 +3087,15 @@ save_figure(p_probability_map_small, "treatment_panels_tracks_pgoal_small_bigfon
 
 ```
 
-Population-level $p_{goal}$ as a function of distance from the flight's endpoint — lower early, higher
-as the animal approaches its goal.
+### How does compatibility with the directed component vary along the track?
+
+The curves smooth the component responsibilities along each animal's observations. One horizontal axis describes distance to the destination: point distance for the roost, and distance along the local approach-field ray for the lake. This quantity differs from the length of the remaining recorded route.
+
+The other axis, labeled cumulative path distance from the end, counts retained-heading intervals backward from the last retained heading and multiplies by 60 m. It provides an approximate progress coordinate. Missing or excluded rows and tracking gaps mean it should not be treated as exact cumulative distance, elapsed time, or distance to an identified decision event.
+
+Each animal's curve is limited to the region supported by its observations. Population curves average the contributing animal curves equally at each position and are shown only where at least two animals contribute. The population average is then smoothed across neighboring positions. The set of contributing bats can therefore change along the horizontal axis. Posterior means and 95% intervals describe uncertainty carried through the smoothing calculation; they do not include uncertainty from sampling new bats or choosing a different smoothing scale.
+
+The saved curves generally show higher compatibility with the directed component closer to the end of the retained records, with substantial differences among treatments and animals. This is a descriptive pattern in observed headings. It does not establish a common recognition point, a monotonic change for every bat, or a fitted effect of distance on the mixture weight.
 
 
 ```{r}
@@ -3217,8 +3299,9 @@ save_figure(p_curve_end_c, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact"
 
 ```
 
-Per-animal (faceted) $p_{goal}$ along the flight, showing the heterogeneity in when each bat commits
-to goal-directed travel.
+The individual panels show how varied those patterns are. Some animals have consistently high component responsibilities, while others show fluctuations or extended stretches of low values. Compare each curve only over the range supported by that animal's observations and read its uncertainty together with the number and distribution of headings.
+
+These panels describe changes in compatibility with a fitted heading component. They do not identify when a bat commits to homing or when it first recognizes its location.
 
 
 ```{r}
@@ -3233,10 +3316,10 @@ save_figure(p_tag_end, "p_goal_tag_kernel_distFromEndM_faceted_TRUNC", 8, 6)
 
 ```
 
-## Review
+## What the decomposition adds
 
-The full and quick budgets retain the same data, priors, and model
-structure. Review the diagnostic tables and figures above before
-interpreting results. The [model guide](../models.md) explains how
-direction, precision, and directed-component probability answer
-different questions.
+The mixture separates a directed component's orientation, its precision, and its prevalence among sampled headings. The saved results retain a strong destination-related tendency in all treatment groups while showing that high component prevalence can coexist with reduced precision. This is more informative than reducing every track to one concentration or treating successful arrival as a complete description of navigation.
+
+The mixture predicts omitted headings better overall, although the improvement is uneven across treatments. Predictive checks show how well it reproduces the observed distributions, and individual summaries reveal variation hidden by treatment averages. The trajectory curves add a descriptive view of component compatibility along the retained tracks.
+
+These conclusions concern the recorded animals and the chosen destination reference. Sampling diagnostics, tracking gaps, and the documented map and diagnostic limitations determine the strength of particular interpretations. The statistical components do not establish distinct internal behavioral states or uniquely identify the sensory mechanism used for navigation.
