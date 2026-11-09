@@ -23,22 +23,28 @@ knitr::opts_chunk$set(dev = "ragg_png")
 
 # Artificial light reorients nocturnal dung beetles
 
-We revisit and re-analyze the two-condition arena experiment in nocturnal ball-rolling dung beetles (*Escarabaeus satyrus*) of J. J. Foster et al., "Light pollution forces a change in dung beetle orientation behavior," *Current Biology* **31**(17), 3935-3942 (2021); [doi:10.1016/j.cub.2021.06.038](https://doi.org/10.1016/j.cub.2021.06.038): each beetle is placed at the center of a circular arena and allowed to roll to the boundary, and its exit bearing is recorded repeatedly under natural nighttime illumination (control) and with an artificial floodlight switched on (treatment).
+A ball-rolling dung beetle has to get away from the dung pile before
+competitors take its ball. Holding a steady bearing helps it roll away
+along a straight path. Beetles can use the same sky cues to hold
+different bearings, so individuals leaving in different directions
+can each be well oriented. Nocturnal species can use the moon and its
+polarization pattern or, on moonless nights, the starry sky. Artificial
+light can obscure faint sky cues, and a bright local lamp can provide
+a bearing that many beetles follow.
 
-This notebook fits the hierarchical von Mises model of the study with `brms` and the
-`unwrap_von_mises` family. `Light` changes the mean
-direction and within-individual concentration. Between-individual
-concentration is estimated post hoc from individuals' own mean directions;
-it is distinct from the shrinkage hyperparameters for their deviations.
+We revisit a field experiment by
+[Foster et al. (2021)](https://doi.org/10.1016/j.cub.2021.06.038)
+with nocturnal dung beetles (*Escarabaeus satyrus*) in South Africa.
+The same beetles rolled their balls under natural nighttime illumination
+and with a floodlight to the southwest. If the lamp acts as a beacon,
+we expect bearings to shift toward it and different beetles to head
+in more similar directions. A separate question is whether the lamp
+changes how reliably each beetle repeats its own bearing.
 
 
 ## Setup
 
-Follow the [R setup](../getting-started-r.md) page once, and run all cells in order. The setup cell checks
-that the pinned packages and CmdStan are available; it stops with a
-pointer to the setup page if the one-time setup has not been run.
-Running the notebook records versions, diagnostics, inline PNGs, and
-vector PDFs.
+[R setup guide](https://jgraving.github.io/unwrap/getting-started-r/)
 
 
 ```{r}
@@ -131,10 +137,12 @@ c(R = as.character(getRversion()),
 
 ```
 
-## Figure style
+## Compare the lighting conditions
 
-Figures render inline and save vector PDFs under `figures/beetles/`.
-All angular calculations use radians and circular summaries.
+Gray marks the natural-light control (floodlight off), and gold marks
+the floodlight treatment. The lamp's position defines the same southwest
+reference bearing in both conditions. That lets us ask how often beetles
+would exit toward that part of the arena even with the lamp off.
 
 
 ```{r}
@@ -173,12 +181,36 @@ ensure_data <- function(subdir) {
 
 ```
 
-## 1. Load the trial data
+## Compare repeated exits from the arena
 
-The trial table has one row per beetle trial:
-`Experiment`, `Beetle`, `Trial`, and `Heading` in degrees. Convert ON to
-1, OFF to 0; drop missing/non-numeric headings and wrap radians to
-$(-\pi,\pi]$. Trials remain nested within beetles.
+Each beetle starts with its ball at the center of a circular arena
+one meter across. After each exit it is returned to the center for
+another trial. The response is the bearing from the center to the
+point where the beetle reaches the boundary. The design called for ten
+exits in each lighting condition for each of ten beetles. Four
+floodlight-on bearings are missing, leaving 100 control and 96
+treatment bearings.
+
+The two conditions are paired within beetle. Repeated exits reveal how
+steadily each beetle follows its own bearing, and comparing conditions
+within the same beetle separates its response to the lamp from
+persistent differences in bearing among beetles.
+
+### Read the observed bearings
+
+Each panel shows one beetle. The angle of a point gives the exit bearing,
+and its distance from the center gives the trial number. The solid and
+dashed spokes mark the circular mean and median. The shaded wedge shows
+one circular standard deviation to either side of the mean. Its width
+describes how spread out the exits were.
+
+Angles wrap around, so exits at 355° and 5° are both close to north and
+have a circular mean of 0°. To find that mean, treat each bearing as an
+arrow of length one and take the direction of the average arrow. In the
+plots, beetle 1 shifts from near north toward the southwest, whereas
+beetle 4 already tended toward the southwest with the lamp off. The
+different starting bearings and different shifts motivate a model with
+both a baseline and a treatment effect for each beetle.
 
 
 ```{r}
@@ -219,24 +251,51 @@ save_figure(p_data, "data_individual_polar_grid", 10, 18)
 
 ```
 
-## 2. Specify the treatment model
+## Model direction and consistency together
 
-Both submodels have a population intercept and a `Light` effect, plus
-independent intercept and `Light` deviations per `Individual`:
-`HeadingRadians ~ Light + (1 + Light | Individual)` and
-`kappa ~ Light + (1 + Light | Individual)`. The `Light` effect on the
-mean direction is the treatment's reorientation; the effect on
-concentration is its change in within-individual precision.
+For beetle $i$ in lighting condition $x$, a von Mises distribution
+describes the distribution of repeated exit bearings. Its mean direction
+$\mu_i(x)$ gives the beetle's preferred bearing, and its concentration
+$\kappa_i(x)$ describes how consistently the beetle returns to it.
+When $\kappa=0$, all bearings are equally likely. Larger $\kappa$ puts
+more probability close to $\mu$.
 
-Mean-direction priors are von Mises: intercept `(0, 1e-6)` (nearly
-uninformative over the circle), treatment `(0, 2)` (a modest pull
-toward the reference direction); each individual deviation vector has
-a concentration whose hyperprior is `LogNormal(log(30), 0.5)`.
-Concentration coefficients live on the pre-softplus scale: intercept
-`Normal(inverse_softplus(5), 1)`, treatment `Normal(0, 1)`,
-independent Normal individual deviations with `HalfNormal(1)` scale
-hyperpriors. The `0 +` in the concentration formula keeps its
-coefficients on the raw 0/1 coding of `Light`.
+### Give each beetle a baseline and a response to the light
+
+Let $x=0$ denote light off and $x=1$ light on. The model uses a separate
+predictor for direction and for concentration.
+
+$$
+\begin{aligned}
+\mu_i(x) &= \operatorname{wrap}\bigl(\beta_0+\beta_1 x+b_{0,i}+b_{1,i}x\bigr),\\
+\kappa_i(x) &= \operatorname{softplus}\bigl(\alpha_0+\alpha_1 x+a_{0,i}+a_{1,i}x\bigr).
+\end{aligned}
+$$
+
+The population terms $\beta_0$ and $\beta_1$ give the baseline direction
+and the angular shift with the lamp on. The offsets $b_{0,i}$ and
+$b_{1,i}$ let beetle $i$ have its own starting bearing and its own
+response. Wrapping the sum treats bearings a full turn apart as the
+same direction. The concentration terms $\alpha$ and $a$ play the
+same baseline and treatment roles on a different scale. Softplus maps
+their sum to a positive concentration. To interpret a change in
+$\kappa$, compare the transformed concentrations with the lamp on and
+off.
+
+### Share information across beetles
+
+The individual offsets are centered around zero. Their spread
+determines how much individual estimates are pulled toward the
+population baseline and treatment effect. With roughly ten exits per
+beetle per condition, this partial pooling helps distinguish persistent
+individual differences from trial-to-trial variation. A beetle with
+imprecise estimates can borrow information from the others.
+
+The prior gives nearly equal weight to all population baseline
+directions and favors smaller angular shifts. On the concentration
+scale it puts the typical baseline near $\kappa=5$. The prior for the
+treatment coefficient is centered at zero before the softplus
+transformation, allowing either an increase or a decrease.
 
 
 ```{r}
@@ -302,23 +361,14 @@ prior_vonmises <- (
 prior_vonmises
 ```
 
-## 3. Fit
+## Estimate the posterior
 
-Full sampling uses four chains with 2,000 warmup and 2,000 retained
-draws per chain. Quick mode (`UNWRAP_R_QUICK=1`) uses four chains with
-1,500 warmup and 1,500 retained draws; `adapt_delta = 0.97` allows
-more conservative adaptation for this grouped model.
-
-Direction coefficients are unconstrained reals, because directions are
-*periodic* rather than bounded on $(-\pi,\pi]$: adding any multiple
-of $2\pi$ to a coefficient leaves every wrapped predicted direction
-unchanged. The posterior therefore contains $2\pi$-equivalent regions
-that encode the same directions, separated by high posterior barriers.
-Chains exploring different regions are each well mixed internally but
-read as non-mixed under a naive R-hat, so all chains are initialized
-together from the per-group circular means of the data (in the fit
-call below). That changes only the sampler's path, never the
-posterior.
+Bayesian inference combines the priors with the likelihood of the
+observed exit bearings. Each posterior draw gives one plausible set of
+population and individual effects. Within that draw we can calculate
+both lighting conditions, take their difference, and then summarize the
+differences across draws. This keeps the uncertainty shared by the
+two conditions in the treatment contrast.
 
 
 ```{r}
@@ -380,15 +430,19 @@ if (is.null(fit)) {
 }
 ```
 
-## Diagnostics and traces
+## Check the posterior estimates
 
-Report the divergence count first: $\hat{R}$ and effective sample
-sizes are meaningful only when it is 0. Direction coefficients are
-compared with `Rhat_unwrap`, the circular analogue of R-hat that
-centers each chain's unwrapped draws before comparing chains; every
-other parameter uses the usual diagnostics. Review the summary table
-and any flagged parameters, including individual effects and
-hyperparameters, before interpreting the posterior.
+Before interpreting the treatment effects, check whether the sampling
+chains explore the same range of plausible values. $\hat R$ near 1
+indicates agreement between chains, and effective sample size estimates
+how many independent draws would provide comparable precision.
+Divergent transitions can indicate that the chains had difficulty
+exploring parts of the posterior. Read angular estimates on the circle,
+where an interval can cross the wrap point and its upper endpoint may
+appear numerically smaller than its lower endpoint.
+
+The saved fit has no entries in the flagged $\hat R$ and bulk effective
+sample size table. The cached fit has no recorded divergence count.
 
 
 ```{r}
@@ -418,13 +472,58 @@ save_figure(p_trace, "trace", 9, 6)
 
 ```
 
-## 4. Directions, within-individual concentration, and alignment
+## Interpret the response to artificial light
 
-Combine fixed and individual effects for both conditions. Direction
-intervals are circular; concentration enters through softplus.
-$R(\kappa)=I_1(\kappa)/I_0(\kappa)$ describes within-individual precision;
-the resultant length of the individual mean directions describes
-between-individual alignment. These are separate quantities.
+### Which way did beetles reorient?
+
+The curves on the polar plot show the posterior distribution of the
+population mean direction $\mu$ in each condition. The points on the
+outer ring show the observed mean bearing of each beetle. With the
+light on, the gold curve moves toward the marked southwest sector and
+the individual means bunch near it. The estimated population shift is
+about 72° on average. The width of each curve describes uncertainty
+about the population mean direction. To see how tightly an individual
+beetle repeated its exits, look at the concentration panel.
+
+### How much did consistency and agreement change?
+
+- **Within-individual concentration** asks how tightly a typical
+  beetle's exits cluster around its own preferred bearing. The panel
+  expresses the population-level $\kappa$ as the expected mean
+  resultant length $R(\kappa)=I_1(\kappa)/I_0(\kappa)$. On this
+  scale, values near zero indicate very dispersed bearings and values
+  near one indicate tightly clustered bearings. The fitted values are
+  high in both conditions, rising modestly from about 0.89 to 0.92.
+- **Between-individual concentration** asks how closely the ten
+  beetles' fitted preferred bearings agree. Give each beetle one unit
+  arrow pointing along its fitted mean and take the length of their
+  average. Arrows pointing in different directions cancel, while
+  similar directions produce a long resultant. This measure rises
+  from roughly 0.3 to 0.9 with the light on. Beetles can be consistent
+  even when their preferred directions are far apart, as in the control.
+
+### How likely was an exit near the floodlight?
+
+For each posterior draw we calculate how much of the von Mises
+distribution falls within 45° of the lamp on either side. The
+calculation uses the population direction and concentration, which
+describe a beetle whose individual offsets are zero. This probability
+combines direction and concentration. Tighter exits increase the
+probability when they cluster near the lamp and can decrease it when
+they cluster elsewhere.
+
+The sector occupies $90^\circ/360^\circ=25\%$ of the circle, so the
+dashed line shows the prediction if all bearings were equally likely.
+The fitted probability rises from roughly 10% with the lamp off to
+70% with it on. The final panel subtracts off from on within each
+draw, giving an estimated increase of about 60 percentage points.
+The points and bars are posterior means and 89% highest-density
+intervals. The change is clearly positive in the figure, with
+substantial uncertainty about its size.
+
+The additional density plot shows the full posterior for the change.
+Values to the right of the zero line represent an increase in the
+probability of exiting toward the lamp.
 
 
 ```{r}
@@ -524,15 +623,38 @@ save_figure(p_mass_delta, "floodlight_mass_change", 6, 3)
 
 ```
 
-## 5. Change in between-individual concentration
+## Estimate the change in agreement among beetles
 
-Fit a von Mises concentration to the distribution of individuals' mean
-directions — the $\kappa_\mu$ summary — first at the posterior point
-estimates and then within every posterior draw, so that uncertainty in
-the individual directions propagates into the interval. Report the
-change as ON minus OFF. This between-individual clustering is a
-separate quantity from within-individual $\kappa$ and from the prior
-concentration of the individual deviations.
+The figure reports agreement on the 0-to-1 resultant length scale.
+Here we express the same pattern as a von Mises concentration
+$\kappa_\mu$. We find the concentration that would give the same
+length of the average arrow for the fitted preferred bearings, by
+inverting $R(\kappa)$. Each beetle contributes one bearing. This gives
+a separate summary of clustering among the ten fitted means.
+
+### Compare the estimated mean directions
+
+First summarize each beetle by its posterior mean direction in each
+condition. These point estimates give $\kappa_\mu$ of about 0.6 with
+the light off and 5.3 with it on.
+
+### Carry uncertainty into the contrast
+
+Repeat the calculation separately for each posterior draw. Reconstruct
+all ten beetles' mean directions with the light off and on, convert
+each set's resultant length to $\kappa_\mu$, and subtract off from on
+within the draw. This carries uncertainty about the fitted bearings
+through to uncertainty in the change. It also keeps the calculation at
+the level of the beetles' preferred bearings even when their exits
+vary from trial to trial.
+
+The posterior mean increase in $\kappa_\mu$ is about 4.6, with a 95%
+highest-density interval of roughly 2.7 to 7. Stronger agreement among
+the beetles is consistent with many individuals using the same local
+beacon. That convergence could make it harder for beetles to disperse
+in different directions away from the dung pile. The arena response
+measures exit bearings, so the contrast speaks directly to their
+orientation in this setting.
 
 
 ```{r}
@@ -563,15 +685,28 @@ mean(kappamu[, "kappa_mu_delta"] > 0)
 
 ```
 
-## Posterior predictive checks
+## Check the circular summaries against the observations
 
-The first predictive check compares hierarchical bootstraps of the
-observations with posterior response-parameter summaries: group mean
-direction, between-individual alignment, and each individual's direction
-and within-individual concentration. Resample individuals first, then
-trials/windows within each condition. Open markers show data bootstraps;
-filled markers show the posterior, with 95% HDIs. The group mean panel
-uses the fixed direction effects.
+Do the main features inferred by the model also show up when we summarize
+the raw bearings? The open markers are bootstrap estimates from repeated
+resamples of the observed exits. For the group summaries we resample
+whole beetles, keeping their two lighting conditions paired, and then
+resample trials within each selected beetle and condition. Each selected
+beetle contributes one mean bearing to the group summary. For the
+individual panels we resample trials within each beetle and condition.
+
+The filled markers summarize the fitted posterior. The upper left
+panel compares the circular average of the resampled beetle means
+with the population direction estimated by the model. The upper
+right panel compares agreement among beetles. In the
+lower panels, compare each beetle's mean direction and its within-beetle
+resultant length. The 95% intervals describe uncertainty from resampling
+for the open markers and uncertainty under the fitted model for the
+filled markers. Both approaches show a tighter grouping of individual
+bearings with the lamp on. With the lamp off, the group direction is
+less precisely estimated, consistent with beetles heading in more
+varied directions. Differences between the markers help locate where
+the model and the raw-data summaries differ.
 
 
 ```{r}
@@ -606,10 +741,21 @@ save_figure(ppc_twin, "beetle_posterior_predictive_check", 8.8,
 
 ```
 
-A second check draws replicated angles from each individual's fitted
-likelihood at the original sample sizes. It compares resultant lengths
-of observed and replicated samples. This captures finite-sample scatter
-as well as uncertainty in the response parameters.
+### Check concentration in replicated exits
+
+Would the fitted model generate sets of exits as tightly clustered as
+those we observed? For each sampled posterior draw, use each beetle's
+fitted direction and concentration to simulate the same number of exits
+recorded in that condition. Compute the sample resultant length
+for each simulated set, just as for the observed exits. The replicated
+values reflect both uncertainty in the fitted parameters and the
+trial-to-trial variation expected in a new set of exits.
+
+The open circles show observed resultant lengths. The filled circles
+and bars show the means and 95% highest-density intervals of the
+replicated lengths. Look for a pattern of observed points above or
+below the intervals. The saved figure shows no consistent mismatch
+across beetles or conditions in this measure of within-beetle spread.
 
 
 ```{r}
