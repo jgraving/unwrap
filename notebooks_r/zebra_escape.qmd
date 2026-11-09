@@ -23,36 +23,29 @@ knitr::opts_chunk$set(dev = "ragg_png")
 
 # Grevy's zebra body orientation during an escape response
 
-A focal group of Grevy's zebra (*Equus grevyi*, $N = 18$) was recorded with an overhead drone at the Mpala Conservancy in Laikipia, Kenya: the body orientations come from the drone recordings of B. Koger, A. Deshpande, J. T. Kerby, J. M. Graving, B. R. Costelloe, and I. D. Couzin, "Quantifying the movement, behaviour and environmental context of group-living animals using drones and computer vision," *Journal of Animal Ecology* **92**(6), 1415-1433 (2023); [doi:10.1111/1365-2656.13904](https://doi.org/10.1111/1365-2656.13904). The first two flights captured baseline (grazing) behavior; the third flight contains a disturbance event in which a human observer approaches the group. Body orientation is available for each frame from automated tracking (body axis from the tail base to the neck base; tracked with DeepPoseKit, J. M. Graving et al., *eLife* **8**, e47994 (2019); [doi:10.7554/eLife.47994](https://doi.org/10.7554/eLife.47994)).
+Grazing animals can respond to a disturbance detected by a group member
+by reorienting together. A group that already faces roughly the same
+way can turn as a group while remaining just as aligned. Tracking each
+animal's body orientation lets us ask whether a disturbance changes
+the direction the group faces, how closely its members agree, and how
+steadily each animal faces its own preferred direction.
 
-To reduce temporal autocorrelation, orientations are circularly averaged over
-non-overlapping 300-frame windows (10 s at 30 Hz), giving approximately
-independent observations. Each window is labeled
-**pre-approach** (the pre-stimulus baseline) or
-**post-approach** (the post-stimulus escape response), so the data
-are repeated direction measurements nested within individuals.
+We follow 18 Grevy's zebras (*Equus grevyi*) in a focal group at Mpala
+Conservancy in Laikipia, Kenya. Overhead drone footage spans about 50
+minutes across three flights. The first two captured baseline behavior,
+and the third included an approaching human observer. We compare body
+orientations before and after the approach began. This is one approach
+to one focal group, so the results describe this escape episode.
 
-**Scientific question.** Does the group's typical orientation change in response
-to the stimulus, and how precisely do individuals orient? The hierarchical model
-separates three complementary aspects of the response:
-
-- a group-level shift in the mean direction ($\mu$);
-- **between-individual alignment**: how tightly the individual mean directions
-  cluster, summarized as a mean resultant length in $[0, 1]$;
-- **within-individual concentration**: $\kappa$ per track, reported on a
-  $[0, 1]$ scale via the Bessel ratio $R(\kappa) = I_1(\kappa)/I_0(\kappa)$.
-
-
-The joint hierarchical von Mises model is fit with `brms` and the custom `unwrap_von_mises` family. Both mean direction and concentration have `PostStimulus` effects and individual `Track` intercept/slope effects.
+We measure each zebra's bearing from the base of the tail toward the
+base of the neck. This gives the direction the animal's body faces,
+whether it is standing, foraging, or moving. [Koger et al. (2023)](https://doi.org/10.1111/1365-2656.13904)
+describe the drone and tracking methods.
 
 
 ## Setup
 
-Follow the [R setup](../getting-started-r.md) page once, and run all cells in order. The setup cell checks
-that the pinned packages and CmdStan are available; it stops with a
-pointer to the setup page if the one-time setup has not been run.
-Running the notebook records versions, diagnostics, inline PNGs, and
-vector PDFs.
+[R setup guide](https://jgraving.github.io/unwrap/getting-started-r/)
 
 
 ```{r}
@@ -147,11 +140,12 @@ c(R = as.character(getRversion()),
 
 ```
 
-## Figure style
+## Read the before-and-after comparison
 
-Figures render inline and save vector PDFs under
-`figures/zebra_escape/`. The condition colors match those of the
-Python analysis. All angular calculations use radians and circular summaries.
+Orange marks the baseline before the approach, and purple marks the
+period after it began. In the polar figures, north is 0° and bearings
+increase clockwise. The two colors let us follow the same group and
+the same animals across the two periods.
 
 
 ```{r}
@@ -213,14 +207,27 @@ ensure_data <- function(subdir) {
 
 ```
 
-## 1. Load the block-averaged bearings
+## Summarize repeated body orientations
 
-Read the same published `zebra_bearings_blocks.parquet` as the Python
-loader. Each row is a non-overlapping 300-frame (10 s at 30 Hz)
-circular average, $\operatorname{atan2}(\overline{\sin b},\overline{\cos b})$.
-The published table already excludes tracks absent from either condition;
-do not average the blocks again. `Track` labels the 18 individuals and
-`PostStimulus` codes pre-approach (0) versus post-approach (1).
+Successive video frames often capture nearly the same posture. To
+reduce short-term dependence, we average each zebra's bearings over
+non-overlapping 10-second windows. Successive bearings can still
+be similar when a zebra faces the same way for longer.
+
+We use a circular mean because angles wrap around. Represent each
+bearing as a unit arrow and take the direction of the average arrow.
+For example, the mean of 359° and 1° is 0°, or north. Averaging the
+degree values directly would give 180°, on the opposite side of the
+circle.
+
+The analysis includes zebras observed both before and after the onset
+of the approach. Comparing the same animals across periods helps
+separate a change in orientation from differences among individuals.
+Repeated bearings in each period show how consistently each zebra
+faced its own typical direction.
+
+The analysis uses 5,417 bearings from 18 zebras, with repeated
+measurements for each zebra before and after the approach.
 
 
 ```{r}
@@ -243,17 +250,53 @@ head(data)
 
 ```
 
-## 2. Specify the joint model
+## Model direction and concentration together
 
-Both submodels have the same fixed and random structure: `HeadingRadians ~ PostStimulus + (1 + PostStimulus | Track)` for the mean direction and `kappa ~ PostStimulus + (1 + PostStimulus | Track)` for the concentration.
+For zebra $i$ in period $x$, a von Mises distribution describes the
+bearings around its mean direction $\mu_i(x)$.
+The concentration $\kappa_i(x)$ controls how tightly those orientations
+cluster around that mean. At $\kappa=0$, all directions are equally
+likely. Larger values put more probability near the preferred
+direction. Modeling both parameters lets a zebra turn while its
+orientation remains just as consistent, or become more or less
+consistent about the same direction.
 
-Mean-direction priors: intercept `VonMises(0, 1e-6)`, stimulus
-`VonMises(0, 2)`; independent individual intercept/slope deviations
-`VonMises(0, kappa)` with separate `LogNormal(log(30), 0.5)` hyperpriors.
-Concentration priors (pre-softplus): intercept
-`Normal(inverse_softplus(2), 1)`, stimulus `Normal(0, 2)`, independent
-Normal individual deviations with `HalfNormal(2)` scales. Explicit
-concentration intercept coding prevents predictor centering.
+### Give each zebra its own baseline and response
+
+Let $x=0$ before the approach and $x=1$ after it begins. The model uses
+two predictors, with separate coefficients for direction and
+concentration.
+
+$$
+\begin{aligned}
+\mu_i(x) &= \operatorname{wrap}\bigl(\beta_0+\beta_1 x+b_{0,i}+b_{1,i}x\bigr),\\
+\kappa_i(x) &= \operatorname{softplus}\bigl(\alpha_0+\alpha_1 x+a_{0,i}+a_{1,i}x\bigr).
+\end{aligned}
+$$
+
+The population terms $\beta_0$ and $\beta_1$ give a common baseline
+direction and a common angular shift. The offsets $b_{0,i}$ and
+$b_{1,i}$ let each zebra start at its own bearing and turn by a
+different amount. Wrapping the sum makes angles a full turn apart
+equivalent. The $\alpha$ and $a$ terms play corresponding roles for
+concentration. Softplus maps their sum to a positive $\kappa$, so
+compare the transformed values before and after the approach to
+interpret how consistency changes.
+
+### Share information across zebras
+
+Individual offsets are centered at zero. Their estimated spread
+controls how strongly individual estimates are pulled toward the
+shared baseline and response. This partial pooling is especially
+helpful when an individual has few bearings in one period or when
+its bearings point in many directions.
+
+Before seeing the data, the direction priors give nearly equal weight
+to all baseline bearings and favor smaller turns. The prior for the
+population baseline concentration is centered near $\kappa=2$. The
+concentration change coefficient is centered at zero before softplus,
+allowing the approach to be associated with either greater or lower
+consistency.
 
 
 ```{r}
@@ -319,31 +362,14 @@ prior_vonmises <- (
 prior_vonmises
 ```
 
-## 3. Fit
+## Estimate the posterior
 
-Full sampling uses four chains with 3,000 warmup and 5,000 retained
-draws per chain. This budget is larger than the other grouped
-notebook: the concentration hyperpriors descend slowly from their
-LogNormal priors, and at 3,000 iterations the R-hat/ESS gate
-remained elevated. Quick mode (`UNWRAP_R_QUICK=1`) uses the same four
-chains with 2,250 warmup and 3,750 retained draws (three-quarters of
-the full budget). The longer adaptation than the
-introductory GLM and `adapt_delta = 0.97` allow for the grouped model
-geometry.
-
-The direction coefficients are unconstrained reals, exactly like the
-Python twin's `circ_mod` parameterization, whose von Mises coefficient
-priors (a `1e-6`-kappa intercept, a `2`-kappa stimulus effect, and
-`LogNormal(log 30, 0.5)` per-track concentrations) are periodic over
-the real line. Because the likelihood depends on the direction effects
-only through their wrapped sum, the posterior is a countable family of
-2*pi-equivalent classes with equal mass, and a sampler chain converges
-within the class it starts in. Every chain is therefore seeded in the
-same class - the prior-preferred vicinity of the origin, with jitter
-too small to cross into a neighbouring class (the `init` list in the
-fit call below). Initialization changes only the sampler's path, never
-the posterior, and the diagnostics report a sine-based R-hat for the
-direction parameters, which is invariant to the class.
+Each posterior draw combines information from the priors and the
+observed orientations in one plausible set of directions and
+concentrations. Calculate the pre- and post-approach summaries from
+the same draw so that both share the population and individual
+baseline terms. Repeating the calculation across draws carries uncertainty
+in those shared terms into the group and individual summaries.
 
 
 ```{r}
@@ -390,14 +416,18 @@ fit <- brm(form_vonmises, data = data,
   control = list(adapt_delta = ADAPT_DELTA))
 ```
 
-## Diagnostics and traces
+## Check the posterior estimates
 
-Report the divergence count first: if the per-iteration flags were not
-retained, the output says so, and that does not establish zero
-divergences. Circular direction coefficients use `Rhat_unwrap`; all
-diagnostics preserve the iteration-by-chain structure. Review the
-summary table and any flagged parameters, including individual effects
-and hyperparameters, before interpreting the posterior.
+Before interpreting the response, check how well the sampling chains
+explore the posterior. $\hat R$ near 1 suggests that the chains agree,
+and effective sample size estimates how many independent draws would
+provide comparable precision. Divergences can signal difficulty
+exploring parts of the posterior. For angular parameters, read
+intervals on the circle. An interval can cross the wrap point even
+when its endpoints look far apart on a signed degree or radian scale.
+
+The saved table of flagged $\hat R$ and effective sample size values
+is empty. The saved diagnostic output gives no divergence count.
 
 
 ```{r}
@@ -427,12 +457,46 @@ save_figure(p_trace, "trace", 9, 6)
 
 ```
 
-## 4. Posterior directions and concentration
+## Interpret the group and individual responses
 
-Evaluate every track in both conditions. The individual mean-direction
-panel and the within-individual $R(\kappa)$ panel include 95% HDIs.
-Directions are combined with circular arithmetic; concentration is
-evaluated on the natural scale after softplus.
+### Which way did the group turn?
+
+In each posterior draw, give each of the 18 zebras a unit arrow
+pointing along its fitted mean direction. The direction of the
+average arrow gives the mean orientation of this focal group.
+Each zebra has equal weight, even if some contribute more bearings
+to the fit. The group polar curves show how these mean directions
+vary across posterior draws, and the markers summarize the curves'
+directions. The group mean moves from about 105° before the approach
+to about 230° after it began, a clockwise shift of roughly 125°.
+
+### Did the zebras become more aligned with one another?
+
+The length of that same average arrow measures between-individual
+alignment. If the arrows point the same way, their average has length
+1. If they cancel, it is close to 0. Alignment is high in both
+periods, around 0.9. The main change is where the group faces.
+Its members' preferred directions remain about as closely clustered
+after the turn as before it.
+
+### How consistently did each zebra face its own direction?
+
+On the individual polar plot, the curves show uncertainty about
+each zebra's fitted mean direction, and the outer markers show the
+circular means of its observed bearings. The separate concentration
+figure shows how much each zebra's bearings vary around its own
+mean direction. It reports the expected
+resultant length $R(\kappa_i)=I_1(\kappa_i)/I_0(\kappa_i)$ of each
+zebra's fitted von Mises distribution. A value near one means the
+zebra tends to face its own mean direction consistently. Group
+alignment uses one mean direction per zebra, while this quantity
+describes variation among one zebra's bearings.
+
+Compare the pre- and post-approach points for the same animal.
+Some individuals become more consistent, and others less so. For
+example, track 2's estimated concentration rises while track 12's
+falls. The points and bars in the concentration and alignment
+summaries give posterior means and 95% highest-density intervals.
 
 
 ```{r}
@@ -526,15 +590,31 @@ save_figure(p_track_mu, "track_direction_polar", 11, 9)
 
 ```
 
-## Posterior predictive checks
+## Check the circular summaries against the observations
 
-The first predictive check compares hierarchical bootstraps of the
-observations with posterior response-parameter summaries: group mean
-direction, between-individual alignment, and each individual's direction
-and within-individual concentration. Resample individuals first, then
-trials/windows within each condition. Open markers show data bootstraps;
-filled markers show the posterior, with 95% HDIs. The group mean panel
-uses the fixed direction effects.
+Do summaries of the observed bearings show the same patterns as the
+fitted model? Open markers show bootstrap summaries. For the group
+comparisons, resample zebras with replacement, keeping both periods
+for each selected zebra. Then resample the bearings within each zebra
+and period. Each selected zebra contributes one circular mean to the
+group summaries. For individual comparisons, resample bearings within
+that zebra and period.
+
+Filled markers show posterior summaries with 95% intervals. The
+group direction in this comparison comes from the model's population
+baseline and approach shift. The main figure averages the
+fitted directions of the 18 focal zebras. Agreement with the bootstrap
+group direction shows that the turn is visible with either way of
+summarizing direction.
+
+The fitted and bootstrap estimates both show high alignment, although
+the posterior estimates are higher. Sampling variation can spread
+out the zebras’ observed mean bearings and lower bootstrap alignment. At the individual level,
+look for wide intervals when a zebra's mean orientation is weakly
+determined. For example, the pre-approach bootstrap mean for track 17
+has a broad interval, while its fitted direction lies closer to the
+group mean. This illustrates how partial pooling can stabilize an
+uncertain direction estimate.
 
 
 ```{r}
@@ -577,10 +657,21 @@ save_figure(p_ind_ppc, "ppc_individual", 11, 7)
 
 ```
 
-A second check draws replicated angles from each individual's fitted
-likelihood at the original sample sizes. It compares resultant lengths
-of observed and replicated samples. This captures finite-sample scatter
-as well as uncertainty in the response parameters.
+### Check concentration in replicated observations
+
+Would the fitted model generate bearings with as much spread as we
+observed? For each sampled posterior draw, use each zebra's fitted
+direction and concentration to simulate as many bearings as were
+observed for that zebra in that period. Calculate the resultant length
+of the simulated bearings just as for the observed bearings. The
+simulated lengths reflect both uncertainty in the fitted parameters
+and variation among bearings.
+
+Open circles show the observed resultant lengths. The filled circles
+and bars summarize the means and 95% highest-density intervals of the
+replicated lengths. The observed values are generally within the
+simulated ranges in both periods. This check assesses whether the
+model can reproduce the spread of each zebra's bearings.
 
 
 ```{r}
