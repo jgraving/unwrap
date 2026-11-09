@@ -337,9 +337,9 @@ The priors describe plausible variation before observing the headings. The almos
 | Quantity | Bimodal prior | Unimodal prior |
 | --- | --- | --- |
 | Population angle(s) | VM(0, 0.000001), two independent | VM(0, 0.000001) |
-| Angular pooling concentration | LogNormal(log(30), 0.1), per component | LogNormal(log(10), 0.1) |
+| Angular pooling concentration | LogNormal(log(30), 0.1), per component | LogNormal(log(30), 0.1) |
 | Animal angular deviation | VM(0, component pooling concentration) | VM(0, pooling concentration) |
-| Population pre-softplus concentration | Normal(log(exp(2)-1), 0.5), per component | Normal(log(exp(1.5)-1), 0.5) |
+| Population pre-softplus concentration | Normal(log(exp(2)-1), 0.5), per component | Normal(log(exp(2)-1), 0.5) |
 | Concentration deviation scale | HalfNormal(1.5), per component | HalfNormal(1.5) |
 | Standardized concentration deviations | Normal(0, 1), independent | Normal(0, 1), independent |
 | Population weight logit | Normal(0, 0.5) | — |
@@ -554,8 +554,8 @@ uni_form <- bf(direction ~ mu,
 uni_priors <- (
   set_prior("target += unwrap_von_mises_lpdf(b_popone[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_devone | 0, kmu_one)", check = FALSE) +
-  set_prior("target += lognormal_lpdf(kmu_one | log(10), 0.1)", check = FALSE) +
-  prior("normal(log(exp(1.5) - 1), 0.5)", class = "b", coef = "Intercept", dpar = "kappa") +
+  set_prior("target += lognormal_lpdf(kmu_one | log(30), 0.1)", check = FALSE) +
+  prior("normal(log(exp(2) - 1), 0.5)", class = "b", coef = "Intercept", dpar = "kappa") +
   prior("normal(0, 1.5)", class = "sd", dpar = "kappa")
 )
 uni_stanvars <- vm_functions + uni_hyper
@@ -568,7 +568,7 @@ stopifnot(isTRUE(all.equal(uni_design$X_devone, animal_design, check.attributes 
 compact_uni_stan <- gsub("[[:space:]]", "", uni_stan)
 stopifnot(grepl("target+=locust_vm_lpdf", compact_uni_stan, fixed = TRUE),
           grepl("unwrap_von_mises_vect_lpdf(b_devone|0,kmu_one)", compact_uni_stan, fixed = TRUE),
-          grepl("lognormal_lpdf(kmu_one|log(10),0.1)", compact_uni_stan, fixed = TRUE))
+          grepl("lognormal_lpdf(kmu_one|log(30),0.1)", compact_uni_stan, fixed = TRUE))
 cat("Unimodal model: Stan code validated -", uni_design$K_popone, "popone +",
     uni_design$K_devone, "devone coefficients, unbounded and wrapped in the",
     "likelihood (no uniform(-pi, pi) prior or bound). \n")
@@ -585,11 +585,10 @@ Posterior summaries require the sampler to explore the fitted distributions reli
 # The 1-component baseline runs at the stem's full fit budget (ITER/WARMUP).
 # Its population mean sits on a near-flat gauge ridge (the
 # population mean and the per-animal deviations are identified only
-# in combination), so under cmdstan the Python twin's smaller draw
-# budget (pm.sample(1000, tune=2000, target_accept=0.9) per chain)
-# misses the R-hat / ESS gate (rhat 1.031, ESS 154 for mu_pop at
-# 1000 draws); at the full budget every retained quantity clears it,
-# the same as the bimodal.
+# in combination), and under the pre-alignment priors even the full
+# cmdstan budget failed on it (rhat 1.034, ESS 322 for mu_pop, with
+# 71% of transitions hitting the max treedepth limit). The aligned
+# priors above are what let the gate clear at the full budget.
 data_anchor <- as.numeric(mod_circular(circ_mean(df$direction)))
 individual_anchor <- vapply(split(df$direction, df$animal), circ_mean, numeric(1))
 anchor_offsets <- as.numeric(mod_circular(individual_anchor - data_anchor))
@@ -612,13 +611,13 @@ mk_init <- function(anchor_seed) {
 }
 init_uni <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
 set.seed(SEED)
-fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal_unbounded", SEED, ITER, WARMUP)
+fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal_unbounded_v2", SEED, ITER, WARMUP)
 if (is.null(fit_unimodal)) {
   fit_unimodal <- brm(uni_form, data = df, prior = uni_priors, stanvars = uni_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
     cores = CHAINS, seed = SEED, init = init_uni,
     control = list(adapt_delta = 0.97, max_treedepth = 12))
-  unwrap_save_fit_cache("locust_mix_unimodal_unbounded", fit_unimodal, SEED, ITER, WARMUP)
+  unwrap_save_fit_cache("locust_mix_unimodal_unbounded_v2", fit_unimodal, SEED, ITER, WARMUP)
 }
 state_unimodal <- extract_state(fit_unimodal, bimodal = FALSE)
 summary_unimodal <- diagnose_fit(fit_unimodal, state_unimodal)

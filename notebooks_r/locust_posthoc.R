@@ -179,8 +179,16 @@ extract_state <- function(fit, bimodal = TRUE) {
 }
 
 diagnose_fit <- function(fit, state) {
-  # Same retained-flag probe as the P1 helpers; absence is not zero.
-  divergences <- tryCatch({
+  # The divergence count travels with the cached snapshot's meta (captured
+  # at sampling time; the serialized fit object keeps no sampler
+  # diagnostics, see unwrap_fit_divergences()). The live probe below is
+  # the fallback for snapshots saved before the meta field existed;
+  # absence is not zero.
+  meta <- attr(fit, "unwrap_fit_cache_meta")
+  divergences <- if (!is.null(meta) && !is.null(meta$n_divergent) &&
+      !is.na(meta$n_divergent)) meta$n_divergent else NA_real_
+  if (is.na(divergences)) {
+    divergences <- tryCatch({
     samples <- fit$fit@sim$samples
     if (is.null(samples) || !length(samples)) {
       NA_real_
@@ -189,6 +197,7 @@ diagnose_fit <- function(fit, state) {
       if (any(vapply(flags, is.null, logical(1)))) NA_real_ else sum(unlist(flags))
     }
   }, error = function(e) NA_real_)
+    }
   if (is.na(divergences)) {
     cat("Divergences: not retained in this fit object.\n")
   } else {

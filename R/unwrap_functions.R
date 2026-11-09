@@ -917,6 +917,47 @@ log_lik_unwrap_von_mises <- function(i, prep) {
 # and how committed notebooks are validated) these helpers are silent
 # no-ops and nothing is read from or written to disk.
 
+# unwrap_fit_divergences() best-effort counts divergent iterations on a
+# just-finished brms fit. Sampler diagnostics are only reachable while the
+# sampling run's output is still readable; the saved RDS object itself
+# retains none (checked: brms drops them before serialization), so the
+# count must be captured at cache-save time and travels with the snapshot
+# meta instead. NA = unknowable (the diagnostic then says "not retained",
+# which is a different statement from "zero").
+unwrap_fit_divergences <- function(fit) {
+  cmdstanr_count <- function(target) {
+    sd <- cmdstanr::sampler_diagnostics(target)
+    col <- intersect(c("diverging", "divergent"), names(sd))
+    if (length(col) != 1L) {
+      return(NA_real_)
+    }
+    sum(as.integer(!is.na(sd[[col]]) & sd[[col]] != 0))
+  }
+  d <- tryCatch(cmdstanr_count(fit$fit$obj), error = function(e) NA_real_)
+  if (is.na(d)) {
+    d <- tryCatch(cmdstanr_count(fit$fit), error = function(e) NA_real_)
+  }
+  if (!is.na(d)) {
+    return(d)
+  }
+  # rstan backend: per-chain divergent flags, if this build retains them.
+  samples <- tryCatch(fit$fit@sim$samples, error = function(e) NULL)
+  if (!is.null(samples) && length(samples) &&
+      all(vapply(samples, function(ch) !is.null(ch[["divergent"]]),
+                logical(1)))) {
+    return(sum(vapply(samples, function(ch) sum(ch[["divergent"]]),
+                      numeric(1))))
+  }
+  divergent <- tryCatch(fit$fit@sim$divergent, error = function(e) NULL)
+  if (!is.null(divergent) && length(divergent) &&
+      all(vapply(divergent, function(ch) !is.null(ch) && length(ch),
+                 logical(1)))) {
+    return(sum(vapply(divergent, function(ch) sum(!is.na(ch) & ch != 0),
+                      numeric(1))))
+  }
+  NA_real_
+}
+
 unwrap_fit_cache_enabled <- function() {
   identical(Sys.getenv("UNWRAP_R_FIT_CACHE"), "1")
 }
@@ -971,8 +1012,11 @@ unwrap_save_fit_cache <- function(name, fit, seed, iter, warmup) {
   }
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   n_fixed <- tryCatch(length(fixef(fit)), error = function(e) NA_real_)
+  # Capture the divergence count NOW: the serialized fit object keeps no
+  # sampler diagnostics, so only the meta can carry the count forward.
+  n_divergent <- unwrap_fit_divergences(fit)
   meta <- list(name = name, seed = seed, iter = iter, warmup = warmup,
-               n_fixed = n_fixed,
+               n_fixed = n_fixed, n_divergent = n_divergent,
                saved_utc = format(Sys.time(), usetz = TRUE))
   if (is.list(fit)) {
     attr(fit, "unwrap_fit_cache_meta") <- meta
