@@ -217,8 +217,13 @@ simulate_angles <- function(mu, kappa) {
   mod_circular(replicated)
 }
 save_figure <- function(plot, name, width = 8, height = 4) {
-  ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
-         width = width, height = height)
+  # The base pdf device's code page cannot represent a few of the glyph
+  # labels (superscript minus, mu, kappa): its conversion warnings are
+  # device-encoding noise, and the art still writes. The agg-rendered
+  # PNG shows every glyph, so only the pdf save is silenced.
+  suppressWarnings(
+    ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
+      width = width, height = height))
   show_figure(plot, name, width, height)
 }
 
@@ -419,11 +424,9 @@ p_paths <- ggplot(merged_df, aes(X, Y, group = fname, colour = gcol)) +
     colour = "black", linewidth = 0.35) +
   facet_wrap(~ gtitle, ncol = n_cols_g, axes = "all") +
   scale_colour_identity(guide = "none") +
-  scale_x_continuous(limits = c(-8, 8), breaks = c(-8, 0, 8),
-    expand = c(0, 0)) +
-  scale_y_continuous(limits = c(-8, 8), breaks = c(-8, 0, 8),
-    expand = c(0, 0)) +
-  coord_equal() +
+  scale_x_continuous(breaks = c(-8, 0, 8), expand = c(0, 0)) +
+  scale_y_continuous(breaks = c(-8, 0, 8), expand = c(0, 0)) +
+  coord_equal(xlim = c(-8, 8), ylim = c(-8, 8)) +
   labs(x = "", y = "") +
   grid_thm()
 save_figure(patchwork::wrap_plots(p_paths, p_key, widths = c(8.6, 1.35)),
@@ -565,9 +568,9 @@ for (r in 0:(n_rows_s - 1)) {
         linewidth = 0.11, alpha = 0.85) +
       geom_path(linewidth = 0.19, alpha = 0.85) +
       scale_colour_identity(guide = "none") +
-      scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
-      scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-      coord_equal() +
+      scale_x_continuous(expand = c(0, 0)) +
+      scale_y_continuous(expand = c(0, 0)) +
+      coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
       theme_void() +
       theme(panel.border = border_thm,
         plot.margin = margin(1.5, 1.5, 1.5, 1.5, "pt"),
@@ -685,9 +688,9 @@ for (r in seq_len(6)) {
   ys <- pmin(0.925, pmax(0.075, ys + rnorm(length(ys), 0, 0.025)))
   p_dots[[r]] <- ggplot(data.frame(x = xs, y = ys), aes(x, y)) +
     geom_point(size = 0.06, colour = sc_reds[as.character(d)]) +
-    scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
-    scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-    coord_equal() + sc_box
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    coord_equal(xlim = c(0, 1), ylim = c(0, 1)) + sc_box
   o <- sc_orders[r]
   k <- sc_kappa(o)
   if (o == 0) {
@@ -709,9 +712,9 @@ for (r in seq_len(6)) {
   }
   p_walks[[r]] <- ggplot(pts, aes(x, y, group = i)) +
     geom_path(linewidth = 0.25, colour = sc_purps[sprintf("%.1f", o)]) +
-    scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
-    scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
-    coord_equal() + sc_box
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    coord_equal(xlim = c(0, 1), ylim = c(0, 1)) + sc_box
 }
 gutters_l <- data.frame(y = rev(seq_len(6)), lbl = as.character(sc_denss))
 gutters_r <- data.frame(y = rev(seq_len(6)),
