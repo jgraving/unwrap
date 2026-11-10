@@ -34,7 +34,7 @@ a bearing that many beetles follow.
 
 We revisit a field experiment by
 [Foster et al. (2021)](https://doi.org/10.1016/j.cub.2021.06.038)
-with nocturnal dung beetles (*Escarabaeus satyrus*) in South Africa.
+with nocturnal dung beetles (*Scarabaeus satyrus*) in South Africa.
 The same beetles rolled their balls under natural nighttime illumination
 and with a floodlight to the southwest. If the lamp acts as a beacon,
 we expect bearings to shift toward it and different beetles to head
@@ -501,6 +501,16 @@ beetle repeated its exits, look at the concentration panel.
   similar directions produce a long resultant. This measure rises
   from roughly 0.3 to 0.9 with the light on. Beetles can be consistent
   even when their preferred directions are far apart, as in the control.
+  The same agreement written as the von Mises concentration of the ten
+  fitted individual means, $\kappa_\mu$ (the concentration whose
+  expected mean resultant length matches the arrow-length measure
+  above), rises from about 0.6 with the light off to about 5.3 with it
+  on. Converting each posterior draw separately, the increase averages
+  about 4.6, with a 95% highest-density interval of roughly 2.7 to 7.
+  In the field experiment, the same convergence toward the floodlight
+  was attributed to attraction toward the light, which increases
+  inter-individual competition and reduces dispersal efficiency
+  (Foster et al., 2021).
 
 ### How likely was an exit near the floodlight?
 
@@ -620,68 +630,6 @@ save_figure(p_concentration, "treat_concentration_plus_floodlight", 8, 3)
 mass_delta <- data.frame(delta = mass[, 2] - mass[, 1])
 p_mass_delta <- mass_delta_plot(mass_delta)
 save_figure(p_mass_delta, "floodlight_mass_change", 6, 3)
-
-```
-
-## Estimate the change in agreement among beetles
-
-The figure reports agreement on the 0-to-1 resultant length scale.
-Here we express the same pattern as a von Mises concentration
-$\kappa_\mu$. We find the concentration that would give the same
-length of the average arrow for the fitted preferred bearings, by
-inverting $R(\kappa)$. Each beetle contributes one bearing. This gives
-a separate summary of clustering among the ten fitted means.
-
-### Compare the estimated mean directions
-
-First summarize each beetle by its posterior mean direction in each
-condition. These point estimates give $\kappa_\mu$ of about 0.6 with
-the light off and 5.3 with it on.
-
-### Carry uncertainty into the contrast
-
-Repeat the calculation separately for each posterior draw. Reconstruct
-all ten beetles' mean directions with the light off and on, convert
-each set's resultant length to $\kappa_\mu$, and subtract off from on
-within the draw. This carries uncertainty about the fitted bearings
-through to uncertainty in the change. It also keeps the calculation at
-the level of the beetles' preferred bearings even when their exits
-vary from trial to trial.
-
-The posterior mean increase in $\kappa_\mu$ is about 4.6, with a 95%
-highest-density interval of roughly 2.7 to 7. Stronger agreement among
-the beetles is consistent with many individuals using the same local
-beacon. That convergence could make it harder for beetles to disperse
-in different directions away from the dung pile. The arena response
-measures exit bearings, so the contrast speaks directly to their
-orientation in this setting.
-
-
-```{r}
-#| cell-id: "beetles-21"
-individual_point <- apply(mu, 2, circ_mean)
-kappamu_point <- c(OFF = inverse_A1(resultant(individual_point[pre])),
-                    ON = inverse_A1(resultant(individual_point[post])))
-kappamu_point
-
-```
-
-```{r}
-#| cell-id: "beetles-22"
-kappamu <- apply(group_alignment, 2, function(r) vapply(r, inverse_A1, numeric(1)))
-kappamu <- cbind(kappa_mu_OFF = kappamu[, 1], kappa_mu_ON = kappamu[, 2],
-                  kappa_mu_delta = kappamu[, 2] - kappamu[, 1])
-stopifnot(all(is.finite(kappamu)))
-kappamu_summary <- do.call(rbind, lapply(colnames(kappamu), function(p) {
-  data.frame(parameter = p, as.list(interval_row(kappamu[, p])))
-}))
-kappamu_summary
-
-```
-
-```{r}
-#| cell-id: "beetles-23"
-mean(kappamu[, "kappa_mu_delta"] > 0)
 
 ```
 
