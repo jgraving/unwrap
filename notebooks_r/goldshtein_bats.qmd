@@ -157,7 +157,9 @@ WARMUP <- if (quick_run) 1500L else 2000L
 
 ```{r}
 #| cell-id: "goldshtein-bats-008"
-wrap <- function(x) atan2(sin(x), cos(x))
+# Canonical modulo wrap [(-pi, pi), the same fmod form as the Python
+# twin's circular_modulo (post-hoc use only: summaries, plots, no sampler input).
+wrap <- function(x) (x + pi) %% (2 * pi) - pi
 circ_mean <- function(x) atan2(mean(sin(x)), mean(cos(x)))
 resultant <- function(x) Mod(mean(exp(1i * x)))
 softplus_stable <- function(x) pmax(x, 0) + log1p(exp(-abs(x)))

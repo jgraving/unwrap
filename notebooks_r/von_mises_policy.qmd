@@ -199,7 +199,7 @@ WARMUP <- if (quick_run) 1500L else 2000L
 # Shared circular helpers for this study (the Python twin defines its
 # policy functions inline the same way): the wrap, the scalar von
 # Mises density, and the sampler calls used by the trajectory loop.
-wrap <- function(x) atan2(sin(x), cos(x))
+wrap <- function(x) (x + pi) %% (2 * pi) - pi
 vm_logpdf <- function(y, mu, kappa) {
   kappa * (cos(y - mu) - 1) - log(2 * pi) - log(besselI(kappa, 0, expon.scaled = TRUE))
 }
