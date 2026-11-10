@@ -84,14 +84,19 @@ suppressPackageStartupMessages({
     library(arrow)
 })
 
-# The repository's R helpers (custom brms family + circular statistics)
-# live next to the notebook; make them reachable regardless of the
-# current working directory.
+# The repository's R helpers live next to the notebook; make them
+# reachable regardless of the working directory. unwrap_family.R
+# defines the brms custom family, unwrap_functions.R is the legacy R
+# library, unwrap_helpers.R is the shared layer (figure plumbing, circular
+# statistics, the von Mises model components and the diagnostic gate),
+# and the zebra scripts below hold this example's post-fit analysis and
+# figures.
 repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) ".." else
     if (file.exists(file.path("R", "unwrap_family.R"))) "." else
     stop("Run this notebook from notebooks_r/ or from the repository root.")
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "R", "unwrap_helpers.R"))
 source(file.path(repo_root, "notebooks_r", "zebra_posthoc.R"))
 source(file.path(repo_root, "notebooks_r", "zebra_plots.R"))
 
@@ -99,21 +104,6 @@ source(file.path(repo_root, "notebooks_r", "zebra_plots.R"))
 FIG_DIR <- file.path(repo_root, "figures", "zebra_escape")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 theme_set(theme_minimal(base_size = 12))
-
-# Without X11/cairo (most server R installs) the default device cannot
-# rasterise, so each figure renders to a PNG through ragg and displays
-# inline; a vector PDF is saved alongside as the portable copy.
-show_figure <- function(plot, name, width, height, res = 110) {
-  file <- file.path(FIG_DIR, paste0(name, ".png"))
-  ragg::agg_png(file, width = width, height = height, units = "in",
-                res = res)
-  print(plot)
-  invisible(dev.off())
-  # Quarto renders the returned plot object natively; there is no
-  # display channel to write to outside Jupyter.
-  plot
-}
-
 
 SEED <- 42
 set.seed(SEED)
@@ -175,35 +165,11 @@ ppc_display_support <- function(x) {
   rbind(lo, hi)
 }
 
-save_figure <- function(plot, name, width = 8, height = 4) {
-  ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
-         width = width, height = height)
-  show_figure(plot, name, width, height)
-}
-
 # Same published source files as the Python loaders; keep their local
 # checkout under the repository root, reachable from notebooks_r/ too.
 # An existing checkout can be supplied through UNWRAP_DATA_ROOT.
 data_root <- Sys.getenv("UNWRAP_DATA_ROOT",
                         unset = file.path(repo_root, "unwrap-data"))
-ensure_data <- function(subdir) {
-  target <- file.path(data_root, subdir)
-  if (!dir.exists(target)) {
-    if (!dir.exists(data_root)) {
-      status <- system2("git", c("clone", "--depth", "1",
-        "--filter=blob:none", "--sparse",
-        "https://github.com/jgraving/unwrap-data.git", shQuote(data_root)))
-      if (status != 0L) stop("Could not fetch the published study data.")
-    }
-    # Sparse checkout downloads only this study; later notebooks may add
-    # their own subdirectory to the same checkout without replacing it.
-    status <- system2("git", c("-C", shQuote(data_root),
-                              "sparse-checkout", "add", subdir))
-    if (status != 0L) stop("Could not materialize the study subdirectory.")
-  }
-  stopifnot(dir.exists(target))
-  target
-}
 
 ```
 
@@ -317,15 +283,7 @@ form_vonmises <- bf(HeadingRadians ~ mu,
 stan_direction_priors <- stanvar(scode = "
   real<lower=0> kmu_intercept;
   real<lower=0> kmu_slope;
-", block = "parameters") + stanvar(scode = "
-  real unwrap_von_mises_vect_lpdf(vector y, real mu, real kappa) {
-    real lp = 0;
-    for (i in 1:num_elements(y)) {
-      lp += unwrap_von_mises_lpdf(y[i] | mu, kappa);
-    }
-    return lp;
-  }
-", block = "functions")
+", block = "parameters") + stan_unwrap_vector_lpdf
 prior_vonmises <- (
   # The direction coefficients are unconstrained reals, matching the
   # Python twin's circ_mod parameterization: its von Mises coefficient
@@ -337,16 +295,12 @@ prior_vonmises <- (
   # generated Stan for this prior set is free of brms's default Gaussian
   # on the direction coefficients (verified at build time in the fit
   # cell).
-  set_prior("target += unwrap_von_mises_lpdf(b_beta0[1] | 0, 1e-6)", check = FALSE) +
-  set_prior("target += unwrap_von_mises_lpdf(b_beta0[2] | 0, 2)", check = FALSE) +
-  set_prior("target += unwrap_von_mises_vect_lpdf(b_bias0 | 0, kmu_intercept)",
-            check = FALSE) +
-  set_prior("target += unwrap_von_mises_vect_lpdf(b_bias1 | 0, kmu_slope)",
-            check = FALSE) +
-  set_prior("target += lognormal_lpdf(kmu_intercept | log(30), 0.5)",
-            check = FALSE) +
-  set_prior("target += lognormal_lpdf(kmu_slope | log(30), 0.5)",
-            check = FALSE) +
+  vm_target_prior("b_beta0[1]", "0", "1e-6") +
+  vm_target_prior("b_beta0[2]", "0", "2") +
+  vm_vector_target_prior("b_bias0", "0", "kmu_intercept") +
+  vm_vector_target_prior("b_bias1", "0", "kmu_slope") +
+  lognormal_target_prior("kmu_intercept", "log(30)", "0.5") +
+  lognormal_target_prior("kmu_slope", "log(30)", "0.5") +
   prior("normal(log(exp(2) - 1), 1)", class = "b", dpar = "kappa",
         coef = "Intercept") +
   prior("normal(0, 2)", class = "b", dpar = "kappa",
@@ -407,13 +361,17 @@ mk_init <- function(anchor_seed) {
     b_bias1 = as.numeric(j(n_track)),
     kmu_intercept = 30, kmu_slope = 30)
 }
-fit <- brm(form_vonmises, data = data,
-  stanvars = stan_unwrap_fun + modulo_circular_fun + stan_direction_priors,
-  prior = prior_vonmises, backend = "cmdstanr",
-  chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
-  seed = SEED,
-  init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
-  control = list(adapt_delta = ADAPT_DELTA))
+# v1 identifies the model under this budget: bump the suffix whenever
+# the formula, priors or the sampling spec changes.
+fit <- unwrap_brms_fit("zebra_main_v1", SEED, ITER, WARMUP, function() {
+  brm(form_vonmises, data = data,
+    stanvars = stan_unwrap_fun + modulo_circular_fun + stan_direction_priors,
+    prior = prior_vonmises, backend = "cmdstanr",
+    chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
+    seed = SEED,
+    init = lapply(seq_len(CHAINS), function(k) mk_init(SEED + k)),
+    control = list(adapt_delta = ADAPT_DELTA))
+})
 ```
 
 ## Check the posterior estimates
