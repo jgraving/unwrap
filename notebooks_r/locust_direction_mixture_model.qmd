@@ -139,22 +139,15 @@ SEED <- 42L
 set.seed(SEED)
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
 CHAINS <- 4L
-# Both fits run 4,000 warmup iterations and keep 4,000 draws per
-# chain, with data-anchored initial values and adapt_delta 0.97 (see
-# the fit cells). Deliberate deviations from the Python twin, which
-# keeps 1,000 draws after 2,000 warmup with the sampler's default
-# initialization and target_accept 0.9:
-# - Budget: at three-quarters of it (4 x 6,000 iterations / 3,000
-#   warmup) the unimodal baseline fit's `mu_pop` R-hat reached 1.0109,
-#   over the 1.01 hard gate, so the four chains need the full draws.
-# - Initialization: with the default initialization the population
-#   component means do not mix. Two fresh plain bakes here (1,000 and
-#   4,000 retained draws, seed 42) left the four chains in different
-#   posterior configurations (component means near +/-81 degrees and
-#   near +/-180 degrees); all 270 component quantities and
-#   `logit_sigma` (R-hat 1.019) failed the 1.01 gate. The anchored
-#   start places every chain in the same configuration, where they
-#   mix routinely.
+# Both fits use the sampler's default initialization and
+# adapt_delta 0.9, matching the Python twin's default init with
+# target_accept 0.9 (see the fit cells). The one deliberate
+# deviation from the Python twin, which keeps 1,000 draws after
+# 2,000 warmup, is the budget: at that budget the unimodal baseline
+# fit's `mu_pop` reached R-hat 1.0141 with bulk ESS 194.7 (seed 42)
+# and one per-animal quantity had bulk ESS 386.8, over the
+# 1.01/400 hard gates; this 4,000 warmup + 4,000 draws budget
+# passes them.
 # Quick mode keeps this MCMC budget and shortens only the cheap
 # bootstrap, KDE, and predictive budgets.
 ITER <- 8000L
@@ -597,47 +590,18 @@ cat(mix_stan)
 
 ### Fitting the two-component model
 
-Posterior draws describe combinations of population and individual parameters that are supported by the headings and priors. Initial values help the sampler begin in plausible regions, while the fitted component directions remain free to move. The full fit uses four chains with 4,000 warmup iterations and 4,000 retained draws per chain. Comparing the chains is part of checking whether the resulting uncertainty summaries are reliable.
+Posterior draws describe combinations of population and individual parameters that are supported by the headings and priors. The fit starts from the sampler's default initial values, and the fitted component directions remain free to move. The full fit uses four chains with 4,000 warmup iterations and 4,000 retained draws per chain. Comparing the chains is part of checking whether the resulting uncertainty summaries are reliable.
 
 
 ```{r}
 #| cell-id: "locust-r-019"
 set.seed(SEED)
-initial_clusters <- kmeans(cbind(cos(df$direction), sin(df$direction)),
-                           centers = 2L, nstart = 20L)
-cluster_means <- vapply(split(df$direction, initial_clusters$cluster), circ_mean, numeric(1))
-cluster_order <- order(cluster_means)
-anchor_mix <- as.numeric(mod_circular(cluster_means[cluster_order]))
-initial_group <- match(initial_clusters$cluster, cluster_order)
-animal_offsets <- function(component) {
-  vapply(levels(df$animal), function(id) {
-    y <- df$direction[df$animal == id & initial_group == component]
-    if (!length(y)) 0 else mod_circular(circ_mean(y) - anchor_mix[component])
-  }, numeric(1))
-}
-anchor_offsets_one <- animal_offsets(1L)
-anchor_offsets_two <- animal_offsets(2L)
-stopifnot(length(anchor_mix) == mix_design$K_popone + mix_design$K_poptwo,
-          length(anchor_offsets_one) == mix_design$K_devone,
-          length(anchor_offsets_two) == mix_design$K_devtwo,
-          all(abs(anchor_mix) < pi - 0.2),
-          all(abs(c(anchor_offsets_one, anchor_offsets_two)) < pi - 0.5))
-mk_init <- function(anchor_seed) {
-  set.seed(anchor_seed)
-  j <- function(n) runif(n, -0.08, 0.08)
-  list(b_popone = as.numeric(anchor_mix[1] + j(mix_design$K_popone)),
-       b_poptwo = as.numeric(anchor_mix[2] + j(mix_design$K_poptwo)),
-       b_devone = as.numeric(anchor_offsets_one + j(mix_design$K_devone)),
-       b_devtwo = as.numeric(anchor_offsets_two + j(mix_design$K_devtwo)))
-}
-init_mix <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
-set.seed(SEED)
 fit_bimodal <- unwrap_load_fit_cache("locust_mix_bimodal", SEED, ITER, WARMUP)
 if (is.null(fit_bimodal)) {
   fit_bimodal <- brm(mix_form, data = df, prior = mix_priors, stanvars = mix_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
-    cores = CHAINS, seed = SEED, init = init_mix,
-    control = list(adapt_delta = 0.97, max_treedepth = 12))
+    cores = CHAINS, seed = SEED,
+    control = list(adapt_delta = 0.9, max_treedepth = 12))
   unwrap_save_fit_cache("locust_mix_bimodal", fit_bimodal, SEED, ITER, WARMUP)
 }
 ```
@@ -848,34 +812,13 @@ The displayed convergence and effective-sample-size checks flag no parameters in
 
 ```{r}
 #| cell-id: "locust-r-025"
-data_anchor <- as.numeric(mod_circular(circ_mean(df$direction)))
-individual_anchor <- vapply(split(df$direction, df$animal), circ_mean, numeric(1))
-anchor_offsets <- as.numeric(mod_circular(individual_anchor - data_anchor))
-if (abs(data_anchor) >= pi - 0.2 || any(abs(anchor_offsets) >= pi - 0.5)) {
-  ordered_means <- sort(individual_anchor)
-  gaps <- diff(c(ordered_means, ordered_means[1] + 2 * pi))
-  widest <- which.max(gaps)
-  seam <- ordered_means[widest] + gaps[widest] / 2
-  data_anchor <- as.numeric(mod_circular(seam + pi))
-  anchor_offsets <- as.numeric(mod_circular(individual_anchor - data_anchor))
-}
-stopifnot(length(data_anchor) == uni_design$K_popone,
-          length(anchor_offsets) == uni_design$K_devone,
-          abs(data_anchor) < pi - 0.2, all(abs(anchor_offsets) < pi - 0.5))
-mk_init <- function(anchor_seed) {
-  set.seed(anchor_seed)
-  j <- function(n) runif(n, -0.08, 0.08)
-  list(b_popone = as.numeric(data_anchor + j(uni_design$K_popone)),
-       b_devone = as.numeric(anchor_offsets + j(uni_design$K_devone)))
-}
-init_uni <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
 set.seed(SEED)
 fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal", SEED, ITER, WARMUP)
 if (is.null(fit_unimodal)) {
   fit_unimodal <- brm(uni_form, data = df, prior = uni_priors, stanvars = uni_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
-    cores = CHAINS, seed = SEED, init = init_uni,
-    control = list(adapt_delta = 0.97, max_treedepth = 12))
+    cores = CHAINS, seed = SEED,
+    control = list(adapt_delta = 0.9, max_treedepth = 12))
   unwrap_save_fit_cache("locust_mix_unimodal", fit_unimodal, SEED, ITER, WARMUP)
 }
 state_unimodal <- extract_state(fit_unimodal, bimodal = FALSE)
