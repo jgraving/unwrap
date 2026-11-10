@@ -789,9 +789,10 @@ def plot_predictive_both_models_population(trace_bimodal, trace_unimodal, df,
     """Cartesian 2x2 population check. Rows: the estimate (top: 16-bin
     bootstrap histogram, bottom: von Mises KDE); columns: the model.
     Each cell shows the model's replicated predictive density (median +
-    2.5/97.5 band across the shared draws) in the model colour, with
-    both black observed-bootstrap overlays (histogram error bars, dashed
-    KDE line with a light band) on every cell, as in the R twin."""
+    2.5/97.5 band across the shared draws) in the model colour. The
+    black observed-bootstrap overlay is split by row, as in the R twin:
+    the histogram row carries the histogram error bars and the KDE row
+    carries the dashed KDE line with a light band."""
     stats = posthoc.both_models_ppc_stats(trace_bimodal, trace_unimodal, df)
     angles = stats["population_angles"]
     bin_centers = stats["bin_centers"]
@@ -808,18 +809,22 @@ def plot_predictive_both_models_population(trace_bimodal, trace_unimodal, df,
             ax.plot(x, s[f"{mkey}_median"], color, linewidth=1.2, zorder=3)
             ax.fill_between(x, s[f"{mkey}_lower"], s[f"{mkey}_upper"],
                             color=color, alpha=0.2, zorder=2)
-            # Black observed-bootstrap overlays, on every cell as in R.
-            ax.errorbar(
-                hist_stats["hist_bin_centers"], hist_stats["hist_median"],
-                yerr=hist_stats["hist_errors"], fmt="o", ecolor="black",
-                markeredgecolor="black", markerfacecolor="black",
-                linewidth=1, capsize=2, markersize=2, zorder=4)
-            ax.plot(kde_stats["kde_angles"], kde_stats["kde_median"],
-                    "black", linestyle="--", linewidth=1.2, zorder=4)
-            ax.fill_between(kde_stats["kde_angles"],
-                            kde_stats["kde_lower_bounds"],
-                            kde_stats["kde_upper_bounds"],
-                            color="black", alpha=0.12, zorder=1)
+            # Black observed-bootstrap overlay, split by row as in the R
+            # twin: histogram error bars on the histogram row, the dashed
+            # KDE line + light band on the KDE row.
+            if mkey == "hist":
+                ax.errorbar(
+                    hist_stats["hist_bin_centers"], hist_stats["hist_median"],
+                    yerr=hist_stats["hist_errors"], fmt="o", ecolor="black",
+                    markeredgecolor="black", markerfacecolor="black",
+                    linewidth=1, capsize=2, markersize=2, zorder=4)
+            elif mkey == "kde":
+                ax.plot(kde_stats["kde_angles"], kde_stats["kde_median"],
+                        "black", linestyle="--", linewidth=1.2, zorder=4)
+                ax.fill_between(kde_stats["kde_angles"],
+                                kde_stats["kde_lower_bounds"],
+                                kde_stats["kde_upper_bounds"],
+                                color="black", alpha=0.12, zorder=1)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
             ax.set_xticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi],
