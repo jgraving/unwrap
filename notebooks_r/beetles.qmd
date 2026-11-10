@@ -649,12 +649,16 @@ the level of the beetles' preferred bearings even when their exits
 vary from trial to trial.
 
 The posterior mean increase in $\kappa_\mu$ is about 4.6, with a 95%
-highest-density interval of roughly 2.7 to 7. Stronger agreement among
-the beetles is consistent with many individuals using the same local
-beacon. That convergence could make it harder for beetles to disperse
-in different directions away from the dung pile. The arena response
-measures exit bearings, so the contrast speaks directly to their
-orientation in this setting.
+highest-density interval of roughly 2.7 to 7. This is the same change
+in agreement that the main figure reports on the 0-to-1 scale as the
+between-individual concentration, rising from roughly 0.3 to 0.9 with
+the light on. The field experiment reports the same pattern: with the
+floodlight on, the beetles' preferred bearings concentrate toward it,
+and the paper attributes that convergence to attraction to the light,
+which increases inter-individual competition and reduces dispersal
+efficiency ([Foster et al. 2021](https://doi.org/10.1016/j.cub.2021.06.038)).
+The arena response measures exit bearings, so the contrast speaks
+directly to their orientation in this setting.
 
 
 ```{r}
