@@ -139,11 +139,24 @@ SEED <- 42L
 set.seed(SEED)
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
 CHAINS <- 4L
-# Quick keeps the full MCMC budget: at three-quarters of it
-# (4 x 6,000 iterations / 3,000 warmup) the unimodal baseline
-# fit's `mu_pop` R-hat reached 1.0109, over the 1.01 hard gate,
-# so the four chains need the full draws to mix. Quick still
-# shortens the cheap bootstrap, KDE, and predictive budgets.
+# Both fits run 4,000 warmup iterations and keep 4,000 draws per
+# chain, with data-anchored initial values and adapt_delta 0.97 (see
+# the fit cells). Deliberate deviations from the Python twin, which
+# keeps 1,000 draws after 2,000 warmup with the sampler's default
+# initialization and target_accept 0.9:
+# - Budget: at three-quarters of it (4 x 6,000 iterations / 3,000
+#   warmup) the unimodal baseline fit's `mu_pop` R-hat reached 1.0109,
+#   over the 1.01 hard gate, so the four chains need the full draws.
+# - Initialization: with the default initialization the population
+#   component means do not mix. Two fresh plain bakes here (1,000 and
+#   4,000 retained draws, seed 42) left the four chains in different
+#   posterior configurations (component means near +/-81 degrees and
+#   near +/-180 degrees); all 270 component quantities and
+#   `logit_sigma` (R-hat 1.019) failed the 1.01 gate. The anchored
+#   start places every chain in the same configuration, where they
+#   mix routinely.
+# Quick mode keeps this MCMC budget and shortens only the cheap
+# bootstrap, KDE, and predictive budgets.
 ITER <- 8000L
 WARMUP <- 4000L
 N_BOOTSTRAPS <- if (quick_run) 150L else 1000L
@@ -151,8 +164,6 @@ N_BOOT_KDE <- if (quick_run) 100L else 1000L
 N_PREDICTIVE <- if (quick_run) 25L else 100L
 # These are execution budgets, not convergence claims. Keep the complete
 # dataset and both model structures; hard gates apply at either budget.
-# The Python unimodal reference reports some R-hat/ESS breaches, so this
-# local draft gives both fits more draws without relaxing the thresholds.
 ```
 
 ## Reading the figures
@@ -482,11 +493,8 @@ locust_mix <- custom_family("locust_mix",
 locust_vm <- custom_family("locust_vm", dpars = c("mu", "kappa"),
   links = c("identity", "softplus"), lb = c(NA, 0), type = "real")
 vm_functions <- modulo_circular_fun + stan_unwrap_fun + stanvar(scode = "
-  real locust_wrap(real x) {
-    return atan2(sin(x), cos(x));
-  }
   real locust_vm_lpdf(real y, real mu, real kappa) {
-    return unwrap_von_mises_lpdf(y | locust_wrap(mu), kappa);
+    return unwrap_von_mises_lpdf(y | mu, kappa);
   }
   real unwrap_von_mises_vect_lpdf(vector y, real mu, real kappa) {
     real lp = 0;
@@ -504,16 +512,19 @@ mix_functions <- stanvar(scode = "
     real sorted_eta = first == 1 ? eta : -eta;
     return log_sum_exp(
       log_inv_logit(sorted_eta) +
-        unwrap_von_mises_lpdf(y | locust_wrap(means[first]), concentrations[first]),
+        unwrap_von_mises_lpdf(y | means[first], concentrations[first]),
       log_inv_logit(-sorted_eta) +
-        unwrap_von_mises_lpdf(y | locust_wrap(means[second]), concentrations[second]));
+        unwrap_von_mises_lpdf(y | means[second], concentrations[second]));
   }
 ", block = "functions")
 # A parameter-dependent order belongs in transformed parameters. Stan
 # stores the first index as a real; the likelihood reconstructs the two
-# integer indices locally. This is Python's argsort for two angles.
+# integer indices locally. This is Python's argsort for two angles,
+# compared after the package's modulo_circular wrap (the same canonical
+# wrap as Python's circular_modulo) so the ordering is canonical on the
+# circle whatever 2*pi class a chain sits in.
 mix_order <- stanvar(scode = "
-  real first_component = b_popone[1] <= b_poptwo[1] ? 1 : 2;
+  real first_component = modulo_circular(b_popone[1]) <= modulo_circular(b_poptwo[1]) ? 1 : 2;
 ", block = "tparameters")
 mix_hyper <- stanvar(scode = "real<lower=0> kmu_one; real<lower=0> kmu_two;",
                      block = "parameters")
@@ -528,14 +539,13 @@ mix_form <- bf(direction ~ mu,
   eta ~ 0 + Intercept + (1 | animal),
   family = locust_mix)
 mix_priors <- (
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "popone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "poptwo",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devtwo",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
+  # The direction coefficients are unconstrained reals, matching the
+  # Python twin's circ_mod parameterization: its von Mises coefficient
+  # priors are periodic over the real line and carry no +-pi bounds.
+  # Each coefficient carries only its von Mises target prior (the weak
+  # 1e-6 kappa intercept term is effectively flat over any 2*pi window);
+  # no uniform +-pi box is used, because bounded walls pin NUTS chains
+  # against the +-pi boundaries, as found in the zebra stem.
   set_prior("target += unwrap_von_mises_lpdf(b_popone[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_lpdf(b_poptwo[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_devone | 0, kmu_one)", check = FALSE) +
@@ -557,9 +567,8 @@ check_angle_design <- function(stan, design, coefficients) {
   stopifnot(length(parameter_block) == 1L)
   for (name in names(coefficients)) {
     expected <- coefficients[[name]]
-    declaration <- paste0("vector<lower=-3\\.14159[0-9]*,upper=3\\.14159[0-9]*>",
-      "\\[K_", name, "\\]b_", name, ";")
-    stopifnot(grepl(declaration, parameter_block),
+    declaration <- paste0("vector[K_", name, "]b_", name, ";")
+    stopifnot(grepl(declaration, parameter_block, fixed = TRUE),
       identical(colnames(design[[paste0("X_", name)]]), expected),
       design[[paste0("K_", name)]] == length(expected))
   }
@@ -574,7 +583,12 @@ check_angle_design(mix_stan, mix_design,
 stopifnot(isTRUE(all.equal(mix_design$X_devone, animal_design, check.attributes = FALSE)),
           isTRUE(all.equal(mix_design$X_devtwo, animal_design, check.attributes = FALSE)))
 compact_mix_stan <- gsub("[[:space:]]", "", mix_stan)
-stopifnot(grepl("first_component=b_popone[1]<=b_poptwo[1]?1:2;", compact_mix_stan, fixed = TRUE),
+stopifnot(!grepl("uniform_lpdf", mix_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_popone", compact_mix_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_poptwo", compact_mix_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_devone", compact_mix_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_devtwo", compact_mix_stan, fixed = TRUE),
+          grepl("first_component=modulo_circular(b_popone[1])<=modulo_circular(b_poptwo[1])?1:2;", compact_mix_stan, fixed = TRUE),
           grepl("target\\+=locust_mix_lpdf\\([^;]+,first_component\\);", compact_mix_stan),
           grepl("unwrap_von_mises_vect_lpdf(b_devone|0,kmu_one)", compact_mix_stan, fixed = TRUE),
           grepl("unwrap_von_mises_vect_lpdf(b_devtwo|0,kmu_two)", compact_mix_stan, fixed = TRUE))
@@ -669,7 +683,7 @@ extract_state <- function(fit, bimodal = TRUE) {
   eta_pop <- get("b_eta_Intercept")
   first_component <- get("first_component")
   stopifnot(all(first_component %in% 1:2),
-            all((first_component == 2) == (p1 > p2)))
+            all((first_component == 2) == (wrap(p1) > wrap(p2))))
   swap <- first_component == 2
   # Read the saved Stan index for all summaries and predictive draws.
   reorder_pair <- function(a, b) {
@@ -800,14 +814,14 @@ uni_form <- bf(direction ~ mu,
   popone ~ 1, devone ~ 0 + animal,
   kappa ~ 0 + Intercept + (1 | animal), family = locust_vm)
 uni_priors <- (
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "popone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
+  # Unconstrained angular coefficients with periodic von Mises target
+  # priors, the same circ_mod geometry as the two-component model and
+  # the Python twin: no uniform +-pi box (bounded walls pin NUTS chains
+  # against the +-pi boundaries).
   set_prior("target += unwrap_von_mises_lpdf(b_popone[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_devone | 0, kmu_one)", check = FALSE) +
-  set_prior("target += lognormal_lpdf(kmu_one | log(10), 0.1)", check = FALSE) +
-  prior("normal(log(exp(1.5) - 1), 0.5)", class = "b", coef = "Intercept", dpar = "kappa") +
+  set_prior("target += lognormal_lpdf(kmu_one | log(30), 0.1)", check = FALSE) +
+  prior("normal(log(exp(2) - 1), 0.5)", class = "b", coef = "Intercept", dpar = "kappa") +
   prior("normal(0, 1.5)", class = "sd", dpar = "kappa")
 )
 uni_stanvars <- vm_functions + uni_hyper
@@ -818,9 +832,12 @@ check_angle_design(uni_stan, uni_design,
   list(popone = "Intercept", devone = colnames(animal_design)))
 stopifnot(isTRUE(all.equal(uni_design$X_devone, animal_design, check.attributes = FALSE)))
 compact_uni_stan <- gsub("[[:space:]]", "", uni_stan)
-stopifnot(grepl("target+=locust_vm_lpdf", compact_uni_stan, fixed = TRUE),
+stopifnot(!grepl("uniform_lpdf", uni_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_popone", compact_uni_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_devone", compact_uni_stan, fixed = TRUE),
+          grepl("target+=locust_vm_lpdf", compact_uni_stan, fixed = TRUE),
           grepl("unwrap_von_mises_vect_lpdf(b_devone|0,kmu_one)", compact_uni_stan, fixed = TRUE),
-          grepl("lognormal_lpdf(kmu_one|log(10),0.1)", compact_uni_stan, fixed = TRUE))
+          grepl("lognormal_lpdf(kmu_one|log(30),0.1)", compact_uni_stan, fixed = TRUE))
 cat(uni_stan)
 ```
 
