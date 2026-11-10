@@ -139,11 +139,17 @@ SEED <- 42L
 set.seed(SEED)
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
 CHAINS <- 4L
-# Quick keeps the full MCMC budget: at three-quarters of it
-# (4 x 6,000 iterations / 3,000 warmup) the unimodal baseline
-# fit's `mu_pop` R-hat reached 1.0109, over the 1.01 hard gate,
-# so the four chains need the full draws to mix. Quick still
-# shortens the cheap bootstrap, KDE, and predictive budgets.
+# Both fits use the sampler's default initialization and
+# adapt_delta 0.9, matching the Python twin's default init with
+# target_accept 0.9 (see the fit cells). The one deliberate
+# deviation from the Python twin, which keeps 1,000 draws after
+# 2,000 warmup, is the budget: at that budget the unimodal baseline
+# fit's `mu_pop` reached R-hat 1.0141 with bulk ESS 194.7 (seed 42)
+# and one per-animal quantity had bulk ESS 386.8, over the
+# 1.01/400 hard gates; this 4,000 warmup + 4,000 draws budget
+# passes them.
+# Quick mode keeps this MCMC budget and shortens only the cheap
+# bootstrap, KDE, and predictive budgets.
 ITER <- 8000L
 WARMUP <- 4000L
 N_BOOTSTRAPS <- if (quick_run) 150L else 1000L
@@ -151,8 +157,6 @@ N_BOOT_KDE <- if (quick_run) 100L else 1000L
 N_PREDICTIVE <- if (quick_run) 25L else 100L
 # These are execution budgets, not convergence claims. Keep the complete
 # dataset and both model structures; hard gates apply at either budget.
-# The Python unimodal reference reports some R-hat/ESS breaches, so this
-# local draft gives both fits more draws without relaxing the thresholds.
 ```
 
 ## Reading the figures
@@ -482,11 +486,8 @@ locust_mix <- custom_family("locust_mix",
 locust_vm <- custom_family("locust_vm", dpars = c("mu", "kappa"),
   links = c("identity", "softplus"), lb = c(NA, 0), type = "real")
 vm_functions <- modulo_circular_fun + stan_unwrap_fun + stanvar(scode = "
-  real locust_wrap(real x) {
-    return atan2(sin(x), cos(x));
-  }
   real locust_vm_lpdf(real y, real mu, real kappa) {
-    return unwrap_von_mises_lpdf(y | locust_wrap(mu), kappa);
+    return unwrap_von_mises_lpdf(y | mu, kappa);
   }
   real unwrap_von_mises_vect_lpdf(vector y, real mu, real kappa) {
     real lp = 0;
@@ -504,16 +505,19 @@ mix_functions <- stanvar(scode = "
     real sorted_eta = first == 1 ? eta : -eta;
     return log_sum_exp(
       log_inv_logit(sorted_eta) +
-        unwrap_von_mises_lpdf(y | locust_wrap(means[first]), concentrations[first]),
+        unwrap_von_mises_lpdf(y | means[first], concentrations[first]),
       log_inv_logit(-sorted_eta) +
-        unwrap_von_mises_lpdf(y | locust_wrap(means[second]), concentrations[second]));
+        unwrap_von_mises_lpdf(y | means[second], concentrations[second]));
   }
 ", block = "functions")
 # A parameter-dependent order belongs in transformed parameters. Stan
 # stores the first index as a real; the likelihood reconstructs the two
-# integer indices locally. This is Python's argsort for two angles.
+# integer indices locally. This is Python's argsort for two angles,
+# compared after the package's modulo_circular wrap (the same canonical
+# wrap as Python's circular_modulo) so the ordering is canonical on the
+# circle whatever 2*pi class a chain sits in.
 mix_order <- stanvar(scode = "
-  real first_component = b_popone[1] <= b_poptwo[1] ? 1 : 2;
+  real first_component = modulo_circular(b_popone[1]) <= modulo_circular(b_poptwo[1]) ? 1 : 2;
 ", block = "tparameters")
 mix_hyper <- stanvar(scode = "real<lower=0> kmu_one; real<lower=0> kmu_two;",
                      block = "parameters")
@@ -528,14 +532,13 @@ mix_form <- bf(direction ~ mu,
   eta ~ 0 + Intercept + (1 | animal),
   family = locust_mix)
 mix_priors <- (
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "popone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "poptwo",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devtwo",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
+  # The direction coefficients are unconstrained reals, matching the
+  # Python twin's circ_mod parameterization: its von Mises coefficient
+  # priors are periodic over the real line and carry no +-pi bounds.
+  # Each coefficient carries only its von Mises target prior (the weak
+  # 1e-6 kappa intercept term is effectively flat over any 2*pi window);
+  # no uniform +-pi box is used, because bounded walls pin NUTS chains
+  # against the +-pi boundaries, as found in the zebra stem.
   set_prior("target += unwrap_von_mises_lpdf(b_popone[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_lpdf(b_poptwo[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_devone | 0, kmu_one)", check = FALSE) +
@@ -557,9 +560,8 @@ check_angle_design <- function(stan, design, coefficients) {
   stopifnot(length(parameter_block) == 1L)
   for (name in names(coefficients)) {
     expected <- coefficients[[name]]
-    declaration <- paste0("vector<lower=-3\\.14159[0-9]*,upper=3\\.14159[0-9]*>",
-      "\\[K_", name, "\\]b_", name, ";")
-    stopifnot(grepl(declaration, parameter_block),
+    declaration <- paste0("vector[K_", name, "]b_", name, ";")
+    stopifnot(grepl(declaration, parameter_block, fixed = TRUE),
       identical(colnames(design[[paste0("X_", name)]]), expected),
       design[[paste0("K_", name)]] == length(expected))
   }
@@ -574,7 +576,12 @@ check_angle_design(mix_stan, mix_design,
 stopifnot(isTRUE(all.equal(mix_design$X_devone, animal_design, check.attributes = FALSE)),
           isTRUE(all.equal(mix_design$X_devtwo, animal_design, check.attributes = FALSE)))
 compact_mix_stan <- gsub("[[:space:]]", "", mix_stan)
-stopifnot(grepl("first_component=b_popone[1]<=b_poptwo[1]?1:2;", compact_mix_stan, fixed = TRUE),
+stopifnot(!grepl("uniform_lpdf", mix_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_popone", compact_mix_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_poptwo", compact_mix_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_devone", compact_mix_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_devtwo", compact_mix_stan, fixed = TRUE),
+          grepl("first_component=modulo_circular(b_popone[1])<=modulo_circular(b_poptwo[1])?1:2;", compact_mix_stan, fixed = TRUE),
           grepl("target\\+=locust_mix_lpdf\\([^;]+,first_component\\);", compact_mix_stan),
           grepl("unwrap_von_mises_vect_lpdf(b_devone|0,kmu_one)", compact_mix_stan, fixed = TRUE),
           grepl("unwrap_von_mises_vect_lpdf(b_devtwo|0,kmu_two)", compact_mix_stan, fixed = TRUE))
@@ -583,47 +590,18 @@ cat(mix_stan)
 
 ### Fitting the two-component model
 
-Posterior draws describe combinations of population and individual parameters that are supported by the headings and priors. Initial values help the sampler begin in plausible regions, while the fitted component directions remain free to move. The full fit uses four chains with 4,000 warmup iterations and 4,000 retained draws per chain. Comparing the chains is part of checking whether the resulting uncertainty summaries are reliable.
+Posterior draws describe combinations of population and individual parameters that are supported by the headings and priors. The fit starts from the sampler's default initial values, and the fitted component directions remain free to move. The full fit uses four chains with 4,000 warmup iterations and 4,000 retained draws per chain. Comparing the chains is part of checking whether the resulting uncertainty summaries are reliable.
 
 
 ```{r}
 #| cell-id: "locust-r-019"
 set.seed(SEED)
-initial_clusters <- kmeans(cbind(cos(df$direction), sin(df$direction)),
-                           centers = 2L, nstart = 20L)
-cluster_means <- vapply(split(df$direction, initial_clusters$cluster), circ_mean, numeric(1))
-cluster_order <- order(cluster_means)
-anchor_mix <- as.numeric(mod_circular(cluster_means[cluster_order]))
-initial_group <- match(initial_clusters$cluster, cluster_order)
-animal_offsets <- function(component) {
-  vapply(levels(df$animal), function(id) {
-    y <- df$direction[df$animal == id & initial_group == component]
-    if (!length(y)) 0 else mod_circular(circ_mean(y) - anchor_mix[component])
-  }, numeric(1))
-}
-anchor_offsets_one <- animal_offsets(1L)
-anchor_offsets_two <- animal_offsets(2L)
-stopifnot(length(anchor_mix) == mix_design$K_popone + mix_design$K_poptwo,
-          length(anchor_offsets_one) == mix_design$K_devone,
-          length(anchor_offsets_two) == mix_design$K_devtwo,
-          all(abs(anchor_mix) < pi - 0.2),
-          all(abs(c(anchor_offsets_one, anchor_offsets_two)) < pi - 0.5))
-mk_init <- function(anchor_seed) {
-  set.seed(anchor_seed)
-  j <- function(n) runif(n, -0.08, 0.08)
-  list(b_popone = as.numeric(anchor_mix[1] + j(mix_design$K_popone)),
-       b_poptwo = as.numeric(anchor_mix[2] + j(mix_design$K_poptwo)),
-       b_devone = as.numeric(anchor_offsets_one + j(mix_design$K_devone)),
-       b_devtwo = as.numeric(anchor_offsets_two + j(mix_design$K_devtwo)))
-}
-init_mix <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
-set.seed(SEED)
 fit_bimodal <- unwrap_load_fit_cache("locust_mix_bimodal", SEED, ITER, WARMUP)
 if (is.null(fit_bimodal)) {
   fit_bimodal <- brm(mix_form, data = df, prior = mix_priors, stanvars = mix_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
-    cores = CHAINS, seed = SEED, init = init_mix,
-    control = list(adapt_delta = 0.97, max_treedepth = 12))
+    cores = CHAINS, seed = SEED,
+    control = list(adapt_delta = 0.9, max_treedepth = 12))
   unwrap_save_fit_cache("locust_mix_bimodal", fit_bimodal, SEED, ITER, WARMUP)
 }
 ```
@@ -669,7 +647,7 @@ extract_state <- function(fit, bimodal = TRUE) {
   eta_pop <- get("b_eta_Intercept")
   first_component <- get("first_component")
   stopifnot(all(first_component %in% 1:2),
-            all((first_component == 2) == (p1 > p2)))
+            all((first_component == 2) == (wrap(p1) > wrap(p2))))
   swap <- first_component == 2
   # Read the saved Stan index for all summaries and predictive draws.
   reorder_pair <- function(a, b) {
@@ -800,14 +778,14 @@ uni_form <- bf(direction ~ mu,
   popone ~ 1, devone ~ 0 + animal,
   kappa ~ 0 + Intercept + (1 | animal), family = locust_vm)
 uni_priors <- (
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "popone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
-  prior("uniform(-pi(), pi())", class = "b", nlpar = "devone",
-    lb = -3.141592653589793, ub = 3.141592653589793) +
+  # Unconstrained angular coefficients with periodic von Mises target
+  # priors, the same circ_mod geometry as the two-component model and
+  # the Python twin: no uniform +-pi box (bounded walls pin NUTS chains
+  # against the +-pi boundaries).
   set_prior("target += unwrap_von_mises_lpdf(b_popone[1] | 0, 1e-6)", check = FALSE) +
   set_prior("target += unwrap_von_mises_vect_lpdf(b_devone | 0, kmu_one)", check = FALSE) +
-  set_prior("target += lognormal_lpdf(kmu_one | log(10), 0.1)", check = FALSE) +
-  prior("normal(log(exp(1.5) - 1), 0.5)", class = "b", coef = "Intercept", dpar = "kappa") +
+  set_prior("target += lognormal_lpdf(kmu_one | log(30), 0.1)", check = FALSE) +
+  prior("normal(log(exp(2) - 1), 0.5)", class = "b", coef = "Intercept", dpar = "kappa") +
   prior("normal(0, 1.5)", class = "sd", dpar = "kappa")
 )
 uni_stanvars <- vm_functions + uni_hyper
@@ -818,9 +796,12 @@ check_angle_design(uni_stan, uni_design,
   list(popone = "Intercept", devone = colnames(animal_design)))
 stopifnot(isTRUE(all.equal(uni_design$X_devone, animal_design, check.attributes = FALSE)))
 compact_uni_stan <- gsub("[[:space:]]", "", uni_stan)
-stopifnot(grepl("target+=locust_vm_lpdf", compact_uni_stan, fixed = TRUE),
+stopifnot(!grepl("uniform_lpdf", uni_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_popone", compact_uni_stan, fixed = TRUE),
+          !grepl("normal_lpdf(b_devone", compact_uni_stan, fixed = TRUE),
+          grepl("target+=locust_vm_lpdf", compact_uni_stan, fixed = TRUE),
           grepl("unwrap_von_mises_vect_lpdf(b_devone|0,kmu_one)", compact_uni_stan, fixed = TRUE),
-          grepl("lognormal_lpdf(kmu_one|log(10),0.1)", compact_uni_stan, fixed = TRUE))
+          grepl("lognormal_lpdf(kmu_one|log(30),0.1)", compact_uni_stan, fixed = TRUE))
 cat(uni_stan)
 ```
 
@@ -831,34 +812,13 @@ The displayed convergence and effective-sample-size checks flag no parameters in
 
 ```{r}
 #| cell-id: "locust-r-025"
-data_anchor <- as.numeric(mod_circular(circ_mean(df$direction)))
-individual_anchor <- vapply(split(df$direction, df$animal), circ_mean, numeric(1))
-anchor_offsets <- as.numeric(mod_circular(individual_anchor - data_anchor))
-if (abs(data_anchor) >= pi - 0.2 || any(abs(anchor_offsets) >= pi - 0.5)) {
-  ordered_means <- sort(individual_anchor)
-  gaps <- diff(c(ordered_means, ordered_means[1] + 2 * pi))
-  widest <- which.max(gaps)
-  seam <- ordered_means[widest] + gaps[widest] / 2
-  data_anchor <- as.numeric(mod_circular(seam + pi))
-  anchor_offsets <- as.numeric(mod_circular(individual_anchor - data_anchor))
-}
-stopifnot(length(data_anchor) == uni_design$K_popone,
-          length(anchor_offsets) == uni_design$K_devone,
-          abs(data_anchor) < pi - 0.2, all(abs(anchor_offsets) < pi - 0.5))
-mk_init <- function(anchor_seed) {
-  set.seed(anchor_seed)
-  j <- function(n) runif(n, -0.08, 0.08)
-  list(b_popone = as.numeric(data_anchor + j(uni_design$K_popone)),
-       b_devone = as.numeric(anchor_offsets + j(uni_design$K_devone)))
-}
-init_uni <- lapply(seq_len(CHAINS), function(k) mk_init(SEED + k))
 set.seed(SEED)
 fit_unimodal <- unwrap_load_fit_cache("locust_mix_unimodal", SEED, ITER, WARMUP)
 if (is.null(fit_unimodal)) {
   fit_unimodal <- brm(uni_form, data = df, prior = uni_priors, stanvars = uni_stanvars,
     backend = "cmdstanr", chains = CHAINS, iter = ITER, warmup = WARMUP,
-    cores = CHAINS, seed = SEED, init = init_uni,
-    control = list(adapt_delta = 0.97, max_treedepth = 12))
+    cores = CHAINS, seed = SEED,
+    control = list(adapt_delta = 0.9, max_treedepth = 12))
   unwrap_save_fit_cache("locust_mix_unimodal", fit_unimodal, SEED, ITER, WARMUP)
 }
 state_unimodal <- extract_state(fit_unimodal, bimodal = FALSE)
