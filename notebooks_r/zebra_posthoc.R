@@ -1,107 +1,13 @@
 # Zebra escape: post-fit computation.
 #
 # Sourced by notebooks_r/zebra_escape.ipynb (no standalone output).
-# R twin of notebooks/zebra_posthoc.py: the circular and interval math,
-# the convergence diagnostic gate, the per-draw direction posteriors and
-# the data-bootstrap / replicated-data PPC statistics. The notebook keeps
-# the fit, prints the returned summary table and the seeds, and calls the
-# figure builders from zebra_plots.R.
-# --- helpers ---
-circ_mean <- function(a) atan2(mean(sin(a)), mean(cos(a)))
-resultant <- function(a) Mod(mean(exp(1i * a)))
-circ_sd <- function(a, m = circ_mean(a)) {
-  sqrt(-2 * log(min(1, Mod(mean(exp(1i * (a - m)))))))
-}
-# Scaled Bessel functions avoid overflow when concentrations are large.
-A1_safe <- function(k) {
-  out <- besselI(k, 1, expon.scaled = TRUE) /
-    besselI(k, 0, expon.scaled = TRUE)
-  if (is.matrix(k)) dim(out) <- dim(k)
-  out
-}
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) -
-    log(besselI(kappa, 0, expon.scaled = TRUE))
-}
-hdi <- function(x, prob = 0.95) {
-  x <- sort(as.numeric(x))
-  stopifnot(length(x) > 1L, all(is.finite(x)))
-  gap <- min(length(x) - 1L, floor(prob * length(x)))
-  starts <- seq_len(length(x) - gap)
-  j <- starts[which.min(x[starts + gap] - x[starts])]
-  c(low = x[j], high = x[j + gap])
-}
-interval_row <- function(x, angular = FALSE, prob = 0.95) {
-  m <- if (angular) circ_mean(x) else mean(x)
-  # Unwrap angular intervals around their circular mean before drawing;
-  # display endpoints can lie just beyond +/-pi to avoid a false long arc.
-  z <- if (angular) m + mod_circular(x - m) else x
-  c(mean = m, hdi(z, prob))
-}
-inverse_A1 <- function(r) {
-  if (r <= 0) {
-    return(0)
-  }
-  if (r >= 1) {
-    return(Inf)
-  }
-  upper <- max(2, 1 / (1 - r))
-  uniroot(function(k) A1_safe(k) - r, c(0, upper), tol = 1e-9)$root
-}
-# Exact tutorial sampler convention: scalar mu/kappa, then wrap the draw.
-vmu <- function(m) circular::circular(
-    m, units = "radians", template = "none", modulo = "2pi")
-vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
-simulate_angles <- function(mu, kappa) {
-  stopifnot(is.matrix(mu), identical(dim(mu), dim(kappa)))
-  replicated <- matrix(0, nrow = nrow(mu), ncol = ncol(mu))
-  for (d in seq_len(nrow(mu))) {
-    for (i in seq_len(ncol(mu))) {
-      replicated[d, i] <- as.numeric(circular::rvonmises(1,
-        mu = vmu(mu[d, i]), kappa = kappa[d, i],
-        control.circular = vm_ctrl))
-    }
-  }
-  mod_circular(replicated)
-}
-
-diagnose_fit <- function(fit, circular_parameters = character()) {
-  # NUTS divergences. Not every brms/cmdstanr combination keeps the
-  # per-iteration divergence flag in the fit object, so probe for it and
-  # report what the fit object actually carries (the R-hat and ESS values
-  # below are the primary convergence checks either way).
-  divergences <- tryCatch({
-    div_flags <- lapply(fit$fit@sim$samples, function(ch) ch[["divergent"]])
-    if (any(vapply(div_flags, is.null, logical(1)))) NA_real_
-    else sum(unlist(div_flags))
-  }, error = function(e) NA_real_)
-  if (is.na(divergences)) {
-      cat("Divergences: not retained in this fit object (see R-hat/ESS below).\n")
-  } else {
-      cat("Divergences:", divergences, "\n")
-  }
-  available <- posterior::variables(posterior::as_draws_array(fit))
-  parameters <- available[grepl("^(b_|sd_|r_|kmu_)", available)]
-  draws_array <- posterior::subset_draws(posterior::as_draws_array(fit),
-                                         variable = parameters)
-  out <- do.call(rbind, lapply(parameters, function(p) {
-    # Preserve iteration x chain shape: flattening loses between-chain
-    # information and would make the R-hat/ESS checks misleading.
-    x <- as.matrix(draws_array[, , p])
-    angular <- p %in% circular_parameters
-    z <- if (angular) mod_circular(x - circ_mean(x)) else x
-    stopifnot(all(is.finite(x)))
-    data.frame(parameter = p,
-      mean = if (angular) circ_mean(x) else mean(x),
-      sd = if (angular) circ_sd(x) else sd(as.numeric(x)),
-      rhat = if (angular) Rhat_unwrap(x, method = "sine") else posterior::rhat(x),
-      ess_bulk = posterior::ess_bulk(z),
-      row.names = NULL, check.names = FALSE)
-  }))
-  out$rhat <- round(out$rhat, 4)
-  out$ess_bulk <- round(out$ess_bulk, 1)
-  out
-}
+# R twin of notebooks/zebra_posthoc.py: the per-draw direction posteriors
+# and the data-bootstrap / replicated-data PPC statistics. The circular
+# and interval math, the convergence diagnostic gate and the shared
+# sampling helpers come from R/unwrap_helpers.R (the notebook sources it
+# before this script); only the zebra-specific post-fit analysis lives
+# here. The notebook keeps the fit, prints the returned summary table and
+# the seeds, and calls the figure builders from zebra_plots.R.
 
 # Per-draw track-condition direction posteriors: the mu/kappa draw
 # matrices over the 18 tracks x 2 conditions grid, the between-individual
