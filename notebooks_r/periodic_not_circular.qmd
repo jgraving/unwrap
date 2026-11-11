@@ -23,13 +23,11 @@ knitr::opts_chunk$set(dev = "ragg_png")
 
 # Periodic but not circular: a 24-hour activity rhythm
 
-This example illustrates the *periodic but not circular* case: the predictor (time of day) repeats every 24 h, while the response itself is not an angle. The quantity of interest is *activity*, a level bounded in $(0, 1)$: the periodicity belongs to the predictor, not to the observation space of the outcome (unlike a **circular** quantity such as a compass bearing, where 0° and 360° are the *same* direction and the data live on a ring). We model activity with a **Beta** likelihood and let both its mean and its precision vary sinusoidally across the 24 h day.
+Suppose an activity sensor reports a continuous level between 0 and 1, with small values indicating little activity and large values indicating much more. We want to describe how that level changes over the day. Time of day repeats: midnight at the end of one day returns to the same position in the daily cycle. Activity does not wrap around in this way. An activity level near 0 is very different from one near 1.
 
-The statistical model is a Beta GLM with a sinusoidal design on time:
+This distinction determines the model. A circular likelihood such as the von Mises describes an angular response, where a full turn returns to the same outcome. Here the response is a bounded activity level, so we use a Beta likelihood for values strictly between 0 and 1. The daily rhythm enters through the predictors. Using a periodic predictor does not require the response itself to be circular.
 
-- a **mean** activity level `mu(t)` driven by a linear predictor of a constant plus sine and cosine of the 24 h day, passed through a sigmoid so it stays in (0, 1);
-- a positive **precision** `phi(t)` from a second sinusoidal linear predictor passed through a softplus;
-- observations `activity ~ Beta(mu * phi, (1 - mu) * phi)`.
+There are two questions to answer: how does average activity change through the day, and how variable are observations made at the same time? We allow the Beta mean and precision to have separate daily patterns. The example uses simulated observations so that we know the patterns that generated them and can compare those patterns with the fitted model.
 
 
 ## Setup
@@ -142,12 +140,38 @@ WARMUP <- if (quick_run) 1500L else 2000L
 
 ## Figure style
 
-Figures use the shared minimal theme. Each figure renders inline and saves a vector PDF under `figures/periodic_not_circular/`.
+Time runs from 0 to 24 hours along the horizontal axis. On an activity axis, vertical distance is an ordinary difference in activity: the top and bottom of that scale are distinct outcomes, even though the two ends of the time axis represent the same daily phase.
 
 
 ## 1. Simulate the 24-hour rhythm
 
-1,000 samples of activity are drawn across a 24 h day from hidden sinusoidal mean and precision curves (fixed seed, so the result is reproducible): `mu(t)`, where activity is centered through the day, and `phi(t)`, how concentrated activity is around that center, each a constant plus a sine and a cosine of the 24 h day. This is the canonical "periodic" parameterization - an angular basis in time, not data on a circle.
+We generate 1,000 independent observations at evenly spaced times across a day. Their underlying mean and precision change smoothly with time; individual observations are drawn from the activity distribution at their respective times.
+
+Let $\theta(t)=2\pi t/24$, with $t$ measured in hours. Sine and cosine return to their starting values after 24 hours. Combining them lets a daily peak occur at a time determined by their coefficients, rather than fixing it at the peak of either basis function. For this example, the two predictors are
+
+$$
+\eta_\mu(t)=0.5+2\sin\theta(t)+1.5\cos\theta(t),
+\qquad
+\eta_\phi(t)=2+\sin\theta(t)+0.5\cos\theta(t).
+$$
+
+We turn these into a valid mean and a positive precision using
+
+$$
+\mu(t)=\frac{1}{1+\exp[-\eta_\mu(t)]},
+\qquad
+\phi(t)=\log\!\left(1+\exp[\eta_\phi(t)]\right),
+$$
+
+then draw activity as
+
+$$
+y_i\sim\operatorname{Beta}\!\left(\mu(t_i)\phi(t_i),\,[1-\mu(t_i)]\phi(t_i)\right).
+$$
+
+The first transformation keeps the mean between 0 and 1; the second, called softplus, keeps precision positive. The predictors are sinusoidal, but the transformed mean and precision need not be sine waves. These chosen coefficients produce high mean activity early in the day and low mean activity in the afternoon.
+
+The cycle length is fixed at 24 hours. Within each curve, its coefficients and the resulting peak time remain constant; the mean activity changes because time advances through the cycle. The mean and precision can peak at different hours because they have different coefficients. Both curves agree at 0 and 24 hours. Two observations at those endpoints can still differ, just as two observations at any other shared time can differ.
 
 
 ```{r}
@@ -182,11 +206,29 @@ head(data)
 
 ## 2. Fit the periodic model
 
-The six Normal priors match the Python model exactly. `brms::Beta`
-uses `phi` for precision. With its log precision link, the nonlinear
-predictor `log(softplus(eta))` gives precisely `phi = softplus(eta)`.
-A plain log-linear precision regression would change the model.
-`0 + Intercept` preserves the uncentered coefficient priors.
+We now treat the six coefficients used to construct the two predictors as unknown. The fitted model has the same form as the simulation:
+
+$$
+\eta_\mu(t)=\beta_0+\beta_s\sin\theta(t)+\beta_c\cos\theta(t),
+\qquad
+\eta_\phi(t)=\alpha_0+\alpha_s\sin\theta(t)+\alpha_c\cos\theta(t).
+$$
+
+The observations inform the baseline level and the strength and timing of each daily pattern. The cycle length remains fixed at 24 hours. All six coefficients have independent Normal priors with standard deviation 1. In intercept, sine, cosine order, the prior means are $(0,2,2)$ for the mean predictor and $(1,1,0)$ for the precision predictor. These priors regularize the estimates. Several are centered above zero, so they favor some daily patterns over others before seeing the observations.
+
+Precision describes variation among observations, not our uncertainty about a fitted coefficient. Its effect is easiest to see from
+
+$$
+\operatorname{Var}(y\mid t)=\frac{\mu(t)[1-\mu(t)]}{\phi(t)+1}.
+$$
+
+At a fixed mean, larger precision gives less variation. Across the day, both mean and precision change, so both contribute to changes in the spread of activity. Estimating these two patterns separately lets mean activity and precision peak at different times.
+
+The coefficient summaries and trace panels help inspect the sampled estimates. The saved fit reports that divergence information was not retained, so these outputs do not provide a complete convergence assessment.
+
+The following two curve panels separate the fitted mean activity from the fitted precision. Black lines are posterior averages of each underlying curve; orange ribbons are 95% highest-density intervals for that curve at each time. Dashed blue lines show the values used to simulate the observations. These ribbons describe uncertainty in the underlying mean or precision, rather than the range of possible individual activity observations.
+
+The fitted curves reproduce the broad daily pattern, with some departures from the generating curves. In particular, the fitted precision peak is below the simulated peak. Compare both the locations of peaks and troughs and the differences in their heights.
 
 
 ```{r}
@@ -253,14 +295,19 @@ save_figure(p_latent, "periodic_beta_latent_curves", 9, 4)
 
 ## 3. Reading the figure
 
-The next cell samples the posterior predictive draws of `activity`, summarizes them (median, 50%/90% highest-density intervals), and draws the figure.
+The points below are the simulated activity observations. The black line is the median of new activity values drawn from the fitted model at each time. The darker and lighter bands are 50% and 90% highest-density intervals, calculated separately at each time: compact intervals containing those proportions of the simulated predictive values.
 
-- Dots are the simulated observations.
-- The solid line is the posterior median of activity over the day.
-- The shaded bands are the 90% (outer) and 50% (inner) highest-density intervals across posterior predictive samples.
-- The band widens where the posterior is less certain about the mean or the precision.
+This line is a predictive median, not the fitted mean $\mu(t)$. The Beta distribution can be strongly asymmetric, so its median and mean can differ substantially. A predictive median close to 0 or 1 does not imply that the mean activity reaches either endpoint.
 
-The recovered curve should track the injected sinusoidal shape and, crucially, *not* be forced to agree across the 0/24 boundary as a plain circular fit would be — the wrap is a periodic continuity, not an angular equivalence. This contrasts with the bearing analysis in `notebooks_r/zebra_escape.ipynb`, where that equivalence is the whole point.
+Each predictive draw includes variation among observations as well as uncertainty about the fitted coefficients. Consequently, a broad predictive band need not mean that the average activity is poorly known. An afternoon with low average activity can still include occasional high values. Both the changing mean and changing precision affect this spread. Highest-density interval boundaries can also change abruptly as the shape of the distribution changes, even when the underlying mean and precision are smooth.
+
+The model specifies the same activity distribution at 0 and 24 hours. Small differences between plotted summaries at these endpoints can arise from the finite set of predictive draws. The daily cycle joins at midnight; activity remains on its ordinary bounded scale.
+
+This example shows how a periodic predictor can describe a changing distribution of a nonangular outcome. For an animal activity study, the sampling design would guide the choice of cycle length and the treatment of repeated measurements. Additional predictors or hierarchical effects could then describe differences among animals, sites, or days. The likelihood would still follow the type of response being measured. For an applied treatment of daily activity patterns using periodic predictors and hierarchical models, see [Iannarilli et al. (2025)](https://doi.org/10.1111/1365-2656.14213).
+
+**Reference**
+
+Iannarilli, F., Gerber, B. D., Erb, J., and Fieberg, J. R. (2025). A “how-to” guide for estimating animal diel activity using hierarchical models. *Journal of Animal Ecology*, **94**(2), 182–194. [https://doi.org/10.1111/1365-2656.14213](https://doi.org/10.1111/1365-2656.14213).
 
 
 ```{r}
