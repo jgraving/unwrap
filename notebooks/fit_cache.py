@@ -1,197 +1,188 @@
-"""Development fit cache for the Python notebooks.
+"""Load-or-save fit cache for the Python notebooks (issue #130, bats part).
 
-When ``UNWRAP_PY_FIT_CACHE=1`` a notebook's PyMC / Bambi fits are reused
-across local runs instead of resampled: before fitting, a cell asks
-:func:`unwrap_load_fit_cache` for a saved snapshot; when none is valid it
-fits as usual and stores the result with :func:`unwrap_save_fit_cache`.
+Environment control
+-------------------
+``UNWRAP_PY_FIT_CACHE``
+    When unset or not a truthy value (``1``/``true``/``yes``/``on``), this
+    module is a complete no-op: :func:`load_or_fit` just calls ``fit_fn``
+    and performs no file I/O. This is the default, so every existing
+    notebook run behaves exactly as before.
 
-This mirrors the R convention in ``R/unwrap_functions.R``
-(``unwrap_load_fit_cache`` / ``unwrap_save_fit_cache``). A snapshot is
-reused only when the name, seed, sampling budget (tune/draws), and a
-data checksum all match, so a stale cache can never sneak into a run.
-``name`` is caller-provided and must identify the MODEL as well as its
-budget: a model change (priors/formula/family) under an unchanged name
-would silently reuse the old snapshot, so bump the name (e.g. a ``_v2``
-suffix) whenever the model changes.
+``UNWRAP_PY_FIT_CACHE_DIR``
+    Directory holding the snapshots (default: ``<repo>/fit_cache``,
+    mirroring the R fit caches pushed to the unwrap-data repo).
 
-With ``UNWRAP_PY_FIT_CACHE`` unset (the default, and how committed
-notebooks are validated) these helpers are silent no-ops and nothing is
-read from or written to disk.
+Snapshots
+---------
+A fit named ``name`` is stored as two files:
 
-Storage
--------
-Fits are ``arviz.InferenceData`` objects, which in arviz 1.x are
-``xarray.DataTree``. They are saved with ``InferenceData.to_netcdf`` and
-loaded with ``arviz.from_netcdf`` (NetCDF4), the xarray-native, portable
-format - no pickling. The cache metadata is carried in the file's global
-attributes so a single ``.nc`` file holds both the draws and the validity
-check.
+* ``<name>.nc``         the xarray ``DataTree`` in the netCDF format the
+                        array package natively saves and loads
+                        (``DataTree.to_netcdf`` / ``xarray.open_datatree``,
+                        a netCDF-4 file): the whole object, including
+                        ``log_likelihood`` when it was requested; in slim
+                        snapshots the variables listed under
+                        ``extra["stripped"]`` are absent and recomputed
+                        from the stored draws on load
+* ``<name>.meta.json``  sha256 of the netCDF file plus validation
+                       metadata: the posterior variable list and shapes,
+                       and the caller-supplied fit parameters (seed, tune,
+                       draws, model id, library versions).
+
+A snapshot is reused only when the sha256 matches and every caller-supplied
+metadata value equals the stored one; any mismatch refits and overwrites
+the snapshot (loudly, on the console).
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import os
-import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
+import xarray
 
-# ---------------------------------------------------------------------------
-# Enable / path
-# ---------------------------------------------------------------------------
+__all__ = ["CacheMismatch", "enabled", "cache_dir", "load_or_fit"]
 
-_ENV_FLAG = "UNWRAP_PY_FIT_CACHE"
-_ENV_DIR = "UNWRAP_PY_FIT_CACHE_DIR"
+ENV_ENABLE = "UNWRAP_PY_FIT_CACHE"
+ENV_DIR = "UNWRAP_PY_FIT_CACHE_DIR"
 
+#: <repo>/fit_cache (this file lives in notebooks/)
+DEFAULT_DIR = Path(__file__).resolve().parent.parent / "fit_cache"
 
-def unwrap_fit_cache_enabled() -> bool:
-    """True only when ``UNWRAP_PY_FIT_CACHE=1`` is set."""
-    return os.environ.get(_ENV_FLAG) == "1"
+_TRUTHY = {"1", "true", "yes", "on"}
 
 
-def _unwrap_data_root() -> Path | None:
-    """Best-effort path to the local ``unwrap-data`` checkout, or None."""
-    try:
-        from unwrap.datasets import DEFAULT_DATA_ROOT
-    except Exception:  # pragma: no cover - unwrap not importable
-        return None
-    root = DEFAULT_DATA_ROOT / "unwrap-data"
-    return root if root.is_dir() else None
+class CacheMismatch(RuntimeError):
+    """A snapshot exists but fails sha256 or metadata validation."""
 
 
-def unwrap_fit_cache_path(name: str) -> Path | None:
-    """Path of the snapshot for ``name`` (None when the cache is disabled).
+def enabled() -> bool:
+    """True when the caller opted into the cache via the environment."""
+    return str(os.environ.get(ENV_ENABLE, "")).strip().lower() in _TRUTHY
 
-    The directory is ``UNWRAP_PY_FIT_CACHE_DIR`` when set; otherwise the
-    ``fit_cache/`` directory of the local ``unwrap-data`` checkout (mirroring
-    where the R fit snapshots live); otherwise ``~/.unwrap_fit_cache``.
+
+def cache_dir() -> Path:
+    override = os.environ.get(ENV_DIR, "").strip()
+    return Path(override).expanduser() if override else DEFAULT_DIR
+
+
+def _snapshot_files(name: str):
+    root = cache_dir() / name
+    return root.with_suffix(".nc"), root.with_suffix(".meta.json")
+
+
+def _digest(blob: bytes) -> str:
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _describe(idata) -> dict:
+    post = idata.posterior
+    return {
+        "n_posterior_vars": len(post.data_vars),
+        "posterior_vars": sorted(map(str, post.data_vars)),
+        "posterior_shapes": {
+            str(k): list(v.shape) for k, v in post.items()
+        },
+    }
+
+
+def load_snapshot(name: str, *, expect: dict | None = None):
+    """Load the cached fit ``name``, validating sha256 and metadata.
+
+    Raises ``FileNotFoundError`` (nothing saved) or ``CacheMismatch``
+    (corrupted or stale snapshot).
     """
-    if not unwrap_fit_cache_enabled():
-        return None
-    override = os.environ.get(_ENV_DIR, "").strip()
-    if override:
-        directory = Path(override)
-    else:
-        root = _unwrap_data_root()
-        directory = (root / "fit_cache") if root is not None else (
-            Path.home() / ".unwrap_fit_cache")
-    return directory / f"{name}.nc"
+    snap, meta_path = _snapshot_files(name)
+    if not (snap.exists() and meta_path.exists()):
+        raise FileNotFoundError(
+            f"no saved fit snapshot for '{name}' in {cache_dir()}"
+        )
+    info = json.loads(meta_path.read_text())
+    blob = snap.read_bytes()
+    if info.get("sha256") != _digest(blob):
+        raise CacheMismatch(f"snapshot '{name}': netCDF file sha256 does not match the metadata")
+    if expect:
+        stored = info.get("extra", {})
+        bad = {k: (stored.get(k), v) for k, v in expect.items() if stored.get(k) != v}
+        if bad:
+            raise CacheMismatch(f"snapshot '{name}': fit metadata mismatch {bad}")
+    obj = xarray.open_datatree(snap).load()
+    if _describe(obj) != {k: info[k] for k in
+                          ("n_posterior_vars", "posterior_vars", "posterior_shapes")}:
+        raise CacheMismatch(f"snapshot '{name}': posterior layout does not match the metadata")
+    return obj
 
 
-# ---------------------------------------------------------------------------
-# Data checksum
-# ---------------------------------------------------------------------------
+def save_snapshot(name: str, idata, *, meta: dict | None = None) -> None:
+    snap, meta_path = _snapshot_files(name)
+    snap.parent.mkdir(parents=True, exist_ok=True)
+    idata.to_netcdf(snap)
+    blob = snap.read_bytes()
+    info = _describe(idata)
+    info["sha256"] = _digest(blob)
+    info["extra"] = dict(meta or {})
+    meta_path.write_text(json.dumps(info, indent=2, sort_keys=True) + "\n")
 
-def data_checksum(response, *, group_arrays=()) -> str:
-    """A short, stable checksum identifying the data a fit was built from.
 
-    ``response`` is the model's heading/response values (a 1-D array);
-    ``group_arrays`` is an optional iterable of ``(name, array)`` for any
-    grouping columns (e.g. animal / tag id). The checksum combines the row
-    count, a hash of the response, and a hash of each grouping array, so a
-    change to the data - different values, a different number of rows, or a
-    re-ordered / re-labelled grouping - invalidates the cache. It is
-    deliberately a coarse fingerprint (not a byte-for-byte hash of the whole
-    frame): cheap to compute and stable across pandas / numpy versions.
+def slim_snapshot(idata, *, drop_groups=(), drop_posterior=()):
+    """Return a copy of ``idata`` without the named large groups and/or
+    posterior variables, for small fit snapshots (issue #130): the bats
+    vMU snapshot strips the per-observation deterministics (``mu``, ``kappa``,
+    ``p_goal``) and the ``log_likelihood`` group, which are cheaply
+    recomputed from the stored latent draws when a snapshot is loaded
+    (notebook cell 53 / posthoc.restore_per_obs_deterministics).
+
+    Only strips what is actually present; other groups and variables pass
+    through untouched.
     """
-    response = np.asarray(response)
-    parts = [f"n:{len(response)}", f"resp:{response.shape}:{_hash(response)}"]
-    for name, values in group_arrays:
-        values = np.asarray(values)
-        parts.append(f"{name}:{values.shape}:{_hash(values)}")
-    payload = "|".join(parts)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    drop_groups = {g for g in drop_groups if g in idata.children}
+    drop_posterior = set(drop_posterior)
+
+    dt = idata
+    if drop_groups:
+        dt = dt.drop_nodes(sorted(drop_groups))
+    if drop_posterior:
+        present = [v for v in dt.posterior.data_vars if v in drop_posterior]
+        if present:
+            post_ds = dt.posterior.to_dataset().drop_vars(present)
+            dt["posterior"] = xarray.DataTree(name="posterior", dataset=post_ds)
+    return dt
 
 
-def _hash(values) -> str:
-    return hashlib.sha256(np.asarray(values).tobytes()).hexdigest()
+def load_or_fit(name: str, fit_fn, *, meta: dict | None = None,
+                pick=None, label: str | None = None):
+    """Reuse a saved fit, or run ``fit_fn()`` and save its snapshot.
 
+    With the cache disabled (the default) this returns ``fit_fn()``
+    unchanged and touches no files. With it enabled:
 
-# ---------------------------------------------------------------------------
-# Metadata (carried in the NetCDF global attributes)
-# ---------------------------------------------------------------------------
+    * a valid snapshot is loaded and returned (``fit_fn`` is not called);
+    * a missing or mismatched snapshot refits via ``fit_fn`` and overwrites
+      the snapshot, printing exactly what happened.
 
-def _set_meta(idata, *, name, seed, tune, draws, checksum) -> None:
-    idata.attrs["unwrap_cache_name"] = str(name)
-    idata.attrs["unwrap_cache_seed"] = int(seed)
-    idata.attrs["unwrap_cache_tune"] = int(tune)
-    idata.attrs["unwrap_cache_draws"] = int(draws)
-    idata.attrs["unwrap_cache_checksum"] = str(checksum)
-    idata.attrs["unwrap_cache_saved_utc"] = datetime.now(
-        timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _meta_matches(attrs, *, name, seed, tune, draws, checksum) -> bool:
-    def _num(key):
-        value = attrs.get(f"unwrap_cache_{key}")
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
-    return (
-        attrs.get("unwrap_cache_name") == str(name)
-        and _num("seed") == int(seed)
-        and _num("tune") == int(tune)
-        and _num("draws") == int(draws)
-        and attrs.get("unwrap_cache_checksum") == str(checksum)
-    )
-
-
-# ---------------------------------------------------------------------------
-# Load / save
-# ---------------------------------------------------------------------------
-
-def unwrap_load_fit_cache(name, seed, tune, draws, checksum):
-    """Return a valid cached ``InferenceData`` for ``name``, or None.
-
-    A snapshot is returned only when it exists and its stored name, seed,
-    tune, draws, and data checksum all match the arguments; otherwise None
-    is returned (and the caller refits). Silent no-op (returns None) when
-    the cache is disabled.
+    ``meta`` (fit parameters such as seed/tune/draws/model id) is validated
+    on load and stored on save. ``pick`` maps ``fit_fn``'s return value to
+    the ``az.InferenceData`` that gets snapshotted (identity by default);
+    the full ``fit_fn`` return value is returned to the caller on refits.
     """
-    path = unwrap_fit_cache_path(name)
-    if path is None or not path.exists():
-        return None
+    if not enabled():
+        return fit_fn()
+
+    lbl = label or name
+    pick = pick or (lambda r: r)
     try:
-        import arviz as az
+        obj = load_snapshot(name, expect=meta)
+        print(f"FIT-CACHE hit: {lbl} <- {(cache_dir() / name).with_suffix('.nc')}")
+        return obj
+    except FileNotFoundError:
+        print(f"FIT-CACHE miss: {lbl}; fitting now and saving "
+              f"{(cache_dir() / name).with_suffix('.nc')}")
+    except CacheMismatch as exc:
+        print(f"FIT-CACHE mismatch ({exc}); refitting and overwriting the snapshot")
 
-        idata = az.from_netcdf(path)
-    except Exception:
-        message("Unwrap fit cache: '%s' is unreadable; refitting." % name)
-        return None
-    if not _meta_matches(idata.attrs, name=name, seed=seed, tune=tune,
-                         draws=draws, checksum=checksum):
-        message("Unwrap fit cache: '%s' is stale; refitting." % name)
-        return None
-    message("Unwrap fit cache: reusing '%s' (seed %s, tune %s, draws %s)."
-            % (name, seed, tune, draws))
-    return idata
-
-
-def unwrap_save_fit_cache(name, idata, seed, tune, draws, checksum):
-    """Store ``idata`` under ``name`` (silent no-op when disabled)."""
-    path = unwrap_fit_cache_path(name)
-    if path is None:
-        return None
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _set_meta(idata, name=name, seed=seed, tune=tune, draws=draws,
-              checksum=checksum)
-    # Write to a temp file in the same directory, then rename, so a
-    # crashed bake never leaves a half-written snapshot behind.
-    fd, tmp = tempfile.mkstemp(suffix=".tmp", dir=str(path.parent))
-    os.close(fd)
-    try:
-        idata.to_netcdf(tmp)
-        os.replace(tmp, path)
-    finally:
-        if os.path.exists(tmp):
-            os.remove(tmp)
-    return None
-
-
-def message(text: str) -> None:
-    """Print a cache notice (kept separate so callers stay quiet by default)."""
-    print(text)
+    res = fit_fn()
+    save_snapshot(name, pick(res), meta=meta)
+    print(f"FIT-CACHE saved: {lbl}")
+    return res
