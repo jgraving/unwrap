@@ -95,6 +95,13 @@ def _save(fig, save, save_path, transparent=False, dpi=300):
                         transparent=transparent, dpi=dpi)
 
 
+# ------------------------------------------------------------------
+#: colorbar/axis name of the posterior-directedness view (per step, the
+#: directed component's share of the combined directed + undirected
+#: component densities, baseline weight removed; 0.5 = equal)
+EVIDENCE_LABEL = "Posterior directedness"
+
+
 # ------------------------------------------------------------------ anchors
 #: map anchors and the Web Mercator EPSG for every basemap figure
 LAKE_GEOJSON = bats_lake_outline_path()
@@ -4048,6 +4055,9 @@ def plot_tracks_pgoal_viridis(
     cbar_pad=0.010,
     cbar_ticksize=8,
     cbar_labelsize=9,
+    # colorbar name of the encoded per-step score (default keeps the
+    # original directed-component probability figure unchanged)
+    cbar_label="Directed-component probability",
     save: bool = True,
     save_path=None,
 ):
@@ -4297,7 +4307,7 @@ def plot_tracks_pgoal_viridis(
     sm.set_array([])
 
     cbar = fig.colorbar(sm, cax=cax)
-    cbar.set_label("Directed-component probability", fontsize=cbar_labelsize)
+    cbar.set_label(cbar_label, fontsize=cbar_labelsize)
     cbar.ax.tick_params(labelsize=cbar_ticksize, width=0.6, length=2.0)
     cbar.outline.set_linewidth(0.6)
 
@@ -4458,6 +4468,9 @@ def plot_tracks_pgoal_small_bigfont(
     cbar_width=0.60,
     cbar_ticksize=8,      # BIGGER
     cbar_labelsize=9,     # BIGGER
+    # colorbar name of the encoded per-step score (default keeps the
+    # original directed-component probability figure unchanged)
+    cbar_label="Directed-component probability",
     pdf_raster_dpi=300,            # dpi for rasterized track layers in PDF
     svg_raster_dpi=600,  # raster dpi of a saved SVG export
     save: bool = True,
@@ -4719,7 +4732,7 @@ def plot_tracks_pgoal_small_bigfont(
     sm.set_array([])
 
     cbar = fig.colorbar(sm, cax=cax, orientation="horizontal")
-    cbar.set_label("Directed-component probability", fontsize=cbar_labelsize, labelpad=2)
+    cbar.set_label(cbar_label, fontsize=cbar_labelsize, labelpad=2)
     cbar.ax.tick_params(labelsize=cbar_ticksize, width=0.6, length=2.2, pad=1)
     cbar.outline.set_linewidth(0.6)
 

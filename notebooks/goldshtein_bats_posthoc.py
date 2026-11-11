@@ -2431,6 +2431,343 @@ def append_pgoal_post_to_df(
     return out, resp_draws
 
 
+# ---------------------------------------------------------------------------
+# Directional evidence: the component density ratio with the baseline
+# mixing weight removed.
+#
+# r = w f_D / (w f_D + (1-w) f_U) is the posterior responsibility (the
+# directed-component probability). Its odds split exactly as
+#
+#   r / (1 - r) = [w / (1 - w)] * [f_D / f_U],
+#
+# so dividing the posterior odds by the (fitted baseline) weight odds
+# removes the explicit mixing-weight contribution and leaves the
+# baseline-adjusted component evidence ratio B = f_D / f_U evaluated at
+# the observed heading. For the von Mises directed component and the
+# EXACT uniform circular background (density 1/(2*pi), log -log(2*pi):
+# the constant cancels),
+#
+#   log B = log f_D - log f_U = kappa*cos(theta - mu) - log I0(kappa).
+#
+# E = logistic(logB) = B/(1+B) maps the ratio to [0, 1] with 0.5 = equal
+# evidence for the two components. E is an equal-prior evidence score,
+# NOT the fitted probability of a directed flight: orientation,
+# precision, and their uncertainty still differ across bats, and only
+# the explicit baseline odds are standardized away.
+# ---------------------------------------------------------------------------
+
+#: log of the exact uniform circular density (per radian).
+LOG_UNIF_CIRCLE = -np.log(2.0 * np.pi)
+
+
+def evidence_log_ratio(y, mu, kappa):
+    """Per-draw log evidence ratio logB = log f_D(y|mu,kappa) - log f_U(y).
+
+    y (n_obs,), mu/kappa broadcastable to the same shape (e.g.
+    (S, n_obs) draws against y[None, :]). Uses the stable log-I0, so
+    large concentrations stay finite. f_U is the exact uniform circle.
+    """
+    y = np.asarray(y, float)
+    mu = np.asarray(mu, float)
+    kappa = np.asarray(kappa, float)
+    return kappa * np.cos(y - mu) - log_i0_stable(kappa)
+
+
+def _per_draw_mu_kappa(idata, n_obs, *, max_draws=1200, seed=123):
+    """Per-draw, per-heading mu and kappa, shape (S, n_obs) each.
+
+    Draws are subsampled without replacement with the same convention
+    (seed, order) as the responsibility machinery, so evidence and
+    membership draws line up when both are requested. Independent copy
+    on purpose: the original directed-component probability path
+    (`_posterior_prob_goal_per_step_curves`) stays untouched.
+    """
+    post = idata.posterior
+    if "mu" not in post.data_vars or "kappa" not in post.data_vars:
+        raise KeyError(
+            "Need posterior 'mu' and 'kappa' (the vMU mixture's directed "
+            "component terms) for directional evidence."
+        )
+
+    def _to_obs(da, var):
+        arr = _stack_samples_first(da)  # (S, ...)
+        obs_axes = [ax for ax in range(1, arr.ndim) if arr.shape[ax] == n_obs]
+        if len(obs_axes) != 1:
+            raise ValueError(
+                f"Can't identify obs axis in '{var}'. shape={arr.shape}, n_obs={n_obs}"
+            )
+        return np.moveaxis(arr, obs_axes[0], 1).reshape(arr.shape[0], n_obs)
+
+    mu = circular_modulo(_to_obs(post["mu"], "mu"))
+    kappa = np.clip(_to_obs(post["kappa"], "kappa"), 1e-12, np.inf)
+    S = mu.shape[0]
+    rng = np.random.default_rng(seed)
+    if (max_draws is not None) and (S > max_draws):
+        idx = rng.choice(S, size=int(max_draws), replace=False)
+        mu = mu[idx]
+        kappa = kappa[idx]
+    return mu, kappa
+
+
+def directional_evidence(idata, y_obs, *, max_draws=1200, seed=123, ci_prob=0.90):
+    """Directional evidence per observed heading, from the vMU posterior.
+
+    For every posterior draw s (parameters of the same draw kept
+    together):
+
+        logB_s = kappa_s*cos(y - mu_s) - log I0(kappa_s)
+        E_s    = sigmoid(logB_s)          (0.5 = equal component evidence)
+
+    The summary over draws is taken of the per-draw transformed scores
+    (posterior mean of E_s plus a pointwise HDI at ci_prob) -- never of
+    posterior-mean parameters, and never as mean membership divided by
+    mean weight. Returns a tuple:
+
+      E_draws      (S, n_obs)  per-draw E = logistic(logB)
+      logB_draws   (S, n_obs)  per-draw log evidence ratio
+      E_mean       (n_obs,)    posterior mean of the per-draw E
+      E_interval   (n_obs, 2)  pointwise HDI of the per-draw E (ci_prob)
+      pr_logb_gt0  (n_obs,)    posterior probability (over draws) that
+                               logB > 0: the per-step evidence support
+                               used by the candidate onset logic
+    """
+    y_obs = np.asarray(y_obs, float).reshape(-1)
+    mu, kappa = _per_draw_mu_kappa(
+        idata, y_obs.size, max_draws=max_draws, seed=seed
+    )
+    logB = evidence_log_ratio(y_obs[None, :], mu, kappa)
+    E = sigmoid(logB)
+    E_mean = E.mean(axis=0)
+    E_interval = hdi_along_samples_2col(E, prob=ci_prob)
+    pr_logb_gt0 = (logB > 0).mean(axis=0)
+    return E, logB, E_mean, E_interval, pr_logb_gt0
+
+
+def append_evidence_to_df(df_track, idata, *, y_col="HeadingRadians",
+                          max_draws=1200, seed=123, ci_prob=0.90):
+    """Append the directional-evidence columns to a modeling table.
+
+    Twin of `append_pgoal_post_to_df` and keeps the original
+    directed-component probability columns untouched (`p_goal_post_*`
+    stays the "Directed-component probability" view). New columns:
+    `evi_post_mean`, `evi_post_lo`, `evi_post_hi` (pointwise HDI of the
+    per-draw transformed score) and `evi_logb_gt0` (per-step draw-wise
+    Pr(logB > 0)). Returns (out_df, E_draws) like its twin.
+    """
+    y_obs = pd.to_numeric(df_track[y_col], errors="coerce").to_numpy(float)
+    E, _logB, E_mean, E_interval, pr_logb_gt0 = directional_evidence(
+        idata, y_obs, max_draws=max_draws, seed=seed, ci_prob=ci_prob
+    )
+    out = df_track.copy()
+    out["evi_post_mean"] = E_mean
+    out["evi_post_lo"] = E_interval[:, 0]
+    out["evi_post_hi"] = E_interval[:, 1]
+    out["evi_logb_gt0"] = pr_logb_gt0
+    return out, E
+
+
+def restore_per_obs_deterministics(idata, tag_idx, treat_idx, *,
+                                   mu_dim="mu_dim_0",
+                                   kappa_dim="kappa_dim_0",
+                                   p_goal_dims=("p_goal_dim_0", "p_goal_dim_1")):
+    """Rebuild the per-observation deterministics of the full vMU model
+    (``mu``, ``kappa``, ``p_goal``) from the latent parameters a slim fit
+    snapshot stores (issue #130: the data-repo snapshot drops these (S,
+    n_obs[, 2]) arrays plus the log-likelihood group to stay small).
+
+    The per-observation values are deterministic functions of the stored
+    draws — for observation ``i`` and draw ``s``:
+
+      mu[s, i]      = wrap(mu0[s] + mu_treat[s, treat(i)] + mu_tag[s, tag(i)])
+      kappa[s, i]   = softplus(eta_kappa0[s] + sigma_kappa_tag[s]
+                               * eta_kappa_tag[s, tag(i)]
+                               + kappa_treat[s, treat(i)])
+      p_goal[s, i]  = sigmoid([logit_p[s, i], -logit_p[s, i]])  (2 components)
+
+    where the ``*_treat`` offsets are present only when the model was fit
+    with treatment effects in that submodel (ref treatment = 0 offset),
+    exactly as the model graph defines them. ``tag_idx`` / ``treat_idx``
+    are the 0-based per-observation indices the model was fit with.
+
+    The dimension names default to the ones PyMC assigns to these
+    deterministics (``mu_dim_0`` etc.) so the restored object has the same
+    layout as one from a fresh fit.
+
+    Mutates and returns ``idata`` (a copy is NOT made; callers pass the
+    freshly loaded slim snapshot).
+    """
+    import xarray as xr
+
+    post = idata.posterior
+    required = ["mu0", "mu_tag", "eta_kappa0", "eta_kappa_tag", "sigma_kappa_tag",
+                "logit_p0", "logit_p_tag", "sigma_p_tag"]
+    missing = [v for v in required if v not in post.data_vars]
+    if missing:
+        raise KeyError(f"restore_per_obs_deterministics: missing '{missing}'; "
+                       f"not the full vMU fit. Available: {list(post.data_vars)[:40]}")
+
+    tag_idx = np.asarray(tag_idx, int)
+    treat_idx = np.asarray(treat_idx, int)
+    n_obs = tag_idx.size
+    n_chains = int(post.sizes["chain"])
+    n_draws = int(post.sizes["draw"])
+    S = n_chains * n_draws
+
+    def _stack(v):
+        return _stack_samples_first(post[v])
+
+    mu0 = _stack("mu0").reshape(S)
+    mu_tag = _stack("mu_tag").reshape(S, -1)
+    eta_kappa0 = _stack("eta_kappa0").reshape(S)
+    eta_kappa_tag = _stack("eta_kappa_tag").reshape(S, -1)
+    sigma_kappa_tag = _stack("sigma_kappa_tag").reshape(S)
+    logit_p0 = _stack("logit_p0").reshape(S)
+    logit_p_tag = _stack("logit_p_tag").reshape(S, -1)
+    sigma_p_tag = _stack("sigma_p_tag").reshape(S)
+
+    def _treat_offsets(var):
+        """(S, n_treat) offsets with the reference treatment = 0, or None."""
+        if var not in post.data_vars:
+            return None
+        arr = _stack(var).reshape(S, -1)
+        return np.concatenate([np.zeros((S, 1)), arr], axis=1)
+
+    mu_treat_off = _treat_offsets("mu_treat")
+    kappa_treat_off = _treat_offsets("kappa_treat")
+    beta_treat_off = _treat_offsets("beta_treat")
+
+    # --- mu (angular) ---
+    mu = mu0[:, None] + mu_tag[:, tag_idx]
+    if mu_treat_off is not None:
+        mu = mu + mu_treat_off[:, treat_idx]
+    mu = circular_modulo(mu)
+
+    # --- kappa (softplus link) ---
+    eta_kappa = (eta_kappa0[:, None]
+                 + sigma_kappa_tag[:, None] * eta_kappa_tag[:, tag_idx])
+    if kappa_treat_off is not None:
+        eta_kappa = eta_kappa + kappa_treat_off[:, treat_idx]
+    kappa = softplus(eta_kappa)
+
+    # --- p_goal (2-component simplex weight) ---
+    logit_p = (logit_p0[:, None]
+               + sigma_p_tag[:, None] * logit_p_tag[:, tag_idx])
+    if beta_treat_off is not None:
+        logit_p = logit_p + beta_treat_off[:, treat_idx]
+    w0 = sigmoid(logit_p)
+    w1 = 1.0 / (1.0 + np.exp(logit_p))  # sigmoid(-logit_p), stable form
+    p_goal = np.stack([w0, w1], axis=-1)  # (S, n_obs, 2): component last
+
+    chain_coord = (post.coords["chain"].values
+                   if "chain" in post.coords else np.arange(n_chains))
+    draw_coord = (post.coords["draw"].values
+                  if "draw" in post.coords else np.arange(n_draws))
+
+    def _da(arr, dims):
+        coords = {"chain": chain_coord, "draw": draw_coord}
+        for dim in dims:
+            coords[dim] = (np.arange(2) if dim == p_goal_dims[-1]
+                           else np.arange(n_obs))
+        return xr.DataArray(
+            arr.reshape((n_chains, n_draws) + arr.shape[1:]),
+            dims=("chain", "draw") + tuple(dims),
+            coords=coords,
+        )
+
+    post["mu"] = _da(mu, (mu_dim,))
+    post["kappa"] = _da(kappa, (kappa_dim,))
+    post["p_goal"] = _da(p_goal, tuple(p_goal_dims))
+    return idata
+
+
+def candidate_onset_steps(df, *, support_col="evi_logb_gt0",
+                          theta_col="HeadingRadians",
+                          gap_col="gap_before",
+                          tag_col="tag", step_col="_step",
+                          ref_rad=0.0,
+                          support_threshold=0.5, min_run_steps=5,
+                          goal_window_rad=np.pi / 4.0):
+    """Candidate sustained-evidence runs per tag (descriptive onset logic).
+
+    Per-step draw-wise evidence support is `support` = Pr(logB > 0) over
+    posterior draws; a step is *supported* when the support is >=
+    `support_threshold`. A maximal run of consecutive supported steps is
+    a candidate run, subject to:
+
+      * tracking gaps reset the current run (a `gap_col == 1` at a step
+        marks the gap before that step);
+      * steps without finite support also reset the run, so gaps and
+        missing values cannot create artificial continuous bouts;
+      * only runs of >= `min_run_steps` consecutive supported steps are
+        returned (both the threshold and the run length are adjustable);
+      * `at_boundary` marks runs that start at the tag's first recorded
+        step: support already present at the recording boundary, which
+        is distinct from an observed candidate onset.
+
+    `toward_goal_frac` is the share of the run's goal-relative headings
+    within `goal_window_rad` of the reference direction (0 = toward the
+    destination). Reading a run as the onset of GOAL-DIRECTED flight
+    requires that share to be high: membership of a biased component
+    alone does not guarantee the heading is toward the local goal.
+
+    This is a threshold rule on already-computed per-draw evidence -- a
+    descriptive candidate, NOT a temporal change-point or
+    switching-state model -- and must not be read as an inferred
+    decision time.
+    """
+    rows = []
+    for tg, g in df.groupby(tag_col, sort=False):
+        g = g.sort_values(step_col)
+        support = pd.to_numeric(g[support_col], errors="coerce").to_numpy(float)
+        steps = g[step_col].to_numpy()
+        if gap_col is not None and gap_col in g.columns:
+            gaps = pd.to_numeric(g[gap_col], errors="coerce").fillna(0).to_numpy()
+        else:
+            gaps = np.zeros(len(g))
+        if theta_col is not None and theta_col in g.columns:
+            theta = pd.to_numeric(g[theta_col], errors="coerce").to_numpy(float)
+        else:
+            theta = np.full(len(g), np.nan)
+
+        run = []
+
+        def _close():
+            nonlocal run
+            if len(run) >= int(min_run_steps):
+                idx = np.asarray(run)
+                theta_run = theta[idx]
+                rows.append({
+                    "tag": tg,
+                    "onset_step": steps[idx[0]],
+                    "end_step": steps[idx[-1]],
+                    "run_len": len(idx),
+                    # a run starting at the tag's first recorded step is
+                    # support already present at the recording boundary,
+                    # distinct from an observed candidate onset
+                    "at_boundary": bool(idx[0] == 0),
+                    "mean_support": float(np.nanmean(support[idx])),
+                    "toward_goal_frac": float(np.nanmean(
+                        np.abs(circular_modulo(theta_run - ref_rad))
+                        <= goal_window_rad
+                    )) if np.isfinite(theta_run).any() else np.nan,
+                })
+            run = []
+
+        for pos in range(len(support)):
+            if gaps[pos] >= 1:
+                _close()
+            supported = (np.isfinite(support[pos])
+                         and support[pos] >= support_threshold)
+            if supported:
+                run.append(pos)
+            else:
+                _close()
+        _close()
+    return pd.DataFrame(rows, columns=[
+        "tag", "onset_step", "end_step", "run_len", "at_boundary",
+        "mean_support", "toward_goal_frac"])
+
+
 def population_curve_kernel_per_tag(
     df,
     resp_draws,
