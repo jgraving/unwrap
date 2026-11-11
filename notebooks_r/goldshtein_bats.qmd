@@ -2915,41 +2915,97 @@ This is the **posterior directed-component probability**. A bearing near the fit
 The weight is constant within each bat, but the probability for an individual bearing changes with the observed angle. We infer it from the directional data and then place it back along the track. It is a model-based interpretation of movement, rather than a separately observed decision to begin homing or a probability of eventual arrival.
 
 
+### Posterior directedness: the component densities, baseline-adjusted
+
+The directed-component probability above also carries each animal's fitted baseline weight $p_i$: where $p_i$ is high, most heading mass is expected to belong to the directed component, so the per-step probability stays elevated even for headings that the two components explain almost equally well. To compare where the directed component is doing genuine explanatory work across animals and treatments, remove the baseline odds. The posterior odds of component membership factor exactly,
+
+$$
+\frac{r_{ij}}{1-r_{ij}}
+= \frac{p_i}{1-p_i}
+  \cdot
+  \frac{\mathcal M(y_{ij}\mid\mu_i,\kappa_i)}{1/(2\pi)},
+$$
+
+so the baseline-adjusted **posterior directedness** is the equal-prior component-density ratio. Evaluated per posterior draw, with the parameters of that draw kept together and the exact uniform-circle background (the additive constant $\log 2\pi$ cancels),
+
+$$
+E_{ij}
+= \operatorname{logistic}\!\left(\kappa_i\cos(\theta_{ij}-\mu_i) - \log I_0(\kappa_i)\right),
+$$
+
+with $0.5$ meaning equal evidence for the two components. Summaries over draws are taken of these per-draw scores (posterior mean plus a pointwise 90% credible interval), never of posterior-mean parameters and never as mean membership divided by mean weight, and every panel uses the same fixed 0-1 scale.
+
+Posterior directedness compares the directed and undirected component densities after removing each bat's fitted baseline weight; a value of 0.5 indicates equal support for the two components. It is not the fitted probability of directed flight, so it should be read alongside the animal's fitted weight $p_i$ and the oriented-component views elsewhere in this notebook.
+
+
 ```{r}
 #| cell-id: "goldshtein-bats-086"
 set.seed(123)
 RESP_DRAWS <- if (quick_run) 200L else 2000L
 resp_ids <- sample.int(nd, min(nd, RESP_DRAWS))
 resp <- matrix(NA_real_, nrow = nrow(df_track), ncol = length(resp_ids))
+evi <- matrix(NA_real_, nrow = nrow(df_track), ncol = length(resp_ids))
+logB <- matrix(NA_real_, nrow = nrow(df_track), ncol = length(resp_ids))
+# Posterior directedness with the EXACT uniform-circle background: its
+# -log(2*pi) cancels the von Mises density constant, so
+# logB = kappa*(cos(y - mu) - 1) - log(besselI(kappa, 0,
+# expon.scaled = TRUE)), the same stable log-I0 form as vm_logpdf
+# (finite at any kappa).
+log_evid_ratio <- function(y, mu, kappa) {
+  kappa * (cos(y - mu) - 1) - log(besselI(kappa, 0, expon.scaled = TRUE))
+}
 for (start in seq.int(1L, nrow(df_track), by = 128L)) {
   ii <- seq.int(start, min(start + 127L, nrow(df_track)))
   par <- response_parameters(fit_mix, df_track[ii, ], mixture = TRUE, draw_ids = resp_ids)
   y <- matrix(rep(df_track$HeadingRadians[ii], length(resp_ids)), nrow = length(ii))
-  log_goal <- vm_logpdf(y, par$mu, par$kappa)
-  # Match the effective append_pgoal_post_to_df helper called by c94/c99:
-  # a near-uniform VM proxy and probability-space posterior summaries.
+  # Match the effective append_pgoal_post_to_df helper called by the
+  # Python notebook: a near-uniform VM proxy and probability-space
+  # posterior summaries (the original "Directed-component probability"
+  # view, kept verbatim).
   w <- pmin(1 - 1e-12, pmax(1e-12, par$p))
+  log_goal <- vm_logpdf(y, par$mu, par$kappa)
   log_flat <- vm_logpdf(y, 0, KAPPA_UNIFORM)
   resp[ii, ] <- plogis(qlogis(w) + log_goal - log_flat)
+  # Posterior directedness E on the SAME draws (parameters of one draw
+  # kept together); summaries are taken of the per-draw transformed
+  # score, never of posterior-mean parameters.
+  logB[ii, ] <- log_evid_ratio(y, par$mu, par$kappa)
+  evi[ii, ] <- plogis(logB[ii, ])
 }
-stopifnot(all(is.finite(resp)), all(resp >= 0 & resp <= 1))
+stopifnot(all(is.finite(resp)), all(resp >= 0 & resp <= 1),
+  all(is.finite(evi)), all(evi >= 0 & evi <= 1))
 # The earlier unused helper has a different logit-space convention; use
 # the later effective helper that the Python notebook actually calls.
 df_track$p_goal_post_mean <- rowMeans(resp)
 resp_hdi <- t(apply(resp, 1, hdi))
 df_track$p_goal_post_lo <- resp_hdi[, 1]
 df_track$p_goal_post_hi <- resp_hdi[, 2]
+# Posterior directedness columns: posterior mean of the per-draw E plus a
+# pointwise 90% HDI of the transformed scores; evi_logb_gt0 is the
+# per-step draw-wise support Pr(logB > 0); input to the descriptive
+# candidate-onset rule (notebooks/goldshtein_bats_posthoc.py).
+# Not used by any figure in this twin for now.
+df_track$evi_post_mean <- rowMeans(evi)
+evi_hdi <- t(apply(evi, 1, hdi, 0.90))
+df_track$evi_post_lo <- evi_hdi[, 1]
+df_track$evi_post_hi <- evi_hdi[, 2]
+df_track$evi_logb_gt0 <- rowMeans(logB > 0)
+# Display name shared with the Python twin.
+EV_LABEL <- "Posterior directedness"
 # The maps' source joins by per-tag step index; join by (tag,time) here to
 # avoid shifting probabilities at rows removed from the modeling table.
 key <- function(tag, time) paste(tag, sprintf("%.12f", time), sep = ":")
 stopifnot(!anyDuplicated(key(track_w_treat$tag, track_w_treat$time)))
 track_w_treat$p_pg <- NA_real_
+track_w_treat$p_ev <- NA_real_
 j <- match(key(track_w_treat$tag, track_w_treat$time), key(df_track$tag, df_track$time))
 ok <- !is.na(j)
-if (!any(ok)) stop("p_goal overlay: no map points matched the modeling table (key-format bug?)")
+if (!any(ok)) stop("evidence overlay: no map points matched the modeling table (key-format bug?)")
 track_w_treat$p_pg[ok] <- df_track$p_goal_post_mean[j[ok]]
-cat("p_goal overlay: ", sum(ok), " of ", length(j), " map points matched the modeling table\n")
-segs_pg <- segments_3857(track_w_treat, pcol = "p_pg")
+track_w_treat$p_ev[ok] <- df_track$evi_post_mean[j[ok]]
+cat("probability/evidence overlay: ", sum(ok), " of ", length(j),
+  " map points matched the modeling table\n")
+segs_pg <- segments_3857(track_w_treat, pcol = "p_ev")
 segs_pg <- segs_pg[is.finite(segs_pg$p), , drop = FALSE]
 segs_pg$p <- pmin(1, pmax(0, segs_pg$p))
 ext_pg <- map_extent(c(list(seg_bounds(segs_pg)), site_bounds), pad = 0.06)
@@ -2958,10 +3014,12 @@ ext_pg <- map_extent(c(list(seg_bounds(segs_pg)), site_bounds), pad = 0.06)
 
 ```{r}
 #| cell-id: "goldshtein-bats-087"
-# Tracks colored by the per-step goal-directed probability (viridis),
-# one panel per treatment on light CartoDB Positron tiles with colored
-# panel borders, scale + compass on the rightmost panel, a thin right-
-# side colourbar and the bottom figure legend - the Python p_goal twin.
+# Tracks colored by each step's posterior directedness (the existing
+# viridis scale and fixed 0-1 limits are unchanged; only the encoded
+# quantity and the labels change), one panel per treatment on light
+# CartoDB Positron tiles with colored panel borders, scale + compass on
+# the rightmost panel, a thin right-side colourbar and the bottom figure
+# legend - the Python directional-evidence twin.
 bm_pg <- basemap_panel_img(ext_pg["xmin"], ext_pg["ymin"],
   ext_pg["xmax"], ext_pg["ymax"], "light_all", 15, "#fafaf8")
 # The equal-aspect subplot boxes of the 8x6 figure are ~1.67 x 5.58 in.
@@ -3000,7 +3058,7 @@ p_pg_4 <- panel_pg("4", treatment_colors_cb["4"])
 p_pg_4 <- add_scale_compass(p_pg_4, xlim_pg, ylim_pg,
   variant = "pgoal", panel_w_in = 1.48, panel_h_in = 4.95)
 # Thin vertical colourbar (Python: figure axes [0.922, 0.20, 0.012,
-# 0.62], label "Directed-component probability").
+# 0.62], label EV_LABEL).
 pb <- seq_len(240)
 cbar_rows <- data.frame(x = 0.30, y = 0.19 + 0.62 * (pb - 0.5) / 240,
   v = (pb - 0.5) / 240)
@@ -3019,7 +3077,7 @@ for (v in seq(0, 1, by = 0.2)) {
 }
 p_cbar <- p_cbar +
   annotate("text", x = 1.10, y = 0.5,
-    label = "Directed-component probability", size = 2.8, angle = 90,
+    label = EV_LABEL, size = 2.8, angle = 90,
     hjust = 0.5, vjust = 0.5) +
   theme_void() +
   guides(fill = "none")
@@ -3033,15 +3091,17 @@ p_probability_map <- p_prob_top | p_cbar
 p_probability_map <- p_probability_map +
   plot_layout(widths = c(1, 0.09)) +
   theme(plot.margin = margin(1, 1, 1, 1))
-save_figure(p_probability_map, "treatment_panels_tracks_pgoal", width = 8, height = 6)
+save_figure(p_probability_map, "treatment_panels_tracks_posterior_directedness", width = 8, height = 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-088"
-# Compact p_goal tracks: smaller figure, the same four treatment panels,
-# a wide horizontal colourbar below (no legend) - the Python
-# small-fig / bigger-font p_goal twin.
+# Compact directional-evidence tracks: smaller figure, the same four
+# treatment panels, a wide horizontal colourbar below (no legend) - the
+# Python small-fig / bigger-font directional-evidence twin. The existing
+# viridis scale and 0-1 limits are unchanged; only the encoded quantity
+# and the labels change.
 ae_pg_s <- aspect_extent(bm_pg, 1.34 / 3.59)
 xlim_pg_s <- ae_pg_s$xlim; ylim_pg_s <- ae_pg_s$ylim
 r_roost_ps <- marker_radius_m(105, 1.34, diff(xlim_pg_s))
@@ -3094,7 +3154,7 @@ for (v in seq(0, 1, by = 0.2)) {
 }
 p_cbar_h <- p_cbar_h +
   annotate("text", x = 0.5, y = 0.05,
-    label = "Directed-component probability", size = 2.8, hjust = 0.5,
+    label = EV_LABEL, size = 2.8, hjust = 0.5,
     vjust = 0) +
   theme_void() +
   guides(fill = "none")
@@ -3102,28 +3162,29 @@ p_prob_top_s <- (p_pgs_1 | p_pgs_2 | p_pgs_3 | p_pgs_4) / p_cbar_h
 p_prob_top_s <- p_prob_top_s + plot_layout(heights = c(1, 0.15))
 p_probability_map_small <- p_prob_top_s +
   theme(plot.margin = margin(1, 1, 1, 1))
-save_figure(p_probability_map_small, "treatment_panels_tracks_pgoal_small_bigfont",
+save_figure(p_probability_map_small, "treatment_panels_tracks_posterior_directedness_small_bigfont",
   width = 5.6, height = 4.2)
 
 ```
 
-### From exploratory movement to more directed travel
+### How does posterior directedness vary along the track?
 
-The progression curves ask whether goal-directed probability changes systematically along the recorded flight. One view uses distance to the destination; the other works backward from the recorded endpoint along the route. The second view is useful because a winding route can have substantial travel remaining even when it is geographically close to its goal.
+The curves smooth the per-draw posterior-directedness scores (see above) along each animal's observations. One horizontal axis describes distance to the destination: point distance for the roost, and distance along the local approach-field ray for the lake. This quantity differs from the length of the remaining recorded route.
 
-The saved curves generally show lower directed probabilities earlier in the retained flights and higher probabilities near their endpoints. This is consistent with search-like movement giving way to more goal-oriented travel, while leaving substantial variation among animals. The pattern is obtained from the full bearings without first selecting a homing phase using straightness.
+The other axis, labeled cumulative path distance from the end, counts retained-heading intervals backward from the last retained heading and multiplies by 60 m. It provides an approximate progress coordinate. Missing or excluded rows and tracking gaps mean it should not be treated as exact cumulative distance, elapsed time, or distance to an identified decision event.
 
-Distance and flight progress are not predictors in the fitted mixture. These are post-hoc summaries of the probabilities assigned to the observed bearings. The model therefore describes a change in the directional pattern without estimating a common localization time or a state-transition process.
+Each animal's curve is limited to the region supported by its observations. Population curves average the contributing animal curves equally at each position and are shown only where at least two animals contribute. The population average is then smoothed across neighboring positions. The set of contributing bats can therefore change along the horizontal axis. Posterior means and pointwise 90% intervals of the per-draw scores describe uncertainty carried through the smoothing calculation; they do not include uncertainty from sampling new bats or choosing a different smoothing scale.
 
-The destination-distance axis uses point distance for the roost and distance along the local approach-field ray for the lake. The coordinate labelled cumulative path distance from the end counts retained-bearing intervals backward and multiplies by 60 m. It approximates progress along the retained route; gaps and excluded rows prevent it from being an exact measure of path length or elapsed time.
-
-Curves are smoothed within bats, then averaged with equal weights over the animals contributing at each position. The population curve is displayed where at least two animals contribute and receives additional smoothing. Consequently, the contributing bats can change along the axis. Its 95% posterior bands carry uncertainty through that calculation, rather than describing how variable an entirely new sample of bats would be.
+The saved curves generally show higher posterior directedness closer to the end of the retained records, with substantial differences among treatments and animals. This is a descriptive pattern in observed headings. It does not establish a common recognition point, a monotonic change for every bat, or a fitted effect of distance on the mixture weight or on the component densities.
 
 
 ```{r}
 #| cell-id: "goldshtein-bats-090"
 # Gaussian smoothing per tag, equal-tag averaging per posterior draw,
-# range/weight truncation, and weighted population post-smoothing.
+# range/weight truncation, and weighted population post-smoothing. The
+# draws matrix (per-step scores, [rows x draws]) is a parameter so the
+# same machinery serves the directional-evidence view (default below)
+# and the original directed-component probability view (pass resp).
 smooth_population <- function(draws, grid, counts, bandwidth = 240) {
   spacing <- median(diff(grid))
   sigma <- bandwidth / spacing
@@ -3142,15 +3203,15 @@ smooth_population <- function(draws, grid, counts, bandwidth = 240) {
   }
   out
 }
-summarize_curve <- function(curve, grid, treatment, tag = NA_character_) {
+summarize_curve <- function(curve, grid, treatment, tag = NA_character_, hdi_prob = 0.95) {
   valid <- rowSums(is.finite(curve)) == ncol(curve)
   if (!any(valid)) return(NULL)
   z <- curve[valid, , drop = FALSE]
-  bounds <- t(apply(z, 1, hdi))
+  bounds <- t(apply(z, 1, hdi, hdi_prob))
   data.frame(x = grid[valid], mean = rowMeans(z), low = bounds[, 1], high = bounds[, 2],
     treatment = treatment, tag = tag)
 }
-make_curves <- function(kind) {
+make_curves <- function(kind, draws, hdi_prob = 0.95) {
   x <- df_track$dist_to_dest_grad_m
   if (kind == "steps_from_end") {
     x <- ave(seq_len(nrow(df_track)), df_track$tag,
@@ -3162,7 +3223,7 @@ make_curves <- function(kind) {
     eligible <- which(df_track$treatment == t & is.finite(x))
     if (kind == "steps_from_end") eligible <- eligible[x[eligible] >= -110 * 60]
     grid <- seq(min(x[eligible]), max(x[eligible]), length.out = G)
-    total <- matrix(0, G, ncol(resp))
+    total <- matrix(0, G, ncol(draws))
     counts <- numeric(G)
     tags <- split(eligible, droplevels(df_track$tag[eligible]))
     for (tag in names(tags)) {
@@ -3171,13 +3232,13 @@ make_curves <- function(kind) {
       # Explicit [grid x observations] kernel, [grid x draws] prediction.
       weights <- exp(-0.5 * (outer(grid, x[ii], "-") / 120)^2)
       denominator <- rowSums(weights) + 1e-12
-      curve <- (weights %*% resp[ii, , drop = FALSE]) / denominator
+      curve <- (weights %*% draws[ii, , drop = FALSE]) / denominator
       valid <- grid >= min(x[ii]) & grid <= max(x[ii]) &
         denominator >= 0.01 * max(denominator)
       total[valid, ] <- total[valid, , drop = FALSE] + curve[valid, , drop = FALSE]
       counts[valid] <- counts[valid] + 1L
       curve[!valid, ] <- NA_real_
-      individual[[paste(t, tag)]] <- summarize_curve(curve, grid, t, tag)
+      individual[[paste(t, tag)]] <- summarize_curve(curve, grid, t, tag, hdi_prob)
     }
     curve <- total / pmax(counts, 1)
     curve[counts < 2L, ] <- NA_real_
@@ -3185,12 +3246,15 @@ make_curves <- function(kind) {
     support[counts < 2L] <- 0
     curve <- smooth_population(curve, grid, support, bandwidth = 240)
     curve[counts < 2L, ] <- NA_real_
-    population[[t]] <- summarize_curve(curve, grid, t)
+    population[[t]] <- summarize_curve(curve, grid, t, hdi_prob)
   }
   list(population = do.call(rbind, population), individual = do.call(rbind, individual))
 }
-distance_curves <- make_curves("distance")
-end_curves <- make_curves("steps_from_end")
+# View: posterior directedness, per-draw 90% intervals (see section above).
+# The original directed-component probability curves are the same calls
+# with draws = resp (default hdi_prob 0.95).
+distance_curves <- make_curves("distance", evi, hdi_prob = 0.90)
+end_curves <- make_curves("steps_from_end", evi, hdi_prob = 0.90)
 # Full-size twin (Python plot_population_curve_smooth): colorblind bands
 # + lines, dashed 0.5 reference, boxed right legend with formatted
 # treatment names, y on [0, 1].
@@ -3211,7 +3275,7 @@ curve_plot_full <- function(curves, reverse = FALSE) {
       labels = function(v) sprintf("%.1f", v), expand = c(0, 0.02)) +
     guides(fill = "none") +
     labs(x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
-      y = "Mean directed-component probability") +
+      y = "Mean posterior directedness") +
     theme_classic(base_size = 9) +
     theme(legend.position = "right",
       legend.background = element_rect(fill = "white", colour = "grey30"),
@@ -3243,7 +3307,7 @@ curve_plot_compact <- function(curves, reverse = FALSE) {
     scale_y_continuous(limits = c(0, 1), expand = c(0, 0.02)) +
     guides(colour = "none", fill = "none") +
     labs(x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
-      y = "Directed-component\nprobability") +
+      y = "Posterior\ndirectedness") +
     theme_classic(base_size = 7) +
     theme(legend.position = "none")
   if (reverse) {
@@ -3274,7 +3338,7 @@ tag_curve_plot <- function(curves, reverse = FALSE) {
         labels = function(v) sprintf("%.1f", v), expand = c(0, 0)) +
       labs(title = treatment_nice[[t]],
         x = if (reverse) "Distance to destination (m)" else "Cumulative path distance from end (m)",
-        y = if (k == 1L || k == 3L) "Directed-component probability" else "") +
+        y = if (k == 1L || k == 3L) "Posterior directedness" else "") +
       theme_classic(base_size = 8) +
       theme(plot.title = element_text(size = 9, hjust = 0.5),
         axis.text.y = if (k %% 2L == 0L) element_blank() else element_text())
@@ -3299,41 +3363,41 @@ p_tag_end <- tag_curve_plot(end_curves)
 
 ```{r}
 #| cell-id: "goldshtein-bats-091"
-save_figure(p_curve_distance, "p_goal_pop_kernel_distance_TRUNC_SMOOTH", 4.4, 2.6)
+save_figure(p_curve_distance, "posterior_directedness_pop_kernel_distance_TRUNC_SMOOTH", 4.4, 2.6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-092"
-save_figure(p_curve_end, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH", 4.4, 2.6)
+save_figure(p_curve_end, "posterior_directedness_pop_kernel_distFromEndM_TRUNC_SMOOTH", 4.4, 2.6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-093"
-save_figure(p_curve_distance_c, "p_goal_pop_kernel_distance_TRUNC_SMOOTH_compact", 3.4, 1.2)
+save_figure(p_curve_distance_c, "posterior_directedness_pop_kernel_distance_TRUNC_SMOOTH_compact", 3.4, 1.2)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-094"
-save_figure(p_curve_end_c, "p_goal_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact", 3.4, 1.2)
+save_figure(p_curve_end_c, "posterior_directedness_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact", 3.4, 1.2)
 
 ```
 
-The individual curves show why the population pattern should not be read as a single timetable for homing. Some bats have high directed probabilities over most of the retained route; others show extended lower-probability stretches or fluctuations between them. Compare those patterns over the part of the route each bat actually supplies, with the uncertainty bands in view.
+The individual panels show how varied those patterns are. Some animals show sustained posterior directedness across most of their retained headings, while others show fluctuating values or extended low-evidence stretches. Compare each curve only over the range supported by that animal's observations and read its uncertainty together with the number and distribution of headings.
 
 
 
 ```{r}
 #| cell-id: "goldshtein-bats-096"
-save_figure(p_tag_distance, "p_goal_tag_kernel_distance_faceted_TRUNC", 8, 6)
+save_figure(p_tag_distance, "posterior_directedness_tag_kernel_distance_faceted_TRUNC", 8, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-097"
-save_figure(p_tag_end, "p_goal_tag_kernel_distFromEndM_faceted_TRUNC", 8, 6)
+save_figure(p_tag_end, "posterior_directedness_tag_kernel_distFromEndM_faceted_TRUNC", 8, 6)
 
 ```
 
