@@ -101,6 +101,30 @@ def _save(fig, save, save_path, transparent=False, dpi=300):
 #: component densities, baseline weight removed; 0.5 = equal)
 EVIDENCE_LABEL = "Posterior directedness"
 
+# ------------------------------------------------------------------
+# Diverging colormaps for the 0-1 posterior-directedness score: purple
+# (undirected-leaning) -> midpoint (0.5 = equal support) -> orange
+# (directed-leaning). The light variant uses a black midpoint for light
+# figure backgrounds; the dark variant uses a white midpoint for dark
+# backgrounds. End anchors are the dark ends of the d3 purple-orange
+# (PuOr) diverging scheme, so the pair stays colour-blind distinguishable.
+DIRECTEDNESS_CMAP_LIGHT = "directedness_light"
+DIRECTEDNESS_CMAP_DARK = "directedness_dark"
+_DIRECTEDNESS_PURPLE = "#7E2F8E"
+_DIRECTEDNESS_ORANGE = "#FC8D59"
+
+
+def _register_directedness_diverging(name, midpoint_rgb):
+    cmap = mpl.colors.LinearSegmentedColormap.from_list(
+        name,
+        [(0.0, _DIRECTEDNESS_PURPLE), (0.5, midpoint_rgb), (1.0, _DIRECTEDNESS_ORANGE)],
+    )
+    mpl.colormaps.register(cmap=cmap, name=name)
+
+
+_register_directedness_diverging(DIRECTEDNESS_CMAP_LIGHT, "black")
+_register_directedness_diverging(DIRECTEDNESS_CMAP_DARK, "white")
+
 
 # ------------------------------------------------------------------ anchors
 #: map anchors and the Web Mercator EPSG for every basemap figure
@@ -4058,6 +4082,11 @@ def plot_tracks_pgoal_viridis(
     # colorbar name of the encoded per-step score (default keeps the
     # original directed-component probability figure unchanged)
     cbar_label="Directed-component probability",
+    # score colormap name (default "viridis" keeps the original
+    # directed-component probability figure unchanged; the directedness
+    # figures pass DIRECTEDNESS_CMAP_LIGHT on light figure backgrounds and
+    # DIRECTEDNESS_CMAP_DARK on dark ones)
+    cmap="viridis",
     save: bool = True,
     save_path=None,
 ):
@@ -4155,7 +4184,7 @@ def plot_tracks_pgoal_viridis(
     fig, axes = plt.subplots(nrows, ncols, figsize=(fig_w, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI)
     axes = np.atleast_1d(axes).ravel()
 
-    cmap = mpl.colormaps.get_cmap("viridis")
+    cmap = mpl.colormaps.get_cmap(cmap)
     norm = mcolors.Normalize(vmin=0.0, vmax=1.0)
 
     if gap_lw is None:
@@ -4471,6 +4500,11 @@ def plot_tracks_pgoal_small_bigfont(
     # colorbar name of the encoded per-step score (default keeps the
     # original directed-component probability figure unchanged)
     cbar_label="Directed-component probability",
+    # score colormap name (default "viridis" keeps the original
+    # directed-component probability figure unchanged; the directedness
+    # figures pass DIRECTEDNESS_CMAP_LIGHT on light figure backgrounds and
+    # DIRECTEDNESS_CMAP_DARK on dark ones)
+    cmap="viridis",
     pdf_raster_dpi=300,            # dpi for rasterized track layers in PDF
     svg_raster_dpi=600,  # raster dpi of a saved SVG export
     save: bool = True,
@@ -4559,7 +4593,7 @@ def plot_tracks_pgoal_small_bigfont(
     fig, axes = plt.subplots(nrows, ncols, figsize=(fig_w, fig_h), dpi=DPI)
     axes = np.atleast_1d(axes).ravel()
 
-    cmap = mpl.colormaps.get_cmap("viridis")
+    cmap = mpl.colormaps.get_cmap(cmap)
     norm = mcolors.Normalize(vmin=0.0, vmax=1.0)
 
     if gap_lw is None:

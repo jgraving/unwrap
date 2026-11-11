@@ -127,3 +127,70 @@ def test_candidate_onset_toward_goal_fraction():
     assert row["toward_goal_frac"] == 1.0
     assert row["mean_support"] == pytest.approx(0.9)
     assert bool(row["at_boundary"]) is True
+
+
+# -- the posterior-directedness diverging colormaps -----------------
+import importlib as _importlib  # noqa: E402
+
+
+def _load_plots():
+    for dep in ("geopandas", "contextily", "pyproj", "seaborn",
+                "matplotlib", "arviz", "joblib", "tqdm"):
+        pytest.importorskip(dep)
+    if str(_NOTEBOOKS) not in sys.path:
+        sys.path.insert(0, str(_NOTEBOOKS))
+    spec = importlib.util.spec_from_file_location(
+        "goldshtein_bats_plots_under_test",
+        _NOTEBOOKS / "goldshtein_bats_plots.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+plots_mod = _load_plots()
+
+
+def _rgb(cmap, t):
+    import matplotlib
+
+    a = np.asarray(cmap(t), dtype=float)
+    return a[:3]
+
+
+def test_directedness_colormaps_registered():
+    import matplotlib
+
+    for name, midpoint in ((plots_mod.DIRECTEDNESS_CMAP_LIGHT, "black"),
+                           (plots_mod.DIRECTEDNESS_CMAP_DARK, "white")):
+        cmap = matplotlib.colormaps.get_cmap(name)
+        purple, orange = _rgb(cmap, 0.0), _rgb(cmap, 1.0)
+        # end anchors: the dark ends of the d3 purple-orange scheme
+        assert np.allclose(purple, np.array([0x7E, 0x2F, 0x8E]) / 255, atol=0.01)
+        assert np.allclose(orange, np.array([0xFC, 0x8D, 0x59]) / 255, atol=0.01)
+        mid = _rgb(cmap, 0.5)
+        want = np.zeros(3) if midpoint == "black" else np.ones(3)
+        assert np.allclose(mid, want, atol=0.05), mid
+
+
+def test_directedness_colormaps_diverge_at_half():
+    import matplotlib
+
+    purple = np.array([0x7E, 0x2F, 0x8E]) / 255
+    orange = np.array([0xFC, 0x8D, 0x59]) / 255
+    for name, mid in ((plots_mod.DIRECTEDNESS_CMAP_LIGHT, np.zeros(3)),
+                      (plots_mod.DIRECTEDNESS_CMAP_DARK, np.ones(3))):
+        cmap = matplotlib.colormaps.get_cmap(name)
+        # each half is a straight RGB ramp: the quarter stops sit at the
+        # exact midpoints of (anchor, endpoint)
+        assert np.allclose(_rgb(cmap, 0.25), (purple + mid) / 2, atol=0.02)
+        assert np.allclose(_rgb(cmap, 0.75), (mid + orange) / 2, atol=0.02)
+
+
+def test_track_map_functions_default_to_viridis():
+    import inspect
+
+    for fn in (plots_mod.plot_tracks_pgoal_viridis,
+               plots_mod.plot_tracks_pgoal_small_bigfont):
+        params = inspect.signature(fn).parameters
+        assert params["cmap"].default == "viridis"

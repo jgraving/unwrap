@@ -2992,6 +2992,15 @@ df_track$evi_post_hi <- evi_hdi[, 2]
 df_track$evi_logb_gt0 <- rowMeans(logB > 0)
 # Display name shared with the Python twin.
 EV_LABEL <- "Posterior directedness"
+# Diverging colourbars for the 0-1 posterior-directedness score (same
+# anchors as the Python twin's directedness_light / directedness_dark
+# colormaps): purple -> midpoint (0.5, equal support) -> orange. The
+# light variant (black midpoint) matches the light figure backgrounds
+# used below; the dark variant (white midpoint) is for dark
+# backgrounds. With three colours, gradientn places the midpoint
+# exactly at 0.5 of the fixed 0-1 limits.
+EVI_PAL_LIGHT <- c("#7E2F8E", "#000000", "#FC8D59")
+EVI_PAL_DARK <- c("#7E2F8E", "#FFFFFF", "#FC8D59")
 # The maps' source joins by per-tag step index; join by (tag,time) here to
 # avoid shifting probabilities at rows removed from the modeling table.
 key <- function(tag, time) paste(tag, sprintf("%.12f", time), sep = ":")
@@ -3014,9 +3023,10 @@ ext_pg <- map_extent(c(list(seg_bounds(segs_pg)), site_bounds), pad = 0.06)
 
 ```{r}
 #| cell-id: "goldshtein-bats-087"
-# Tracks colored by each step's posterior directedness (the existing
-# viridis scale and fixed 0-1 limits are unchanged; only the encoded
-# quantity and the labels change), one panel per treatment on light
+# Tracks colored by each step's posterior directedness (diverging
+# purple-black-orange scale on the light background, midpoint 0.5 =
+# equal support; the dark-background twin uses EVI_PAL_DARK, purple-
+# white-orange), fixed 0-1 limits, one panel per treatment on light
 # CartoDB Positron tiles with colored panel borders, scale + compass on
 # the rightmost panel, a thin right-side colourbar and the bottom figure
 # legend - the Python directional-evidence twin.
@@ -3041,7 +3051,7 @@ panel_pg <- function(tt, border_col) {
     geom_segment(data = sd[!sd$gap, ], inherit.aes = FALSE,
       aes(x = x, y = y, xend = xend, yend = yend, colour = p),
       linewidth = 1.0 * 0.3528, alpha = 0.92) +
-    scale_colour_viridis_c(limits = c(0, 1)) +
+    scale_colour_gradientn(colours = EVI_PAL_LIGHT, limits = c(0, 1)) +
     guides(colour = "none") +
     add_roost_marker(r_roost_p) +
     add_x_markers(TRANS_XY, r_trans_p) +
@@ -3064,7 +3074,7 @@ cbar_rows <- data.frame(x = 0.30, y = 0.19 + 0.62 * (pb - 0.5) / 240,
   v = (pb - 0.5) / 240)
 p_cbar <- ggplot(cbar_rows, aes(x, y, fill = v)) +
   geom_tile(width = 0.13, height = 0.62 / 240) +
-  scale_fill_viridis_c(limits = c(0, 1)) +
+  scale_fill_gradientn(colours = EVI_PAL_LIGHT, limits = c(0, 1)) +
   scale_x_continuous(limits = c(0, 1.35), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0))
 for (v in seq(0, 1, by = 0.2)) {
@@ -3099,9 +3109,9 @@ save_figure(p_probability_map, "treatment_panels_tracks_posterior_directedness",
 #| cell-id: "goldshtein-bats-088"
 # Compact directional-evidence tracks: smaller figure, the same four
 # treatment panels, a wide horizontal colourbar below (no legend) - the
-# Python small-fig / bigger-font directional-evidence twin. The existing
-# viridis scale and 0-1 limits are unchanged; only the encoded quantity
-# and the labels change.
+# Python small-fig / bigger-font directional-evidence twin. The
+# existing diverging purple-black-orange (light-background) scale and
+# the 0-1 limits match the full-size map.
 ae_pg_s <- aspect_extent(bm_pg, 1.34 / 3.59)
 xlim_pg_s <- ae_pg_s$xlim; ylim_pg_s <- ae_pg_s$ylim
 r_roost_ps <- marker_radius_m(105, 1.34, diff(xlim_pg_s))
@@ -3118,7 +3128,7 @@ panel_pg_s <- function(tt, border_col) {
     geom_segment(data = sd[!sd$gap, ], inherit.aes = FALSE,
       aes(x = x, y = y, xend = xend, yend = yend, colour = p),
       linewidth = 0.8 * 0.3528, alpha = 0.90) +
-    scale_colour_viridis_c(limits = c(0, 1)) +
+    scale_colour_gradientn(colours = EVI_PAL_LIGHT, limits = c(0, 1)) +
     guides(colour = "none") +
     add_roost_marker(r_roost_ps) +
     add_x_markers(TRANS_XY, r_trans_ps) +
@@ -3141,7 +3151,7 @@ cbar_h_rows <- data.frame(x = 0.20 + 0.60 * (pb - 0.5) / 240, y = 0.62,
   v = (pb - 0.5) / 240)
 p_cbar_h <- ggplot(cbar_h_rows, aes(x, y, fill = v)) +
   geom_tile(width = 0.60 / 240, height = 0.24) +
-  scale_fill_viridis_c(limits = c(0, 1)) +
+  scale_fill_gradientn(colours = EVI_PAL_LIGHT, limits = c(0, 1)) +
   scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0))
 for (v in seq(0, 1, by = 0.2)) {
