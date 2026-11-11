@@ -16,15 +16,18 @@ Snapshots
 ---------
 A fit named ``name`` is stored as two files:
 
-* ``<name>.pkl``       pickled xarray ``DataTree`` (the whole object,
-                       including ``log_likelihood`` when it was requested;
-                       in slim snapshots the variables listed under
-                       ``extra["stripped"]`` are absent and recomputed
-                       from the stored draws on load)
-* ``<name>.meta.json``  sha256 of the pickle plus validation metadata:
-                       the posterior variable list and shapes, and the
-                       caller-supplied fit parameters (seed, tune, draws,
-                       model id, library versions).
+* ``<name>.nc``         the xarray ``DataTree`` in the netCDF format the
+                        array package natively saves and loads
+                        (``DataTree.to_netcdf`` / ``xarray.open_datatree``,
+                        a netCDF-4 file): the whole object, including
+                        ``log_likelihood`` when it was requested; in slim
+                        snapshots the variables listed under
+                        ``extra["stripped"]`` are absent and recomputed
+                        from the stored draws on load
+* ``<name>.meta.json``  sha256 of the netCDF file plus validation
+                       metadata: the posterior variable list and shapes,
+                       and the caller-supplied fit parameters (seed, tune,
+                       draws, model id, library versions).
 
 A snapshot is reused only when the sha256 matches and every caller-supplied
 metadata value equals the stored one; any mismatch refits and overwrites
@@ -36,8 +39,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import pickle
 from pathlib import Path
+
+import xarray
 
 __all__ = ["CacheMismatch", "enabled", "cache_dir", "load_or_fit"]
 
@@ -66,7 +70,7 @@ def cache_dir() -> Path:
 
 def _snapshot_files(name: str):
     root = cache_dir() / name
-    return root.with_suffix(".pkl"), root.with_suffix(".meta.json")
+    return root.with_suffix(".nc"), root.with_suffix(".meta.json")
 
 
 def _digest(blob: bytes) -> str:
@@ -90,21 +94,21 @@ def load_snapshot(name: str, *, expect: dict | None = None):
     Raises ``FileNotFoundError`` (nothing saved) or ``CacheMismatch``
     (corrupted or stale snapshot).
     """
-    pkl, meta_path = _snapshot_files(name)
-    if not (pkl.exists() and meta_path.exists()):
+    snap, meta_path = _snapshot_files(name)
+    if not (snap.exists() and meta_path.exists()):
         raise FileNotFoundError(
             f"no saved fit snapshot for '{name}' in {cache_dir()}"
         )
     info = json.loads(meta_path.read_text())
-    blob = pkl.read_bytes()
+    blob = snap.read_bytes()
     if info.get("sha256") != _digest(blob):
-        raise CacheMismatch(f"snapshot '{name}': pickle sha256 does not match the metadata")
+        raise CacheMismatch(f"snapshot '{name}': netCDF file sha256 does not match the metadata")
     if expect:
         stored = info.get("extra", {})
         bad = {k: (stored.get(k), v) for k, v in expect.items() if stored.get(k) != v}
         if bad:
             raise CacheMismatch(f"snapshot '{name}': fit metadata mismatch {bad}")
-    obj = pickle.loads(blob)
+    obj = xarray.open_datatree(snap).load()
     if _describe(obj) != {k: info[k] for k in
                           ("n_posterior_vars", "posterior_vars", "posterior_shapes")}:
         raise CacheMismatch(f"snapshot '{name}': posterior layout does not match the metadata")
@@ -112,10 +116,10 @@ def load_snapshot(name: str, *, expect: dict | None = None):
 
 
 def save_snapshot(name: str, idata, *, meta: dict | None = None) -> None:
-    pkl, meta_path = _snapshot_files(name)
-    pkl.parent.mkdir(parents=True, exist_ok=True)
-    blob = pickle.dumps(idata, protocol=4)
-    pkl.write_bytes(blob)
+    snap, meta_path = _snapshot_files(name)
+    snap.parent.mkdir(parents=True, exist_ok=True)
+    idata.to_netcdf(snap)
+    blob = snap.read_bytes()
     info = _describe(idata)
     info["sha256"] = _digest(blob)
     info["extra"] = dict(meta or {})
@@ -133,8 +137,6 @@ def slim_snapshot(idata, *, drop_groups=(), drop_posterior=()):
     Only strips what is actually present; other groups and variables pass
     through untouched.
     """
-    import xarray
-
     drop_groups = {g for g in drop_groups if g in idata.children}
     drop_posterior = set(drop_posterior)
 
@@ -172,11 +174,11 @@ def load_or_fit(name: str, fit_fn, *, meta: dict | None = None,
     pick = pick or (lambda r: r)
     try:
         obj = load_snapshot(name, expect=meta)
-        print(f"FIT-CACHE hit: {lbl} <- {(cache_dir() / name).with_suffix('.pkl')}")
+        print(f"FIT-CACHE hit: {lbl} <- {(cache_dir() / name).with_suffix('.nc')}")
         return obj
     except FileNotFoundError:
         print(f"FIT-CACHE miss: {lbl}; fitting now and saving "
-              f"{(cache_dir() / name).with_suffix('.pkl')}")
+              f"{(cache_dir() / name).with_suffix('.nc')}")
     except CacheMismatch as exc:
         print(f"FIT-CACHE mismatch ({exc}); refitting and overwriting the snapshot")
 
