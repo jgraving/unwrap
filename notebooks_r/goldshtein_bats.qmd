@@ -2910,7 +2910,7 @@ r_{ij}
 {\omega_i\,\mathcal M(\varepsilon_{ij}\mid\mu_i,\kappa_i)+(1-\omega_i)/(2\pi)}.
 $$
 
-This is the **posterior directed-component probability**. A bearing near the fitted directed peak raises its inferred probability of directed travel; a bearing in the broad background can lower it. The plotted quantity, `p_goal`, summarizes this probability across posterior draws.
+This is the **posterior directed-component probability**. A bearing near the fitted directed peak raises its inferred probability of directed travel; a bearing in the broad background can lower it. The trajectory figures below use posterior directedness, introduced next. This score compares the two component densities with equal prior weights, allowing the same kind of comparison across bats with different fitted mixture weights.
 
 The weight is constant within each bat, but the probability for an individual bearing changes with the observed angle. We infer it from the directional data and then place it back along the track. It is a model-based interpretation of movement, rather than a separately observed decision to begin homing or a probability of eventual arrival.
 
@@ -2926,7 +2926,7 @@ $$
   \frac{\mathcal M(y_{ij}\mid\mu_i,\kappa_i)}{1/(2\pi)},
 $$
 
-so the baseline-adjusted **posterior directedness** is the equal-prior component-density ratio. Evaluated per posterior draw, with the parameters of that draw kept together and the exact uniform-circle background (the additive constant $\log 2\pi$ cancels),
+Removing the baseline odds gives the component-density ratio $B_{ij}$. We express **posterior directedness** on a 0–1 scale as $E_{ij}=B_{ij}/(1+B_{ij})$, corresponding to equal prior weights for the two components. Evaluated per posterior draw, with the parameters of that draw kept together and the exact uniform-circle background (the additive constant $\log 2\pi$ cancels),
 
 $$
 E_{ij}
@@ -3407,4 +3407,4 @@ The bats retain a strong tendency to move toward their recorded goals across the
 
 Separating those contributions changes the treatment interpretation. Broad bearings across a whole flight can reflect exploration as well as reduced precision during directed travel. Once the undirected component is represented, the directed component can be more concentrated, but treatment contrasts become more uncertain. Pronounced differences between individual bats make it difficult to attribute the variation to a consistent treatment-wide change in goal-directedness or precision.
 
-The progression curves add a behavioral view of that result: directed probabilities generally rise toward the end of retained flights, consistent with searching giving way to more goal-oriented travel. Individual routes vary substantially around this pattern. Modeling the full usable bearings preserves that variation without selecting a homing subset using features that treatment might itself change.
+The progression curves generally show higher posterior directedness toward the end of retained flights: those bearings receive greater support from the directed component relative to the uniform component. This pattern is consistent with searching giving way to more goal-oriented travel. Individual routes vary substantially around this pattern. Modeling the full usable bearings preserves that variation without selecting a homing subset using features that treatment might itself change.
