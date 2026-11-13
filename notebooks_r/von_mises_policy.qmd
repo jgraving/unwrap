@@ -85,6 +85,11 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) {
 } else {
   stop("Run from notebooks_r/ or the repository root.")
 }
+# The shared helper library defines its Stan accumulator through brms::stanvar
+# at source time, so brms must be loaded before it (this notebook otherwise
+# only plots and does not fit a model).
+suppressPackageStartupMessages(library(brms))
+source(file.path(repo_root, "R", "unwrap_helpers.R"))
 source(file.path(repo_root, "notebooks_r", "von_mises_policy_plots.R"))
 
 ```
@@ -93,24 +98,7 @@ source(file.path(repo_root, "notebooks_r", "von_mises_policy_plots.R"))
 #| cell-id: "von-mises-policy-006"
 FIG_DIR <- file.path(repo_root, "figures", "von_mises_policy")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
-# Render PNGs for inline display; keep vector PDFs alongside them.
-
-show_figure <- function(plot, name, width, height, res = 110) {
-  file <- file.path(FIG_DIR, paste0(name, ".png"))
-  ragg::agg_png(file, width = width, height = height, units = "in",
-                res = res)
-  print(plot)
-  invisible(dev.off())
-  # Quarto renders the returned plot object natively; there is no
-  # display channel to write to outside Jupyter.
-  plot
-}
-
 theme_set(theme_minimal(base_size = 12))
-save_figure <- function(plot, name, width = 8, height = 5) {
-  ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot, width = width, height = height)
-  show_figure(plot, name, width, height)
-}
 
 ```
 
@@ -128,15 +116,9 @@ WARMUP <- if (quick_run) 1500L else 2000L
 
 ```{r}
 #| cell-id: "von-mises-policy-008"
-# Shared circular helpers for this study (the Python twin defines its
-# policy functions inline the same way): the wrap, the scalar von
-# Mises density, and the sampler calls used by the trajectory loop.
-wrap <- function(x) (x + pi) %% (2 * pi) - pi
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) - log(besselI(kappa, 0, expon.scaled = TRUE))
-}
-vmu <- function(m) circular::circular(
-    m, units = "radians", template = "none", modulo = "2pi")
+# The wrap, the scalar von Mises density, and the sampler convention come
+# from the shared helpers; this study's trajectory loop draws wrapped von
+# Mises angles through them.
 vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
 draw_vm <- function(mu, kappa) {
   wrap(as.numeric(circular::rvonmises(1, mu = vmu(mu), kappa = kappa,

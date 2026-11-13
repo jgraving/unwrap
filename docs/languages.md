@@ -56,7 +56,7 @@ development page).
 - [`R/unwrap_functions.R`](https://github.com/jgraving/unwrap/blob/main/R/unwrap_functions.R)
   adds circular summaries and analysis helpers on top of the family (it also
   loads `cmdstanr`); it is not required by the small example script.
-- [`R/Circular Dataset Structures.Rmd`](https://github.com/jgraving/unwrap/blob/main/R/Circular%20Dataset%20Structures.Rmd)
+- [`docs/Circular Dataset Structures.Rmd`](https://github.com/jgraving/unwrap/blob/main/docs/Circular%20Dataset%20Structures.Rmd)
   is the longer early analysis of circular dataset structures. Its
   dependencies and paths still need a reproducibility pass, so treat it as a
   reference for the intended approach rather than a ready-to-run script.

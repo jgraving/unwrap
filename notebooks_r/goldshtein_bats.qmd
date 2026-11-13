@@ -105,6 +105,7 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) {
 
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "R", "unwrap_helpers.R"))
 
 ```
 
@@ -113,7 +114,10 @@ source(file.path(repo_root, "R", "unwrap_functions.R"))
 FIG_DIR <- file.path(repo_root, "figures", "goldshtein_bats")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 # Render PNGs for inline display; keep vector PDFs alongside them.
-
+# save_figure comes from the shared helpers. show_figure is kept local
+# (overriding the shared copy) because this study's individual PPC grid is a
+# gtable with a hand-drawn legend row, which must be drawn through the grid
+# engine rather than print() - a plain print leaves the device blank.
 show_figure <- function(plot, name, width, height, res = 110) {
   file <- file.path(FIG_DIR, paste0(name, ".png"))
   ragg::agg_png(file, width = width, height = height, units = "in",
@@ -129,10 +133,6 @@ show_figure <- function(plot, name, width, height, res = 110) {
 }
 
 theme_set(theme_minimal(base_size = 12))
-save_figure <- function(plot, name, width = 8, height = 5) {
-  ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot, width = width, height = height)
-  show_figure(plot, name, width, height)
-}
 
 ```
 
@@ -157,36 +157,13 @@ WARMUP <- if (quick_run) 1500L else 2000L
 
 ```{r}
 #| cell-id: "goldshtein-bats-008"
-# Canonical modulo wrap [(-pi, pi), the same fmod form as the Python
-# twin's circular_modulo (post-hoc use only: summaries, plots, no sampler input).
-wrap <- function(x) (x + pi) %% (2 * pi) - pi
-circ_mean <- function(x) atan2(mean(sin(x)), mean(cos(x)))
-resultant <- function(x) Mod(mean(exp(1i * x)))
 softplus_stable <- function(x) pmax(x, 0) + log1p(exp(-abs(x)))
 log1p_exp <- softplus_stable
-A1_safe <- function(k) {
-  z <- besselI(k, 1, expon.scaled = TRUE) / besselI(k, 0, expon.scaled = TRUE)
-  if (!is.null(dim(k))) dim(z) <- dim(k)
-  z
-}
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) - log(besselI(kappa, 0, expon.scaled = TRUE))
-}
-hdi <- function(x, prob = 0.95) {
-  x <- sort(as.numeric(x))
-  stopifnot(length(x) > 1L, all(is.finite(x)))
-  gap <- min(length(x) - 1L, floor(prob * length(x)))
-  ii <- seq_len(length(x) - gap)
-  j <- ii[which.min(x[ii + gap] - x[ii])]
-  c(low = x[j], high = x[j + gap])
-}
 interval <- function(x, angular = FALSE, prob = 0.95) {
   m <- if (angular) circ_mean(x) else mean(x)
   z <- if (angular) m + wrap(x - m) else x
   c(mean = m, hdi(z, prob))
 }
-vmu <- function(m) circular::circular(
-    m, units = "radians", template = "none", modulo = "2pi")
 vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
 draw_vm <- function(mu, kappa) {
   wrap(as.numeric(circular::rvonmises(1, mu = vmu(mu), kappa = kappa,

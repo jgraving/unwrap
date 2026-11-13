@@ -84,26 +84,13 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) ".." else
     stop("Run this notebook from notebooks_r/ or from the repository root.")
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "R", "unwrap_helpers.R"))
 source(file.path(repo_root, "notebooks_r", "circular_regression_plots.R"))
 
 # The figure code writes to the repository-relative figures directory.
 FIG_DIR <- file.path(repo_root, "figures", "circular_regression")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 theme_set(theme_minimal(base_size = 12))
-
-# Without X11/cairo (most server R installs) the default device cannot
-# rasterise, so each figure renders to a PNG through ragg and displays
-# inline; a vector PDF is saved alongside as the portable copy.
-show_figure <- function(plot, name, width, height, res = 110) {
-  file <- file.path(FIG_DIR, paste0(name, ".png"))
-  ragg::agg_png(file, width = width, height = height, units = "in",
-                res = res)
-  print(plot)
-  invisible(dev.off())
-  # Quarto renders the returned plot object natively; there is no
-  # display channel to write to outside Jupyter.
-  plot
-}
 
 SEED <- 42
 # CI runs with shortened sampling (the committed outputs use the full
@@ -152,8 +139,6 @@ kappa_true <- softplus(2 + 0.5 * x)
 # circular 0.5.x samplers take scalar mu and kappa plus a control list;
 # draw on the default [0, 2*pi) domain and wrap back to the model's
 # (-pi, pi] convention. (These helpers are reused in the PPC cell below.)
-vmu <- function(m) circular::circular(
-    m, units = "radians", template = "none", modulo = "2pi")
 vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
 y <- vapply(
     seq_len(n_samples),
@@ -265,8 +250,6 @@ ess_values <- vapply(parameters, function(p) posterior::ess_bulk(draw_split[[p]]
 # Posterior summary. The intercept is circular, so its location is the
 # circular mean and its spread the circular standard deviation - the
 # R analogue of the Python tutorial's circular_summary().
-circ_mean <- function(a) atan2(mean(sin(a)), mean(cos(a)))
-circ_sd <- function(a, m) sqrt(-2 * log(Mod(mean(exp(1i * (a - m))))))
 m_int <- circ_mean(draws$b_Intercept)
 summary_frame <- data.frame(
     parameter = parameters,

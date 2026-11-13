@@ -95,26 +95,12 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) ".." else
     stop("Run this notebook from notebooks_r/ or from the repository root.")
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "R", "unwrap_helpers.R"))
 
 # The figure code writes to the repository-relative figures directory.
 FIG_DIR <- file.path(repo_root, "figures", "locust_density_order")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 theme_set(theme_minimal(base_size = 12))
-
-# Without X11/cairo (most server R installs) the default device cannot
-# rasterise, so each figure renders to a PNG through ragg and displays
-# inline; a vector PDF is saved alongside as the portable copy.
-show_figure <- function(plot, name, width, height, res = 110) {
-  file <- file.path(FIG_DIR, paste0(name, ".png"))
-  ragg::agg_png(file, width = width, height = height, units = "in",
-                res = res)
-  print(plot)
-  invisible(dev.off())
-  # Quarto renders the returned plot object natively; there is no
-  # display channel to write to outside Jupyter.
-  plot
-}
-
 
 SEED <- 123
 set.seed(SEED)
@@ -151,63 +137,7 @@ The analysis uses radians, while some figure labels express directions in degree
 
 ```{r}
 #| cell-id: "locust-density-order-05"
-circ_mean <- function(a) atan2(mean(sin(a)), mean(cos(a)))
-resultant <- function(a) Mod(mean(exp(1i * a)))
-circ_sd <- function(a, m = circ_mean(a)) {
-  sqrt(-2 * log(min(1, Mod(mean(exp(1i * (a - m)))))))
-}
-# Scaled Bessel functions avoid overflow when concentrations are large.
-A1_safe <- function(k) {
-  out <- besselI(k, 1, expon.scaled = TRUE) /
-    besselI(k, 0, expon.scaled = TRUE)
-  if (is.matrix(k)) dim(out) <- dim(k)
-  out
-}
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) -
-    log(besselI(kappa, 0, expon.scaled = TRUE))
-}
-hdi <- function(x, prob = 0.95) {
-  x <- sort(as.numeric(x))
-  stopifnot(length(x) > 1L, all(is.finite(x)))
-  gap <- min(length(x) - 1L, floor(prob * length(x)))
-  starts <- seq_len(length(x) - gap)
-  j <- starts[which.min(x[starts + gap] - x[starts])]
-  c(low = x[j], high = x[j + gap])
-}
-interval_row <- function(x, angular = FALSE, prob = 0.95) {
-  m <- if (angular) circ_mean(x) else mean(x)
-  # Unwrap angular intervals around their circular mean before drawing;
-  # display endpoints can lie just beyond +/-pi to avoid a false long arc.
-  z <- if (angular) m + mod_circular(x - m) else x
-  c(mean = m, hdi(z, prob))
-}
-inverse_A1 <- function(r) {
-  if (r <= 0) {
-    return(0)
-  }
-  if (r >= 1) {
-    return(Inf)
-  }
-  upper <- max(2, 1 / (1 - r))
-  uniroot(function(k) A1_safe(k) - r, c(0, upper), tol = 1e-9)$root
-}
-# Exact tutorial sampler convention: scalar mu/kappa, then wrap the draw.
-vmu <- function(m) circular::circular(
-    m, units = "radians", template = "none", modulo = "2pi")
 vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
-simulate_angles <- function(mu, kappa) {
-  stopifnot(is.matrix(mu), identical(dim(mu), dim(kappa)))
-  replicated <- matrix(0, nrow = nrow(mu), ncol = ncol(mu))
-  for (d in seq_len(nrow(mu))) {
-    for (i in seq_len(ncol(mu))) {
-      replicated[d, i] <- as.numeric(circular::rvonmises(1,
-        mu = vmu(mu[d, i]), kappa = kappa[d, i],
-        control.circular = vm_ctrl))
-    }
-  }
-  mod_circular(replicated)
-}
 save_figure <- function(plot, name, width = 8, height = 4) {
   # The base pdf device's code page cannot represent a few of the glyph
   # labels (superscript minus, mu, kappa): its conversion warnings are
@@ -224,24 +154,6 @@ save_figure <- function(plot, name, width = 8, height = 4) {
 # An existing checkout can be supplied through UNWRAP_DATA_ROOT.
 data_root <- Sys.getenv("UNWRAP_DATA_ROOT",
                         unset = file.path(repo_root, "unwrap-data"))
-ensure_data <- function(subdir) {
-  target <- file.path(data_root, subdir)
-  if (!dir.exists(target)) {
-    if (!dir.exists(data_root)) {
-      status <- system2("git", c("clone", "--depth", "1",
-        "--filter=blob:none", "--sparse",
-        "https://github.com/jgraving/unwrap-data.git", shQuote(data_root)))
-      if (status != 0L) stop("Could not fetch the published study data.")
-    }
-    # Sparse checkout downloads only this study; later notebooks may add
-    # their own subdirectory to the same checkout without replacing it.
-    status <- system2("git", c("-C", shQuote(data_root),
-                              "sparse-checkout", "add", subdir))
-    if (status != 0L) stop("Could not materialize the study subdirectory.")
-  }
-  stopifnot(dir.exists(target))
-  target
-}
 
 ```
 

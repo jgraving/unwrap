@@ -103,6 +103,7 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) {
 }
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "R", "unwrap_helpers.R"))
 ```
 
 ```{r}
@@ -114,27 +115,13 @@ dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 
 ```{r}
 #| cell-id: "locust-r-007"
-show_figure <- function(plot, name, width, height, res = 110) {
-  file <- file.path(FIG_DIR, paste0(name, ".png"))
-  ragg::agg_png(file, width = width, height = height, units = "in",
-                res = res)
-  print(plot)
-  invisible(dev.off())
-  # Quarto renders the returned plot object natively; there is no
-  # display channel to write to outside Jupyter.
-  plot
-}
+
 
 ```
 
 ```{r}
 #| cell-id: "locust-r-008"
 theme_set(theme_classic(base_size = 12))
-save_figure <- function(plot, name, width = 8, height = 5) {
-  ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
-         width = width, height = height)
-  show_figure(plot, name, width, height)
-}
 SEED <- 42L
 set.seed(SEED)
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
@@ -166,28 +153,12 @@ Orange identifies the two-component fit and blue the one-component fit in the co
 
 ```{r}
 #| cell-id: "locust-r-010"
-wrap <- function(x) (x + pi) %% (2 * pi) - pi
-circ_mean <- function(x) atan2(mean(sin(x)), mean(cos(x)))
-resultant <- function(x) Mod(mean(exp(1i * x)))
-softplus <- function(x) pmax(x, 0) + log1p(exp(-abs(x)))
-vm_logpdf <- function(y, mu, kappa) {
-  kappa * (cos(y - mu) - 1) - log(2 * pi) -
-    log(besselI(kappa, 0, expon.scaled = TRUE))
-}
 log_add <- function(a, b) {
   m <- pmax(a, b)
   m + log(exp(a - m) + exp(b - m))
 }
 A1_safe <- function(kappa) {
   besselI(kappa, 1, expon.scaled = TRUE) / besselI(kappa, 0, expon.scaled = TRUE)
-}
-hdi <- function(x, prob = 0.95) {
-  x <- sort(as.numeric(x))
-  stopifnot(length(x) > 1L, all(is.finite(x)))
-  gap <- min(length(x) - 1L, floor(prob * length(x)))
-  starts <- seq_len(length(x) - gap)
-  j <- starts[which.min(x[starts + gap] - x[starts])]
-  c(low = x[j], high = x[j + gap])
 }
 # Every prediction/density matrix in this notebook is [grid x draws].
 vm_grid <- function(theta, mu, kappa) {
@@ -272,24 +243,6 @@ The trajectory plots help relate those distributions back to movement. A populat
 #| cell-id: "locust-r-012"
 data_root <- Sys.getenv("UNWRAP_DATA_ROOT",
                         unset = file.path(repo_root, "unwrap-data"))
-ensure_data <- function(subdir) {
-  target <- file.path(data_root, subdir)
-  if (!dir.exists(target)) {
-    if (!dir.exists(data_root)) {
-      status <- system2("git", c("clone", "--depth", "1",
-        "--filter=blob:none", "--sparse",
-        "https://github.com/jgraving/unwrap-data.git", shQuote(data_root)))
-      if (status != 0L) stop("Could not fetch the published study data.")
-    }
-    # Sparse checkout downloads only this study; later notebooks may add
-    # their own subdirectory to the same checkout without replacing it.
-    status <- system2("git", c("-C", shQuote(data_root),
-                              "sparse-checkout", "add", subdir))
-    if (status != 0L) stop("Could not materialize the study subdirectory.")
-  }
-  stopifnot(dir.exists(target))
-  target
-}
 
 data_dir <- ensure_data("directional")
 files <- sort(list.files(data_dir, pattern = "[.]parquet$", full.names = TRUE), method = "radix")
