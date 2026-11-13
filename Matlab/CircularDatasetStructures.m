@@ -58,7 +58,7 @@ col.treat = hex2rgb('#006400'); % treatment observations
 
 %% Divergence from home direction
 %
-% <<../R/icons/ant.png>>
+% <<../docs/icons/ant.png>>
 %
 % _Desert ants of the genus Cataglyphis are known for their use of path
 % integration (dead reckoning) to return to their nest. Disruption of visual
@@ -169,7 +169,7 @@ fprintf('ELPD difference (expected at -15° - divergent): %s\n', elpdDiff(looTru
 
 %% Change in direction
 %
-% <<../R/icons/sandhopper.png>>
+% <<../docs/icons/sandhopper.png>>
 %
 % _Sandhoppers (Talitridae) forage along beaches, following the movement of
 % the sea to avoid drying out. Their movement is guided by celestial cues,
@@ -260,7 +260,7 @@ fprintf('ELPD difference (kappa delta - no delta): %s\n', elpdDiff(looKappaDelta
 
 %% Change in concentration
 %
-% <<../R/icons/honeybee.png>>
+% <<../docs/icons/honeybee.png>>
 %
 % _Honeybees performing a "waggle dance" on a horizontal observation hive that
 % view a green light-spot, orient their dances as if viewing the sun. The
@@ -330,7 +330,7 @@ fprintf('ELPD difference (mu & kappa - kappa only): %s\n', elpdDiff(looConc, loo
 
 %% High inter-individual correlation
 %
-% <<../R/icons/moth.png>>
+% <<../docs/icons/moth.png>>
 %
 % _Tethered Bogong moths can be induced to fly in "flight simulators", which
 % allows repeated measurements of flight directions across multiple
@@ -391,7 +391,7 @@ fprintf('softplus(b_kappa_Intercept) > true kappa: %.1f%%\n', ...
 
 %% Low inter-individual correlation
 %
-% <<../R/icons/beetle.png>>
+% <<../docs/icons/beetle.png>>
 %
 % _When rolling a dung ball, ball-rolling dung beetles can be repeatedly
 % returned to the centre of a circular arena on exiting, resulting in repeated
@@ -456,7 +456,7 @@ fprintf('ELPD difference (kappa_mu - no kappa_mu): %s\n', elpdDiff(looLow, looNo
 
 %% Variable individual parameters
 %
-% <<../R/icons/fly.png>>
+% <<../docs/icons/fly.png>>
 %
 % _Tethered vinegar flies (Drosophila) can be induced to fly in a "virtual
 % reality" LED arena, in which their wing motion causes visual cues to rotate.
@@ -502,7 +502,7 @@ fprintf('beta0 > 0°: %.1f%% of estimates\n', ...
 
 %% Individual heading changes
 %
-% <<../R/icons/bird.png>>
+% <<../docs/icons/bird.png>>
 %
 % _Birds exhibiting migratory restlessness hop repeatedly in their intended
 % flight direction, allowing this to be recorded repeatedly for the same

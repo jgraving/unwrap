@@ -90,6 +90,7 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) ".." else
     stop("Run this notebook from notebooks_r/ or from the repository root.")
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "R", "unwrap_helpers.R"))
 source(file.path(repo_root, "notebooks_r", "beetles_posthoc.R"))
 source(file.path(repo_root, "notebooks_r", "beetles_plots.R"))
 
@@ -97,21 +98,6 @@ source(file.path(repo_root, "notebooks_r", "beetles_plots.R"))
 FIG_DIR <- file.path(repo_root, "figures", "beetles")
 dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 theme_set(theme_minimal(base_size = 12))
-
-# Without X11/cairo (most server R installs) the default device cannot
-# rasterise, so each figure renders to a PNG through ragg and displays
-# inline; a vector PDF is saved alongside as the portable copy.
-show_figure <- function(plot, name, width, height, res = 110) {
-  file <- file.path(FIG_DIR, paste0(name, ".png"))
-  ragg::agg_png(file, width = width, height = height, units = "in",
-                res = res)
-  print(plot)
-  invisible(dev.off())
-  # Quarto renders the returned plot object natively; there is no
-  # display channel to write to outside Jupyter.
-  plot
-}
-
 
 SEED <- 42
 set.seed(SEED)
@@ -148,36 +134,11 @@ would exit toward that part of the arena even with the lamp off.
 ```{r}
 #| cell-id: "beetles-05"
 
-
-save_figure <- function(plot, name, width = 8, height = 4) {
-  ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
-         width = width, height = height)
-  show_figure(plot, name, width, height)
-}
-
 # Same published source files as the Python loaders; keep their local
 # checkout under the repository root, reachable from notebooks_r/ too.
 # An existing checkout can be supplied through UNWRAP_DATA_ROOT.
 data_root <- Sys.getenv("UNWRAP_DATA_ROOT",
                         unset = file.path(repo_root, "unwrap-data"))
-ensure_data <- function(subdir) {
-  target <- file.path(data_root, subdir)
-  if (!dir.exists(target)) {
-    if (!dir.exists(data_root)) {
-      status <- system2("git", c("clone", "--depth", "1",
-        "--filter=blob:none", "--sparse",
-        "https://github.com/jgraving/unwrap-data.git", shQuote(data_root)))
-      if (status != 0L) stop("Could not fetch the published study data.")
-    }
-    # Sparse checkout downloads only this study; later notebooks may add
-    # their own subdirectory to the same checkout without replacing it.
-    status <- system2("git", c("-C", shQuote(data_root),
-                              "sparse-checkout", "add", subdir))
-    if (status != 0L) stop("Could not materialize the study subdirectory.")
-  }
-  stopifnot(dir.exists(target))
-  target
-}
 
 ```
 

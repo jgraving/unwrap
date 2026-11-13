@@ -25,11 +25,9 @@
 # cells and again in the per-stem *_posthoc.R scripts. Where those copies
 # had drifted in cosmetics only (argument names, line layout, a missing
 # dimension-preserving guard), the copy here is the most general body and
-# the stems keep their existing call sites. The fit-cache primitives and
-# the circular/Rhat utilities are mirrored from R/unwrap_functions.R,
-# which remains sourced for now; until that legacy file is pruned the two
-# copies are byte-identical and the definitions sourced last (this file's)
-# are the effective ones.
+# the stems keep their existing call sites. The fit-cache primitives now
+# live only here: the byte-identical duplicate in R/unwrap_functions.R has
+# been pruned, so this file is their single source.
 
 # --- Data and figure plumbing -------------------------------------------------
 
@@ -231,8 +229,7 @@ lognormal_target_prior <- function(param, mu, sigma) {
                    " | ", mu, ", ", sigma, ")"), check = FALSE)
 }
 
-# Development fit cache (mirrored from R/unwrap_functions.R until that
-# legacy file is pruned).
+# Development fit cache.
 # When UNWRAP_R_FIT_CACHE=1, a notebook's brms fits are reused across
 # local runs instead of resampled: before fitting, a cell asks
 # unwrap_load_fit_cache() for a saved snapshot; when none is valid it
