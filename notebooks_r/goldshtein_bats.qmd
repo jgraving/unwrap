@@ -560,6 +560,10 @@ The repeated bearings help estimate each bat's directional behavior, while the n
 #| cell-id: "goldshtein-bats-018"
 need <- c("tag", "flightAngDiffDest_deg", "treatment", "dist_to_dest_grad_m")
 df_track <- track_w_treat[complete.cases(track_w_treat[need]), ]
+# 1-based positions of these usable rows in the full track (issue #142):
+# the recency-directedness smoother needs them to align per-animal scores
+# back onto the complete recorded sequence (including missing/gap rows).
+track_positions <- as.integer(which(complete.cases(track_w_treat[need])))
 df_track$HeadingRadians <- wrap(df_track$flightAngDiffDest_deg * pi / 180)
 df_track$tag <- factor(df_track$tag, levels = sort(unique(df_track$tag)))
 df_track$treatment <- factor(df_track$treatment, levels = sort(unique(df_track$treatment)))
@@ -1758,6 +1762,9 @@ The saved curves generally show higher posterior directedness closer to the end 
 ```{r}
 #| cell-id: "goldshtein-bats-090"
 # View: posterior directedness, per-draw 90% intervals (see section above).
+# make_curves smooths each animal's per-draw scores with a recency-weighted
+# trailing exponential window (issue #142, W=10) in recorded-step order, then
+# bin-aggregates onto the common x grid (no second Gaussian smoother).
 # The original directed-component probability curves are the same calls
 # with draws = resp (default hdi_prob 0.95).
 distance_curves <- make_curves("distance", evi, hdi_prob = 0.90)
@@ -1773,25 +1780,25 @@ p_tag_end <- tag_curve_plot(end_curves)
 
 ```{r}
 #| cell-id: "goldshtein-bats-091"
-save_figure(p_curve_distance, "posterior_directedness_pop_kernel_distance_TRUNC_SMOOTH", 4.4, 2.6)
+save_figure(p_curve_distance, "posterior_directedness_pop_recencyW10_distance_TRUNC_SMOOTH", 4.4, 2.6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-092"
-save_figure(p_curve_end, "posterior_directedness_pop_kernel_distFromEndM_TRUNC_SMOOTH", 4.4, 2.6)
+save_figure(p_curve_end, "posterior_directedness_pop_recencyW10_distFromEndM_TRUNC_SMOOTH", 4.4, 2.6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-093"
-save_figure(p_curve_distance_c, "posterior_directedness_pop_kernel_distance_TRUNC_SMOOTH_compact", 3.4, 1.2)
+save_figure(p_curve_distance_c, "posterior_directedness_pop_recencyW10_distance_TRUNC_SMOOTH_compact", 3.4, 1.2)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-094"
-save_figure(p_curve_end_c, "posterior_directedness_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact", 3.4, 1.2)
+save_figure(p_curve_end_c, "posterior_directedness_pop_recencyW10_distFromEndM_TRUNC_SMOOTH_compact", 3.4, 1.2)
 
 ```
 
@@ -1801,13 +1808,13 @@ The individual panels show how varied those patterns are. Some animals show sust
 
 ```{r}
 #| cell-id: "goldshtein-bats-096"
-save_figure(p_tag_distance, "posterior_directedness_tag_kernel_distance_faceted_TRUNC", 8, 6)
+save_figure(p_tag_distance, "posterior_directedness_tag_recencyW10_distance_faceted_TRUNC", 8, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-097"
-save_figure(p_tag_end, "posterior_directedness_tag_kernel_distFromEndM_faceted_TRUNC", 8, 6)
+save_figure(p_tag_end, "posterior_directedness_tag_recencyW10_distFromEndM_faceted_TRUNC", 8, 6)
 
 ```
 
