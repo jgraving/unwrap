@@ -20,6 +20,7 @@ the effective one). The statistical odd choices of the annotated study
 from __future__ import annotations
 
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -2300,6 +2301,71 @@ def weighted_gaussian_smooth_draws(draw_curve_SxG, xg_G, weight_G, bw_x, eps=1e-
     return out
 
 
+# Recency-weighted trailing directedness smoother (issue #142).
+#
+# Replaces the Gaussian x-domain smoothing on the directedness curves. For
+# each animal, in original chronological/recorded-step order, each valid
+# step's per-draw score is replaced by a finite, normalized trailing
+# exponential window over the most recent valid steps. A tracking gap or a
+# missing/unusable heading resets the history, so segments never contaminate
+# one another and the filter never runs backward from the end.
+#
+#   alpha = 2 / (1 + sqrt(W));  decay = 1 - alpha
+#   q_smooth[i] = sum(decay**k * q[i-k]) / sum(decay**k)   (k = 0..m-1)
+#
+# where m is the number of consecutive valid steps available through i,
+# capped at the integer window W (1..20, default 10). W=1 returns the input
+# exactly. This is a finite normalized trailing window, not an infinite
+# recursive EMA, so a library ewm call is not automatically equivalent.
+#
+# The input is one animal's full recorded sequence, including missing and
+# gap rows. `scores` is [steps, joint posterior draws]; `valid` and
+# `gap_before` have one entry per recorded step. Align the fitted scores
+# back onto the full sequence before calling, and call separately for each
+# animal in chronological order. Keep the draws aligned throughout: smooth
+# this matrix first, then summarize across draws.
+
+def smooth_directedness(scores, valid, gap_before, window=10):
+    if isinstance(window, (bool, np.bool_)) or not isinstance(
+        window, (int, np.integer)
+    ) or not 1 <= window <= 20:
+        raise ValueError("window must be an integer in 1..20")
+
+    q = np.asarray(scores, dtype=float)
+    valid = np.asarray(valid, dtype=bool)
+    gap_before = np.asarray(gap_before, dtype=bool)
+    if q.ndim != 2 or valid.shape != (len(q),) or gap_before.shape != (len(q),):
+        raise ValueError("expected scores[steps, draws] and aligned step masks")
+    if np.any(~np.isfinite(q[valid])) or np.any(
+        (q[valid] < 0) | (q[valid] > 1)
+    ):
+        raise ValueError("valid steps must have finite scores in [0, 1]")
+
+    out = q.copy()
+    if window == 1:
+        return out
+
+    alpha = 2.0 / (1.0 + np.sqrt(window))
+    decay = 1.0 - alpha
+    history = []
+
+    for i in range(len(q)):
+        if not valid[i] or gap_before[i]:
+            history.clear()
+            # Missing rows retain their missing values; valid gap-crossing
+            # rows retain their raw scores, but never enter the history.
+            continue
+
+        history.append(i)
+        history = history[-window:]
+        age = np.arange(len(history) - 1, -1, -1)
+        weights = decay ** age
+        weights /= weights.sum()
+        out[i] = np.sum(q[history] * weights[:, None], axis=0)
+
+    return out
+
+
 # the per-curve version of the responsibility (returns the draws)
 
 def _posterior_prob_goal_per_step_curves(
@@ -3189,6 +3255,239 @@ def tag_curves_kernel_by_treatment(
                 "x_min": x_min_tg,
                 "x_max": x_max_tg,
             }
+
+    return treat_levels, out
+
+
+# Recency-weighted trailing directedness curves (issue #142).
+#
+# Replaces the Gaussian x-domain smoothing (population_curve_kernel_per_tag /
+# tag_curves_kernel_by_treatment) for the posterior-directedness figures.
+#
+# Two clearly separated stages:
+#   1. SMOOTHING (time domain): each animal's per-draw directedness scores are
+#      smoothed with smooth_directedness in original chronological/recorded
+#      step order, with a finite normalized trailing exponential window (W).
+#      A tracking gap or a missing/unusable heading resets the history, so
+#      segments never contaminate one another and the filter never runs
+#      backward. This is the only smoothing stage; there is no second
+#      (Gaussian) smoother on top.
+#   2. ALIGNMENT/AGGREGATION (x domain): the already-smoothed observations are
+#      mapped onto a common per-treatment x grid by nearest-cell binning. Each
+#      cell averages the contributing animals' per-draw values EQUALLY per
+#      animal (equal-animal averaging per joint draw); a population cell is
+#      shown only where at least min_tags_at_x distinct animals contribute.
+#      Binning is a pure aggregation: it does not weight across cells, so it
+#      neither extrapolates beyond an animal's observed range nor bridges
+#      unsupported tracking gaps. Repeated/nonmonotonic destination distances
+#      are handled by averaging an animal's multiple observations in a cell;
+#      an animal's curve is masked to its own observed x-range.
+#
+# The x-axis meanings are unchanged from the Gaussian path: "distance" is the
+# distance to the destination, and "steps_from_end" is the cumulative path
+# distance from the end of the recorded route (usable-row count x step length).
+#
+# Returns the same (treat_levels, out_by_treat) structure the plot functions
+# consume: out_by_treat[t] has "x_mid", "mean", "lo", "hi" (population) and
+# "tags" {tag: {"mean","lo","hi","n_obs"}} (per-animal), all aligned to x_mid.
+
+def directedness_curves_recency(
+    df_full,
+    df_model,
+    evi_draws,
+    *,
+    tag_col="tag",
+    treat_col="treatment",
+    treat_name_col="treatmentName",
+    gap_col="gap_before",
+
+    x_kind="distance",                 # "distance" or "steps_from_end"
+    last_n_steps=110,
+    steps_x_units="m",                 # "m" or "steps"
+    step_length_m=60.0,
+    dist_col="dist_to_dest_grad_m",
+
+    window=10,                          # trailing window W (1..20), default 10
+    n_grid=2000,
+    hdi_prob=0.90,
+    min_tags_at_x=2,
+):
+    # evi_draws is (S, n_model) = (draws, steps); keep that orientation.
+    evi = np.asarray(evi_draws, float)
+    S = evi.shape[0]
+    m = len(df_model)
+    if evi.ndim != 2 or evi.shape[1] != m:
+        raise ValueError(
+            f"evi_draws must be (S, n_model) matching df_model rows. "
+            f"Got {evi.shape} vs n_model={m}"
+        )
+
+    # Usable rows' positions in the full track (df_model keeps the full index).
+    pos = np.asarray(df_model.index, dtype=int)
+    n_full = len(df_full)
+    if pos.size and (pos.min() < 0 or pos.max() >= n_full):
+        raise ValueError("df_model index does not index into df_full")
+
+    # ---- x per usable row (unchanged meaning from the Gaussian path) ----
+    dm = df_model.reset_index(drop=True)
+    if x_kind == "steps_from_end":
+        fwd = dm.groupby(tag_col, observed=False).cumcount()
+        last = fwd.groupby(dm[tag_col], observed=False).transform("max")
+        x_steps = (fwd - last).to_numpy()
+        keep = (x_steps >= -int(last_n_steps)) & (x_steps <= 0)
+        if str(steps_x_units).lower() in ("m", "meter", "meters"):
+            x = x_steps[keep].astype(float) * float(step_length_m)
+        elif str(steps_x_units).lower() in ("step", "steps"):
+            x = x_steps[keep].astype(float)
+        else:
+            raise ValueError("steps_x_units must be 'm' or 'steps'")
+        dm = dm.loc[keep].reset_index(drop=True)
+        pos = pos[keep]
+        evi = evi[:, keep]
+    elif x_kind == "distance":
+        if dist_col not in dm.columns:
+            raise KeyError(f"Missing distance column '{dist_col}' in df_model.")
+        xall = pd.to_numeric(dm[dist_col], errors="coerce").to_numpy(float)
+        keep = np.isfinite(xall)
+        x = xall[keep]
+        dm = dm.loc[keep].reset_index(drop=True)
+        pos = pos[keep]
+        evi = evi[:, keep]
+    else:
+        raise ValueError("x_kind must be 'distance' or 'steps_from_end'")
+
+    n_use = len(dm)
+    tags = dm[tag_col].to_numpy()
+    treats = dm[treat_col].to_numpy()
+
+    # ---- Stage 1: smooth each animal's draws in recorded-step order ----
+    # smoothed is (n_use, S): per usable row, its smoothed per-draw scores.
+    smoothed = np.full((n_use, S), np.nan, float)
+    full_tags = df_full[tag_col].to_numpy()
+    full_gap = np.asarray(
+        pd.to_numeric(df_full[gap_col], errors="coerce").fillna(0)
+    ).astype(bool)
+    # Map each full-track row to its usable-row index (-1 if missing).
+    full_to_use = np.full(n_full, -1, dtype=int)
+    full_to_use[pos] = np.arange(n_use)
+    # Process each animal (df_full is grouped by tag, chronological within tag).
+    for t0 in np.flatnonzero(np.r_[True, full_tags[1:] != full_tags[:-1]]):
+        t1 = np.flatnonzero(np.r_[False, full_tags[t0 + 1:] != full_tags[t0]])
+        t1 = (t1[0] + t0) if t1.size else n_full
+        seg = np.arange(t0, t1)
+        use_idx = full_to_use[seg]
+        if not (use_idx >= 0).any():
+            continue  # animal with no usable rows
+        n_seg = seg.size
+        valid = use_idx >= 0
+        scores_full = np.full((n_seg, S), np.nan, float)
+        # evi is (S, n_use); evi[:, use_idx[valid]] is (S, n_valid) -> (n_valid, S).
+        scores_full[valid, :] = evi[:, use_idx[valid]].T
+        gap_seg = full_gap[seg]
+        sm = smooth_directedness(scores_full, valid, gap_seg, window=window)
+        smoothed[use_idx[valid], :] = sm[valid, :]
+
+    # ---- Stage 2: bin the smoothed observations onto a common grid ----
+    if treat_name_col in df_model.columns:
+        name_map = (
+            df_model.groupby(treat_col, observed=False)[treat_name_col].first().to_dict()
+        )
+    else:
+        name_map = {}
+    if isinstance(df_model[treat_col].dtype, pd.CategoricalDtype):
+        treat_levels = list(df_model[treat_col].cat.categories)
+    else:
+        treat_levels = sorted(pd.Series(treats).dropna().unique().tolist())
+
+    out = {}
+    for t in treat_levels:
+        mask_t = treats == t
+        if not mask_t.any():
+            continue
+        xt = x[mask_t]
+        xmin, xmax = float(np.nanmin(xt)), float(np.nanmax(xt))
+        if not np.isfinite(xmin) or not np.isfinite(xmax) or xmax <= xmin:
+            continue
+        xg = np.linspace(xmin, xmax, int(n_grid)).astype(float)
+        # Nearest-cell binning (pure alignment; no cross-cell weighting).
+        cell = np.clip(np.searchsorted(xg, xt, side="left"), 0, int(n_grid) - 1)
+        # Refine to nearest of the two bracketing cells.
+        lo = np.clip(cell - 1, 0, int(n_grid) - 1)
+        hi = np.clip(cell, 0, int(n_grid) - 1)
+        cell = np.where(np.abs(xt - xg[lo]) <= np.abs(xt - xg[hi]), lo, hi)
+
+        ttags = tags[mask_t]
+        tdraws = smoothed[mask_t, :]  # (n_obs_t, S)
+        uniq_tags = np.unique(ttags)
+
+        # Per-tag curves on the common grid (equal-animal per draw).
+        tags_out = {}
+        pop_sum = np.zeros((int(n_grid), S), float)
+        pop_cnt = np.zeros(int(n_grid), int)
+        for tg in uniq_tags:
+            tg_mask = ttags == tg
+            tg_cell = cell[tg_mask]
+            tg_draws = tdraws[tg_mask, :]  # (n_obs_tg, S)
+            # Per-cell per-draw average for this tag (cells it occupies).
+            tg_curve = np.full((int(n_grid), S), np.nan, float)
+            for c in np.unique(tg_cell):
+                sel = tg_cell == c
+                tg_curve[c, :] = tg_draws[sel, :].mean(axis=0)
+            # Mask to this animal's observed x-range.
+            tg_xmin = float(np.nanmin(xt[tg_mask]))
+            tg_xmax = float(np.nanmax(xt[tg_mask]))
+            tg_curve[(xg < tg_xmin) | (xg > tg_xmax), :] = np.nan
+            # Per-cell pointwise interval across draws (HDI over axis 1).
+            tg_curve_f = np.where(np.isfinite(tg_curve), tg_curve, np.nan)
+            tg_lo = np.full(int(n_grid), np.nan)
+            tg_hi = np.full(int(n_grid), np.nan)
+            for c in np.unique(tg_cell):
+                b = hdi_1d(tg_curve[c, :], prob=hdi_prob)
+                tg_lo[c], tg_hi[c] = b[0], b[1]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)  # empty cells -> NaN
+                tg_mean = np.nanmean(tg_curve, axis=1)
+            tags_out[tg] = {
+                "mean": tg_mean,
+                "lo": tg_lo,
+                "hi": tg_hi,
+                "n_obs": int(tg_mask.sum()),
+                "x_min": tg_xmin,
+                "x_max": tg_xmax,
+            }
+            # Accumulate into the population: equal-animal per draw.
+            have = np.isfinite(tg_curve[:, 0])  # per-cell mask (n_grid,)
+            pop_sum[have, :] += tg_curve[have, :]
+            pop_cnt[have] += 1
+
+        pop_curve = np.full((int(n_grid), S), np.nan, float)
+        have = pop_cnt > 0
+        pop_curve[have, :] = pop_sum[have, :] / pop_cnt[have][:, None]
+        unstable = pop_cnt < int(min_tags_at_x)
+        pop_curve[unstable, :] = np.nan
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)  # unsupported cells -> NaN
+            pop_mean = np.nanmean(pop_curve, axis=1)
+        # Pointwise interval across draws for each cell (HDI over axis 1).
+        pop_lo = np.full(int(n_grid), np.nan)
+        pop_hi = np.full(int(n_grid), np.nan)
+        for c in np.flatnonzero(pop_cnt >= int(min_tags_at_x)):
+            b = hdi_1d(pop_curve[c, :], prob=hdi_prob)
+            pop_lo[c], pop_hi[c] = b[0], b[1]
+
+        out[t] = {
+            "label": _format_treatment_name(name_map.get(t, t)),
+            "x_mid": xg,
+            "mean": pop_mean,
+            "lo": pop_lo,
+            "hi": pop_hi,
+            "smoother": f"recency-weighted trailing exponential, W={window}",
+            "n_tags": int(uniq_tags.size),
+            "n_tags_by_x": pop_cnt,
+            "min_tags_at_x": int(min_tags_at_x),
+            "tags": tags_out,
+        }
 
     return treat_levels, out
 
