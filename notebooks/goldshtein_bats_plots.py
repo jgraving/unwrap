@@ -116,16 +116,33 @@ def _carto_auth(source):
     configured. The key is read from the ``CARTO_API_KEY`` environment
     variable (it is never stored in the repository); requests made with
     it are served against the key instead of the anonymous pool, which
-    is being throttled with watermarked 'API KEY REQUIRED' tiles. With
-    the variable unset the source is returned unchanged, and public
-    readers of the notebook keep working anonymously."""
+    is being throttled with watermarked 'API key required' block tiles.
+    xyzservices CartoDB providers carry the key through a ``{apikey}``
+    template variable, so this sets it on a copy of the provider; with
+    the variable unset the source is returned unchanged and public
+    readers keep the anonymous fallback."""
     key = os.environ.get("CARTO_API_KEY", "")
     if not key:
         return source
+    if isinstance(source, dict):
+        existing = str(source.get("apikey") or "")
+        if existing and "<insert your" not in existing:
+            return source
+        url = str(source.get("url", ""))
+        if "cartocdn.com" not in url:
+            return source
+        provider = source.copy()
+        provider["apikey"] = key
+        return provider
     url = str(getattr(source, "url", source))
     if "cartocdn.com" not in url:
         return source
-    return f"{url}?api_key={key}"
+    if "{apikey}" in url:
+        return url.replace("{apikey}", key)
+    if "?key=" in url:
+        return source
+    # CARTO's documented parameter name for plain URL templates.
+    return f"{url}?key={key}"
 
 
 # ------------------------------------------------------------------
@@ -713,7 +730,7 @@ def plot_destination_panels(
             try:
                 # returns a URL string with {r} filled (provider supports retina via {r})
                 with _cartodb_quiet():
-                    basemap_source = basemap_source.build_url(r="@2x")
+                    basemap_source = _carto_auth(basemap_source).build_url(r="@2x")
             except Exception:
                 pass
 
