@@ -17,8 +17,8 @@
 
 ### Housekeeping still pending (workstream wrap-up)
 - R debloat workstream is DONE code-wise: #141 (dedup shared lib), #143 (bats), #145 (direction/mixture), #147 (density/order) — all merged, main = d74b841.
-- periodic/zebra snapshot gap (one-time cache-OFF bake + .rds upload + small dedupe follow-up) — still open, needs its own session/bake.
-- Stale-branch cleanup candidates (user call, only if intent captured): notebooks-to-scripts-{circular,periodic,policy}, feat/notebooks-to-scripts, origin/fix/r-shared-helpers; stale worktree /tmp/opencode/wt-rsref (detached @ c363ae3). Pre-existing remote branches docs/locust-density-order-prose + feat/locust-density-order-unwrap-data are NOT part of this workstream's cleanup list.
+- periodic/zebra snapshot gap (one-time cache-OFF bake + .rds upload + small dedupe follow-up) — IN PROGRESS: periodic_fit.rds to be produced on this machine (notebook's load/save wiring exists; fit_cache has no periodic_fit -> snapshot-generation bake, NOT a verification bake). zebra_escape has NO fit-cache wiring at all (plain brm) -> its dedupe follow-up needs wiring decided first.
+- DONE 2026-11-16: stale-branch cleanup + wt-rsref removal. Deleted local: notebooks-to-scripts-{circular_regression 6798174, periodic 242db24, policy 6d7d191, zebra 3417cb7, infra db5cc15}, fix/r-shared-helpers e523c16. Deleted remote: the three + beetles 1612f9b, infra db5cc15, feat/notebooks-to-scripts ca04985 (umbrella), fix/r-shared-helpers. All were Oct-30-era Python-side extraction drafts whose intent landed on main via squash-merged equivalents (02ba1c1/2b015e0/613d6d1 + later polish) or are strict ancestors of main; shas recorded here for recovery. wt-rsref worktree removed (detached @ c363ae3 = main merge #132, clean tree). Remaining worktrees: main checkout, r-env, wt-handoff.
 
 ## STATE - updated 2026-11-13 (R DEBLOAT PR 2 MERGED: #143 @ 2531502 — goldshtein_bats figure/post-hoc extraction into per-notebook _plots.R/_posthoc.R, behavior-neutral (baked-vs-baked byte-identical except the known run-to-run-nondeterministic cell-82 PNG, repeat-bake proven); next = R DEBLOAT PR 3 = locust_density_order extraction)
 
