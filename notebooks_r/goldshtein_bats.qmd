@@ -1744,22 +1744,28 @@ save_figure(p_probability_map_small, "treatment_panels_tracks_posterior_directed
 
 ```
 
-### How does posterior directedness vary along the track?
+The curves summarize the per-draw posterior-directedness scores (see above) with a recency-weighted trailing average over each animal's recorded steps (issue #142). Within each posterior draw, and in the order the headings were actually recorded, every step becomes a normalized exponentially weighted mean of itself and up to W-1 earlier valid steps (W = 10; alpha = 2/(1+sqrt(W))). Smoothing is never done in order of distance to the destination, and a future step never enters an earlier window. Missing headings and tracking gaps reset the history; a heading that crosses a gap keeps its raw score but never enters a window.
 
-The curves smooth the per-draw posterior-directedness scores (see above) along each animal's observations. One horizontal axis describes distance to the destination: point distance for the roost, and distance along the local approach-field ray for the lake. This quantity differs from the length of the remaining recorded route.
+One horizontal axis describes distance to the destination: point distance for the roost, and distance along the local approach-field ray for the lake. This quantity differs from the length of the remaining recorded route.
 
 The other axis, labeled cumulative path distance from the end, counts retained-heading intervals backward from the last retained heading and multiplies by 60 m. It provides an approximate progress coordinate. Missing or excluded rows and tracking gaps mean it should not be treated as exact cumulative distance, elapsed time, or distance to an identified decision event.
 
-Each animal's curve is limited to the region supported by its observations. Population curves average the contributing animal curves equally at each position and are shown only where at least two animals contribute. The population average is then smoothed across neighboring positions. The set of contributing bats can therefore change along the horizontal axis. Posterior means and pointwise 90% intervals of the per-draw scores describe uncertainty carried through the smoothing calculation; they do not include uncertainty from sampling new bats or choosing a different smoothing scale.
-
-The saved curves generally show higher posterior directedness closer to the end of the retained records, with substantial differences among treatments and animals. This is a descriptive pattern in observed headings. It does not establish a common recognition point, a monotonic change for every bat, or a fitted effect of distance on the mixture weight or on the component densities.
+The smoothed per-step scores are then placed on a shared position grid by equal-width bins: a grid position takes the plain average of the already-smoothed steps that fall in the bin, so repeated or nonmonotone destination distances are aggregated without any second smoother, and nothing is interpolated or bridged across tracking gaps or unsupported ranges. Each animal's curve is limited to the region supported by its observations. Population curves average the contributing animal curves equally at each position and are shown only where at least two animals contribute; the set of contributing bats can therefore change along the horizontal axis. Posterior means and pointwise 90% intervals are computed across the smoothed joint draws, so they carry the posterior uncertainty through the smoothing; they do not include uncertainty from sampling new bats.
 
 
 ```{r}
 #| cell-id: "goldshtein-bats-090"
 # View: posterior directedness, per-draw 90% intervals (see section above).
-# The original directed-component probability curves are the same calls
-# with draws = resp (default hdi_prob 0.95).
+# make_curves first smooths each animal's per-draw scores along RECORDED
+# TIME with the recency-weighted trailing exponential filter (issue #142,
+# W = 10, alpha = 2/(1+sqrt(W))): within each joint posterior draw every
+# recorded step becomes a normalized trailing average of itself and up to
+# W-1 earlier valid steps; gaps/missing headings reset the history and
+# future steps never enter an earlier window. The already-smoothed step
+# draws are then mapped onto the grid by equal-width binning (plain
+# per-draw means; aggregation of repeated / nonmonotone x only, no second
+# smoother, no bridging across gaps). Population shown where >= 2 animals
+# contribute; intervals are HDIs across the smoothed joint draws.
 distance_curves <- make_curves("distance", evi, hdi_prob = 0.90)
 end_curves <- make_curves("steps_from_end", evi, hdi_prob = 0.90)
 p_curve_distance <- curve_plot_full(distance_curves, reverse = TRUE)
@@ -1773,25 +1779,25 @@ p_tag_end <- tag_curve_plot(end_curves)
 
 ```{r}
 #| cell-id: "goldshtein-bats-091"
-save_figure(p_curve_distance, "posterior_directedness_pop_kernel_distance_TRUNC_SMOOTH", 4.4, 2.6)
+save_figure(p_curve_distance, "posterior_directedness_pop_recencyW10_distance_TRUNC_SMOOTH", 4.4, 2.6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-092"
-save_figure(p_curve_end, "posterior_directedness_pop_kernel_distFromEndM_TRUNC_SMOOTH", 4.4, 2.6)
+save_figure(p_curve_end, "posterior_directedness_pop_recencyW10_distFromEndM_TRUNC_SMOOTH", 4.4, 2.6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-093"
-save_figure(p_curve_distance_c, "posterior_directedness_pop_kernel_distance_TRUNC_SMOOTH_compact", 3.4, 1.2)
+save_figure(p_curve_distance_c, "posterior_directedness_pop_recencyW10_distance_TRUNC_SMOOTH_compact", 3.4, 1.2)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-094"
-save_figure(p_curve_end_c, "posterior_directedness_pop_kernel_distFromEndM_TRUNC_SMOOTH_compact", 3.4, 1.2)
+save_figure(p_curve_end_c, "posterior_directedness_pop_recencyW10_distFromEndM_TRUNC_SMOOTH_compact", 3.4, 1.2)
 
 ```
 
@@ -1801,13 +1807,13 @@ The individual panels show how varied those patterns are. Some animals show sust
 
 ```{r}
 #| cell-id: "goldshtein-bats-096"
-save_figure(p_tag_distance, "posterior_directedness_tag_kernel_distance_faceted_TRUNC", 8, 6)
+save_figure(p_tag_distance, "posterior_directedness_tag_recencyW10_distance_faceted_TRUNC", 8, 6)
 
 ```
 
 ```{r}
 #| cell-id: "goldshtein-bats-097"
-save_figure(p_tag_end, "posterior_directedness_tag_kernel_distFromEndM_faceted_TRUNC", 8, 6)
+save_figure(p_tag_end, "posterior_directedness_tag_recencyW10_distFromEndM_faceted_TRUNC", 8, 6)
 
 ```
 
