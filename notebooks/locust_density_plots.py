@@ -694,8 +694,9 @@ def plot_alignment(idata, df, *, save=True,
 
 # ---------------------------------------------------------------------------
 # Final fit: two-panel posterior predictive density at y=0 (computed in log
-# space, exponentiated for plotting). Uniform reference line at 1/(2*pi).
-# Transparent axes. 90% HDI, grid of 50.
+# space, exponentiated for plotting). Opaque white background (the docs site
+# renders these inline on dark page themes, where transparent axes lose their
+# background). 90% HDI, grid of 50.
 # ---------------------------------------------------------------------------
 def plot_elpd0(idata, df, *, save=True,
                save_path="figures/locust/order_density_elpd0.pdf"):
@@ -721,12 +722,11 @@ def plot_elpd0(idata, df, *, save=True,
     fig_h = 1.55
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(fig_w, fig_h), dpi=_plots.DEFAULT_DISPLAY_DPI)
 
-    fig.patch.set_facecolor("none")
-    fig.patch.set_alpha(0)
+    fig.patch.set_facecolor("white")
     for ax in (ax1, ax2):
-        ax.set_facecolor("none")
-        ax.patch.set_facecolor("none")
-        ax.patch.set_alpha(0)
+        ax.set_facecolor("white")
+        ax.patch.set_facecolor("white")
+        ax.patch.set_alpha(1)
 
     cmap_density = plt.cm.Reds
     cmap_order = plt.cm.Purples
