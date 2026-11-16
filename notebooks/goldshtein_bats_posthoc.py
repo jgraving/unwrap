@@ -2768,47 +2768,156 @@ def candidate_onset_steps(df, *, support_col="evi_logb_gt0",
         "mean_support", "toward_goal_frac"])
 
 
-def population_curve_kernel_per_tag(
+# ---------------------------------------------------------------------------
+# Recency-weighted trailing directedness smoothing (issue #142)
+# ---------------------------------------------------------------------------
+
+
+def smooth_directedness(scores, valid, gap_before, window=10):
+    """Recency-weighted trailing mean of directedness over recorded steps.
+
+    For each joint posterior draw ``s`` and original recorded step ``i``
+    (the array is in ORIGINAL chronological/recorded-step order for ONE
+    animal), this computes the finite normalized trailing exponential
+    average
+
+        alpha = 2 / (1 + sqrt(W));  decay = 1 - alpha
+        q_smooth[s, i] = sum(decay**k * q[s, i-k] for k in 0..m-1)
+                         / sum(decay**k for k in 0..m-1)
+
+    with ``m = min(W, valid consecutive steps available through i)``: a
+    finite trailing window with normalized partial weights at segment
+    starts -- NOT an infinite recursive EMA. ``window = 1`` returns the
+    input exactly.
+
+    Parameters
+    ----------
+    scores : (steps, draws) matrix of baseline-adjusted posterior
+        directedness in [0, 1], one row per RECORDED step (align missing
+        rows first with NaN scores and ``valid=False``).
+    valid : (steps,) bool. False = missing/unusable heading: the row keeps
+        its missing values and resets the trailing history.
+    gap_before : (steps,) bool. True = this heading crosses a tracking
+        gap: the row keeps its raw score (for inspection) but never enters
+        the history, and history restarts at the following step.
+    window : int in 1..20 (W).
+
+    Never call this in order of a plotted coordinate (distance to
+    destination is not monotone in time) and never backward. Away-facing
+    valid headings contribute to the average like any other valid step.
+    The same joint draw stays aligned across the whole trajectory: filter
+    the draw matrix first, then summarize means/intervals/probabilities.
+    """
+    if isinstance(window, (bool, np.bool_)) or not isinstance(
+        window, (int, np.integer)
+    ) or not 1 <= window <= 20:
+        raise ValueError("window must be an integer in 1..20")
+
+    q = np.asarray(scores, dtype=float)
+    valid = np.asarray(valid, dtype=bool)
+    gap_before = np.asarray(gap_before, dtype=bool)
+    if q.ndim != 2 or valid.shape != (len(q),) or gap_before.shape != (len(q),):
+        raise ValueError("expected scores[steps, draws] and aligned step masks")
+    if np.any(~np.isfinite(q[valid])) or np.any(
+        (q[valid] < 0) | (q[valid] > 1)
+    ):
+        raise ValueError("valid steps must have finite scores in [0, 1]")
+
+    out = q.copy()
+    if window == 1:
+        return out
+
+    alpha = 2.0 / (1.0 + np.sqrt(window))
+    decay = 1.0 - alpha
+    history = []
+
+    for i in range(len(q)):
+        if not valid[i] or gap_before[i]:
+            history.clear()
+            # Missing rows retain their missing values; valid gap-crossing
+            # rows retain their raw scores, but never enter the history.
+            continue
+
+        history.append(i)
+        history = history[-window:]
+        age = np.arange(len(history) - 1, -1, -1)
+        weights = decay ** age
+        weights /= weights.sum()
+        out[i] = np.sum(q[history] * weights[:, None], axis=0)
+
+    return out
+
+
+def _finite_mean_axis1(arr):
+    """Column-wise mean over finite entries; NaN for all-NaN columns.
+
+    (Plain ``np.nanmean`` warns on fully unsupported grid cells, which are
+    an expected outcome here -- masked bins.)
+    """
+    fin = np.isfinite(arr)
+    cnt = fin.sum(axis=1)
+    tot = np.where(fin, arr, 0.0).sum(axis=1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = np.where(cnt > 0, tot / np.maximum(cnt, 1), np.nan)
+    return out
+
+
+def _directedness_bin_edges(x_eligible, bin_width):
+    """Equal-width bin edges (lower edges + outer right edge) covering
+    ``x_eligible``. Bins are the plotting grid, labelled by their lower
+    edge (bin-start labels stay inside the observed x range)."""
+    lo = np.floor(np.nanmin(x_eligible) / bin_width) * bin_width
+    hi = np.nanmax(x_eligible)
+    n_bins = int(np.ceil((hi - lo) / bin_width)) + 1
+    return lo, n_bins
+
+
+def _directedness_curves_impl(
     df,
     resp_draws,
     *,
-    tag_col="tag",
-    treat_col="treatment",
-    treat_name_col="treatmentName",
-
-    x_kind="distance",                 # "distance" or "steps_from_end"
-    last_n_steps=150,
-    steps_x_units="m",                 # "m" or "steps"
-    step_length_m=60.0,
-
-    dist_col="dist_to_dest_m",
-    dist_clip_q=None,
-
-    n_grid=2000,
-    bandwidth=240.0,
-    chunk_size=4000,
-
-    hdi_prob=0.95,
-    eps=1e-12,
-
-    # truncation controls
-    truncate_to_data_range=True,
-    truncate_by_weight=True,
-    den_frac=0.01,
-
-    # population stabilization
-    pop_post_smooth=True,
-    pop_smooth_bandwidth=None,
-    min_tags_at_x=1,
-
-    return_tag_summaries=False,
+    tag_col,
+    treat_col,
+    treat_name_col,
+    x_kind,
+    last_n_steps,
+    steps_x_units,
+    step_length_m,
+    dist_col,
+    dist_clip_q,
+    window,
+    gap_col,
+    bin_width_m,
+    hdi_prob,
+    eps,
+    min_tags_at_x,
 ):
+    """Shared engine for the two public curve functions (issue #142).
+
+    Pipeline (the trailing exponential filter is the ONLY smoother):
+
+    1. Per animal, in recorded-step order, ``smooth_directedness`` the
+       [steps x draws] score matrix (gap/missing rows reset history).
+    2. Map already-smoothed step scores onto the plotting grid by
+       equal-width binning: each joint draw's value in a bin is the
+       plain mean of that animal's smoothed steps whose x falls in the
+       bin. Binning is aggregation over repeated / nonmonotone x values
+       at the SAME x, not a decay smoother: it never fills a bin the
+       animal has no steps in, so unsupported ranges and tracking gaps
+       are not bridged, and nothing is extrapolated.
+    3. Equal-animal averaging per joint draw across the animals that
+       cover a bin, mask bins with fewer than ``min_tags_at_x`` animals,
+       then summarize means / HDIs ACROSS the joint draws (never of the
+       interval endpoints).
+    """
     d = df.copy().reset_index(drop=True)
     n_obs = len(d)
 
     resp = np.asarray(resp_draws, float)
     if resp.ndim != 2 or resp.shape[1] != n_obs:
         raise ValueError(f"resp_draws must be (S, n_obs) matching df rows. Got {resp.shape} vs n_obs={n_obs}")
+    if isinstance(window, (bool, np.bool_)) or not isinstance(window, (int, np.integer)) or not 1 <= window <= 20:
+        raise ValueError("window must be an integer in 1..20")
 
     d["_rowpos"] = np.arange(n_obs, dtype=int)
 
@@ -2824,13 +2933,15 @@ def population_curve_kernel_per_tag(
     else:
         labels = {t: _format_treatment_name(t) for t in treat_levels}
 
-    # ---- define x ----
+    # ---- define x (unchanged axis semantics; computed on ALL rows so the
+    # time-domain smoother always sees each animal's full recorded sequence
+    # -- plotting-range filtering happens AFTER smoothing) ----
     if x_kind == "steps_from_end":
         d["_step_fwd"] = d.groupby(tag_col, observed=False).cumcount()
         d["_last_fwd"] = d.groupby(tag_col, observed=False)["_step_fwd"].transform("max")
         d["_x_steps"] = d["_step_fwd"] - d["_last_fwd"]  # last=0; earlier negative
 
-        d = d.loc[(d["_x_steps"] >= -int(last_n_steps)) & (d["_x_steps"] <= 0)].copy()
+        in_window = (d["_x_steps"] >= -int(last_n_steps)) & (d["_x_steps"] <= 0)
 
         if str(steps_x_units).lower() in ("m", "meter", "meters"):
             d["_x"] = d["_x_steps"].astype(float) * float(step_length_m)
@@ -2843,157 +2954,196 @@ def population_curve_kernel_per_tag(
         if dist_col not in d.columns:
             raise KeyError(f"Missing distance column '{dist_col}' in df.")
         xvals = pd.to_numeric(d[dist_col], errors="coerce").to_numpy(float)
-        ok = np.isfinite(xvals)
-        d = d.loc[ok].copy()
-        xvals = pd.to_numeric(d[dist_col], errors="coerce").to_numpy(float)
 
         if dist_clip_q is not None:
             cap = float(np.nanquantile(xvals, float(dist_clip_q)))
             xvals = np.clip(xvals, a_min=None, a_max=cap)
 
         d["_x"] = xvals
+        in_window = pd.Series(True, index=d.index)
     else:
         raise ValueError("x_kind must be 'distance' or 'steps_from_end'")
 
-    # gaussian kernel
-    def K(z):
-        return np.exp(-0.5 * z * z)
+    # ---- smoothing / grid controls ----
+    if bin_width_m is None:
+        if x_kind == "steps_from_end":
+            bin_width = 1.0 if str(steps_x_units).lower() in ("step", "steps") else float(step_length_m)
+        else:
+            bin_width = 250.0
+    else:
+        bin_width = float(bin_width_m)
+    if not np.isfinite(bin_width) or bin_width <= 0:
+        raise ValueError("bin_width_m must be a positive number")
 
-    def _smooth_one_tag(resp_SxN, x_N, xg_G, h):
-        S, N = resp_SxN.shape
-        G = xg_G.size
-        num = np.zeros((S, G), float)
-        den = np.zeros((G,), float)
+    if gap_col is not None and gap_col in d.columns:
+        gap_flag = pd.to_numeric(d[gap_col], errors="coerce").fillna(0).to_numpy() != 0
+    elif gap_col is not None:
+        raise KeyError(f"Missing gap flag column '{gap_col}' in df (pass gap_col=None to skip gap resets).")
+    else:
+        gap_flag = np.zeros(len(d), dtype=bool)
 
-        for start in range(0, N, int(chunk_size)):
-            stop = min(N, start + int(chunk_size))
-            xs = x_N[start:stop]                       # (n,)
-            rs = resp_SxN[:, start:stop]               # (S,n)
-            z = (xs[:, None] - xg_G[None, :]) / h      # (n,G)
-            w = K(z)                                   # (n,G)
-            den += w.sum(axis=0)
-            num += rs @ w
+    x_all = d["_x"].to_numpy(float)
+    # eligible = usable x AND inside the plotting range (applied after the
+    # time-domain smoother, so kept steps still see their full history)
+    eligible = in_window.to_numpy() & np.isfinite(x_all)
+    S = resp.shape[0]
 
-        den = den + eps
-        return num / den[None, :], den
+    # ---- per-treatment grids (from eligible rows) ----
+    grids = {}
+    for t in treat_levels:
+        rows_t = np.flatnonzero((d[treat_col] == t).to_numpy() & eligible)
+        if rows_t.size == 0:
+            continue
+        lo_edge, n_bins = _directedness_bin_edges(x_all[rows_t], bin_width)
+        grids[t] = {"lo_edge": lo_edge, "n_bins": n_bins,
+                    # Bin-start labels keep the grid inside the observed
+                    # x range (no labels beyond the last covered cell).
+                    "x_mid": lo_edge + bin_width * np.arange(n_bins),
+                    "tot": np.zeros((n_bins, S), float),
+                    "cov": np.zeros(n_bins, float),
+                    "tags": {}}
 
-    out = {}
-    tag_out = {} if return_tag_summaries else None
+    # ---- one pass per animal: smooth in recorded-step order, then bin ----
+    for tag, sub in d.groupby(tag_col, observed=False, sort=False):
+        t = sub[treat_col].iloc[0]
+        g = grids.get(t)
+        if g is None:
+            continue
+        rows = sub["_rowpos"].to_numpy(int)
+        xs = x_all[rows]
+        q = resp[:, rows].T                                      # (steps, draws)
+        valid = np.isfinite(xs) & np.isfinite(q).all(axis=1)
+        # the ONLY smoother: trailing exponential filter in recorded-step
+        # order, over the animal's FULL recorded sequence (issue #142)
+        sm = smooth_directedness(q, valid, gap_flag[rows], window)
+
+        use = eligible[rows] & valid
+        bidx = np.floor((xs - g["lo_edge"]) / bin_width).astype(int)
+        bidx[~use | (bidx < 0) | (bidx >= g["n_bins"])] = -1
+        ok = bidx >= 0
+        if not ok.any():
+            continue
+        n_bins = g["n_bins"]
+
+        sums = np.zeros((n_bins, S), float)
+        cnt = np.zeros(n_bins, float)
+        np.add.at(sums, bidx[ok], sm[ok])
+        np.add.at(cnt, bidx[ok], 1.0)
+        have = cnt > 0
+        tag_curve = np.full((n_bins, S), np.nan)                 # bins x draws
+        tag_curve[have] = sums[have] / cnt[have, None]
+
+        tg_mean = _finite_mean_axis1(tag_curve)
+        tg_hdi = hdi_along_samples_2col(np.ascontiguousarray(tag_curve.T), prob=hdi_prob)
+        g["tags"][tag] = {
+            "mean": tg_mean,
+            "lo": tg_hdi[:, 0],
+            "hi": tg_hdi[:, 1],
+            "n_obs": int(ok.sum()),
+            "x_min": float(np.nanmin(xs[ok])),
+            "x_max": float(np.nanmax(xs[ok])),
+            "n_bins": int(have.sum()),
+        }
+
+        g["tot"][have] += tag_curve[have]
+        g["cov"][have] += 1.0
+
+    # ---- summarize ----
+    pop_out = {}
+    tag_out = {}
+    min_k = int(max(1, min_tags_at_x))
 
     for t in treat_levels:
-        dt = d.loc[d[treat_col] == t].copy()
-        if dt.empty:
+        g = grids.get(t)
+        if g is None or not g["tags"]:
             continue
+        x_mid, n_bins = g["x_mid"], g["n_bins"]
+        cov = g["cov"]
 
-        x_all = dt["_x"].to_numpy(float)
-        xmin = float(np.nanmin(x_all))
-        xmax = float(np.nanmax(x_all))
-        if not np.isfinite(xmin) or not np.isfinite(xmax) or xmax <= xmin:
-            continue
+        draw_curve = np.full((n_bins, S), np.nan)
+        have_any = cov > 0
+        draw_curve[have_any] = g["tot"][have_any] / cov[have_any, None]  # equal-animal mean per joint draw
+        draw_curve[cov < float(min_k)] = np.nan                   # minimum-two-animal rule
 
-        xg = np.linspace(xmin, xmax, int(n_grid)).astype(float)
-        h = float(bandwidth)
-        if not np.isfinite(h) or h <= 0:
-            raise ValueError("bandwidth must be positive and finite.")
+        mean = _finite_mean_axis1(draw_curve)
+        hdi = hdi_along_samples_2col(np.ascontiguousarray(draw_curve.T), prob=hdi_prob)
 
-        # accumulate per draw across tags, NaN-safe
-        pop_sum = None                         # (S,G)
-        pop_cnt = np.zeros((xg.size,), float)  # (#tags contributing at each x)
-        n_tags_any = 0
-
-        for tg, g in dt.groupby(tag_col, observed=False):
-            j = g["_rowpos"].to_numpy(int)
-            if j.size == 0:
-                continue
-
-            x_tg_full = g["_x"].to_numpy(float)
-            x_tg = x_tg_full[np.isfinite(x_tg_full)]
-            if x_tg.size < 2:
-                continue
-
-            x_min_tg = float(np.nanmin(x_tg))
-            x_max_tg = float(np.nanmax(x_tg))
-
-            resp_tg = resp[:, j]  # (S, N_tag)
-            curve_SxG, den_G = _smooth_one_tag(resp_tg, x_tg_full, xg, h)
-
-            # ---- truncation mask for this tag (same for all draws) ----
-            mask = np.zeros_like(xg, dtype=bool)
-
-            if truncate_to_data_range:
-                mask |= (xg < x_min_tg) | (xg > x_max_tg)
-
-            if truncate_by_weight:
-                thr = float(den_frac) * float(np.nanmax(den_G))
-                mask |= (den_G < thr)
-
-            if mask.any():
-                curve_SxG[:, mask] = np.nan
-
-            if pop_sum is None:
-                pop_sum = np.zeros_like(curve_SxG)
-
-            good = np.isfinite(curve_SxG)  # (S,G) but mask identical across draws
-            pop_sum += np.where(good, curve_SxG, 0.0)
-            pop_cnt += np.isfinite(curve_SxG[0]).astype(float)
-
-            n_tags_any += 1
-
-            if return_tag_summaries:
-                tg_mean = np.nanmean(curve_SxG, axis=0)
-                tg_hdi = hdi_along_samples_2col(curve_SxG, prob=hdi_prob)
-                tag_out[(t, tg)] = {
-                    "x_mid": xg,
-                    "mean": tg_mean,
-                    "lo": tg_hdi[:, 0],
-                    "hi": tg_hdi[:, 1],
-                    "x_min": x_min_tg,
-                    "x_max": x_max_tg,
-                }
-
-        if pop_sum is None or n_tags_any == 0:
-            continue
-
-        # equal-weight mean across tags at each x (NaN where no tags)
-        denom = np.maximum(pop_cnt, 1.0)
-        draw_curve = pop_sum / denom[None, :]
-        draw_curve[:, pop_cnt < 1] = np.nan
-
-        # mask unstable x where too few tags contribute (removes jagged tails)
-        min_k = int(max(1, min_tags_at_x))
-        unstable = pop_cnt < float(min_k)
-        if unstable.any():
-            draw_curve[:, unstable] = np.nan
-
-        # ---- population post-smoothing across x ----
-        if pop_post_smooth:
-            bw_pop = float(pop_smooth_bandwidth) if pop_smooth_bandwidth is not None else float(bandwidth)
-            w = pop_cnt.copy()
-            w[unstable] = 0.0
-            draw_curve = weighted_gaussian_smooth_draws(draw_curve, xg, w, bw_pop, eps=eps)
-            draw_curve[:, unstable] = np.nan
-            draw_curve[:, pop_cnt < 1] = np.nan
-
-        mean = np.nanmean(draw_curve, axis=0)
-        hdi = hdi_along_samples_2col(draw_curve, prob=hdi_prob)
-
-        out[t] = {
+        pop_out[t] = {
             "label": labels.get(t, str(t)),
-            "x_mid": xg,
+            "x_mid": x_mid,
             "mean": mean,
             "lo": hdi[:, 0],
             "hi": hdi[:, 1],
-            "bandwidth": h,
-            "n_tags": int(n_tags_any),
-            "n_tags_by_x": pop_cnt,
+            "window": int(window),
+            "bin_width_m": float(bin_width),
+            "n_tags": len(g["tags"]),
+            "n_tags_by_x": cov,
             "min_tags_at_x": min_k,
-            "pop_post_smooth": bool(pop_post_smooth),
-            "pop_smooth_bandwidth": float(pop_smooth_bandwidth) if pop_smooth_bandwidth is not None else float(bandwidth),
         }
+        tag_out[t] = {"label": labels.get(t, str(t)), "x_mid": x_mid,
+                      "window": int(window), "bin_width_m": float(bin_width),
+                      "tags": g["tags"]}
 
+    return treat_levels, pop_out, tag_out
+
+
+def population_curve_kernel_per_tag(
+    df,
+    resp_draws,
+    *,
+    tag_col="tag",
+    treat_col="treatment",
+    treat_name_col="treatmentName",
+
+    x_kind="distance",                 # "distance" or "steps_from_end"
+    last_n_steps=150,
+    steps_x_units="m",                 # "m" or "steps"
+    step_length_m=60.0,
+
+    dist_col="dist_to_dest_m",
+    dist_clip_q=None,                  # None for full range; or e.g. 0.999 to cap outliers
+
+    # recency smoothing (issue #142)
+    window=10,                         # trailing exponential window W (1..20); 1 = raw scores
+    gap_col="gap_before",              # per-row gap-crossing flag (resets history); None disables
+    bin_width_m=None,                  # grid/bin width; None: 250 m (distance axis), 1 step (steps axis)
+
+    hdi_prob=0.95,
+    eps=1e-12,
+
+    # population support
+    min_tags_at_x=1,
+
+    return_tag_summaries=False,
+):
+    """Recency-weighted (trailing exponential) population directedness curves.
+
+    Replaces the former x-coordinate Gaussian smoothing path (issue #142):
+    scores are smoothed along RECORDED TIME per animal by
+    ``smooth_directedness`` and only then mapped onto the x grid by
+    equal-width binning (documented aggregation of repeated / nonmonotone
+    x, never a second smoother; see ``_directedness_curves_impl``). Equal-
+    animal averaging happens per joint draw, bins with fewer than
+    ``min_tags_at_x`` animals are dropped, and intervals are HDIs across
+    the smoothed joint draws.
+
+    Returns:
+      treat_levels, out_by_treat  (and, if requested, per-tag summaries)
+
+    out_by_treat[t] = {label, x_mid, mean, lo, hi, window, bin_width_m,
+                       n_tags, n_tags_by_x, min_tags_at_x}
+    """
+    treat_levels, pop_out, tag_out = _directedness_curves_impl(
+        df, resp_draws,
+        tag_col=tag_col, treat_col=treat_col, treat_name_col=treat_name_col,
+        x_kind=x_kind, last_n_steps=last_n_steps, steps_x_units=steps_x_units,
+        step_length_m=step_length_m, dist_col=dist_col, dist_clip_q=dist_clip_q,
+        window=window, gap_col=gap_col, bin_width_m=bin_width_m,
+        hdi_prob=hdi_prob, eps=eps, min_tags_at_x=min_tags_at_x,
+    )
     if return_tag_summaries:
-        return treat_levels, out, tag_out
-    return treat_levels, out
+        return treat_levels, pop_out, tag_out
+    return treat_levels, pop_out
 
 
 def tag_curves_kernel_by_treatment(
@@ -3005,190 +3155,50 @@ def tag_curves_kernel_by_treatment(
     treat_name_col="treatmentName",
 
     x_kind="distance",                 # "distance" or "steps_from_end"
-
-    # steps-from-end x definition
     last_n_steps=150,
     steps_x_units="m",                 # "m" or "steps"
     step_length_m=60.0,
 
-    # distance x definition
     dist_col="dist_to_dest_m",
     dist_clip_q=None,                  # None for full range; or e.g. 0.999 to cap outliers
 
-    # smoothing controls
-    n_grid=2000,
-    bandwidth=240.0,
-    chunk_size=4000,
+    # recency smoothing (issue #142)
+    window=10,                         # trailing exponential window W (1..20); 1 = raw scores
+    gap_col="gap_before",              # per-row gap-crossing flag (resets history); None disables
+    bin_width_m=None,                  # grid/bin width; None: 250 m (distance axis), 1 step (steps axis)
 
     hdi_prob=0.95,
     eps=1e-12,
-
-    # TRUNCATION CONTROLS
-    truncate_to_data_range=True,
-    truncate_by_weight=False,
-    den_frac=0.01,
 ):
-    """
+    """Per-animal recency-weighted directedness curves on the treatment grid.
+
+    Same single-smoother pipeline as ``population_curve_kernel_per_tag``:
+    ``smooth_directedness`` along recorded time, then equal-width bin
+    aggregation onto the grid; each animal's curve is NaN outside the bins
+    its own steps cover (per-animal observed-range mask, no bridging).
+
     Returns:
       treat_levels, out_by_treat
 
     out_by_treat[t] = {
         "label": str,
         "x_mid": (G,),
-        "bandwidth": float,
+        "window": int,
+        "bin_width_m": float,
         "tags": {
             tag_value: {
                 "mean": (G,), "lo": (G,), "hi": (G,),
-                "n_obs": int, "x_min": float, "x_max": float
+                "n_obs": int, "x_min": float, "x_max": float, "n_bins": int
             }, ...
         }
       }
     """
-    d = df.copy().reset_index(drop=True)
-    n_obs = len(d)
-
-    resp = np.asarray(resp_draws, float)
-    if resp.ndim != 2 or resp.shape[1] != n_obs:
-        raise ValueError(f"resp_draws must be (S, n_obs) matching df rows. Got {resp.shape} vs n_obs={n_obs}")
-
-    d["_rowpos"] = np.arange(n_obs, dtype=int)
-
-    if isinstance(d[treat_col].dtype, pd.CategoricalDtype):
-        treat_levels = list(d[treat_col].cat.categories)
-    else:
-        treat_levels = sorted(d[treat_col].dropna().unique().tolist())
-
-    if treat_name_col in d.columns:
-        name_map = d.groupby(treat_col, observed=False)[treat_name_col].first().to_dict()
-        labels = {t: _format_treatment_name(name_map.get(t, t)) for t in treat_levels}
-    else:
-        labels = {t: _format_treatment_name(t) for t in treat_levels}
-
-    # ---- define x for each row ----
-    if x_kind == "steps_from_end":
-        d["_step_fwd"] = d.groupby(tag_col, observed=False).cumcount()
-        d["_last_fwd"] = d.groupby(tag_col, observed=False)["_step_fwd"].transform("max")
-        d["_x_steps"] = d["_step_fwd"] - d["_last_fwd"]  # last=0; earlier negative
-
-        d = d.loc[(d["_x_steps"] >= -int(last_n_steps)) & (d["_x_steps"] <= 0)].copy()
-
-        if str(steps_x_units).lower() in ("m", "meter", "meters"):
-            d["_x"] = d["_x_steps"].astype(float) * float(step_length_m)
-        elif str(steps_x_units).lower() in ("step", "steps"):
-            d["_x"] = d["_x_steps"].astype(float)
-        else:
-            raise ValueError("steps_x_units must be 'm' or 'steps'")
-
-    elif x_kind == "distance":
-        if dist_col not in d.columns:
-            raise KeyError(f"Missing distance column '{dist_col}' in df.")
-
-        xvals = pd.to_numeric(d[dist_col], errors="coerce").to_numpy(float)
-        ok = np.isfinite(xvals)
-        d = d.loc[ok].copy()
-        xvals = pd.to_numeric(d[dist_col], errors="coerce").to_numpy(float)
-
-        if dist_clip_q is not None:
-            cap = float(np.nanquantile(xvals, float(dist_clip_q)))
-            xvals = np.clip(xvals, a_min=None, a_max=cap)
-
-        d["_x"] = xvals
-    else:
-        raise ValueError("x_kind must be 'distance' or 'steps_from_end'")
-
-    def K(z):
-        return np.exp(-0.5 * z * z)
-
-    def _smooth_one_tag(resp_SxN, x_N, xg_G, h):
-        """
-        resp_SxN: (S,N), x_N: (N,), xg_G: (G,)
-        returns:
-          curve_SxG: (S,G)
-          den_G: (G,) kernel weight sum at each grid point (same for all draws)
-        """
-        S, N = resp_SxN.shape
-        G = xg_G.size
-        num = np.zeros((S, G), float)
-        den = np.zeros((G,), float)
-
-        for start in range(0, N, int(chunk_size)):
-            stop = min(N, start + int(chunk_size))
-            xs = x_N[start:stop]                       # (n,)
-            rs = resp_SxN[:, start:stop]               # (S,n)
-            z = (xs[:, None] - xg_G[None, :]) / h      # (n,G)
-            w = K(z)                                   # (n,G)
-            den += w.sum(axis=0)
-            num += rs @ w
-
-        den = den + eps
-        return num / den[None, :], den
-
-    out = {}
-
-    for t in treat_levels:
-        dt = d.loc[d[treat_col] == t].copy()
-        if dt.empty:
-            continue
-
-        # common x-grid per treatment (align all tags in panel)
-        x_all = dt["_x"].to_numpy(float)
-        xmin = float(np.nanmin(x_all))
-        xmax = float(np.nanmax(x_all))
-        if not np.isfinite(xmin) or not np.isfinite(xmax) or xmax <= xmin:
-            continue
-
-        xg = np.linspace(xmin, xmax, int(n_grid)).astype(float)
-        h = float(bandwidth)
-        if not np.isfinite(h) or h <= 0:
-            raise ValueError("bandwidth must be positive and finite.")
-
-        out[t] = {
-            "label": labels.get(t, str(t)),
-            "x_mid": xg,
-            "bandwidth": h,
-            "tags": {},
-        }
-
-        for tg, g in dt.groupby(tag_col, observed=False):
-            j = g["_rowpos"].to_numpy(int)
-            if j.size == 0:
-                continue
-
-            x_tg = g["_x"].to_numpy(float)
-            x_tg = x_tg[np.isfinite(x_tg)]
-            if x_tg.size < 2:
-                continue
-
-            x_min_tg = float(np.nanmin(x_tg))
-            x_max_tg = float(np.nanmax(x_tg))
-
-            resp_tg = resp[:, j]  # (S, N_tag)
-            curve_SxG, den_G = _smooth_one_tag(resp_tg, g["_x"].to_numpy(float), xg, h)
-
-            # ---- TRUNCATION (critical): mask outside the individual's observed support ----
-            mask = np.zeros_like(xg, dtype=bool)
-
-            if truncate_to_data_range:
-                mask |= (xg < x_min_tg) | (xg > x_max_tg)
-
-            if truncate_by_weight:
-                thr = float(den_frac) * float(np.nanmax(den_G))
-                mask |= (den_G < thr)
-
-            if mask.any():
-                curve_SxG[:, mask] = np.nan  # breaks line & band beyond data
-
-            tg_mean = np.nanmean(curve_SxG, axis=0)
-            tg_hdi = hdi_along_samples_2col(curve_SxG, prob=hdi_prob)
-
-            out[t]["tags"][tg] = {
-                "mean": tg_mean,
-                "lo": tg_hdi[:, 0],
-                "hi": tg_hdi[:, 1],
-                "n_obs": int(j.size),
-                "x_min": x_min_tg,
-                "x_max": x_max_tg,
-            }
-
-    return treat_levels, out
-
+    treat_levels, _pop_out, tag_out = _directedness_curves_impl(
+        df, resp_draws,
+        tag_col=tag_col, treat_col=treat_col, treat_name_col=treat_name_col,
+        x_kind=x_kind, last_n_steps=last_n_steps, steps_x_units=steps_x_units,
+        step_length_m=step_length_m, dist_col=dist_col, dist_clip_q=dist_clip_q,
+        window=window, gap_col=gap_col, bin_width_m=bin_width_m,
+        hdi_prob=hdi_prob, eps=eps, min_tags_at_x=1,
+    )
+    return treat_levels, tag_out

@@ -160,27 +160,57 @@ band_table <- function(draws, x, treatment, source, kind, equal_tail = FALSE) {
   data.frame(x = x, median = apply(draws, 1, median), low = bounds[, 1],
     high = bounds[, 2], treatment = treatment, source = source, kind = kind)
 }
+# Recency-weighted trailing directedness smoother (issue #142).
+# R twin of smooth_directedness() in notebooks/goldshtein_bats_posthoc.py.
+#
+# scores: [steps x draws] matrix for ONE animal in recorded-step order.
+# valid: per-step logical, FALSE = missing/unusable heading (the row keeps
+#   its values and resets the trailing history).
+# gap_before: per-step logical, TRUE = heading crosses a tracking gap (the
+#   row keeps its raw score but never enters the history, and history
+#   restarts at the following step).
+#
+# alpha = 2 / (1 + sqrt(W)); decay = 1 - alpha; a finite trailing
+# exponential window with normalized partial weights at segment starts --
+# NOT an infinite recursive EMA. window = 1L returns the input exactly.
+# Never apply this in order of a plotted coordinate (distance to the
+# destination is not monotone in time) and never backward.
+smooth_directedness <- function(scores, valid, gap_before, window = 10L) {
+  if (is.logical(window)) stop("window must be an integer in 1..20")
+  window <- as.integer(window)
+  if (length(window) != 1L || is.na(window) || window < 1L || window > 20L) {
+    stop("window must be an integer in 1..20")
+  }
+  if (!is.matrix(scores)) stop("scores must be a [steps x draws] matrix")
+  if (length(valid) != nrow(scores) || length(gap_before) != nrow(scores)) {
+    stop("expected scores[steps, draws] and aligned step masks")
+  }
+  valid <- as.logical(valid)
+  gap_before <- as.logical(gap_before)
+  vs <- scores[valid, , drop = FALSE]
+  if (nrow(vs) > 0L && (any(!is.finite(vs)) || any(vs < 0) || any(vs > 1))) {
+    stop("valid steps must have finite scores in [0, 1]")
+  }
 
-# Gaussian smoothing per tag, equal-tag averaging per posterior draw,
-# range/weight truncation, and weighted population post-smoothing. The
-# draws matrix (per-step scores, [rows x draws]) is a parameter so the
-# same machinery serves the directional-evidence view (default below)
-# and the original directed-component probability view (pass resp).
-smooth_population <- function(draws, grid, counts, bandwidth = 240) {
-  spacing <- median(diff(grid))
-  sigma <- bandwidth / spacing
-  if (sigma < 0.5) return(draws)
-  radius <- ceiling(4 * sigma)
-  offsets <- seq.int(-radius, radius)
-  kernel <- exp(-0.5 * (offsets / sigma)^2)
-  safe <- draws
-  safe[!is.finite(safe)] <- 0
-  out <- matrix(NA_real_, nrow(draws), ncol(draws))
-  for (g in seq_along(grid)) {
-    ii <- g + offsets
-    valid <- ii >= 1L & ii <= length(grid)
-    w <- kernel[valid] * counts[ii[valid]]
-    if (sum(w) > 1e-12) out[g, ] <- colSums(safe[ii[valid], , drop = FALSE] * w) / sum(w)
+  out <- scores
+  if (window == 1L) return(out)
+
+  alpha <- 2 / (1 + sqrt(window))
+  decay <- 1 - alpha
+  history <- integer(0)
+  for (i in seq_len(nrow(scores))) {
+    if (!valid[i] || gap_before[i]) {
+      # Missing rows retain their missing values; valid gap-crossing rows
+      # retain their raw scores, but never enter the history.
+      history <- integer(0)
+      next
+    }
+    history <- c(history, i)
+    if (length(history) > window) {
+      history <- history[seq.int(length(history) - window + 1L, length(history))]
+    }
+    w <- decay ^ rev(seq_along(history) - 1L)
+    out[i, ] <- colSums(scores[history, , drop = FALSE] * (w / sum(w)))
   }
   out
 }
@@ -194,42 +224,91 @@ summarize_curve <- function(curve, grid, treatment, tag = NA_character_, hdi_pro
     treatment = treatment, tag = tag)
 }
 
-make_curves <- function(kind, draws, hdi_prob = 0.95) {
+# Curves for one view (issue #142). draws is [nrow(df_track) x draws]: the
+# per-step posterior directedness, one row per recorded step.
+#
+# The trailing exponential filter smooth_directedness() is the ONLY smoother:
+# it runs per animal along RECORDED steps over the animal's full sequence
+# (missing rows and tracking gaps reset the history; gap-crossing headings
+# keep their raw score but never enter a window). Only then are the
+# already-smoothed step scores mapped onto the plotting grid by equal-width
+# binning: each joint draw's value in a bin is the plain mean of that
+# animal's smoothed steps whose x falls in the bin. Binning is aggregation
+# over repeated / nonmonotone x values at the SAME x -- not a decay
+# smoother: it fills no bin an animal has no steps in, so unsupported
+# ranges and tracking gaps are never bridged and nothing is extrapolated.
+# Equal-animal averaging happens per joint draw; grid cells with fewer than
+# two contributing animals are dropped; means and intervals are computed
+# ACROSS the smoothed joint draws (never of interval endpoints). W defaults
+# to 10 (the issue's default); window = 1L plots the raw step scores.
+make_curves <- function(kind, draws, hdi_prob = 0.90, window = 10L, bin_width = NULL,
+                        min_tags_at_x = 2L) {
   x <- df_track$dist_to_dest_grad_m
+  in_window <- rep(TRUE, nrow(df_track))
   if (kind == "steps_from_end") {
     x <- ave(seq_len(nrow(df_track)), df_track$tag,
       FUN = function(ii) (seq_along(ii) - length(ii)) * 60)
+    in_window <- x >= -110 * 60 & x <= 0
+  } else if (kind != "distance") {
+    stop("kind must be 'distance' or 'steps_from_end'")
   }
-  G <- if (quick_run) 400L else 2000L
+  if (is.null(bin_width)) bin_width <- if (kind == "steps_from_end") 60 else 250
+  if (!(bin_width > 0)) stop("bin_width must be positive")
+  gap <- !is.na(df_track$gap_before) & as.logical(df_track$gap_before)
+  eligible <- in_window & is.finite(x)
   population <- individual <- list()
+
+  # Per-treatment bin grids (bin centres are the plotting grid), built from
+  # eligible rows; smoothing itself ignores the plotting range entirely.
+  grids <- list()
   for (t in levels(df_track$treatment)) {
-    eligible <- which(df_track$treatment == t & is.finite(x))
-    if (kind == "steps_from_end") eligible <- eligible[x[eligible] >= -110 * 60]
-    grid <- seq(min(x[eligible]), max(x[eligible]), length.out = G)
-    total <- matrix(0, G, ncol(draws))
-    counts <- numeric(G)
-    tags <- split(eligible, droplevels(df_track$tag[eligible]))
-    for (tag in names(tags)) {
-      ii <- tags[[tag]]
-      if (length(ii) < 2L) next
-      # Explicit [grid x observations] kernel, [grid x draws] prediction.
-      weights <- exp(-0.5 * (outer(grid, x[ii], "-") / 120)^2)
-      denominator <- rowSums(weights) + 1e-12
-      curve <- (weights %*% draws[ii, , drop = FALSE]) / denominator
-      valid <- grid >= min(x[ii]) & grid <= max(x[ii]) &
-        denominator >= 0.01 * max(denominator)
-      total[valid, ] <- total[valid, , drop = FALSE] + curve[valid, , drop = FALSE]
-      counts[valid] <- counts[valid] + 1L
-      curve[!valid, ] <- NA_real_
-      individual[[paste(t, tag)]] <- summarize_curve(curve, grid, t, tag, hdi_prob)
-    }
-    curve <- total / pmax(counts, 1)
-    curve[counts < 2L, ] <- NA_real_
-    support <- counts
-    support[counts < 2L] <- 0
-    curve <- smooth_population(curve, grid, support, bandwidth = 240)
-    curve[counts < 2L, ] <- NA_real_
-    population[[t]] <- summarize_curve(curve, grid, t, hdi_prob)
+    xs <- x[eligible & df_track$treatment == t]
+    if (!length(xs)) next
+    lo_edge <- floor(min(xs) / bin_width) * bin_width
+    n_bins <- ceiling((max(xs) - lo_edge) / bin_width) + 1L
+    grids[[t]] <- list(lo = lo_edge, n = n_bins,
+      x_mid = lo_edge + bin_width * (seq_len(n_bins) - 1L),  # bin-start labels
+      tot = matrix(0, n_bins, ncol(draws)), cnt = numeric(n_bins))
+  }
+
+  # One pass per animal: smooth in recorded-step order, then bin.
+  tag_rows <- split(seq_len(nrow(df_track)), droplevels(df_track$tag))
+  for (tag in names(tag_rows)) {
+    ii <- tag_rows[[tag]]
+    t <- as.character(df_track$treatment[ii[1]])
+    g <- grids[[t]]
+    if (is.null(g)) next
+    xs <- x[ii]
+    valid <- is.finite(xs) & rowSums(is.finite(draws[ii, , drop = FALSE])) == ncol(draws)
+    sm <- smooth_directedness(draws[ii, , drop = FALSE], valid, gap[ii], window)
+    b <- floor((xs - g$lo) / bin_width) + 1L
+    keep <- which(eligible[ii] & valid & b >= 1L & b <= g$n)
+    if (!length(keep)) next
+    bg <- factor(b[keep], levels = seq_len(g$n))
+    cnt <- as.numeric(table(bg))
+    rs <- rowsum(sm[keep, , drop = FALSE], group = bg)
+    sums <- matrix(0, g$n, ncol(draws))
+    sums[match(rownames(rs), as.character(seq_len(g$n))), ] <- as.matrix(rs)
+    have <- cnt > 0
+    tag_curve <- matrix(NA_real_, g$n, ncol(draws))
+    tag_curve[have, ] <- sums[have, , drop = FALSE] / cnt[have]
+
+    individual[[paste(t, tag)]] <- summarize_curve(tag_curve, g$x_mid, t, tag, hdi_prob)
+    g$tot[have, ] <- g$tot[have, , drop = FALSE] + tag_curve[have, , drop = FALSE]
+    g$cnt[have] <- g$cnt[have] + 1
+    grids[[t]] <- g
+  }
+
+  # Equal-animal average per joint draw; minimum-two-animal population rule;
+  # intervals across draws.
+  for (t in names(grids)) {
+    g <- grids[[t]]
+    if (!any(g$cnt > 0)) next
+    curve <- matrix(NA_real_, g$n, ncol(draws))
+    have <- g$cnt > 0
+    curve[have, ] <- g$tot[have, , drop = FALSE] / g$cnt[have]
+    curve[g$cnt < min_tags_at_x, ] <- NA_real_
+    population[[t]] <- summarize_curve(curve, g$x_mid, t, hdi_prob = hdi_prob)
   }
   list(population = do.call(rbind, population), individual = do.call(rbind, individual))
 }
