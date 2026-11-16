@@ -20,6 +20,8 @@ from pathlib import Path
 
 import math
 import os
+import warnings
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
@@ -93,6 +95,54 @@ def _save(fig, save, save_path, transparent=False, dpi=300):
         return
     _plots.save_by_path(fig, FIG_DIR, save_path,
                         transparent=transparent, dpi=dpi)
+
+
+@contextmanager
+def _cartodb_quiet():
+    """Silence contextily's 'CartoDB tiles now require an API key' notice
+    while tiles are fetched or their URLs built. The tiles still render
+    fine (the key is not enforced for these figures), so the notice is
+    noise the published notebook should not surface."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="CartoDB tiles now require an API key.*",
+            category=UserWarning)
+        yield
+
+
+def _carto_auth(source):
+    """Attach a CARTO basemap API key to a basemap source when one is
+    configured. The key is read from the ``CARTO_API_KEY`` environment
+    variable (it is never stored in the repository); requests made with
+    it are served against the key instead of the anonymous pool, which
+    is being throttled with watermarked 'API key required' block tiles.
+    xyzservices CartoDB providers carry the key through a ``{apikey}``
+    template variable, so this sets it on a copy of the provider; with
+    the variable unset the source is returned unchanged and public
+    readers keep the anonymous fallback."""
+    key = os.environ.get("CARTO_API_KEY", "")
+    if not key:
+        return source
+    if isinstance(source, dict):
+        existing = str(source.get("apikey") or "")
+        if existing and "<insert your" not in existing:
+            return source
+        url = str(source.get("url", ""))
+        if "cartocdn.com" not in url:
+            return source
+        provider = source.copy()
+        provider["apikey"] = key
+        return provider
+    url = str(getattr(source, "url", source))
+    if "cartocdn.com" not in url:
+        return source
+    if "{apikey}" in url:
+        return url.replace("{apikey}", key)
+    if "?key=" in url:
+        return source
+    # CARTO's documented parameter name for plain URL templates.
+    return f"{url}?key={key}"
 
 
 # ------------------------------------------------------------------
@@ -679,7 +729,8 @@ def plot_destination_panels(
         if basemap_retina and hasattr(basemap_source, "build_url"):
             try:
                 # returns a URL string with {r} filled (provider supports retina via {r})
-                basemap_source = basemap_source.build_url(r="@2x")
+                with _cartodb_quiet():
+                    basemap_source = _carto_auth(basemap_source).build_url(r="@2x")
             except Exception:
                 pass
 
@@ -705,14 +756,15 @@ def plot_destination_panels(
 
             # basemap (higher zoom and/or retina improves apparent raster detail)
             try:
-                cx.add_basemap(
-                    ax,
-                    source=basemap_source,
-                    attribution=False,
-                    alpha=basemap_alpha,
-                    zoom=basemap_zoom,              # None = auto; set e.g. 14/15/16 for sharper tiles
-                    interpolation=basemap_interpolation,
-                )
+                with _cartodb_quiet():
+                    cx.add_basemap(
+                        ax,
+                        source=_carto_auth(basemap_source),
+                        attribution=False,
+                        alpha=basemap_alpha,
+                        zoom=basemap_zoom,              # None = auto; set e.g. 14/15/16 for sharper tiles
+                        interpolation=basemap_interpolation,
+                    )
             except Exception as e:
                 print("Basemap failed (continuing without tiles):", e)
 
@@ -907,7 +959,8 @@ def plot_destination_panels_compact(
 
         # basemap (already raster by nature)
         try:
-            cx.add_basemap(ax, source=cx.providers.CartoDB.PositronNoLabels, attribution=False, alpha=basemap_alpha)
+            with _cartodb_quiet():
+                cx.add_basemap(ax, source=_carto_auth(cx.providers.CartoDB.PositronNoLabels), attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 
@@ -1335,7 +1388,8 @@ def plot_destination_flow_fields(
 
         if show_basemap:
             try:
-                cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+                with _cartodb_quiet():
+                    cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
             except Exception as e:
                 print("Basemap failed (continuing without tiles):", e)
 
@@ -4169,7 +4223,8 @@ def plot_tracks_pgoal_viridis(
 
         # basemap
         try:
-            cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+            with _cartodb_quiet():
+                cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 
@@ -4577,7 +4632,8 @@ def plot_tracks_pgoal_small_bigfont(
 
         # basemap (already raster by nature)
         try:
-            cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+            with _cartodb_quiet():
+                cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 

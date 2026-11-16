@@ -8,7 +8,7 @@ repo_url: https://github.com/jgraving/unwrap
 plugins:
   - mkdocs-jupyter:
       execute: false
-      markdown_cell_processor: mkdocs
+      markdown_cell_processor: jupyter
       custom_template: docs/jupyter_templates/notebook.html.j2
 hooks:
   - docs_hooks/notebook_css.py

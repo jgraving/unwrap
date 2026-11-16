@@ -19,6 +19,8 @@ Palette: pre-stimulus is orange, post-stimulus is purple (colorblind-safe).
 """
 from pathlib import Path
 
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -88,6 +90,20 @@ def _save(fig, save, save_path):
     if not save:
         return
     _plots.save_by_path(fig, FIG_DIR, save_path)
+
+
+def _tight_layout(fig):
+    """``fig.tight_layout()`` without the benign 'Axes are not compatible'
+    UserWarning: this grid carries inset/twin axes that tight_layout skips
+    around, so the layout is correct and the warning is noise the published
+    notebook should not surface."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="This figure includes Axes that are not compatible with "
+                    "tight_layout",
+            category=UserWarning)
+        fig.tight_layout()
 
 
 
@@ -233,7 +249,7 @@ def plot_summary(idata, df_blocks, *, save=True,
     fig.legend(handles=handles, loc="lower center", ncol=2, frameon=True,
                bbox_to_anchor=(0.5, 0.01), columnspacing=1.2, handletextpad=0.6)
 
-    plt.tight_layout()
+    _tight_layout(fig)
     _save(fig, save, save_path)
     return fig
 

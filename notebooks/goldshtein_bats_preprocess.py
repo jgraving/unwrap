@@ -889,8 +889,11 @@ def harmonic_target_vector_to_polygon(
     tx = -du_dx
     ty = -du_dy
     norm = np.hypot(tx, ty)
-    tx = np.where(norm > 0, tx / norm, np.nan)
-    ty = np.where(norm > 0, ty / norm, np.nan)
+    # np.where pre-evaluates both branches, so the guarded division briefly
+    # hits 0/0 at the norm == 0 cells; the fallback value is already correct.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        tx = np.where(norm > 0, tx / norm, np.nan)
+        ty = np.where(norm > 0, ty / norm, np.nan)
 
     # Bilinear sample at points
     fx = (x - x_centers[0]) / res
@@ -1009,8 +1012,11 @@ def smoothed_distance_target_vector_to_polygon(
     tx = -dd_dx
     ty = -dd_dy
     norm = np.hypot(tx, ty)
-    tx = np.where(norm > 0, tx / norm, np.nan)
-    ty = np.where(norm > 0, ty / norm, np.nan)
+    # np.where pre-evaluates both branches, so the guarded division briefly
+    # hits 0/0 at the norm == 0 cells; the fallback value is already correct.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        tx = np.where(norm > 0, tx / norm, np.nan)
+        ty = np.where(norm > 0, ty / norm, np.nan)
 
     # Bilinear sample at points
     fx = (x - x_centers[0]) / res

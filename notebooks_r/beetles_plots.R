@@ -254,8 +254,11 @@ to360 <- function(rad) (rad * 180 / pi + 360) %% 360
     label = txt, size = 3.6, fontface = "bold", hjust = 0, vjust = 1,
     colour = "black")
   p_g_mu <- ggplot(add_key(df_gmu), aes(x = x, y = y)) +
-    geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.3) +
-    geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.3) +
+    # na.rm: bootstrap-CI ends missing or outside the panel scale are
+    # intentionally dropped (they are simply not drawn); the stat warning
+    # would only be noise in the published notebook.
+    geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.3, na.rm = TRUE) +
+    geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.3, na.rm = TRUE) +
     geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.5) +
     scale_colour_manual(values = ppc_cond_colors, guide = "none") +
     scale_fill_manual(values = ppc_fill_vals, guide = "none") +
@@ -267,10 +270,10 @@ to360 <- function(rad) (rad * 180 / pi + 360) %% 360
     panel_label("a.", 4, 1.32) +
     theme_classic(base_size = 10) +
     theme(plot.title = element_text(hjust = 0.5, size = 11.5),
-      legend.position = "none", clip = "on")
+      legend.position = "none")
   p_gr <- ggplot(add_key(df_gr), aes(x = x, y = y)) +
-    geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.3) +
-    geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.3) +
+    geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.3, na.rm = TRUE) +
+    geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.3, na.rm = TRUE) +
     geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.5) +
     scale_colour_manual(values = ppc_cond_colors, guide = "none") +
     scale_fill_manual(values = ppc_fill_vals, guide = "none") +
@@ -281,7 +284,7 @@ to360 <- function(rad) (rad * 180 / pi + 360) %% 360
     panel_label("b.", 0.02, 1.32) +
     theme_classic(base_size = 10) +
     theme(plot.title = element_text(hjust = 0.5, size = 11.5),
-      legend.position = "none", clip = "on")
+      legend.position = "none")
   # Per-individual rows: open bootstrap (y - 0.14) under filled posterior
   # (y + 0.14) for every beetle in every condition.
   ind_mu_off <- ind_mu_on <- NULL
@@ -320,8 +323,8 @@ to360 <- function(rad) (rad * 180 / pi + 360) %% 360
   ind_mu_panel <- function(rows, lab, show_labels, xlab) {
     ggplot(add_key(rows), aes(x = x, y = y)) +
       ind_grid +
-      geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25) +
-      geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25) +
+      geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25, na.rm = TRUE) +
+      geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25, na.rm = TRUE) +
       geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.9) +
       scale_colour_manual(values = ppc_cond_colors, guide = "none") +
       scale_fill_manual(values = ppc_fill_vals, guide = "none") +
@@ -331,13 +334,13 @@ to360 <- function(rad) (rad * 180 / pi + 360) %% 360
       labs(x = xlab, y = "") +
       panel_label(lab, 3, 0.3) +
       theme_classic(base_size = 9) +
-      theme(legend.position = "none", clip = "on")
+      theme(legend.position = "none")
   }
   ind_r_panel <- function(rows, lab, show_labels, xlab) {
     ggplot(add_key(rows), aes(x = x, y = y)) +
       ind_grid +
-      geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25) +
-      geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25) +
+      geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25, na.rm = TRUE) +
+      geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25, na.rm = TRUE) +
       geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.9) +
       scale_colour_manual(values = ppc_cond_colors, guide = "none") +
       scale_fill_manual(values = ppc_fill_vals, guide = "none") +
@@ -347,7 +350,7 @@ to360 <- function(rad) (rad * 180 / pi + 360) %% 360
       labs(x = xlab, y = "") +
       panel_label(lab, 0.55, 0.3) +
       theme_classic(base_size = 9) +
-      theme(legend.position = "none", clip = "on")
+      theme(legend.position = "none")
   }
   p_c <- ind_mu_panel(ind_mu_off, "c.", TRUE, "")
   p_d <- ind_mu_panel(ind_mu_on, "d.", FALSE, "Individual mean direction (deg)")
