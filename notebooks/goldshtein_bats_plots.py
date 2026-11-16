@@ -111,6 +111,23 @@ def _cartodb_quiet():
         yield
 
 
+def _carto_auth(source):
+    """Attach a CARTO basemap API key to a basemap source when one is
+    configured. The key is read from the ``CARTO_API_KEY`` environment
+    variable (it is never stored in the repository); requests made with
+    it are served against the key instead of the anonymous pool, which
+    is being throttled with watermarked 'API KEY REQUIRED' tiles. With
+    the variable unset the source is returned unchanged, and public
+    readers of the notebook keep working anonymously."""
+    key = os.environ.get("CARTO_API_KEY", "")
+    if not key:
+        return source
+    url = str(getattr(source, "url", source))
+    if "cartocdn.com" not in url:
+        return source
+    return f"{url}?api_key={key}"
+
+
 # ------------------------------------------------------------------
 #: colorbar/axis name of the posterior-directedness view (per step, the
 #: directed component's share of the combined directed + undirected
@@ -725,7 +742,7 @@ def plot_destination_panels(
                 with _cartodb_quiet():
                     cx.add_basemap(
                         ax,
-                        source=basemap_source,
+                        source=_carto_auth(basemap_source),
                         attribution=False,
                         alpha=basemap_alpha,
                         zoom=basemap_zoom,              # None = auto; set e.g. 14/15/16 for sharper tiles
@@ -926,7 +943,7 @@ def plot_destination_panels_compact(
         # basemap (already raster by nature)
         try:
             with _cartodb_quiet():
-                cx.add_basemap(ax, source=cx.providers.CartoDB.PositronNoLabels, attribution=False, alpha=basemap_alpha)
+                cx.add_basemap(ax, source=_carto_auth(cx.providers.CartoDB.PositronNoLabels), attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 
@@ -1355,7 +1372,7 @@ def plot_destination_flow_fields(
         if show_basemap:
             try:
                 with _cartodb_quiet():
-                    cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+                    cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
             except Exception as e:
                 print("Basemap failed (continuing without tiles):", e)
 
@@ -4190,7 +4207,7 @@ def plot_tracks_pgoal_viridis(
         # basemap
         try:
             with _cartodb_quiet():
-                cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+                cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 
@@ -4599,7 +4616,7 @@ def plot_tracks_pgoal_small_bigfont(
         # basemap (already raster by nature)
         try:
             with _cartodb_quiet():
-                cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+                cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 
