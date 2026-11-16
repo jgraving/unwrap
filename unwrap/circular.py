@@ -251,7 +251,7 @@ def _circular_mcse(samples, batches=5):
 
 
 def circular_summary(idata, var_names=None, circ_var_names=(), *, hdi_prob=0.94,
-                     skipna=False, group="posterior"):
+                     skipna=False, group="posterior", circ_diag="linear"):
     """``az.summary`` with the circular columns arviz 1.x dropped.
 
     arviz 0.23's ``az.summary(..., circ_var_names=[...])`` replaced the
@@ -268,10 +268,24 @@ def circular_summary(idata, var_names=None, circ_var_names=(), *, hdi_prob=0.94,
     (``mean, sd, hdi_<p>%/hdi_<100-p>%/mcse_mean, mcse_sd, ess_bulk,
     ess_tail, r_hat``) and the circular columns recomputed for the named
     rows (rounded the way 0.23's auto rounding did).
+
+    ``circ_diag`` selects the ``r_hat``/ESS treatment for the rows named
+    in ``circ_var_names`` (issue #117). The default ``"linear"`` keeps
+    arviz 0.23's verbatim behaviour: both diagnostics on the raw angles,
+    which are not angle-origin invariant. ``"circular"`` mirrors the R
+    twins' ``diagnose_fit``: ``r_hat`` uses the ``Rhat_unwrap`` sine
+    convention, ``max(rhat(sin x), rhat(cos x))``, and both ESS columns
+    are recomputed on the deviations centred on the circular mean,
+    ``wrap(x - circ_mean(x))`` (tail ESS requested at 0.05/0.95). These
+    are invariant to the angle origin, so chains that converged on the
+    circle while sitting in different ``2*pi`` wrap classes are not
+    misread as unconverged near the ``+-pi`` seam.
     """
     import arviz as az
     from arviz_base.labels import IdxLabeller
 
+    if circ_diag not in ("linear", "circular"):
+        raise ValueError("circ_diag must be 'linear' or 'circular'")
     base = az.summary(idata, var_names=var_names, ci_prob=hdi_prob,
                       ci_kind="hdi", kind="all", skipna=skipna, group=group)
     if not circ_var_names:
@@ -303,6 +317,26 @@ def circular_summary(idata, var_names=None, circ_var_names=(), *, hdi_prob=0.94,
             out.loc[label, f"hdi_{pct_lo}%"] = round(float(h_lo), 3)
             out.loc[label, f"hdi_{pct_hi}%"] = round(float(h_hi), 3)
             out.loc[label, "mcse_mean"] = round(_circular_mcse(a), 3)
+            if circ_diag == "circular":
+                # Convergence diagnostics with the R twins' circular
+                # treatment (issue #117); az.rhat/az.ess take the
+                # [chain, draw] array directly. The stored draws keep the
+                # chain dimension even for scalar variables.
+                arr = np.asarray(values, float)
+                if arr.ndim == 1:
+                    arr = arr[np.newaxis, :]
+                # float() raises rather than silently picking one chain if
+                # a diagnostic ever stops returning a single scalar.
+                r_hat = max(float(az.rhat(np.sin(arr))),
+                            float(az.rhat(np.cos(arr))))
+                dev = wrap_pi(arr - float(scs.circmean(a, high=np.pi,
+                                                       low=-np.pi,
+                                                       nan_policy=nan_policy)))
+                out.loc[label, "r_hat"] = round(r_hat, 3)
+                out.loc[label, "ess_bulk"] = round(
+                    float(az.ess(dev, method="bulk")), 3)
+                out.loc[label, "ess_tail"] = round(float(
+                    az.ess(dev, method="tail", prob=(0.05, 0.95))), 3)
     return out
 
 
