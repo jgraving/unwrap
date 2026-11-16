@@ -20,6 +20,8 @@ from pathlib import Path
 
 import math
 import os
+import warnings
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
@@ -93,6 +95,20 @@ def _save(fig, save, save_path, transparent=False, dpi=300):
         return
     _plots.save_by_path(fig, FIG_DIR, save_path,
                         transparent=transparent, dpi=dpi)
+
+
+@contextmanager
+def _cartodb_quiet():
+    """Silence contextily's 'CartoDB tiles now require an API key' notice
+    while tiles are fetched or their URLs built. The tiles still render
+    fine (the key is not enforced for these figures), so the notice is
+    noise the published notebook should not surface."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="CartoDB tiles now require an API key.*",
+            category=UserWarning)
+        yield
 
 
 # ------------------------------------------------------------------
@@ -679,7 +695,8 @@ def plot_destination_panels(
         if basemap_retina and hasattr(basemap_source, "build_url"):
             try:
                 # returns a URL string with {r} filled (provider supports retina via {r})
-                basemap_source = basemap_source.build_url(r="@2x")
+                with _cartodb_quiet():
+                    basemap_source = basemap_source.build_url(r="@2x")
             except Exception:
                 pass
 
@@ -705,14 +722,15 @@ def plot_destination_panels(
 
             # basemap (higher zoom and/or retina improves apparent raster detail)
             try:
-                cx.add_basemap(
-                    ax,
-                    source=basemap_source,
-                    attribution=False,
-                    alpha=basemap_alpha,
-                    zoom=basemap_zoom,              # None = auto; set e.g. 14/15/16 for sharper tiles
-                    interpolation=basemap_interpolation,
-                )
+                with _cartodb_quiet():
+                    cx.add_basemap(
+                        ax,
+                        source=basemap_source,
+                        attribution=False,
+                        alpha=basemap_alpha,
+                        zoom=basemap_zoom,              # None = auto; set e.g. 14/15/16 for sharper tiles
+                        interpolation=basemap_interpolation,
+                    )
             except Exception as e:
                 print("Basemap failed (continuing without tiles):", e)
 
@@ -907,7 +925,8 @@ def plot_destination_panels_compact(
 
         # basemap (already raster by nature)
         try:
-            cx.add_basemap(ax, source=cx.providers.CartoDB.PositronNoLabels, attribution=False, alpha=basemap_alpha)
+            with _cartodb_quiet():
+                cx.add_basemap(ax, source=cx.providers.CartoDB.PositronNoLabels, attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 
@@ -1335,7 +1354,8 @@ def plot_destination_flow_fields(
 
         if show_basemap:
             try:
-                cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+                with _cartodb_quiet():
+                    cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
             except Exception as e:
                 print("Basemap failed (continuing without tiles):", e)
 
@@ -4169,7 +4189,8 @@ def plot_tracks_pgoal_viridis(
 
         # basemap
         try:
-            cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+            with _cartodb_quiet():
+                cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 
@@ -4577,7 +4598,8 @@ def plot_tracks_pgoal_small_bigfont(
 
         # basemap (already raster by nature)
         try:
-            cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
+            with _cartodb_quiet():
+                cx.add_basemap(ax, source=basemap_source, attribution=False, alpha=basemap_alpha)
         except Exception as e:
             print("Basemap failed (continuing without tiles):", e)
 
