@@ -23,6 +23,7 @@ tab10 brown (diamonds) and kappa coefficients tab10 green (triangles).
 from pathlib import Path
 
 import textwrap
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -71,6 +72,20 @@ def _save(fig, save, save_path, transparent=False):
     if not save:
         return
     _plots.save_by_path(fig, FIG_DIR, save_path, transparent=transparent)
+
+
+def _tight_layout(fig):
+    """``fig.tight_layout()`` without the benign 'Axes are not compatible'
+    UserWarning: these grids carry colorbar/inset axes that tight_layout
+    skips around, so the layout is correct and the warning is noise the
+    published notebook should not surface."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="This figure includes Axes that are not compatible with "
+                    "tight_layout",
+            category=UserWarning)
+        fig.tight_layout()
 
 
 # ---------------------------------------------------------------------------
@@ -779,7 +794,7 @@ def plot_elpd0(idata, df, *, save=True,
     ax2.set_ylim(0.0, 1.0)
 
     fig.tight_layout()
-    _save(fig, save, save_path, transparent=True)
+    _save(fig, save, save_path)
     plt.show()
 
 
@@ -1235,7 +1250,7 @@ def plot_alignment_ppc_bootstrap(idata, df, *, save=True,
                       frameon=True, loc="upper right", borderaxespad=0.1,
                       handlelength=1.2)
 
-    fig.tight_layout()
+    _tight_layout(fig)
     _save(fig, save, save_path)
     plt.show()
 
@@ -1385,7 +1400,7 @@ def plot_cell_ppc_dots(idata, df, *, save=True,
         ax.set_ylabel("")
         ax.axhline(0, linestyle="--", color="k", zorder=0)
 
-    fig.tight_layout()
+    _tight_layout(fig)
     _save(fig, save, save_path)
     plt.show()
 
