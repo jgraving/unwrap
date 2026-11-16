@@ -96,6 +96,7 @@ repo_root <- if (file.exists(file.path("..", "R", "unwrap_family.R"))) {
 
 source(file.path(repo_root, "R", "unwrap_family.R"))
 source(file.path(repo_root, "R", "unwrap_functions.R"))
+source(file.path(repo_root, "R", "unwrap_helpers.R"))
 source(file.path(repo_root, "notebooks_r", "periodic_not_circular_posthoc.R"))
 source(file.path(repo_root, "notebooks_r", "periodic_not_circular_plots.R"))
 
