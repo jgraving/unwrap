@@ -323,8 +323,8 @@ to360 <- function(rad) (rad * 180 / pi + 360) %% 360
   ind_mu_panel <- function(rows, lab, show_labels, xlab) {
     ggplot(add_key(rows), aes(x = x, y = y)) +
       ind_grid +
-      geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25) +
-      geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25) +
+      geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25, na.rm = TRUE) +
+      geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25, na.rm = TRUE) +
       geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.9) +
       scale_colour_manual(values = ppc_cond_colors, guide = "none") +
       scale_fill_manual(values = ppc_fill_vals, guide = "none") +
@@ -339,8 +339,8 @@ to360 <- function(rad) (rad * 180 / pi + 360) %% 360
   ind_r_panel <- function(rows, lab, show_labels, xlab) {
     ggplot(add_key(rows), aes(x = x, y = y)) +
       ind_grid +
-      geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25) +
-      geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25) +
+      geom_segment(aes(xend = xlo, yend = y, colour = cond), linewidth = 0.25, na.rm = TRUE) +
+      geom_segment(aes(xend = xhi, yend = y, colour = cond), linewidth = 0.25, na.rm = TRUE) +
       geom_point(aes(shape = cond, colour = cond, fill = key), size = 1.9) +
       scale_colour_manual(values = ppc_cond_colors, guide = "none") +
       scale_fill_manual(values = ppc_fill_vals, guide = "none") +
