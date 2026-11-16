@@ -76,8 +76,12 @@ show_figure <- function(plot, name, width, height, res = 110) {
 # All figure call sites in the current examples pass width and height
 # explicitly; the defaults only serve a standalone script calling bare.
 save_figure <- function(plot, name, width = 8, height = 4) {
+  # cairo_pdf instead of the default pdf device: the Type-1 fonts behind
+  # grDevices::pdf cannot encode Greek axis labels (mu/kappa), which both
+  # warns (mbcsToSbcs) and silently degrades the vector copy; cairo_pdf
+  # shapes the same text the inline ragg PNG already shows, warning-free.
   ggsave(file.path(FIG_DIR, paste0(name, ".pdf")), plot,
-         width = width, height = height)
+         width = width, height = height, device = grDevices::cairo_pdf)
   show_figure(plot, name, width, height)
 }
 

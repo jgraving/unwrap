@@ -884,7 +884,7 @@ tag_hdi_plot <- function(quantity, label, reference = NULL, xlimits = NULL) {
     panel <- ggplot(sub, aes(mean, y = seq_len(ny))) +
       annotate("rect", xmin = poprow$low, xmax = poprow$high,
         ymin = 0.5, ymax = ny + 0.5,
-        fill = "#d9d9d9", colour = NA, inherit.aes = FALSE) +
+        fill = "#d9d9d9", colour = NA) +
       geom_vline(xintercept = poprow$mean, linewidth = 0.3, colour = "#000000") +
       geom_errorbar(aes(xmin = low, xmax = high, colour = treatment),
         orientation = "y", width = 0.22, linewidth = 0.3) +
@@ -917,8 +917,8 @@ base_coef_plot <- function(coef_pt, coef_lab) {
   cband_lim <- cb_raw + c(-0.05, 0.05) * cspan_c
   ggplot(coef_pt, aes(x, y)) +
     geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.3) +
-    geom_errorbarh(aes(xmin = low, xmax = high, colour = treatment),
-      height = 0.18, linewidth = 0.3) +
+    geom_errorbar(aes(xmin = low, xmax = high, colour = treatment),
+      orientation = "y", width = 0.18, linewidth = 0.3) +
     geom_point(aes(colour = treatment, shape = comp), size = 1.9) +
     scale_shape_manual(values = c(mu = 18, kappa = 17), guide = "none") +
     scale_colour_manual(values = treatment_colors[tlabels_all], guide = "none") +
