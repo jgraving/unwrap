@@ -265,10 +265,12 @@ def build_svg(arrays, df, *, family="Arial"):
         lamp_xy = draw_polar(fig, arrays, df)
         fig.text(lamp_xy[0], lamp_xy[1] - 0.052, "Floodlight", ha="center",
                  va="top", fontsize=8.5, color=INK)
-        handles = [Line2D([], [], color=c, lw=1.7, label=t)
+        handles = [Line2D([], [], color=c, marker="s", linestyle="none", ms=6,
+                          markeredgewidth=0, label=t)
                    for c, t in ((OFF, "Light off"), (ON, "Light on"))]
         fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.82, 0.918),
-                   ncol=2, frameon=False, fontsize=8, handlelength=1.6, columnspacing=1.7)
+                   ncol=2, frameon=False, fontsize=8, handlelength=0.9,
+                   handletextpad=0.5, columnspacing=1.7)
         levels = [
             Line2D([], [], color=INK, lw=1.7, label="Population-level\nmean"),
             Line2D([], [], color=INK, lw=0, marker="o", ms=4,
