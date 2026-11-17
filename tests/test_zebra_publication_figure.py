@@ -451,6 +451,42 @@ def test_prepare_inputs_verifies_and_tamper_proofs(tmp_path, monkeypatch):
         figure.prepare_inputs(empty, download=False)
 
 
+def test_build_context_reads_only_pinned_tracks(tmp_path, monkeypatch):
+    from unwrap import datasets
+
+    frames = np.r_[np.arange(5, 16), np.arange(25, 36)]
+    pos = pd.DataFrame({"track_number": figure.FOCAL_TRACK, "frame": frames,
+                        "kp0_x": 1.0, "kp0_y": 2.0})
+    bearings = pd.DataFrame({"track_number": figure.FOCAL_TRACK,
+                             "observation": figure.OBS, "frame": frames,
+                             "compass_bearing": 90.0,
+                             "row_index": np.arange(frames.size)})
+    pins = {}
+    for name, table in (("postures", pos), ("raw", bearings)):
+        directory = tmp_path / "zebra_bearings" / name
+        directory.mkdir(parents=True)
+        path = directory / f"{figure.FOCAL_TRACK}.parquet"
+        table.to_parquet(path)
+        pins[path.relative_to(tmp_path).as_posix()] = figure.sha256(path)
+        # Any attempt to read an unpinned track will fail on this file.
+        (directory / f"{figure.OBS}-99.parquet").write_bytes(b"unpinned")
+
+    monkeypatch.setattr(figure, "INPUT_HASHES", pins)
+    monkeypatch.setitem(figure.INSET_PRE, "anchor_frame", 10)
+    monkeypatch.setitem(figure.INSET_POST, "anchor_frame", 30)
+    monkeypatch.setattr(figure, "ANCHOR_WINDOW_FRAMES", 5)
+    monkeypatch.setattr(figure, "load_fit", lambda root: (None, {}, 0))
+    monkeypatch.setattr(figure, "summary_numbers", lambda idata, blocks: {})
+    monkeypatch.setattr(datasets, "load_zebra_bearings",
+                        lambda data_root: pd.DataFrame())
+    monkeypatch.setattr(datasets, "load_zebra_mosaic",
+                        lambda **kwargs: (np.zeros((2, 2, 4)), (0, 1, 0, 1)))
+
+    ctx = figure.build_context(figure.prepare_inputs(tmp_path))
+    pd.testing.assert_frame_equal(ctx["df_pos"], pos)
+    pd.testing.assert_frame_equal(ctx["df_bearings"], bearings)
+
+
 def test_committed_assets_match_manifest():
     manifest = figure.check_assets()
     for name in ("drone_inset_pre.jpg", "drone_inset_post.jpg",

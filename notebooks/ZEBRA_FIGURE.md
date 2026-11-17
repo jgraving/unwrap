@@ -179,9 +179,9 @@ rendered image patches against the author's reference.
 `tight_layout`/`legend_anchor`/`fancybox`/`framealpha` switches with the
 standalone defaults preserved; all 16 pre-existing tests pass).
 
-CI (`.github/workflows/zebra-figure.yml`) runs the hermetic tests and a
-deterministic-render job that downloads the pinned data, renders the
-figure twice with Liberation Sans, and compares both output directories; the CI
-render is not byte-compared against the committed Arial exports.
+CI (`.github/workflows/zebra-figure.yml`) runs the hermetic figure and
+map tests on relevant pull requests. Run the workflow manually to
+download the pinned data once, render twice with Liberation Sans, and
+compare both output directories. The committed snapshots use Arial.
 The PDF export removes the Cairo creation timestamp. The provenance JSON
 records the SHA-256 of each graphical export.

@@ -324,6 +324,7 @@ def load_zebra_bearings_raw(
     data_root: Path | None = None,
     *,
     sort: bool = True,
+    tracks: list[str] | None = None,
 ) -> pd.DataFrame:
     """Load the raw per-frame zebra escape-bearing observations.
 
@@ -331,7 +332,8 @@ def load_zebra_bearings_raw(
     (``zebra_bearings/raw/<track>.parquet``) so each stays within git's
     per-file limit. Every row carries a ``row_index`` naming its row in the
     original ``zebra_bearings.csv``; with ``sort=True`` the reassembled frame
-    is value-for-value the original CSV (verified lossless).
+    follows the original CSV order. Pass full track IDs such as
+    ``observation088-5`` in ``tracks`` to load only those files.
 
     Returns ``observation``, ``track_number``, ``frame``,
     ``compass_bearing``, ``pre_scare``, ``row_index`` -- 4 zebras, 59 tracks,
@@ -343,7 +345,8 @@ def load_zebra_bearings_raw(
     base = _resolve_dir("zebra_bearings", data_root)
     raw = base / "raw"
     _require_dir(raw)
-    files = sorted(raw.glob("*.parquet"))
+    files = (sorted(raw.glob("*.parquet")) if tracks is None
+             else [raw / f"{track}.parquet" for track in tracks])
     if not files:
         raise FileNotFoundError(f"no raw zebra files under {raw}")
     df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)

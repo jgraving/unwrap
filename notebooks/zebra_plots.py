@@ -861,7 +861,7 @@ def draw_escape_map(
         cand = frames_every_distance_greedy(
             focal_x, focal_y, spacing_m=float(arrows_every_m),
             start_offset_m=float(arrows_start_offset_m))
-        arrow_frames = b.index.intersection(cand).to_numpy()
+        arrow_frames = b.index.intersection(focal_frame[cand]).to_numpy()
     else:
         raise ValueError("arrow_mode must be 'time' or 'distance'")
 

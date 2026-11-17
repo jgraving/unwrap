@@ -259,6 +259,21 @@ def test_plot_escape_map_distance_mode_smoke():
     plt.close(fig)
 
 
+def test_draw_escape_map_distance_uses_frame_ids():
+    img, extent, pos, bearings = _map_inputs()
+    pos["frame"] = 100 + 2 * pos["frame"]
+    bearings["frame"] = 100 + 2 * bearings["frame"]
+    fig, ax = plt.subplots()
+    try:
+        plots.draw_escape_map(
+            ax, img, extent, pos, bearings, focal_track="observationT-0",
+            arrows_every_m=3.0, frame_max=108,
+        )
+        assert len(ax.patches) == 2  # focal rows 1 and 4, frames 102 and 108
+    finally:
+        plt.close(fig)
+
+
 def test_plot_escape_map_time_mode_smoke():
     img, extent, pos, bearings = _map_inputs()
     fig = plots.plot_escape_map(

@@ -280,7 +280,9 @@ CAPTION = (
     "individual mean directions, with the posterior mean before and after "
     "the approach. (e) Individual-level mean directions: the posterior "
     "density of each fitted individual mean direction (loops) and each "
-    "animal's observed circular-mean heading (markers). (f) Individual-level "
+    "animal's observed circular-mean heading (markers). Panels c and e show "
+    "model angles clockwise from 0° at the top. Panel a uses geographic "
+    "compass bearings. (f) Individual-level "
     "concentration: each animal's posterior mean resultant length with 95% "
     "HDI, before and after the approach, paired within animal across "
     "conditions. Panels c-f are evaluated from a saved hierarchical von "
@@ -507,9 +509,14 @@ def build_context(data_root, *, mosaic_max_side_px=MOSAIC_MAX_SIDE_PX):
         data_root=root, xlim=PANEL_XLIM, ylim=MOSAIC_YLIM,
         max_side_px=mosaic_max_side_px)
     img = _downsample_side(img, MOSAIC_EMBED_SIDE)
-    df_pos = load_zebra_postures(data_root=root, observation=OBS)
-    df_bearings = load_zebra_bearings_raw(data_root=root)
-    df_bearings = df_bearings[df_bearings["observation"] == OBS]
+    inputs = sorted(Path(name) for name in INPUT_HASHES)
+    posture_tracks = [int(path.stem.removeprefix(f"{OBS}-")) for path in inputs
+                      if path.parent == Path("zebra_bearings/postures")]
+    bearing_tracks = [path.stem for path in inputs
+                      if path.parent == Path("zebra_bearings/raw")]
+    df_pos = load_zebra_postures(data_root=root, observation=OBS,
+                                 tracks=posture_tracks)
+    df_bearings = load_zebra_bearings_raw(data_root=root, tracks=bearing_tracks)
 
     pos = df_pos.loc[df_pos["track_number"] == FOCAL_TRACK] \
                 .sort_values("frame")
