@@ -15,6 +15,8 @@ figure reproducible without access to the manuscript repository.
 
 `beetle_floodlight.svg` restores the floodlight graphic from the same source
 revision. It contains paths `path251` through `path258`, extracted from group
-`g124` without its group translation or text, with view box `337 116 33 33`.
-The generator positions and scales this vector symbol and supplies its label.
+`g124` without its group translation or text. Its 33 × 33 view box is centred
+on the graphic's circular lamp body (353.67169, 132.2807). The generator
+positions that centre on the ±45° sector's central spoke after resolving
+the polar axes' final aspect ratio, and supplies the label.
 It is a schematic icon, not a measurement of the lamp's angular extent.

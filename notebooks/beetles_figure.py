@@ -46,6 +46,7 @@ INPUT_HASHES = {
 }
 INK = "#262626"
 MUTED = "#686868"
+RULE = "#dededc"
 HALFWIDTH = FLOOD_HALFWIDTH
 HDI_PROB = 0.89
 KDE_KAPPA = 80.0
@@ -168,14 +169,14 @@ def resolve_fonts(directory=None, family="Arial"):
     return resolved
 
 
-def panel_heading(fig, x, y, letter, title, title_x):
+def panel_heading(fig, x, y, letter, title, title_x, *, align="center"):
     fig.text(x, y, letter + ".", fontsize=13, weight="bold", va="top", color=INK)
     fig.text(title_x, y - 0.003, title, fontsize=9.5, weight="bold", va="top",
-             ha="center", color=INK, linespacing=1.2)
+             ha=align, color=INK, linespacing=1.2)
 
 
 def draw_polar(fig, arrays, df):
-    ax = fig.add_axes([0.61, 0.515, 0.32, 0.40], projection="polar")
+    ax = fig.add_axes([0.61, 0.54, 0.32, 0.375], projection="polar")
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
     ax.set_axis_off()
@@ -183,6 +184,8 @@ def draw_polar(fig, arrays, df):
     density = np.stack([von_mises_kde(samples, theta, KDE_KAPPA) for samples in arrays["mu"]])
     scale = density.max()
     base, amplitude, ring = 0.40, 0.48, 1.0
+    for angle in np.arange(4) * np.pi / 2:
+        ax.plot([angle, angle], [0, ring], lw=0.5, color=RULE, zorder=0)
     ax.plot(theta, np.full_like(theta, ring), lw=0.7, color="#c9c9c9", zorder=1)
     for condition, color in enumerate((OFF, ON)):
         radius = base + amplitude * density[condition] / scale
@@ -191,21 +194,27 @@ def draw_polar(fig, arrays, df):
         for _, group in df[df.Light == condition].groupby("Individual", observed=True):
             bearing = circular_mean(group.HeadingRadians.to_numpy())
             ax.scatter([bearing], [ring], s=26, color=color, edgecolor="white", linewidth=0.45, zorder=5)
-    # Cardinal labels and radial crosshairs are unnecessary for this panel;
-    # the verified bearing convention is stated in the caption instead.
+    # Clockwise compass bearings, viewed from above. Move S outside the
+    # marked sector; the other labels sit just beyond the observation ring.
+    for angle, label in zip(np.arange(4) * np.pi / 2, ("N", "E", "S", "W")):
+        radius = 1.31 if label == "S" else 1.13
+        ax.text(angle, radius, label, ha="center", va="center",
+                color=MUTED, fontsize=7.5)
     sector = np.linspace(FLOOD_DIR - HALFWIDTH, FLOOD_DIR + HALFWIDTH, 100)
     ax.plot(sector, np.full_like(sector, 1.15), color=INK, lw=0.9)
     for angle in (sector[0], FLOOD_DIR, sector[-1]):
         ax.plot([angle, angle], [1.12, 1.18], color=INK, lw=0.9)
     ax.set_ylim(0, 1.36)
-    # Place the restored vector lamp on the sector's central spoke. Return
-    # figure coordinates so the artwork follows the polar transform exactly.
+    # Polar axes shrink their box to remain circular at draw time. Apply that
+    # aspect adjustment before converting the central spoke into figure
+    # coordinates, so the lamp stays aligned with the rendered sector tick.
+    ax.apply_aspect()
     point = ax.transData.transform((FLOOD_DIR, 1.39))
     return fig.transFigure.inverted().transform(point)
 
 
 def draw_summary(fig, x, samples, ylabel, *, difference=False, uniform=False):
-    ax = fig.add_axes([x + 0.079, 0.105, 0.135, 0.30])
+    ax = fig.add_axes([x + 0.079, 0.105, 0.135, 0.27])
     ax.set_xlim(-0.52, 1.52)
     lower = min(0.0, min(_mean_hdi(samples, HDI_PROB)) - 0.025) if difference else 0.0
     ax.set_ylim(lower, 1.025)
@@ -251,23 +260,24 @@ def build_svg(arrays, df, *, family="Arial"):
         fig = plt.figure(figsize=(7.2, 4.8), dpi=160)
         panel_heading(fig, 0.025, 0.973, "a", "Repeated exit bearings",
                       0.27)
-        panel_heading(fig, 0.545, 0.973, "b", "Population mean direction", 0.77)
+        panel_heading(fig, 0.545, 0.973, "b", "Reorientation", 0.77)
         fig.text(0.402, 0.832, "Exit\nbearing", ha="center", fontsize=8.5, color=INK, linespacing=1.2)
         lamp_xy = draw_polar(fig, arrays, df)
         fig.text(lamp_xy[0], lamp_xy[1] - 0.052, "Floodlight", ha="center",
                  va="top", fontsize=8.5, color=INK)
         handles = [Line2D([], [], color=c, lw=1.7, marker="o", ms=4, label=t)
                    for c, t in ((OFF, "Light off"), (ON, "Light on"))]
-        fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.77, 0.903),
+        fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.77, 0.918),
                    ncol=2, frameon=False, fontsize=8, handlelength=1.6, columnspacing=1.7)
-        for x, letter, ylabel, key in (
-            (0.025, "c", "Within-individual\nconcentration (R)", "within"),
-            (0.270, "d", "Between-individual\nconcentration (R)", "between"),
-            (0.515, "e", "Exit probability (±45°)", "mass"),
-            (0.760, "f", "Change in exit\nprobability (±45°)", "difference"),
+        fig.add_artist(Line2D([0.025, 0.975], [0.456, 0.456],
+                              transform=fig.transFigure, color=RULE, lw=0.7))
+        for x, letter, title, ylabel, key in (
+            (0.025, "c", "Within-individual", "Mean resultant length", "within"),
+            (0.270, "d", "Between-individual", "Mean resultant length", "between"),
+            (0.515, "e", "Floodlight attraction", "Exit probability (±45°)", "mass"),
+            (0.760, "f", "Treatment effect", "Change in exit\nprobability (±45°)", "difference"),
         ):
-            fig.text(x, 0.45, letter + ".", fontsize=13, weight="bold",
-                     va="top", color=INK)
+            panel_heading(fig, x, 0.431, letter, title, x + 0.040, align="left")
             draw_summary(fig, x, arrays[key], ylabel,
                          difference=(key == "difference"), uniform=(key == "mass"))
         buffer = io.StringIO()

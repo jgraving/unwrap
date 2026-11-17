@@ -148,6 +148,23 @@ def test_missing_font_is_explicit():
         figure.resolve_fonts(family="AnIntentionallyMissingFigureFont")
 
 
+def test_lamp_aligns_with_sector_after_polar_aspect_adjustment(posterior):
+    """The final on-screen lamp and centre tick must lie on the same ray."""
+    data = pd.DataFrame({"Individual": [1, 1], "Light": [0, 1],
+                         "HeadingRadians": [0.1, -2.4]})
+    fig = plt.figure(figsize=(7.2, 4.8))
+    lamp_fig = figure.draw_polar(fig, figure.posterior_arrays(posterior), data)
+    fig.canvas.draw()
+    ax = fig.axes[0]
+    origin = ax.transData.transform((0, 0))
+    tick = ax.transData.transform((figure.FLOOD_DIR, 1.15)) - origin
+    lamp = fig.transFigure.transform(lamp_fig) - origin
+    np.testing.assert_allclose(lamp / np.linalg.norm(lamp),
+                               tick / np.linalg.norm(tick), atol=1e-12)
+    assert np.linalg.norm(lamp) > np.linalg.norm(tick)
+    plt.close(fig)
+
+
 def test_vector_export_and_reproducible_svg(posterior, tmp_path):
     pytest.importorskip("cairosvg")
     data = pd.DataFrame({"Individual": [1, 2, 3] * 2, "Light": [0] * 3 + [1] * 3,

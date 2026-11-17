@@ -2,10 +2,11 @@
 
 The six-panel figure combines the original arena and floodlight illustrations with newly
 rendered statistical panels. It retains Arial and the existing grey/gold
-palette (`#9e9e9e` / `#f4a300`), with ticked axes, conventional y-axis labels
-in c–f instead of headings, and a shared condition legend. Horizontal lines
-are limited to zero and the uniform reference; explanatory details live in
-the caption. The statistical
+palette (`#9e9e9e` / `#f4a300`), with concise panel headings, measurement
+labels on the c–f y-axes, and a shared condition legend. The polar plot has
+light crosshairs and N/E/S/W labels; a thin separator divides the two rows.
+The statistical panels have ticked axes with only zero and uniform reference
+lines. Explanatory details live in the caption. The statistical
 estimands and 89% highest-density intervals match `beetles_plots.py`.
 
 A rendered review snapshot (SVG, PDF, PNG, HTML, and provenance) is checked in
@@ -115,9 +116,9 @@ reported easterly heading of 74° also establishes the compass interpretation
 of these values. The original `SecurityLightBergsig.txt` is byte-identical to
 the pinned `unwrap-data` input (SHA-256 recorded above). Thus, the current
 plot's north-up, east-right orientation is consistent with the bearing data;
-it is not intended to reproduce the reflected sky photographs. Extra N/E/S/W
-labels and crosshairs are omitted from the figure, with the convention stated
-in its caption instead.
+it is not intended to reproduce the reflected sky photographs. The N/E/S/W
+labels and light crosshairs follow this convention, which is also stated
+in the caption.
 
 **Lamp position versus analysis sector:** the original paper describes the
 floodlight as south-southwest and reports a collective **beetle heading** of
