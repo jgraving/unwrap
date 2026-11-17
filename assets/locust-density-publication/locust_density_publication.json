@@ -1,0 +1,261 @@
+{
+  "data_repository": "jgraving/unwrap-data",
+  "data_revision": "31eb4bdb4a0fe9a0c0bd20df7f101dbd884a8dcc",
+  "inputs_sha256": {
+    "fit_cache/locust_density_hier.nc": "af8df700a42354c59fa673e8635d25e4c11f038f404cdb9513aaf5b853176498",
+    "fit_cache/locust_density_hier.meta.json": "ebbbd2a67f5145961da05357a32c1cb9f48181b37bd598050a48c4efaeaeec49"
+  },
+  "code_revision": "a58eb0ed56051146c2d7697a81237b9bff5d2384",
+  "source_sha256": {
+    "notebooks/locust_density_figure.py": "7431071d84885595b7b977b5b7c2e427d424577b1ad28ccc2b2e5674a329cfa0",
+    "tools/prepare_locust_figure_assets.py": "c0896d0f78a82833c1dcf0108be92bd608c10cb0274d00069c953f1174d3ae5a",
+    "unwrap/link/numpy.py": "f598dda5da67f935dcd405b8ea379e46d0f90c5a1b80f853208c5607b64ceaf3",
+    "unwrap/circular.py": "55c26262dbee6e71bfe1cbfdf0cb664d0a52e305665e7cf5d2f6e80c739defc2",
+    "unwrap/bessel.py": "2fac0a114d83b63cf05c02f26a62863a426ed038284aa972cb6ff4e3d04a27f8",
+    "notebooks/assets/locust_density_order/README.md": "843fbb19c4a8cddf32d1dd87d01d846b678ba6b4946c4f555e7c4470a7160510",
+    "notebooks/assets/locust_density_order/images.json": "05f87e85f43d3bdfa3ba8d98823624cb3b797c3bb346ca999361ee3e83eeb67b",
+    "notebooks/assets/locust_density_order/real_locust.jpeg": "e0a43a3ba709e59039ba41d8fc12f92cb891d21d9a7e7130ab4919ca89e63b24",
+    "notebooks/assets/locust_density_order/real_swarm.jpeg": "4b8192e1dd14ee18a7706a3e4699e9a5aaf0944d6249e08a68a5e9dd2cbac746",
+    "notebooks/assets/locust_density_order/selection.json": "ae81cfa499d2d3aacd413548b6bd50b6ce6930f27fb90fa857cfc28a6573b82d",
+    "notebooks/assets/locust_density_order/virtual_locust_front.jpeg": "02ea621648b117fbe52afeb02e9e855f74c4251c6c12bed26305690ac053c0f7",
+    "notebooks/assets/locust_density_order/virtual_locust_lateral.jpeg": "596a50a9f92e95575de784bdf430ecf58a5f008a9969bb0407bbe10479bdf8ef",
+    "notebooks/assets/locust_density_order/virtual_locust_rear.jpeg": "603558d32964599d2af4bfe37dfd6527a3ce8599cb1b5ae946663e7223e87581",
+    "notebooks/assets/locust_density_order/virtual_swarm.jpeg": "c43412a2c60facadd011fa4dc24840a627b9863370035a01a7762486d09e4d4c",
+    "notebooks/assets/locust_density_order/vr_arena.jpeg": "83fa4e192f279d6722424791d103b69be0f6f97065ea502f979f924bcdb117e0"
+  },
+  "python": "3.12.14",
+  "font_family": "Arial",
+  "fonts": {
+    "normal": {
+      "file": "Arial.TTF",
+      "sha256": "35c0f3559d8db569e36c31095b8a60d441643d95f59139de40e23fada819b833"
+    },
+    "bold": {
+      "file": "Arialbd.TTF",
+      "sha256": "4044aa6b5bebbc36980206b45b0aaaaa5681552a48bcadb41746d5d1d71fd7b4"
+    }
+  },
+  "packages": {
+    "numpy": "2.3.5",
+    "scipy": "1.18.1",
+    "matplotlib": "3.10.8",
+    "xarray": "2026.9.0",
+    "h5netcdf": "1.8.3",
+    "h5py": "3.16.0",
+    "cairosvg": "2.9.1"
+  },
+  "posterior_chains": 4,
+  "posterior_draws_per_chain": 1000,
+  "divergences": 0,
+  "selection_source": {
+    "source_repository": "jgraving/unwrap",
+    "source_revision": "075cb7274f8d80f284346dbe30bdc3e0f20dfd89",
+    "source_path": "notebooks/locust_density_order.ipynb",
+    "source_sha256": "073d9272f24ce6b648f92550ac25156b269c4a52599b58be00a05bf874e971a7",
+    "cell_index": 23,
+    "basis": "Saved Python screening output; 440 recording mean directions; printed to six decimals",
+    "recompute": "locust_density_posthoc.model_sweep(screen_df, draws=1000, seed=123)",
+    "models": [
+      {
+        "name": "Density \u00d7 Order",
+        "elpd": -590.814957,
+        "delta": 0.0,
+        "se": 0.0,
+        "pareto_k_max": 0.349546,
+        "best": "Density \u00d7 Order",
+        "has_order": true
+      },
+      {
+        "name": "Density + Order",
+        "elpd": -593.249415,
+        "delta": -2.434459,
+        "se": 2.454244,
+        "pareto_k_max": 0.261412,
+        "best": "Density \u00d7 Order",
+        "has_order": true
+      },
+      {
+        "name": "Order",
+        "elpd": -599.675344,
+        "delta": -8.860387,
+        "se": 5.846474,
+        "pareto_k_max": 0.127786,
+        "best": "Density \u00d7 Order",
+        "has_order": true
+      },
+      {
+        "name": "Density",
+        "elpd": -666.522883,
+        "delta": -75.707926,
+        "se": 11.227931,
+        "pareto_k_max": 0.162298,
+        "best": "Density \u00d7 Order",
+        "has_order": false
+      },
+      {
+        "name": "Intercept-only",
+        "elpd": -669.259555,
+        "delta": -78.444598,
+        "se": 11.598301,
+        "pareto_k_max": 0.071369,
+        "best": "Density \u00d7 Order",
+        "has_order": false
+      }
+    ]
+  },
+  "prediction_basis": "Original scaled coordinates of stored Bambi coefficients; concentration offset zero",
+  "prediction_summary": "exp(mean(log density at zero)); exponentiated 90% log-density HDI",
+  "coefficient_hdi_probability": 0.95,
+  "schematic_seed": 123,
+  "caption": "Order and density of a virtual swarm shape locust directional responses. (a) Real locust. (b) Original front, lateral, and rear renderings of the virtual locust. (c) Panoramic VR arena and spherical treadmill, with the projection screen raised. (d) Real and virtual swarms; arrow indicates the virtual march direction. (e) Seeded illustrations of density and motion order; these are stimulus schematics, not recorded trajectories. (f) Five screening specifications fitted to 440 recording mean directions; D denotes density and O denotes order. points show PSIS-LOO ELPD differences from the best model, bars \u00b11 standard error. Values reproduce the versioned Python notebook's saved screening table, printed to six decimals. (g) Population fixed-effect coefficients from the saved hierarchical fit to 18,641 headings from 440 recordings. Points show posterior means (circular for the direction intercept), bars 95% highest-density intervals. Density is log\u2082-scaled from 1\u201364 m\u207b\u00b2 to [\u22121, 1]; order is scaled from 0\u20131 to [\u22121, 1]. Coefficients are on the pre-link scale. (h) Reference density at the march direction, f(0), with the recording concentration offset set to zero. Curves are exp(mean(log f(0))), with exponentiated 90% highest-density intervals of log f(0). These are geometric posterior summaries of density per radian, not probabilities or ELPD scores. Dashed lines mark uniform density 1/(2\u03c0). Curves use the original scaled coordinates of the stored Bambi coefficients, correcting the notebook helper's extra centering. Photos and stimulus renderings are extracted from the manuscript figure; photo credit: Centre for the Advanced Study of Collective Behaviour (manuscript states used with permission).",
+  "summaries": {
+    "coefficients": [
+      [
+        [
+          -0.06674206650255066,
+          -0.09362894056733806,
+          -0.04082217672684241
+        ],
+        [
+          0.4368085172594692,
+          0.22654638273236238,
+          0.666023029273291
+        ]
+      ],
+      [
+        [
+          -0.14317413385742545,
+          -0.18228889697465533,
+          -0.10501596081943718
+        ],
+        [
+          0.4300787513940294,
+          0.13085076950969668,
+          0.7617096225840863
+        ]
+      ],
+      [
+        [
+          0.07255228864856633,
+          0.03975647767350462,
+          0.10652066310612146
+        ],
+        [
+          2.340667419611639,
+          2.034102390253113,
+          2.6695886318606834
+        ]
+      ],
+      [
+        [
+          0.15611617613915374,
+          0.10239975798636337,
+          0.20788474226110717
+        ],
+        [
+          0.6350717098434181,
+          0.20634922970016123,
+          1.0616103261752672
+        ]
+      ]
+    ],
+    "density_at_zero_order_endpoints": [
+      {
+        "density": 1.0,
+        "geometric_mean": [
+          0.1878375260274045,
+          0.4934395049099878
+        ],
+        "low": [
+          0.1727961270535083,
+          0.42469594787555426
+        ],
+        "high": [
+          0.20401247151973495,
+          0.5814383663847582
+        ]
+      },
+      {
+        "density": 4.0,
+        "geometric_mean": [
+          0.1840209400535693,
+          0.5890482138143744
+        ],
+        "low": [
+          0.17481789624868316,
+          0.545367678368181
+        ],
+        "high": [
+          0.19283482979886787,
+          0.6394038674932216
+        ]
+      },
+      {
+        "density": 8.0,
+        "geometric_mean": [
+          0.18211568289704622,
+          0.6335834567048799
+        ],
+        "low": [
+          0.1748949312595529,
+          0.5980666179576104
+        ],
+        "high": [
+          0.18980600194181518,
+          0.6710784529982085
+        ]
+      },
+      {
+        "density": 16.0,
+        "geometric_mean": [
+          0.18025956786439287,
+          0.6756048696628464
+        ],
+        "low": [
+          0.17342044431495393,
+          0.6421806034675472
+        ],
+        "high": [
+          0.18764222452318377,
+          0.7097209948881152
+        ]
+      },
+      {
+        "density": 32.0,
+        "geometric_mean": [
+          0.17846619022270158,
+          0.7151981189078762
+        ],
+        "low": [
+          0.17031430962018873,
+          0.6787274785916914
+        ],
+        "high": [
+          0.1862635162316956,
+          0.7547516923147515
+        ]
+      },
+      {
+        "density": 64.0,
+        "geometric_mean": [
+          0.17673767102296054,
+          0.7525128730664092
+        ],
+        "low": [
+          0.16840496805131924,
+          0.7073500275599953
+        ],
+        "high": [
+          0.1864553988200058,
+          0.7994172363608999
+        ]
+      }
+    ]
+  },
+  "outputs_sha256": {
+    ".svg": "e61793c6eb709766378e1c0b9e30d10776f285db81ef7d1cf6564e5bc74d3a56",
+    ".pdf": "03dd8d657b0230eedec3f6cec70ac4e82cb1621a3fe9f0933255a89e26e52a62",
+    ".png": "2c7e6515a498867eb6eaa78d5341b905a55ec08162e00514c1dbf412d1104100",
+    ".html": "dc5afb7d0061526ca508af570a225d6a82b9cc35186bec0cae45efcaf3c86847"
+  }
+}
