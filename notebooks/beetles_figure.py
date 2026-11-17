@@ -271,8 +271,6 @@ def build_svg(arrays, df, *, family="Arial"):
                    for c, t in ((OFF, "Light off"), (ON, "Light on"))]
         fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.77, 0.902),
                    ncol=2, frameon=False, fontsize=8, handlelength=1.6, columnspacing=1.7)
-        fig.add_artist(Line2D([0.025, 0.975], [0.456, 0.456],
-                              transform=fig.transFigure, color=RULE, lw=0.7))
         for x, letter, title, ylabel, key in (
             (0.025, "c", "Within-individual", "Mean resultant length", "within"),
             (0.270, "d", "Between-individual", "Mean resultant length", "between"),
