@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 PAPER_REV = "9bef710eb44fd8d20a61a7119a12e4933d02ce6d"
@@ -54,6 +55,66 @@ def extract_selection(data):
             "models": rows}
 
 
+def extract_original_panels(doc):
+    """Retain a–e as source artwork, including every crop and the scale bar.
+
+    Remove only completely covered graphics on the statistical side. A
+    touch-based redaction would also delete schematic paths that extend
+    beyond their visible clipping boxes. Verify all retained pixels before
+    exporting vector paths and original image transforms.
+    """
+    import fitz
+    import numpy as np
+    page = doc[0]
+    original = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+    # Preserve the original f/g/h panel letters and titles as source paths.
+    page.add_redact_annot(fitz.Rect(345, 217, 750, 370), fill=None)
+    page.add_redact_annot(fitz.Rect(345, 397, 750, 525), fill=None)
+    page.apply_redactions(images=0, graphics=1, text=0)
+    # Replace only the old unit line; its exponent was on the baseline.
+    page.add_redact_annot(fitz.Rect(231, 213, 260, 225), fill=None)
+    page.apply_redactions(images=0, graphics=0, text=0)
+    retained = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+    a = np.frombuffer(original.samples, dtype=np.uint8).reshape(original.height, original.width, 3)
+    b = np.frombuffer(retained.samples, dtype=np.uint8).reshape(retained.height, retained.width, 3)
+    mask = np.zeros(a.shape[:2], dtype=bool)
+    mask[:370] = True
+    mask[370:, :680] = True
+    mask[370:434, 690:] = True
+    mask[740:794, 690:] = True
+    mask[420:452, 460:522] = False
+    changed = int(np.count_nonzero(np.any(a != b, axis=-1) & mask))
+    if changed:
+        raise ValueError(f"Extraction altered {changed} retained source pixels")
+    svg = page.get_svg_image(text_as_path=True)
+    # Source and Matplotlib glyph/clip IDs must never collide on composition.
+    root = ET.fromstring(svg)
+    ids = {el.get("id"): "original-" + el.get("id") for el in root.iter() if el.get("id")}
+    for el in root.iter():
+        if el.get("id"):
+            el.set("id", ids[el.get("id")])
+        for key, value in list(el.attrib.items()):
+            if value.startswith("#") and value[1:] in ids:
+                el.set(key, "#" + ids[value[1:]])
+            elif "url(#" in value:
+                el.set(key, re.sub(r"url\(#([^)]*)\)", lambda m: "url(#" + ids[m[1]] + ")", value))
+    # Some PDF compound paths combine a–e graphics with an old legend frame.
+    # Keep their retained parts but prevent any f–h remnants from painting
+    # underneath the regenerated statistical panels.
+    ns = "{http://www.w3.org/2000/svg}"
+    defs = root.find(ns + "defs")
+    clip = ET.SubElement(defs, ns + "clipPath", id="original-visible-panels")
+    for x, y, w, h in ((0, 0, 750, 185), (0, 185, 340, 340),
+                        (345, 185, 405, 32), (345, 370, 405, 27)):
+        ET.SubElement(clip, ns + "rect", x=str(x), y=str(y), width=str(w), height=str(h))
+    visible = ET.Element(ns + "g", {"clip-path": "url(#original-visible-panels)"})
+    for child in list(root):
+        if child.tag != ns + "defs":
+            root.remove(child); visible.append(child)
+    root.append(visible)
+    return ET.tostring(root, encoding="unicode") + "\n", changed
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pdf", required=True, type=Path)
@@ -78,9 +139,16 @@ def main():
         path.write_bytes(image["image"])
         images[path.name] = dict(xref=xref, width=image["width"], height=image["height"],
                                  sha256=digest(image["image"]))
+    original_svg, changed = extract_original_panels(doc)
+    (args.output_dir / "original_panels.svg").write_text(original_svg)
     manifest = {"source_repository": "jgraving/circstats", "source_revision": PAPER_REV,
                 "source_path": "figures/locust_density_order_figure.pdf",
                 "source_sha256": PDF_SHA, "page": 1, "images": images,
+                "original_panels": {"file": "original_panels.svg", "sha256": digest(original_svg.encode()),
+                                    "page_points": [750, 525], "retained_panel_pixel_changes": changed,
+                                    "verification_pixels_per_point": 2,
+                                    "scale_bar_source_endpoints": [139.50950622558594, 163.97853088378906],
+                                    "scale_bar_label": "10 cm", "extractor": "PyMuPDF " + fitz.VersionBind},
                 "credit": "Centre for the Advanced Study of Collective Behaviour; manuscript states used with permission. No additional redistribution licence is inferred."}
     for name, obj in (("images.json", manifest),
                       ("selection.json", extract_selection(notebook))):

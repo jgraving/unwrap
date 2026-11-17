@@ -23,5 +23,14 @@ Photo credit: Centre for the Advanced Study of Collective Behaviour. The
 manuscript caption states used with permission; no additional redistribution
 licence is inferred. Preserve the credit with the figure.
 
-The generator defines all display crops and positions in code. To repeat
-extraction, see [the figure instructions](../../LOCUST_DENSITY_FIGURE.md).
+`original_panels.svg` preserves panels a–e at the original 750 × 525-point
+page coordinates, including clipping paths, image transforms, the 10 cm
+scale bar, lettering, and the complete vector schematic. Original f–h panel
+letters and titles are also retained. Only the statistical drawings and the
+old unit line were removed. Source preparation
+checks that retained a–e pixels are unchanged, excluding the unit line.
+The original scale-label backing and its transparency mask are retained.
+`images.json` records the SVG hash and preservation result. The generator
+rebuilds statistical panels f–h in code and inserts a correctly typeset unit.
+
+To repeat extraction, see [the figure instructions](../../LOCUST_DENSITY_FIGURE.md).

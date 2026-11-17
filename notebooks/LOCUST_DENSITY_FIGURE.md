@@ -1,12 +1,21 @@
 # Reproduce the locust density–order figure
 
-The publication generator keeps the original photos and virtual-agent views,
-Arial, red/purple stimulus palettes, brown/green coefficient colours, and
-blue/orange model-comparison key. It uses short headings, measurement labels
-on the axes, light ticks, and white space in the style of the beetle figure.
-All diagrams, statistical curves, bands, axes, and typography are vector;
-only the original photographs/renderings remain raster images. No generated
-imagery or screenshots of statistical panels are used.
+The generator reproduces the original manuscript's 750 × 525-point layout
+as the baseline. Panels a–e retain the original artwork, image crops,
+proportions, lettering, panel d's calibrated 10 cm scale bar, and panel e's
+vector density/order schematic. Panels f–h are rebuilt from numerical inputs
+in their original positions, with the original titles, full predictor names,
+boxed axes, and vertical legends. The density unit is typeset as one math
+expression, `(m⁻²)`, with the exponent inside the parentheses.
+Every panel letter and subplot title is retained from the source PDF as
+vector paths, including the original f–h titles.
+
+Arial and the original red/purple, brown/green, and blue/orange palettes are
+retained. Statistical curves, bands, axes, schematics, and typography remain
+vector. Photos/renderings and the source scale-label backing/mask retain
+their original raster content. No generated imagery or screenshots of
+statistical panels are used. The earlier redesign remains in git history;
+the current output establishes the reproduction baseline for later edits.
 
 ## Generate
 
@@ -20,6 +29,8 @@ python notebooks/locust_density_figure.py --download --font-dir /path/to/arial-f
 Arial regular and bold must be installed or provided with `--font-dir`.
 The script refuses a silent font substitution. An explicit alternative is
 possible with `--font-family 'Liberation Sans'`; provenance records it.
+That override affects redrawn labels; source artwork retains its original
+outlined typography.
 Font files are not redistributed. SVG/PDF lettering is outlined to preserve
 the selected face on other computers. CairoSVG requires the Cairo system
 library.
@@ -72,8 +83,18 @@ numbers, and checksums are in
 The PDF SHA-256 is
 `48609fdc9185e20227ae0b1c20dd377301d5aa962c7d57078ef1bf5873d0bf21`.
 The JPEG files are checked in, so normal generation does not need access to
-the manuscript repository. Display crops preserve image aspect ratios and
-are defined explicitly in the generator; the source image files are intact.
+the manuscript repository. `original_panels.svg` additionally preserves
+the original a–e artwork and all PDF clipping/image transforms, rather than
+inventing new image crops. The source image files remain intact.
+
+The preparation command removes the old f–h statistical drawings while
+keeping their panel letters/titles, and removes the old unit line. It
+exports the retained source artwork as SVG paths and
+images. A pixel comparison at two pixels per point verifies **zero changes**
+throughout a–e, excluding only the unit line being replaced. The scale bar
+keeps its original endpoints, 139.509506 to 163.978531 PDF points, alongside
+the unmodified photo transform and 10 cm label. This avoids recalibrating a
+scale bar after changing an image crop.
 
 To repeat the extraction from a local copy of the **pinned** source PDF and
 notebook (PyMuPDF is needed only for this optional preparation step):
@@ -98,8 +119,8 @@ saved output of cell 23 in the Python notebook at unwrap revision
 `075cb7274f8d80f284346dbe30bdc3e0f20dfd89`, automatically parsed into
 `assets/locust_density_order/selection.json`. It includes ELPD, differences
 from the best model, standard errors, maximum Pareto k, and source provenance.
-Bars are ±1 SE. Its six-decimal print precision is retained. D denotes
-density and O denotes order in the compact axis labels.
+Bars are ±1 SE. Its six-decimal print precision is retained. Density and
+Order are written out in full, including both interaction labels.
 
 This panel reproduces a **saved screening table**, rather than recomputing
 PSIS-LOO from cached Python draws: unwrap-data contains the separate initial
@@ -161,6 +182,8 @@ python -m pytest tests/test_locust_density_figure.py -q
 Checks cover the Bambi/PyMC graph comparison, stable density against SciPy,
 HDIs against ArviZ, periodicity, dimension order, the analytic uniform case,
 input integrity, original image hashes, deterministic SVG generation, and
-SVG/PDF export. Review the PNG and an independently rendered PDF at intended
-manuscript size. Unlike the beetle figure, this PDF necessarily contains the
-source photographs; the statistical content remains vector.
+SVG/PDF export, unique composed SVG IDs, and the checksum of the preserved
+a–e artwork. The source-preparation command also verifies pixel preservation
+of the original panels. Review the PNG and an independently rendered PDF at
+intended manuscript size. This PDF contains the source photographs and the
+original scale-label backing/mask; statistical content remains vector.

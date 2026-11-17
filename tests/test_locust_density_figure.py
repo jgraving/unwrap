@@ -101,8 +101,15 @@ def test_assets_selection_and_vector_export(posterior, tmp_path):
     svg = figure.draw_figure(stats, selection, family="DejaVu Sans")
     assert svg == figure.draw_figure(stats, selection, family="DejaVu Sans")
     root = ET.fromstring(svg)
-    # Seven source images are embedded; no rasterized statistical panels.
-    assert len(root.findall(".//{http://www.w3.org/2000/svg}image")) == 7
+    # Seven source photos/renderings plus the original scale-label backing
+    # and its alpha mask; statistical panels contain no raster images.
+    assert len(root.findall(".//{http://www.w3.org/2000/svg}image")) == 9
+    original = manifest["original_panels"]
+    assert figure.sha256(figure.ASSETS / original["file"]) == original["sha256"]
+    assert original["retained_panel_pixel_changes"] == 0
+    assert original["scale_bar_label"] == "10 cm"
+    ids = [node.get("id") for node in root.iter() if node.get("id")]
+    assert len(ids) == len(set(ids))
     assert not root.findall(".//{http://www.w3.org/2000/svg}text")
     assert root.find("{http://www.w3.org/2000/svg}desc").text == figure.CAPTION
     stem = figure.write_outputs(tmp_path, stats, selection, {}, family="DejaVu Sans")

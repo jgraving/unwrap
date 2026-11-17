@@ -48,5 +48,21 @@
       "sha256": "c43412a2c60facadd011fa4dc24840a627b9863370035a01a7762486d09e4d4c"
     }
   },
+  "original_panels": {
+    "file": "original_panels.svg",
+    "sha256": "46f1ccea80a692a10bd7f5656d146f5dce902230ba0b231fc6fc19af4f5ee4e4",
+    "page_points": [
+      750,
+      525
+    ],
+    "retained_panel_pixel_changes": 0,
+    "verification_pixels_per_point": 2,
+    "scale_bar_source_endpoints": [
+      139.50950622558594,
+      163.97853088378906
+    ],
+    "scale_bar_label": "10 cm",
+    "extractor": "PyMuPDF 1.26.6"
+  },
   "credit": "Centre for the Advanced Study of Collective Behaviour; manuscript states used with permission. No additional redistribution licence is inferred."
 }

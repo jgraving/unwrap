@@ -6,7 +6,6 @@ the corrected predictor coordinates, and source-image extraction.
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import importlib.metadata
 import io
@@ -22,13 +21,11 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
 import numpy as np
 from scipy.special import i0e
 import xarray as xr
 
 from unwrap.circular import circular_mean
-from unwrap.bessel import inverse_bessel_ratio
 from unwrap.link.numpy import circular_modulo, softplus
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,7 +49,6 @@ CAPTION = (
     "the virtual march direction. (e) Seeded illustrations of density and "
     "motion order; these are stimulus schematics, not recorded trajectories. "
     "(f) Five screening specifications fitted to 440 recording mean directions; "
-    "D denotes density and O denotes order. "
     "points show PSIS-LOO ELPD differences from the best model, bars ±1 standard "
     "error. Values reproduce the versioned Python notebook's saved screening "
     "table, printed to six decimals. (g) Population fixed-effect coefficients "
@@ -174,200 +170,122 @@ def statistics(post):
 
 
 def style_axis(ax):
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
-    for side in ("left", "bottom"):
-        ax.spines[side].set_linewidth(.65)
-        ax.spines[side].set_color(INK)
-    ax.tick_params(length=3, width=.65, pad=3, colors=INK, labelsize=7)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_linewidth(1.02)
+        spine.set_color("black")
+    ax.tick_params(length=3.5, width=1.02, pad=3, colors="black", labelsize=8.93)
     ax.grid(False)
 
 
-def heading(fig, letter, title, x, y, center):
-    title_artist = fig.text(center, y - .002, title, ha="center", va="top",
-                            fontsize=9.2, weight="bold")
-    label = fig.text(x, y, letter + ".", va="top", fontsize=12, weight="bold")
-    renderer = fig.canvas.get_renderer()
-    title_box = title_artist.get_window_extent(renderer)
-    label_box = label.get_window_extent(renderer)
-    label.set_x((title_box.x0 - label_box.width - 4 * fig.dpi / 72) / fig.bbox.width)
-
-
-def photo(fig, name, bounds, *, crop=None, fit="cover", rotation=0):
-    # Place native JPEGs into the final SVG directly, avoiding Matplotlib's
-    # image resampling. A transparent axes placeholder records the placement.
-    ax = fig.add_axes(bounds)
-    ax.set_axis_off()
-    return dict(name=name, bounds=bounds, crop=crop, fit=fit, rotation=rotation)
-
-
-def stimulus_schematic(fig):
-    left, bottom, width, height = .281, .125, .174, .484
-    ax = fig.add_axes([left, bottom, width, height])
-    ax.set_axis_off(); ax.set_xlim(-.35, 2.6); ax.set_ylim(-.2, 6.2)
-    rng = np.random.default_rng(123)
-    for i, (density, order) in enumerate(zip(DENSITY_LEVELS[::-1], ORDER_LEVELS[::-1])):
-        y = 5 - i
-        red, purple = plt.cm.Reds(.95 - .10 * i), plt.cm.Purples(.95 - .10 * i)
-        boxes = []
-        for x in (0, 1.3):
-            box = Rectangle((x, y), 1, .82, facecolor="#fafafa", edgecolor="#dededc", lw=.6)
-            ax.add_patch(box); boxes.append(box)
-        xy = rng.uniform([.07, y + .07], [.93, y + .75], (int(density), 2))
-        ax.scatter(xy[:, 0], xy[:, 1], s=6, color=red, linewidths=0)
-        for start in np.linspace(.1, .72, 7):
-            kappa = inverse_bessel_ratio(float(min(order, .999)))
-            angles = rng.vonmises(0, kappa, 120)
-            increments = np.column_stack([np.cos(angles), np.sin(angles)])
-            path = np.vstack([[0, 0], np.cumsum(increments, axis=0)])
-            span = np.maximum(np.ptp(path, axis=0), 1e-9)
-            scale = min(.92 / span[0], .68 / span[1])
-            path = (path - (path.max(axis=0) + path.min(axis=0))/2) * scale
-            offset = (start - .41) * max(0, 1 - np.ptp(path[:, 1])/.68)
-            line, = ax.plot(1.8 + path[:, 0], y + .41 + offset + path[:, 1],
-                            color=purple, lw=.8)
-            line.set_clip_path(boxes[1])
-        ax.text(-.12, y + .41, f"{density:g}", ha="right", va="center", fontsize=7.5)
-        ax.text(2.42, y + .41, f"{order:g}", va="center", fontsize=7.5)
-    ax.text(.5, 6.45, "Density\n(m$^{-2}$)", ha="center", va="top", fontsize=7.5)
-    ax.text(1.8, 6.45, "Order", ha="center", va="top", fontsize=7.5)
-    ax.annotate("", xy=(2.2, 6.12), xytext=(1.4, 6.12),
-                arrowprops={"arrowstyle": "-|>", "lw": .7, "color": INK})
-
-
 def draw_figure(stats, selection, *, family="Arial"):
-    with mpl.rc_context({"font.family": family, "font.size": 7.5, "text.color": INK,
+    """Reproduce the manuscript's 750 × 525-point multipanel layout.
+
+    a–e retain the original artwork and image transforms. Only f–h are
+    redrawn from numerical inputs; the density unit is corrected as one
+    math expression so its exponent stays inside the parentheses.
+    """
+    width, height = 750, 525
+    def axes_at(fig, x, y, w, h):
+        return fig.add_axes([x/width, (height-y-h)/height, w/width, h/height])
+
+    with mpl.rc_context({"font.family": family, "font.size": 8.93,
+                         "text.color": "black", "axes.labelcolor": "black",
                          "mathtext.fontset": "custom", "mathtext.rm": family,
                          "mathtext.it": family + ":italic", "mathtext.bf": family + ":bold",
-                         "mathtext.cal": family,
-                         "axes.labelcolor": INK, "svg.fonttype": "path",
-                         "svg.hashsalt": "unwrap-locust-density-v1", "figure.facecolor": "white"}):
-        fig = plt.figure(figsize=(8.8, 7.1))
-        photos = []
-        heading(fig, "a", "Real locust", .025, .973, .135)
-        heading(fig, "b", "Virtual locust", .270, .973, .365)
-        heading(fig, "c", "Immersive arena", .495, .973, .74)
-        photos.append(photo(fig, "real_locust", [.025, .725, .22, .20], crop=[.20, 0, .80, 1]))
-        # Original front/lateral/rear views, with generous space around limbs.
-        for name, y in (("virtual_locust_front", .858), ("virtual_locust_lateral", .791), ("virtual_locust_rear", .725)):
-            photos.append(photo(fig, name, [.270, y, .195, .067],
-                                crop=[.18, .13, .82, .89], fit="contain"))
-        photos.append(photo(fig, "vr_arena", [.495, .725, .48, .20]))
-        heading(fig, "d", "Swarm stimuli", .025, .676, .135)
-        heading(fig, "e", "Density & order", .270, .676, .372)
-        heading(fig, "f", "Model comparison", .490, .676, .623)
-        heading(fig, "g", "Fixed effects", .765, .676, .88)
-        # Match the -90-degree image orientation in the source PDF, so the
-        # displayed virtual agents and the marching arrow point together.
-        photos.append(photo(fig, "real_swarm", [.025, .390, .22, .215], rotation=-90))
-        photos.append(photo(fig, "virtual_swarm", [.025, .125, .22, .215], rotation=-90))
-        fig.text(.135, .622, "Real swarm", ha="center", fontsize=7.5)
-        fig.text(.135, .356, "Virtual swarm", ha="center", fontsize=7.5)
-        arrow = fig.add_axes([.075, .071, .12, .026]); arrow.set_axis_off()
-        arrow.annotate("", xy=(1, .6), xytext=(0, .6), arrowprops={"arrowstyle": "-|>", "lw": 1.2, "color": INK})
-        fig.text(.135, .046, "Marching direction", ha="center", fontsize=7.5)
-        stimulus_schematic(fig)
-        # Forest plots: intervals first and markers second; no gridlines.
-        ax = fig.add_axes([.574, .435, .135, .17]); style_axis(ax)
+                         "mathtext.cal": family, "svg.fonttype": "path",
+                         "svg.hashsalt": "unwrap-locust-density-baseline-v1"}):
+        fig = plt.figure(figsize=(width/72, height/72))
+        fig.patch.set_visible(False)
+        # All panel letters/titles are retained as original source paths.
+        fig.text(245.4/width, 1-225/height, r"$(\mathrm{m}^{-2})$",
+                 ha="center", va="baseline", fontsize=11)
+        ax = axes_at(fig, 420.534, 220.492, 107.159, 116.196)
+        style_axis(ax)
         rows = selection["models"]
         for y, row in enumerate(rows[::-1]):
             color = "#1f77b4" if row["has_order"] else "#ff7f0e"
-            ax.plot([row["delta"] - row["se"], row["delta"] + row["se"]], [y, y], color=color, lw=1.1)
-            ax.scatter(row["delta"], y, s=22, color=color, zorder=3,
-                       marker="o" if row["has_order"] else "s")
-        ax.axvline(0, lw=.7, color=MUTED, ls=(0, (3, 3)))
-        ax.set_yticks(range(5), [r["name"].replace("Density", "D").replace("Order", "O") for r in rows[::-1]])
-        ax.set_ylim(-.5, 4.6); ax.set_xlim(-96, 6); ax.set_xticks([-80, -40, 0])
-        ax.set_xlabel("ELPD difference", labelpad=5)
-        ax.legend(handles=[Line2D([], [], color=c, marker=m, ls="", label=t, ms=4)
-                           for c, m, t in (("#1f77b4", "o", "Order included"), ("#ff7f0e", "s", "Order excluded"))],
-                  loc="lower left", bbox_to_anchor=(-.04, 1.03), frameon=False,
-                  borderpad=0, fontsize=6.5, handletextpad=.4)
-        ax = fig.add_axes([.835, .435, .140, .17]); style_axis(ax)
+            ax.errorbar(row["delta"], y, xerr=row["se"], color=color,
+                        fmt="o" if row["has_order"] else "s", ms=5.7,
+                        capsize=3, elinewidth=1.1, capthick=1)
+        ax.axvline(0, lw=1, color="black", ls=(0, (4, 3)))
+        ax.set_yticks(range(5), [r["name"] for r in rows[::-1]])
+        ax.set_ylim(-.2, 4.2); ax.set_xlim(-95, 5); ax.set_xticks([-50, 0])
+        ax.set_xlabel("ELPD difference", labelpad=6)
+        ax.legend(handles=[Line2D([], [], color=c, marker=m, label=t, ms=5.5)
+                           for c, m, t in (("#1f77b4", "o", "Order included"),
+                                           ("#ff7f0e", "s", "Order excluded"))],
+                  loc="upper left", frameon=True, fontsize=8.93, borderpad=.25,
+                  handlelength=.8, handletextpad=.35, labelspacing=.15)
+        ax = axes_at(fig, 607.833, 220.492, 107.159, 116.196)
+        style_axis(ax)
         for term, row in enumerate(stats["coefficients"]):
             for j, (color, marker) in enumerate(((MU_COLOR, "D"), (KAPPA_COLOR, "^"))):
-                y = 3 - term + (.10 if j == 0 else -.10)
+                y = 3-term + (.075 if j == 0 else -.075)
                 mean, low, high = row[j]
-                ax.plot([low, high], [y, y], color=color, lw=1.1)
-                ax.scatter(mean, y, color=color, marker=marker, s=22, zorder=3)
-        ax.axvline(0, lw=.7, color=MUTED, ls=(0, (3, 3)))
-        ax.set_yticks(range(4), ["D × O", "Order", "Density", "Intercept"])
-        ax.set_ylim(-.5, 3.6); ax.set_xlabel("Coefficient value", labelpad=5)
-        ax.legend(handles=[Line2D([], [], color=c, marker=m, ls="", label=t, ms=4)
-                           for c, m, t in ((MU_COLOR, "D", "Direction μ"), (KAPPA_COLOR, "^", "Concentration κ"))],
-                  loc="lower left", bbox_to_anchor=(-.05, 1.03), frameon=False,
-                  borderpad=0, fontsize=6.5, handletextpad=.4)
-        heading(fig, "h", "Response to swarm motion", .490, .344, .75)
-        for key, grid, bounds, levels, cmap, xlabel in (
-            ("over_order", "order_grid", [.535, .105, .17, .155], DENSITY_LEVELS, plt.cm.Reds, "Order"),
-            ("over_density", "density_grid", [.805, .105, .17, .155], ORDER_LEVELS, plt.cm.Purples, "Density (m$^{-2}$)"),
+                midpoint = (low+high)/2
+                ax.errorbar(midpoint, y, xerr=(high-low)/2, color=color,
+                            fmt="none", capsize=3, elinewidth=1.1, capthick=1)
+                ax.plot(mean, y, marker, ms=6, color=color)
+        ax.axvline(0, lw=1, color="black", ls=(0, (4, 3)))
+        ax.set_yticks(range(4), ["Density × Order", "Order", "Density", "Intercept"])
+        ax.set_ylim(-.25, 3.25); ax.set_xlim(-.35, 3.02); ax.set_xticks([0, 2])
+        ax.set_xlabel("Coefficient value", labelpad=6)
+        ax.legend(handles=[Line2D([], [], color=c, marker=m, label=t, ms=6)
+                           for c, m, t in ((MU_COLOR, "D", "μ"), (KAPPA_COLOR, "^", "κ"))],
+                  loc="upper right", frameon=True, fontsize=8.93, borderpad=.25,
+                  handlelength=.8, handletextpad=.35, labelspacing=.15)
+        for key, grid, x, levels, cmap, xlabel in (
+            ("over_order", "order_grid", 405.066, DENSITY_LEVELS, plt.cm.Reds, "Order"),
+            ("over_density", "density_grid", 587.715, ORDER_LEVELS, plt.cm.Purples, "Density"),
         ):
-            ax = fig.add_axes(bounds); style_axis(ax)
-            for i, (level, curve) in enumerate(zip(levels, stats[key])):
-                color = cmap(.45 + .10 * i)
-                ax.fill_between(stats[grid], curve["low"], curve["high"], color=color, alpha=.15, lw=0)
-                ax.plot(stats[grid], curve["mean"], color=color, lw=1.25)
-            ax.axhline(1 / (2 * np.pi), color=MUTED, lw=.7, ls=(0, (3, 3)))
-            ax.set_ylim(0, 1); ax.set_yticks([0, .25, .5, .75, 1], ["0", ".25", ".5", ".75", "1"])
-            ax.set_xlabel(xlabel, labelpad=5)
+            ax = axes_at(fig, x, 401.301, 110.682, 89.75)
+            style_axis(ax)
+            handles = []
+            for i in range(len(levels)-1, -1, -1):
+                curve = stats[key][i]
+                color = cmap(.45 + .10*i)
+                ax.fill_between(stats[grid], curve["low"], curve["high"], color=color, alpha=.35, lw=0)
+                line, = ax.plot(stats[grid], curve["mean"], color=color, lw=1.27)
+                handles.append(line)
+            ax.axhline(1/(2*np.pi), color="black", lw=1.15, ls=(0, (4, 3)))
+            ax.set_ylim(0, 1); ax.set_yticks(np.linspace(0, 1, 6))
+            ax.set_xlabel(xlabel, labelpad=6)
             if key == "over_order":
-                ax.set_xlim(0, 1); ax.set_xticks([0, .5, 1]); ax.set_ylabel("Density at 0° (rad$^{-1}$)", labelpad=5)
+                ax.set_xlim(0, 1); ax.set_xticks(np.linspace(0, 1, 6))
+                ax.set_xticklabels(["0", "0.2", "0.4", "0.6", "0.8", "1.0"])
+                ax.set_ylabel("Predictive density", labelpad=4)
             else:
                 ax.set_xscale("log", base=2); ax.set_xlim(1, 64)
-                ax.set_xticks([1, 4, 16, 64], ["1", "4", "16", "64"])
-            # Compact colour key above each plot; all six levels are explicit.
-            handles = [Line2D([], [], color=cmap(.45 + .10*i), lw=2, label=f"{v:g}") for i,v in enumerate(levels)]
-            ax.legend(handles=handles, title="Density (m$^{-2}$)" if key=="over_order" else "Order",
-                      loc="lower left", bbox_to_anchor=(-.05, 1.01), ncol=3, frameon=False,
-                      fontsize=6.3, title_fontsize=6.8, handlelength=.8,
-                      columnspacing=.7, handletextpad=.35, labelspacing=.25, borderpad=0)
+                ax.set_xticks([1, 2, 4, 8, 16, 32, 64], ["1", "2", "4", "8", "16", "32", "64"])
+            ax.legend(handles=handles, labels=[f"{v:g}" for v in levels[::-1]],
+                      title="Density" if key=="over_order" else "Order",
+                      loc="center left", bbox_to_anchor=(1.035, .5), ncol=1,
+                      frameon=True, fontsize=8.93, title_fontsize=8.93,
+                      handlelength=1.2, handletextpad=.4, labelspacing=.15, borderpad=.3)
         buffer = io.StringIO()
         fig.savefig(buffer, format="svg", metadata={"Date": None, "Creator": "unwrap locust_density_figure.py"})
         plt.close(fig)
-    return embed_photos(buffer.getvalue(), photos)
+    return embed_original_panels(buffer.getvalue())
 
 
-def embed_photos(svg, placements):
-    """Use original JPEG streams inside vector SVG frames and clipping paths."""
+def embed_original_panels(svg):
+    """Compose preserved a–e artwork underneath newly computed f–h panels."""
     ET.register_namespace("", SVG)
     root = ET.fromstring(svg)
+    manifest = json.loads((ASSETS / "images.json").read_text())
+    info = manifest["original_panels"]
+    path = ASSETS / info["file"]
+    if sha256(path) != info["sha256"]:
+        raise ValueError("Original panel artwork checksum mismatch")
+    original = ET.parse(path).getroot()
+    original.set("x", "0"); original.set("y", "0")
     title = ET.Element(f"{{{SVG}}}title", id="figure-title"); title.text = "Locust density and order"
     desc = ET.Element(f"{{{SVG}}}desc", id="figure-description"); desc.text = CAPTION
-    root.insert(0, title); root.insert(1, desc)
+    background = ET.Element(f"{{{SVG}}}rect", x="0", y="0", width="750", height="525", fill="white")
+    for index, item in enumerate((title, desc, background, original)):
+        root.insert(index, item)
     root.set("role", "img"); root.set("aria-labelledby", "figure-title figure-description")
-    manifest = json.loads((ASSETS / "images.json").read_text())
-    width, height = 8.8 * 72, 7.1 * 72
-    for i, placement in enumerate(placements):
-        name = placement["name"] + ".jpeg"
-        path = ASSETS / name
-        meta = manifest["images"][name]
-        if sha256(path) != meta["sha256"]:
-            raise ValueError(f"Altered source image: {path}")
-        x, y, w, h = placement["bounds"]
-        x, y, w, h = x * width, (1 - y - h) * height, w * width, h * height
-        crop = placement["crop"] or [0, 0, 1, 1]
-        rotation = placement["rotation"]
-        source_w, source_h = meta["width"], meta["height"]
-        if rotation == -90:
-            source_w, source_h = source_h, source_w
-        # Crop to an explicit source rectangle, then fill the destination;
-        # preserve the source aspect ratio and clip any extra overflow.
-        l, t, r, b = crop
-        fit = min if placement["fit"] == "contain" else max
-        scale = fit(w / (source_w * (r-l)), h / (source_h * (b-t)))
-        iw, ih = source_w * scale, source_h * scale
-        ix, iy = x + w/2 - (l+r)/2*iw, y + h/2 - (t+b)/2*ih
-        clip = ET.SubElement(root, f"{{{SVG}}}clipPath", id=f"photo-clip-{i}")
-        ET.SubElement(clip, f"{{{SVG}}}rect", x=str(x), y=str(y), width=str(w), height=str(h))
-        group = ET.SubElement(root, f"{{{SVG}}}g", {"clip-path": f"url(#photo-clip-{i})"})
-        ET.SubElement(group, f"{{{SVG}}}rect", x=str(x), y=str(y), width=str(w), height=str(h), fill="#e5e5e5")
-        attrs = {"x": str(ix), "y": str(iy), "width": str(iw), "height": str(ih)}
-        if rotation == -90:
-            attrs = {"x": "0", "y": "0", "width": str(ih), "height": str(iw),
-                     "transform": f"translate({ix} {iy + ih}) rotate(-90)"}
-        ET.SubElement(group, f"{{{SVG}}}image", {**attrs,
-            "href": "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode(),
-            "preserveAspectRatio": "xMidYMid meet"})
     return "\n".join(line.rstrip() for line in ET.tostring(root, encoding="unicode").splitlines()) + "\n"
 
 
@@ -424,7 +342,8 @@ def main(argv=None):
         "divergences": divergences, "selection_source": selection,
         "prediction_basis": "Original scaled coordinates of stored Bambi coefficients; concentration offset zero",
         "prediction_summary": "exp(mean(log density at zero)); exponentiated 90% log-density HDI",
-        "coefficient_hdi_probability": .95, "schematic_seed": 123, "caption": CAPTION}
+        "coefficient_hdi_probability": .95, "layout": "Original 750 × 525-point manuscript layout",
+        "illustration_basis": "Original PDF artwork for panels a–e, including calibrated scale bar", "caption": CAPTION}
     stem = write_outputs(args.output_dir, statistics(post), selection, metadata, family=args.font_family)
     print(f"Wrote SVG, PDF, PNG, HTML and provenance JSON: {stem}")
 
