@@ -169,10 +169,19 @@ def resolve_fonts(directory=None, family="Arial"):
     return resolved
 
 
-def panel_heading(fig, x, y, letter, title, title_x, *, align="center"):
-    fig.text(x, y, letter + ".", fontsize=13, weight="bold", va="top", color=INK)
-    fig.text(title_x, y - 0.003, title, fontsize=9.5, weight="bold", va="top",
-             ha=align, color=INK, linespacing=1.2)
+def panel_heading(fig, x, y, letter, title, title_x, *, align="center", letter_gap=None):
+    heading = fig.text(title_x, y - 0.003, title, fontsize=9.5, weight="bold", va="top",
+                       ha=align, color=INK, linespacing=1.2)
+    letter_align = "left"
+    if letter_gap is not None:
+        # Keep the heading centred on its axes and place its letter a fixed
+        # number of typographic points before the rendered title.
+        box = heading.get_window_extent(renderer=fig.canvas.get_renderer())
+        left = fig.transFigure.inverted().transform((box.x0, 0))[0]
+        x = left - letter_gap / (72 * fig.get_figwidth())
+        letter_align = "right"
+    fig.text(x, y, letter + ".", fontsize=13, weight="bold", va="top",
+             ha=letter_align, color=INK)
 
 
 def draw_polar(fig, arrays, df):
@@ -288,7 +297,8 @@ def build_svg(arrays, df, *, family="Arial"):
             ax = draw_summary(fig, x, arrays[key], ylabel,
                               difference=(key == "difference"), uniform=(key == "mass"))
             box = ax.get_position()
-            panel_heading(fig, x, 0.431, letter, title, box.x0 + box.width / 2)
+            panel_heading(fig, x, 0.431, letter, title, box.x0 + box.width / 2,
+                          letter_gap=4)
         buffer = io.StringIO()
         fig.savefig(buffer, format="svg", metadata={"Date": None, "Creator": "unwrap beetles_figure.py"})
         plt.close(fig)
