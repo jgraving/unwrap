@@ -222,13 +222,70 @@ def svg_matrix(linear, translation):
     return "matrix(" + " ".join(f"{v:.9g}" for v in values) + ")"
 
 
+def rolling_beetle(original, prefix, index, position, radial, size):
+    """Reuse four original views with raised hind legs resting on each ball.
+
+    Keep the camera's upright direction: choose/mirror the closest view and
+    limit its turn to 25 degrees. Place the body and ball separately, drawing
+    the ball in front and the two articulated hind legs over its upper cap.
+    """
+    poses = (
+        dict(ball=14, body=(22, 21, 20), ground=(15, 16, 17),
+             anchor=(221.41477, 115.67518), head=(199.5, 102), flip=(1, 1), lift=1,
+             hips=((203.35827, 104.24067), (213.2612, 101.5208))),
+        dict(ball=25, body=(26, 32, 33), ground=(27, 28, 29),
+             anchor=(151.07448, 22.453), head=(150, 36), flip=(1, -1), lift=5,
+             hips=((145.1332, 30.884533), (156.314, 31.298667))),
+        dict(ball=34, body=(35, 41, 42), ground=(37, 38, 39),
+             anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1), lift=8,
+             hips=((82.757467, 40.500533), (91.170133, 38.514533))),
+        dict(ball=5, body=(8, 7, 6), ground=(9, 10, 11),
+             anchor=(239.24303, 38.07613), head=(210.5, 40.5), flip=(-1, 1), lift=0,
+             hips=((226.02587, 31.765467), (223.12053, 28.860133))),
+    )
+    pose = poses[index]
+    mirror = np.diag(pose["flip"])
+    source = mirror @ (np.array(pose["anchor"]) - np.array(pose["head"]))
+    angle = np.angle(np.exp(1j * (np.arctan2(radial[1], radial[0])
+                                  - np.arctan2(source[1], source[0]))))
+    angle = np.clip(angle, -np.deg2rad(25), np.deg2rad(25))
+    linear = size * np.array([[np.cos(angle), -np.sin(angle)],
+                              [np.sin(angle), np.cos(angle)]]) @ mirror
+    ball_shift = position - linear @ np.array(pose["anchor"])
+    body_shift = ball_shift - np.array([0, pose["lift"] * size])
+    beetle = ET.Element(f"{{{SVG}}}g", id=f"{prefix}-beetle-{index}",
+                        attrib={"data-source-pose": str(pose["ball"])})
+
+    def add_part(number, shift):
+        part = deepcopy(original[f"{prefix}-path{number}"])
+        part.set("id", f"{prefix}-beetle-{index}-path{number}")
+        part.set("transform", svg_matrix(linear, shift))
+        beetle.append(part)
+
+    for number in (*pose["ground"], *pose["body"]):
+        add_part(number, body_shift)
+    add_part(pose["ball"], ball_shift)
+    hips = sorted((linear @ np.array(hip) + body_shift for hip in pose["hips"]),
+                  key=lambda point: point[0])
+    for side, hip in zip((-1, 1), hips):
+        contact = position + size * np.array([side * 5.0, -8.5])
+        knee = (hip + contact) / 2 + size * np.array([side * 2.8, -3.5])
+        toe = contact + size * np.array([side * 0.7, 1.3])
+        points = [" ".join(f"{value:.8g}" for value in point)
+                  for point in (hip, knee, contact, toe)]
+        ET.SubElement(beetle, f"{{{SVG}}}path", id=f"{prefix}-beetle-{index}-hind-{side}",
+                      d=f"M {points[0]} L {points[1]} L {points[2]} L {points[3]}",
+                      style=f"fill:none;stroke:#3b493e;stroke-width:{1.1 * size:.8g};"
+                            "stroke-linecap:round;stroke-linejoin:round")
+    return beetle
+
+
 def arena_vector(condition):
     """Compose the treatment schematic from original vector paths.
 
     The on exits fan toward the nominal lamp bearing on the arena ellipse.
-    Beetles use the original foreground view, placed and rigidly rotated to
-    face outward. This preserves round dung balls and the body proportions;
-    their size and drawing order vary gently with foreground depth.
+    Four original beetle views are adapted separately, with rear legs on the
+    upper ball surfaces. Size and drawing order vary with foreground depth.
     """
     prefix = f"arena-light-{condition}"
     x, y, width, height = ARENA_BOUNDS[condition]
@@ -262,15 +319,7 @@ def arena_vector(condition):
         path = deepcopy(original[f"{prefix}-{path_id}"])
         path.set("d", f"M {coordinates[0]} C {' '.join(coordinates[1:4])} C {' '.join(coordinates[4:])}")
         root.append(path)
-        angle = np.arctan2(radial[1], radial[0]) - np.arctan2(12, 16)
-        linear = size * np.array([[np.cos(angle), -np.sin(angle)],
-                                  [np.sin(angle), np.cos(angle)]])
-        beetle = ET.Element(f"{{{SVG}}}g", id=f"{prefix}-beetle-{index}",
-                            transform=svg_matrix(linear, rim - linear @ np.array([222, 117])))
-        for number in range(14, 23):
-            part = deepcopy(original[f"{prefix}-path{number}"])
-            part.set("id", f"{prefix}-beetle-{index}-path{number}")
-            beetle.append(part)
+        beetle = rolling_beetle(original, prefix, index, rim, radial, size)
         beetles.append((rim[1], beetle))
     for _, beetle in sorted(beetles, key=lambda item: item[0]):
         root.append(beetle)
