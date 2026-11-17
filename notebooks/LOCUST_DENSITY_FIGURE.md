@@ -10,13 +10,17 @@ The current styling uses 16-point panel letters, bold 11-point f–h titles,
 9-point statistical labels, thin left/bottom axes, and vertical legends
 without frames. Prediction lines are 1.5 points with 0.16-alpha bands.
 Borders around d/e are lighter. Order legend entries use 1.0 through 0.0.
-Density units are single math expressions, `(m⁻²)` and `(rad⁻¹)`, with
-automatically sized parentheses that enclose the full exponent height.
+The density unit in e is retained directly from the original PDF. The unit in
+h uses the same compact typography: ordinary Arial parentheses, a two-thirds
+size exponent, and a baseline rise of 2.626465/11 em. No extensible mathematical
+parentheses or extra-high superscripts are used.
 
 Arial and the original red/purple, brown/green, and blue/orange palettes are
 retained. Statistical curves, bands, axes, schematics, and typography remain
-vector. Photos/renderings and the source scale-label backing/mask retain
-their original raster content. No generated imagery or screenshots of
+vector. PDF export restores the original JPEG image objects, including their ICC
+profiles and interpolation settings, without changing image placement or
+pixel dimensions. PNG previews are rendered from that PDF at 3000 × 2100.
+The source scale-label backing/mask retains its original raster content. No generated imagery or screenshots of
 statistical panels are used. The faithful reproduction baseline is retained
 at commit `fb1ad2d60e58facca79c16d597d0d9fbc2b1a9f8`; the current rendering
 applies the approved polish to that baseline.
@@ -201,3 +205,17 @@ scale-bar preservation. Source preparation also verifies pixel preservation
 of the original baseline panels. Review the PNG and an independently rendered PDF at
 intended manuscript size. This PDF contains the source photographs and the
 original scale-label backing/mask; statistical content remains vector.
+
+## Source image fidelity
+
+`notebooks/assets/locust_density_order/reference.pdf` is the checksum-pinned
+original figure from circstats at the revision above. It allows offline
+comparison of typography, image streams, colours, interpolation and crops.
+The virtual swarm embedded in that original is 445 × 445 pixels. Export now
+preserves its original compressed stream and colour profile; increasing the
+preview dimensions does not create additional image detail. A higher resolution
+source can replace this image once provided, without changing the panel crop.
+
+The cloud workflow `Locust figure fidelity` compares source and exported artwork
+and runs the scientific/export tests. All changes in this pass concern typography
+and image export; saved numerical summaries and sampling specifications are unchanged.

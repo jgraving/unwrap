@@ -4,55 +4,56 @@ on:
     branches: [feat/locust-density-publication-figure]
     paths:
       - '.github/workflows/locust-figure.yml'
+      - 'notebooks/locust_density_figure.py'
+      - 'notebooks/assets/locust_density_order/reference.pdf'
+      - 'tools/prepare_locust_figure_assets.py'
+      - 'tools/refresh_locust_figure_artwork.py'
+      - 'tests/test_locust_density_figure.py'
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: locust-artwork-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  compare:
+  refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: '3.12'
-      - name: Install PDF inspection tools
-        run: python -m pip install pymupdf==1.26.6 pillow
-      - name: Compare source artwork and unit typography
+          enable-cache: true
+      - name: Install figure and test dependencies
+        run: |
+          uv venv
+          uv pip install -e '.[test,figure]' 'pymupdf==1.26.6'
+      - name: Refresh units and native image export
+        run: uv run --no-project python tools/refresh_locust_figure_artwork.py
+      - name: Check scientific results and image fidelity
+        run: uv run --no-project python -m pytest -q tests/test_locust_density_figure.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: locust-figure-exports
+          path: |
+            assets/locust-density-publication
+            notebooks/assets/locust_density_order/original_panels.svg
+            notebooks/assets/locust_density_order/images.json
+      - name: Return reviewed exports
         shell: python
         run: |
-          import base64, hashlib, io, json, re, urllib.request
+          import base64, json
           from pathlib import Path
-          import fitz
-          from PIL import Image, ImageDraw
-          import xml.etree.ElementTree as ET
-          
-          raw = Path("notebooks/assets/locust_density_order/reference.pdf").read_bytes()
-          assert hashlib.sha256(raw).hexdigest() == "48609fdc9185e20227ae0b1c20dd377301d5aa962c7d57078ef1bf5873d0bf21"
-          original = fitz.open(stream=raw, filetype="pdf")
-          current = fitz.open("assets/locust-density-publication/locust_density_publication.pdf")
-          report = {"original_fonts": original[0].get_fonts(full=True), "original_text": original[0].get_text("dict", flags=fitz.TEXTFLAGS_DICT & ~fitz.TEXT_PRESERVE_IMAGES), "original_images": original[0].get_images(full=True), "current_images": current[0].get_images(full=True)}
-          report["original_image_21"] = original.xref_object(21)
-          report["original_image_21_sha256"] = hashlib.sha256(original.extract_image(21)["image"]).hexdigest()
-          root = ET.parse("assets/locust-density-publication/locust_density_publication.svg").getroot()
-          report["svg_images"] = [{"id": n.get("id"), "width": n.get("width"), "height": n.get("height")} for n in root.iter("{http://www.w3.org/2000/svg}image")]
-          print("REPORT_START")
-          print(json.dumps(report))
-          print("REPORT_END")
-          for name, rect in [("units", (225, 204, 267, 232)), ("swarm", (15, 360, 176, 515))]:
-              panels = []
-              for label, doc in [("Original PDF", original), ("Current PDF", current)]:
-                  pix = doc[0].get_pixmap(matrix=fitz.Matrix(4, 4), clip=fitz.Rect(rect))
-                  im = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
-                  canvas = Image.new("RGB", (im.width, im.height + 28), "white")
-                  canvas.paste(im, (0, 28)); ImageDraw.Draw(canvas).text((8, 5), label, fill="black")
-                  panels.append(canvas)
-              canvas = Image.new("RGB", (sum(p.width for p in panels), max(p.height for p in panels)), "white")
-              x = 0
-              for im in panels:
-                  canvas.paste(im, (x, 0)); x += im.width
-              data = io.BytesIO(); canvas.save(data, format="PNG")
-              print("PREVIEW_" + name + "_START")
-              print(base64.b64encode(data.getvalue()).decode())
-              print("PREVIEW_" + name + "_END")
-          
+          paths = list(Path("assets/locust-density-publication").glob("locust_density_publication.*"))
+          paths += [Path("notebooks/assets/locust_density_order/original_panels.svg"), Path("notebooks/assets/locust_density_order/images.json")]
+          for path in paths:
+              print("EXPORT_START " + path.as_posix())
+              encoded = base64.b64encode(path.read_bytes()).decode()
+              for i in range(0, len(encoded), 30000):
+                  print(encoded[i:i+30000])
+              print("EXPORT_END")

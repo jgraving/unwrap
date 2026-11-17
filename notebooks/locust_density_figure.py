@@ -22,6 +22,10 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
 from matplotlib.lines import Line2D
+from matplotlib.patches import PathPatch
+from matplotlib.path import Path as MplPath
+from matplotlib.textpath import TextPath, TextToPath
+from matplotlib.transforms import Affine2D
 import numpy as np
 from scipy.special import i0e
 import xarray as xr
@@ -170,6 +174,85 @@ def statistics(post):
             "coefficients": np.asarray(coefficients)}
 
 
+# Native superscript metrics measured in the original circstats PDF:
+# 7 1/3-point exponent on 11-point type, raised 2.626465 points.
+SUPERSCRIPT_SCALE = 2/3
+SUPERSCRIPT_RISE = 2.626465/11
+
+
+def compact_unit_path(label, unit, exponent, *, fontsize=9, family="Arial", prop=None):
+    """Ordinary sans-serif parentheses with the manuscript's compact exponent."""
+    prop = prop.copy() if prop is not None else font_manager.FontProperties(family=family)
+    writer = TextToPath()
+
+    def part(text, size):
+        font = prop.copy()
+        font.set_size(size)
+        path = TextPath((0, 0), text, size=size, prop=font, usetex=False)
+        advance = writer.get_text_width_height_descent(text, font, ismath=False)[0]
+        return path, advance
+
+    prefix, width = part((label + " " if label else "") + "(" + unit, fontsize)
+    power, power_width = part(str(exponent), fontsize * SUPERSCRIPT_SCALE)
+    closing, closing_width = part(")", fontsize)
+    path = MplPath.make_compound_path(
+        prefix,
+        power.transformed(Affine2D().translate(width, fontsize * SUPERSCRIPT_RISE)),
+        closing.transformed(Affine2D().translate(width + power_width, 0)),
+    )
+    return path, width + power_width + closing_width
+
+
+def add_compact_unit_label(fig, x, y, label, unit, exponent, *,
+                           fontsize=9, family="Arial", rotation=0, prop=None):
+    """Place a vector label in page points, centred along its baseline."""
+    path, advance = compact_unit_path(label, unit, exponent, fontsize=fontsize,
+                                     family=family, prop=prop)
+    transform = (Affine2D().translate(-advance/2, 0).rotate_deg(rotation)
+                 .translate(x, y)
+                 .scale(1/(fig.get_figwidth()*72), 1/(fig.get_figheight()*72))
+                 + fig.transFigure)
+    patch = PathPatch(path, transform=transform, facecolor=INK, edgecolor="none",
+                      gid="predictive-density-label")
+    fig.patches.append(patch)
+    return patch
+
+
+def restore_pdf_source_images(path):
+    """Keep the original JPEG streams, ICC profiles and PDF interpolation.
+
+    CairoSVG preserves the pixel dimensions but decodes/re-encodes the source
+    images into DeviceRGB. Copy the source image objects back without changing
+    any placement, crop, scale bar or drawing command.
+    """
+    import fitz
+    reference = ASSETS / "reference.pdf"
+    manifest = json.loads((ASSETS / "images.json").read_text())
+    if sha256(reference) != manifest["source_sha256"]:
+        raise ValueError("Original PDF checksum mismatch")
+    document = fitz.open(path)
+    geometry = document[0].get_image_info()
+    targets = {(item[2], item[3]): item[0]
+               for item in document[0].get_images(full=True)
+               if item[2] > 24}
+    temporary_page = len(document)
+    with fitz.open(reference) as original:
+        document.insert_pdf(original, from_page=0, to_page=0)
+    sources = {(item[2], item[3]): item[0]
+               for item in document[temporary_page].get_images(full=True)
+               if item[2] > 24}
+    if targets.keys() != sources.keys() or len(targets) != 7:
+        raise ValueError("Source photo inventory changed; review image replacements")
+    for dimensions, target in targets.items():
+        document.xref_copy(sources[dimensions], target)
+    document.delete_page(temporary_page)
+    if [item["bbox"] for item in geometry] != [item["bbox"] for item in document[0].get_image_info()]:
+        raise ValueError("Photo placement changed during PDF export")
+    data = document.tobytes(garbage=4, deflate=True)
+    document.close()
+    Path(path).write_bytes(data)
+
+
 def style_axis(ax):
     for side, spine in ax.spines.items():
         spine.set_visible(side in ("left", "bottom"))
@@ -204,8 +287,6 @@ def draw_figure(stats, selection, *, family="Arial"):
                            ("Population-level summary", 547.97, 377.55)):
             fig.text(x/width, 1-y/height, text, ha="center", va="top",
                      fontsize=11, weight="bold", linespacing=1)
-        fig.text(245.4/width, 1-225/height, r"$\left(\mathrm{m}^{-2}\right)$",
-                 ha="center", va="baseline", fontsize=11)
         ax = axes_at(fig, 420.534, 220.492, 107.159, 116.196)
         style_axis(ax)
         rows = selection["models"]
@@ -260,7 +341,9 @@ def draw_figure(stats, selection, *, family="Arial"):
             if key == "over_order":
                 ax.set_xlim(0, 1); ax.set_xticks(np.linspace(0, 1, 6))
                 ax.set_xticklabels(["0", "0.2", "0.4", "0.6", "0.8", "1.0"])
-                ax.set_ylabel(r"Predictive density $\left(\mathrm{rad}^{-1}\right)$", labelpad=4)
+                add_compact_unit_label(fig, 380.576, height - (401.301 + 89.75/2),
+                                       "Predictive density", "rad", -1,
+                                       fontsize=9, family=family, rotation=90)
             else:
                 ax.set_xscale("log", base=2); ax.set_xlim(1, 64)
                 ax.set_xticks([1, 2, 4, 8, 16, 32, 64], ["1", "2", "4", "8", "16", "32", "64"])
@@ -345,7 +428,10 @@ def write_outputs(output, stats, selection, metadata, *, family="Arial"):
     svg = draw_figure(stats, selection, family=family)
     stem.with_suffix(".svg").write_text(svg)
     cairosvg.svg2pdf(bytestring=svg.encode(), write_to=str(stem.with_suffix(".pdf")))
-    cairosvg.svg2png(bytestring=svg.encode(), write_to=str(stem.with_suffix(".png")), output_width=2200)
+    restore_pdf_source_images(stem.with_suffix(".pdf"))
+    import fitz
+    with fitz.open(stem.with_suffix(".pdf")) as document:
+        document[0].get_pixmap(matrix=fitz.Matrix(4, 4)).save(stem.with_suffix(".png"))
     stem.with_suffix(".html").write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Locust density and order</title>
 <style>body{{margin:0;background:#f5f5f4;color:#262626;font:15px/1.65 Arial,sans-serif}}

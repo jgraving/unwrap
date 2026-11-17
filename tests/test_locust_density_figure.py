@@ -146,3 +146,22 @@ def test_polish_preserves_photo_geometry_and_calibrated_scale():
     figure.polish_original_panels(polished)
     assert image_geometry(polished) == before_geometry
     assert scale_bar(polished) == before_bar
+
+
+def test_pdf_export_preserves_native_photo_streams(posterior, tmp_path):
+    """PDF rendering must retain each original compressed image and ICC profile."""
+    fitz = pytest.importorskip("fitz")
+    selection = json.loads((figure.ASSETS / "selection.json").read_text())
+    stem = figure.write_outputs(tmp_path, figure.statistics(posterior), selection, {},
+                                family="DejaVu Sans")
+    with fitz.open(figure.ASSETS / "reference.pdf") as original, fitz.open(stem.with_suffix(".pdf")) as exported:
+        expected = {(row[2], row[3]): original.xref_stream_raw(row[0])
+                    for row in original[0].get_images(full=True) if row[2] > 24}
+        actual = {(row[2], row[3]): exported.xref_stream_raw(row[0])
+                  for row in exported[0].get_images(full=True) if row[2] > 24}
+        assert len(actual) == 7
+        assert actual == expected
+        for row in exported[0].get_images(full=True):
+            if row[2] > 24:
+                assert exported.xref_get_key(row[0], "Interpolate") == ("bool", "true")
+                assert row[5] == "ICCBased"

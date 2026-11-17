@@ -71,9 +71,8 @@ def extract_original_panels(doc):
     page.add_redact_annot(fitz.Rect(345, 217, 750, 370), fill=None)
     page.add_redact_annot(fitz.Rect(345, 397, 750, 525), fill=None)
     page.apply_redactions(images=0, graphics=1, text=0)
-    # Replace only the old unit line; its exponent was on the baseline.
-    page.add_redact_annot(fitz.Rect(231, 213, 260, 225), fill=None)
-    page.apply_redactions(images=0, graphics=0, text=0)
+    # The density unit already uses the correct compact superscript and
+    # ordinary Arial parentheses. Preserve it directly from the manuscript.
     retained = page.get_pixmap(matrix=fitz.Matrix(2, 2))
     a = np.frombuffer(original.samples, dtype=np.uint8).reshape(original.height, original.width, 3)
     b = np.frombuffer(retained.samples, dtype=np.uint8).reshape(retained.height, retained.width, 3)
@@ -82,7 +81,6 @@ def extract_original_panels(doc):
     mask[370:, :680] = True
     mask[370:434, 690:] = True
     mask[740:794, 690:] = True
-    mask[420:452, 460:522] = False
     changed = int(np.count_nonzero(np.any(a != b, axis=-1) & mask))
     if changed:
         raise ValueError(f"Extraction altered {changed} retained source pixels")
