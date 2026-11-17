@@ -10,8 +10,8 @@ The current styling uses 16-point panel letters, bold 11-point f–h titles,
 9-point statistical labels, thin left/bottom axes, and vertical legends
 without frames. Prediction lines are 1.5 points with 0.16-alpha bands.
 Borders around d/e are lighter. Order legend entries use 1.0 through 0.0.
-Density units are single math expressions, `(m⁻²)` and `(rad⁻¹)`, keeping
-the exponent inside the parentheses.
+Density units are single math expressions, `(m⁻²)` and `(rad⁻¹)`, with
+automatically sized parentheses that enclose the full exponent height.
 
 Arial and the original red/purple, brown/green, and blue/orange palettes are
 retained. Statistical curves, bands, axes, schematics, and typography remain

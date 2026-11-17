@@ -204,7 +204,7 @@ def draw_figure(stats, selection, *, family="Arial"):
                            ("Population-level summary", 547.97, 377.55)):
             fig.text(x/width, 1-y/height, text, ha="center", va="top",
                      fontsize=11, weight="bold", linespacing=1)
-        fig.text(245.4/width, 1-225/height, r"$(\mathrm{m}^{-2})$",
+        fig.text(245.4/width, 1-225/height, r"$\left(\mathrm{m}^{-2}\right)$",
                  ha="center", va="baseline", fontsize=11)
         ax = axes_at(fig, 420.534, 220.492, 107.159, 116.196)
         style_axis(ax)
@@ -260,7 +260,7 @@ def draw_figure(stats, selection, *, family="Arial"):
             if key == "over_order":
                 ax.set_xlim(0, 1); ax.set_xticks(np.linspace(0, 1, 6))
                 ax.set_xticklabels(["0", "0.2", "0.4", "0.6", "0.8", "1.0"])
-                ax.set_ylabel(r"Predictive density $(\mathrm{rad}^{-1})$", labelpad=4)
+                ax.set_ylabel(r"Predictive density $\left(\mathrm{rad}^{-1}\right)$", labelpad=4)
             else:
                 ax.set_xscale("log", base=2); ax.set_xlim(1, 64)
                 ax.set_xticks([1, 2, 4, 8, 16, 32, 64], ["1", "2", "4", "8", "16", "32", "64"])
