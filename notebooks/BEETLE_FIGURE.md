@@ -17,6 +17,12 @@ so the abdomens rest over the upper ball surfaces. Rear legs are tapered,
 filled polygons with the original grey fill and dark green outlines. They
 are drawn above the balls and beneath the bodies, keeping leg roots hidden
 and feet visible on the surface.
+Each light-on beetle has three complete articulated pairs: two forelegs and
+two middle legs bracing on the arena, plus two hind legs on the ball. All
+six use tapered, filled polygons. The walking pairs have compact proportions
+and distinct foot positions, rather than reusing partially hidden limbs
+from the source poses. All 24 foot contacts and tips are checked against
+the body silhouettes; the sixteen walking contacts sit inside the arena.
 Uniform transforms preserve the ball and body shapes. Slight depth scaling
 and back-to-front drawing order keep them visually grounded. The lamp and
 exit positions share the same elliptical projection. Each vector copy
