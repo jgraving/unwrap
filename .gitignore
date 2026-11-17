@@ -153,3 +153,7 @@ figures/
 # activation file written by `Rscript -e 'renv::activate()'` is kept
 # local to each checkout (see docs/getting-started-r.md).
 .Rprofile
+
+# Regenerated paper-figure outputs from the examples/ notebooks
+# (authoritative PDFs live in the circstats paper repository)
+examples/figures/
