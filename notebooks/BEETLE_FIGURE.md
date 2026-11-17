@@ -9,9 +9,13 @@ of −40°, −12°, +13°, and +40° from its nominal bearing; they are not obs
 bearings or fitted draws. Both treatments use thicker, round-ended paths
 (3.4 source units, about 1.43 points in the exported figure).
 
-The light-on paths are gentle cubic curves. Beetles reuse the original
-foreground view, translated and rigidly rotated to face outward; the dung
-balls remain round and body proportions are preserved. Slight depth scaling
+The light-on paths are gentle cubic curves that connect to each beetle's
+revised position. Each of the four original beetle views is used once.
+Views are mirrored as needed and receive a turn of at most 25°, preserving
+the artwork's upright appearance. Bodies and balls are placed separately:
+the balls overlap bodies behind them, while two articulated rear legs are
+drawn last with their feet resting on the upper surface of each ball.
+Uniform transforms preserve the ball and body shapes. Slight depth scaling
 and back-to-front drawing order keep them visually grounded. The lamp and
 exit positions share the same elliptical projection. Each vector copy
 receives unique IDs. All placement, path construction, and recolouring are in
