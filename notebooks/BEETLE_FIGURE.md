@@ -12,9 +12,11 @@ bearings or fitted draws. Both treatments use thicker, round-ended paths
 The light-on paths are gentle cubic curves that connect to each beetle's
 revised position. Each of the four original beetle views is used once.
 Views are mirrored as needed and receive a turn of at most 25°, preserving
-the artwork's upright appearance. Bodies and balls are placed separately:
-the balls overlap bodies behind them, while two articulated rear legs are
-drawn last with their feet resting on the upper surface of each ball.
+the artwork's upright appearance. Bodies and balls are placed separately
+so the abdomens rest over the upper ball surfaces. Rear legs are tapered,
+filled polygons with the original grey fill and dark green outlines. They
+are drawn above the balls and beneath the bodies, keeping leg roots hidden
+and feet visible on the surface.
 Uniform transforms preserve the ball and body shapes. Slight depth scaling
 and back-to-front drawing order keep them visually grounded. The lamp and
 exit positions share the same elliptical projection. Each vector copy

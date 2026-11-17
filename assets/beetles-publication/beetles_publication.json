@@ -6,9 +6,9 @@
     "fit_cache/beetles_fit.nc": "f985f7e55f6a28ffb9d6ec544c624b03d8195b7447ec575a43a82351247bf5d1",
     "fit_cache/beetles_fit.meta.json": "51dbcdd857bd26f3e2dadfe90dac85633c2d4698e868cd07330d722f20bbd278"
   },
-  "code_revision": "2bdf5fada12f5bd85e7978268abcddab5cceb560",
+  "code_revision": "2fb04c4213f373496aa0cec46eb948969351434d",
   "source_sha256": {
-    "notebooks/beetles_figure.py": "08b59a5933e2ee32c31dc47e63db847b044ce366d5d3e6f4270f374b993043bc",
+    "notebooks/beetles_figure.py": "b0ce61fcbfa8e0da2b942993001d2c97533bf2629009f68a507b05ca98991fcf",
     "notebooks/assets/beetle_arena.svg": "f7474fd7213af4001b7a802ceb2ed6a7cdda3667880f35ef3e89c3ce303b3862",
     "notebooks/assets/beetle_floodlight.svg": "366174ea1cebc388142e8af043673d79f494bffdf82f978a80318ff6704f4f24",
     "notebooks/beetles_study.json": "66bf3ca03c6a3047a917da0a2d51749ca8bc6aa7be03da25ee40a88ca5b30222",
@@ -104,9 +104,9 @@
     }
   },
   "outputs_sha256": {
-    ".svg": "a4ca080ecbb224da1672885d7ae7dde8e022956373a48dd687f747049aef89c8",
-    ".pdf": "71ce85df7bfdc10280223d6a08d39c57c4607d04d166ec6a59ceb03535e8bd9b",
-    ".png": "8b3b078edf2a875797e97690e810a9d89ebe9d0cc213e65164f32e983ef94773",
-    ".html": "c395a21fcd660974f023bc1ca5b55c2bc5315d1aea7caa1017a3753788cfa4ec"
+    ".svg": "f6ff85a56792502f8d37976561cfad8ea53726e20b760003cb004d2bc6e97c14",
+    ".pdf": "84186253b56ba903accf7bcd3a3843ee311fa58f6eed7be128548e546e194c16",
+    ".png": "9eb94d8a0f754f8530284df5f6cc0677405e351dab08de1d3a7ba1942cb2a852",
+    ".html": "872dfa1a1e39f2bb906deb7cab875c2aca1a59b6942b6515c99d3d090763a345"
   }
 }
