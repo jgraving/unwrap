@@ -18,8 +18,11 @@ from unwrap.datasets import load_beetle_security_light
 from unwrap.link.numpy import circular_modulo
 
 
-def load_beetle_model_table():
+def load_beetle_model_table(data_root=None):
     """Load the security-light trials and build the modelling table.
+
+    ``data_root`` optionally selects an existing unwrap-data directory, avoiding
+    any download (used by the reproducible publication-figure command).
 
     Returns
     -------
@@ -29,7 +32,7 @@ def load_beetle_model_table():
         with non-numeric or missing headings are dropped. Bit-identical to
         the notebook's former inline data cell.
     """
-    df = load_beetle_security_light()
+    df = load_beetle_security_light(data_root=data_root)
 
     # Create a binary indicator for the Light (1 for 'ON', 0 for 'OFF')
     df['Light'] = df['Experiment'].apply(lambda x: 1 if 'ON' in x else 0)
