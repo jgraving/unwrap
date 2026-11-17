@@ -1,0 +1,105 @@
+{
+  "data_repository": "jgraving/unwrap-data",
+  "data_revision": "31eb4bdb4a0fe9a0c0bd20df7f101dbd884a8dcc",
+  "inputs_sha256": {
+    "beetle_security_light/SecurityLightBergsig.txt": "5a3acd579c166c4357204566fbf9eca1233d220af0faf48cffd87ccf2155f78f",
+    "fit_cache/beetles_fit.nc": "f985f7e55f6a28ffb9d6ec544c624b03d8195b7447ec575a43a82351247bf5d1",
+    "fit_cache/beetles_fit.meta.json": "51dbcdd857bd26f3e2dadfe90dac85633c2d4698e868cd07330d722f20bbd278"
+  },
+  "code_revision": "714cf26b965bf83c741b02ebe5fb3e76df4d7e4c",
+  "source_sha256": {
+    "notebooks/beetles_figure.py": "b81ba8222e802c99efbec7396c40b6b3bd540450253c4da584e49ecf5dae952c",
+    "notebooks/assets/beetle_arena.svg": "f7474fd7213af4001b7a802ceb2ed6a7cdda3667880f35ef3e89c3ce303b3862",
+    "notebooks/beetles_plots.py": "a8ec3cfc5f63756d425a4d67b7b8030e86b54288a50def5c0af6add4d0588ef1",
+    "notebooks/beetles_preprocess.py": "8ffaf8e181f079f963c1116f2215ef4e68ee9391c2f6d318daca615b30ba249d",
+    "unwrap/circular.py": "55c26262dbee6e71bfe1cbfdf0cb664d0a52e305665e7cf5d2f6e80c739defc2",
+    "unwrap/bessel.py": "2fac0a114d83b63cf05c02f26a62863a426ed038284aa972cb6ff4e3d04a27f8",
+    "unwrap/link/numpy.py": "f598dda5da67f935dcd405b8ea379e46d0f90c5a1b80f853208c5607b64ceaf3"
+  },
+  "python": "3.12.14",
+  "packages": {
+    "numpy": "2.3.5",
+    "scipy": "1.18.1",
+    "pandas": "2.2.3",
+    "matplotlib": "3.10.8",
+    "arviz": "1.3.0",
+    "xarray": "2026.9.0",
+    "h5netcdf": "1.8.3",
+    "h5py": "3.16.0",
+    "cairosvg": "2.9.1"
+  },
+  "font_family": "Arial",
+  "fonts": {
+    "normal": {
+      "file": "Arial.TTF",
+      "sha256": "35c0f3559d8db569e36c31095b8a60d441643d95f59139de40e23fada819b833"
+    },
+    "bold": {
+      "file": "Arialbd.TTF",
+      "sha256": "4044aa6b5bebbc36980206b45b0aaaaa5681552a48bcadb41746d5d1d71fd7b4"
+    }
+  },
+  "posterior_chains": 4,
+  "posterior_draws_per_chain": 2000,
+  "divergences": 0,
+  "observations": {
+    "off": 100,
+    "on": 96
+  },
+  "hdi_probability": 0.89,
+  "kde_kappa": 80.0,
+  "floodlight_degrees": -135,
+  "sector_halfwidth_degrees": 45,
+  "caption": "Artificial light shifts dung beetle orientation at multiple levels. (a) Each of ten beetles repeatedly exits the arena, with ten trials per lighting condition; four light-on bearings are missing. The arena drawing is schematic. (b) Curves show kernel density estimates of the posterior population mean direction, with a common radial density scale; dots show each beetle's observed circular mean bearing. The southwest arc marks the sector within 45\u00b0 of the floodlight. (c) Population-level within-individual concentration, converted to mean resultant length using I\u2081(\u03ba)/I\u2080(\u03ba). (d) Between-individual concentration: the resultant length of the ten fitted individual mean directions, calculated in each draw. (e) Probability of an exit within the marked sector, using population direction and concentration (individual offsets set to zero); the dashed line marks the uniform expectation of 0.25. (f) The paired draw-wise difference in this probability, on minus off. Points show posterior means and bars show 89% highest-density intervals.",
+  "summaries": {
+    "within": {
+      "off": {
+        "mean": 0.8898756014473879,
+        "hdi_low": 0.8672054333233085,
+        "hdi_high": 0.9147502625610926
+      },
+      "on": {
+        "mean": 0.9188493583192255,
+        "hdi_low": 0.9011520821221727,
+        "hdi_high": 0.9379348738543752
+      }
+    },
+    "between": {
+      "off": {
+        "mean": 0.28210867936607775,
+        "hdi_low": 0.21816818627629642,
+        "hdi_high": 0.34449988002473775
+      },
+      "on": {
+        "mean": 0.8923148090469922,
+        "hdi_low": 0.8569980480077646,
+        "hdi_high": 0.9305276406475117
+      }
+    },
+    "mass": {
+      "off": {
+        "mean": 0.0908437804770996,
+        "hdi_low": 1.7865951334183894e-05,
+        "hdi_high": 0.2387433773969564
+      },
+      "on": {
+        "mean": 0.6943378303068461,
+        "hdi_low": 0.2848705642915298,
+        "hdi_high": 0.96897535599845
+      }
+    },
+    "difference": {
+      "on_minus_off": {
+        "mean": 0.6034940498297467,
+        "hdi_low": 0.21817965133530182,
+        "hdi_high": 0.9291384543252755
+      }
+    }
+  },
+  "outputs_sha256": {
+    ".svg": "7354af43abecf83bb18d6e015c8915c484f5e1770a21bb977097831d43e8aec6",
+    ".pdf": "d2fa73971bb3a1dd67f842ab615301eb8e6b7ea18760496731513865aef2c39e",
+    ".png": "4782ce8896082098e272b88d885ea01c40f6fbd6621fd37eff3746c3be376c6b",
+    ".html": "7b90334b4141b488d0402fd1f301ae6a149029aa188d9d511b8d5128966eaa42"
+  }
+}
