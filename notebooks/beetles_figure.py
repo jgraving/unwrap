@@ -24,13 +24,17 @@ from matplotlib.lines import Line2D
 import numpy as np
 import xarray as xr
 
-from beetles_plots import OFF, ON, _mean_hdi, _vonmises_interval_mass
+from beetles_plots import (
+    OFF, ON, STUDY, STUDY_PATH, FLOOD_DIR, FLOOD_HALFWIDTH,
+    _mean_hdi, _vonmises_interval_mass,
+)
 from beetles_preprocess import load_beetle_model_table
 from unwrap.circular import A_of_kappa, circular_mean, resultant_length_angles, von_mises_kde
 from unwrap.link.numpy import circular_modulo, softplus
 
 REPO = Path(__file__).resolve().parents[1]
 ASSET = Path(__file__).parent / "assets" / "beetle_arena.svg"
+FLOODLIGHT_ASSET = ASSET.with_name("beetle_floodlight.svg")
 DATA_REVISION = "31eb4bdb4a0fe9a0c0bd20df7f101dbd884a8dcc"
 INPUT_HASHES = {
     "beetle_security_light/SecurityLightBergsig.txt":
@@ -42,9 +46,7 @@ INPUT_HASHES = {
 }
 INK = "#262626"
 MUTED = "#686868"
-RULE = "#e6e6e6"
-FLOOD_DIR = np.deg2rad(-135)
-HALFWIDTH = np.deg2rad(45)
+HALFWIDTH = FLOOD_HALFWIDTH
 HDI_PROB = 0.89
 KDE_KAPPA = 80.0
 SVG = "http://www.w3.org/2000/svg"
@@ -54,8 +56,14 @@ CAPTION = (
     "lighting condition; four light-on bearings are missing. The arena drawing "
     "is schematic. (b) Curves show kernel density estimates of the posterior "
     "population mean direction, with a common radial density scale; dots show "
-    "each beetle's observed circular mean bearing. The southwest arc marks "
-    "the sector within 45° of the floodlight. (c) Population-level within-"
+    "each beetle's observed circular mean bearing. Bearings increase clockwise "
+    "from north, viewed from above. The lamp icon is schematic. The arc is "
+    f"centred at {STUDY['sector_center_degrees']:g}° with a "
+    f"{STUDY['sector_halfwidth_degrees']:g}° half-width, using the nominal "
+    "south-southwest bearing reported by Foster et al. (2021), rather than a "
+    "surveyed azimuth. Sector probabilities and intervals are conditional on "
+    "this approximate centre. "
+    "(c) Population-level within-"
     "individual concentration, converted to mean resultant length using "
     "I₁(κ)/I₀(κ). (d) Between-individual concentration: the resultant length "
     "of the ten fitted individual mean directions, calculated in each draw. "
@@ -95,7 +103,7 @@ def prepare_inputs(root, *, download=False):
     return root
 
 
-def posterior_arrays(post):
+def posterior_arrays(post, *, sector_center=FLOOD_DIR):
     """The estimands used by beetles_plots.plot_concentration, unchanged.
 
     Use named dimensions so chain/draw storage order cannot change the result.
@@ -128,7 +136,7 @@ def posterior_arrays(post):
         circular_modulo(fixed["Intercept"][..., None] + rand_i),
         circular_modulo((fixed["Intercept"] + fixed["Light"])[..., None] + rand_i + rand_l),
     ]).reshape(2, -1, rand_i.shape[-1])
-    mass = _vonmises_interval_mass(mu, kappa, FLOOD_DIR - HALFWIDTH, FLOOD_DIR + HALFWIDTH)
+    mass = _vonmises_interval_mass(mu, kappa, sector_center - HALFWIDTH, sector_center + HALFWIDTH)
     return {
         "mu": mu,
         "within": A_of_kappa(kappa),
@@ -160,14 +168,14 @@ def resolve_fonts(directory=None, family="Arial"):
     return resolved
 
 
-def panel_heading(fig, x, y, letter, title, subtitle):
+def panel_heading(fig, x, y, letter, title, title_x):
     fig.text(x, y, letter + ".", fontsize=13, weight="bold", va="top", color=INK)
-    fig.text(x + 0.035, y - 0.001, title, fontsize=10.2, weight="bold", va="top", color=INK)
-    fig.text(x + 0.035, y - 0.045, subtitle, fontsize=8, va="top", color=MUTED, linespacing=1.4)
+    fig.text(title_x, y - 0.003, title, fontsize=9.5, weight="bold", va="top",
+             ha="center", color=INK, linespacing=1.2)
 
 
 def draw_polar(fig, arrays, df):
-    ax = fig.add_axes([0.61, 0.515, 0.32, 0.375], projection="polar")
+    ax = fig.add_axes([0.61, 0.515, 0.32, 0.40], projection="polar")
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
     ax.set_axis_off()
@@ -175,9 +183,6 @@ def draw_polar(fig, arrays, df):
     density = np.stack([von_mises_kde(samples, theta, KDE_KAPPA) for samples in arrays["mu"]])
     scale = density.max()
     base, amplitude, ring = 0.40, 0.48, 1.0
-    for angle in np.arange(4) * np.pi / 2:
-        ax.plot([angle, angle], [0, ring], lw=0.5, color=RULE, zorder=0)
-    ax.plot(theta, np.full_like(theta, base), lw=0.65, color=RULE, zorder=0)
     ax.plot(theta, np.full_like(theta, ring), lw=0.7, color="#c9c9c9", zorder=1)
     for condition, color in enumerate((OFF, ON)):
         radius = base + amplitude * density[condition] / scale
@@ -186,38 +191,43 @@ def draw_polar(fig, arrays, df):
         for _, group in df[df.Light == condition].groupby("Individual", observed=True):
             bearing = circular_mean(group.HeadingRadians.to_numpy())
             ax.scatter([bearing], [ring], s=26, color=color, edgecolor="white", linewidth=0.45, zorder=5)
-    for angle, label in zip(np.arange(4) * np.pi / 2, ("N", "E", "S", "W")):
-        radius = 1.31 if label in ("S", "W") else 1.13
-        ax.text(angle, radius, label, ha="center", va="center", color=MUTED, fontsize=7.5)
+    # Cardinal labels and radial crosshairs are unnecessary for this panel;
+    # the verified bearing convention is stated in the caption instead.
     sector = np.linspace(FLOOD_DIR - HALFWIDTH, FLOOD_DIR + HALFWIDTH, 100)
     ax.plot(sector, np.full_like(sector, 1.15), color=INK, lw=0.9)
     for angle in (sector[0], FLOOD_DIR, sector[-1]):
         ax.plot([angle, angle], [1.12, 1.18], color=INK, lw=0.9)
     ax.set_ylim(0, 1.36)
-    ax.annotate("Floodlight\n±45°", xy=(FLOOD_DIR, 1.16),
-                xytext=(-30, -12), textcoords="offset points", ha="right", va="top",
-                fontsize=7.5, color=INK, linespacing=1.25,
-                arrowprops={"arrowstyle": "-", "color": MUTED, "lw": 0.65})
+    # Place the restored vector lamp on the sector's central spoke. Return
+    # figure coordinates so the artwork follows the polar transform exactly.
+    point = ax.transData.transform((FLOOD_DIR, 1.39))
+    return fig.transFigure.inverted().transform(point)
 
 
-def draw_summary(fig, x, samples, *, difference=False, uniform=False):
-    ax = fig.add_axes([x + 0.042, 0.12, 0.158, 0.255])
+def draw_summary(fig, x, samples, ylabel, *, difference=False, uniform=False):
+    ax = fig.add_axes([x + 0.079, 0.105, 0.135, 0.30])
     ax.set_xlim(-0.52, 1.52)
-    lower = min(-0.025, min(_mean_hdi(samples, HDI_PROB)) - 0.025) if difference else -0.025
+    lower = min(0.0, min(_mean_hdi(samples, HDI_PROB)) - 0.025) if difference else 0.0
     ax.set_ylim(lower, 1.025)
     ticks = [0, 0.25, 0.5, 0.75, 1]
     if lower < -0.25:
         ticks = list(np.arange(-0.25, lower, -0.25)[::-1]) + ticks
     ax.set_yticks(ticks, [f"{v:g}" for v in ticks])
-    ax.tick_params(axis="both", length=0, pad=5, labelsize=8, colors=MUTED)
+    ax.tick_params(axis="both", length=3, width=0.7, direction="out", pad=4,
+                   labelsize=8, colors=INK)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.set_axisbelow(True)
-    ax.grid(axis="y", color=RULE, linewidth=0.55)
-    ax.axhline(0, color="#bcbcbc", lw=0.75, zorder=1)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_visible(True)
+        ax.spines[side].set_linewidth(0.7)
+        ax.spines[side].set_color(INK)
+    ax.spines["left"].set_bounds(lower, 1)
+    ax.spines["bottom"].set_position(("data", 0))
+    ax.grid(False)
+    ax.set_ylabel(ylabel, fontsize=8, color=INK, labelpad=7, linespacing=1.25)
     if uniform:
         ax.axhline(0.25, color=MUTED, lw=0.9, linestyle=(0, (3, 3)), zorder=1)
-        ax.text(1.49, 0.22, "Uniform", ha="right", va="top", color=MUTED, fontsize=7)
+        ax.text(1.49, 0.22, "Uniform", ha="right", va="top", color=INK, fontsize=7.5)
     series = [(0.5, samples, ON)] if difference else [(0, samples[0], OFF), (1, samples[1], ON)]
     for location, draws, color in series:
         mean, lo, hi = _mean_hdi(draws, hdi_prob=HDI_PROB)
@@ -238,31 +248,28 @@ def build_svg(arrays, df, *, family="Arial"):
         "figure.facecolor": "white", "axes.facecolor": "white",
     }
     with mpl.rc_context(style):
-        fig = plt.figure(figsize=(7.2, 5.4), dpi=160)
+        fig = plt.figure(figsize=(7.2, 4.8), dpi=160)
         panel_heading(fig, 0.025, 0.973, "a", "Repeated exit bearings",
-                      "10 beetles · paired lighting conditions")
-        panel_heading(fig, 0.545, 0.973, "b", "Reorientation",
-                      "Population mean direction")
-        fig.text(0.065, 0.548, "10 trials per beetle and condition", fontsize=8.5, color=INK)
-        fig.text(0.065, 0.516, "100 light-off bearings · 96 light-on bearings", fontsize=8, color=MUTED)
-        fig.text(0.402, 0.832, "Exit\nbearing", ha="center", fontsize=8, color=INK, linespacing=1.2)
-        draw_polar(fig, arrays, df)
+                      0.27)
+        panel_heading(fig, 0.545, 0.973, "b", "Population mean direction", 0.77)
+        fig.text(0.402, 0.832, "Exit\nbearing", ha="center", fontsize=8.5, color=INK, linespacing=1.2)
+        lamp_xy = draw_polar(fig, arrays, df)
+        fig.text(lamp_xy[0], lamp_xy[1] - 0.052, "Floodlight", ha="center",
+                 va="top", fontsize=8.5, color=INK)
         handles = [Line2D([], [], color=c, lw=1.7, marker="o", ms=4, label=t)
                    for c, t in ((OFF, "Light off"), (ON, "Light on"))]
-        fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.77, 0.506),
+        fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.77, 0.903),
                    ncol=2, frameon=False, fontsize=8, handlelength=1.6, columnspacing=1.7)
-        fig.add_artist(Line2D([0.025, 0.975], [0.474, 0.474], transform=fig.transFigure,
-                              color=RULE, lw=0.7))
-        for x, letter, title, subtitle, key in (
-            (0.025, "c", "Within-individual", "Mean resultant length", "within"),
-            (0.270, "d", "Between-individual", "Mean resultant length", "between"),
-            (0.515, "e", "Floodlight attraction", "Probability within ±45°", "mass"),
-            (0.760, "f", "Treatment effect", "Probability difference", "difference"),
+        for x, letter, ylabel, key in (
+            (0.025, "c", "Within-individual\nconcentration (R)", "within"),
+            (0.270, "d", "Between-individual\nconcentration (R)", "between"),
+            (0.515, "e", "Exit probability (±45°)", "mass"),
+            (0.760, "f", "Change in exit\nprobability (±45°)", "difference"),
         ):
-            panel_heading(fig, x, 0.441, letter, title, subtitle)
-            draw_summary(fig, x, arrays[key], difference=(key == "difference"), uniform=(key == "mass"))
-        fig.text(0.025, 0.030, "Points: posterior means    Bars: 89% highest-density intervals",
-                 fontsize=7.5, color=MUTED)
+            fig.text(x, 0.45, letter + ".", fontsize=13, weight="bold",
+                     va="top", color=INK)
+            draw_summary(fig, x, arrays[key], ylabel,
+                         difference=(key == "difference"), uniform=(key == "mass"))
         buffer = io.StringIO()
         fig.savefig(buffer, format="svg", metadata={"Date": None, "Creator": "unwrap beetles_figure.py"})
         plt.close(fig)
@@ -279,11 +286,18 @@ def build_svg(arrays, df, *, family="Arial"):
     # Original arena artwork, as vector paths only. Coordinates are SVG points.
     arena = ET.parse(ASSET).getroot()
     arena.set("x", "32")
-    arena.set("y", "66")
+    arena.set("y", "59")
     arena.set("width", "224")
     arena.set("height", "103")
     root.append(arena)
-    return ET.tostring(root, encoding="unicode")
+    lamp = ET.parse(FLOODLIGHT_ASSET).getroot()
+    width, height = 7.2 * 72, 4.8 * 72
+    lamp.set("x", str(lamp_xy[0] * width - 13))
+    lamp.set("y", str((1 - lamp_xy[1]) * height - 13))
+    lamp.set("width", "26")
+    lamp.set("height", "26")
+    root.append(lamp)
+    return "\n".join(line.rstrip() for line in ET.tostring(root, encoding="unicode").splitlines()) + "\n"
 
 
 def write_outputs(output, arrays, df, metadata, *, family="Arial"):
@@ -352,7 +366,7 @@ def main(argv=None):
         "data_repository": "jgraving/unwrap-data", "data_revision": DATA_REVISION,
         "inputs_sha256": INPUT_HASHES, "code_revision": code_revision,
         "source_sha256": {p.relative_to(REPO).as_posix(): sha256(p) for p in
-                          (Path(__file__), ASSET, Path(__file__).with_name("beetles_plots.py"),
+                          (Path(__file__), ASSET, FLOODLIGHT_ASSET, STUDY_PATH, Path(__file__).with_name("beetles_plots.py"),
                            Path(__file__).with_name("beetles_preprocess.py"),
                            REPO / "unwrap" / "circular.py", REPO / "unwrap" / "bessel.py",
                            REPO / "unwrap" / "link" / "numpy.py")},
@@ -363,7 +377,7 @@ def main(argv=None):
         "posterior_chains": post.sizes["chain"], "posterior_draws_per_chain": post.sizes["draw"],
         "divergences": divergences, "observations": {"off": 100, "on": 96},
         "hdi_probability": HDI_PROB, "kde_kappa": KDE_KAPPA,
-        "floodlight_degrees": -135, "sector_halfwidth_degrees": 45,
+        **STUDY,
         "caption": CAPTION,
     }
     stem = write_outputs(args.output_dir, arrays, df, metadata, family=args.font_family)

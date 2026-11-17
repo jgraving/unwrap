@@ -63,6 +63,48 @@ def test_named_dimensions_and_circular_wrap(posterior):
     np.testing.assert_array_equal(arrays["difference"], arrays["mass"][1] - arrays["mass"][0])
 
 
+def test_sector_center_and_independent_quadrature(posterior):
+    """Check the recentered, seam-crossing sector without using the CDF helper.
+
+    The fine grid is independent of the CDF implementation; the coarse grid
+    matches the R notebook's existing 181-point trapezoid integration.
+    """
+    from scipy.integrate import trapezoid
+    from scipy.stats import vonmises
+
+    assert figure.STUDY["sector_center_degrees"] == 202.5
+    assert figure.STUDY["sector_halfwidth_degrees"] == 45
+    arrays = figure.posterior_arrays(posterior)
+    kappa = np.stack([
+        figure.softplus(posterior["kappa_Intercept"].values.ravel()),
+        figure.softplus((posterior["kappa_Intercept"] + posterior["kappa_Light"]).values.ravel()),
+    ])
+    for points, atol in ((20001, 1e-8), (181, 3e-5)):
+        theta = np.linspace(np.deg2rad(157.5), np.deg2rad(247.5), points)
+        density = vonmises.pdf(theta[:, None, None], kappa, loc=arrays["mu"])
+        mass = trapezoid(density, theta, axis=0)
+        np.testing.assert_allclose(arrays["mass"], mass, atol=atol, rtol=0)
+
+
+def test_negative_difference_interval_is_visible(posterior):
+    shifted = posterior.copy(deep=True)
+    shifted["Intercept"][:] = figure.FLOOD_DIR
+    shifted["Light"][:] = np.pi
+    arrays = figure.posterior_arrays(shifted)
+    assert arrays["difference"].max() < 0
+    fig = plt.figure()
+    ax = figure.draw_summary(fig, 0, arrays["difference"], "Change", difference=True)
+    assert ax.get_ylim()[0] <= arrays["difference"].min()
+    plt.close(fig)
+    with patch.object(beetles_plots, "_ensure_style"):
+        fig = beetles_plots.plot_concentration(
+            SimpleNamespace(posterior=shifted), None,
+            figure.circular_modulo, figure.softplus, save=False,
+        )
+    assert fig.axes[-1].get_ylim()[0] <= min(figure._mean_hdi(arrays["difference"], .89))
+    plt.close(fig)
+
+
 def test_uniform_distribution_and_identical_conditions(posterior):
     uniform = posterior.copy(deep=True)
     uniform["kappa_Intercept"][:] = -1000  # softplus underflows to zero

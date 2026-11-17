@@ -1,4 +1,4 @@
-# Beetle arena artwork
+# Beetle artwork
 
 `beetle_arena.svg` contains the original vector arena and beetles used in
 panel a of the beetle figure. It retains the original colours and paths;
@@ -12,3 +12,9 @@ panels are included. The illustration is schematic, not measured tracks.
 
 Keeping this small vector asset alongside the generator makes the complete
 figure reproducible without access to the manuscript repository.
+
+`beetle_floodlight.svg` restores the floodlight graphic from the same source
+revision. It contains paths `path251` through `path258`, extracted from group
+`g124` without its group translation or text, with view box `337 116 33 33`.
+The generator positions and scales this vector symbol and supplies its label.
+It is a schematic icon, not a measurement of the lamp's angular extent.
