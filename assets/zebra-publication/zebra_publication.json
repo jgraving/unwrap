@@ -53,7 +53,7 @@
     "zebra_bearings/raw/observation088-9.parquet": "9458cac455479de27905d650b7da76e0383c6dcce11e518d30358e890006c006",
     "zebra_bearings/zebra_bearings_blocks.parquet": "51beb1e2b92fd2d71e4620d7c4e2cbdf2c1b62ec5ecafbac86b8e205847a7e6d"
   },
-  "code_revision": "f633542025050408aeac868cf7253071a762ab4d",
+  "code_revision": "8a56a73e477458f9e0824fd7c41b0a80d6d1fbaa",
   "python": "3.12.14",
   "font_family": "Arial",
   "fonts": {
@@ -554,9 +554,9 @@
   },
   "caption": "Escape response of a focal group of 18 Grevy's zebra (*Equus grevyi*) filmed from overhead drones at the Mpala Conservancy, Kenya. (a) Georeferenced trajectories of the 18 tracked zebra on the aerial orthomosaic of the grazing site: the focal animal of this panel in black, the rest of the group in white, with the focal animal's body orientation every 5 m of straight-line travel as arrows (orange before the approach stimulus, purple after). The circular insets (orange / purple) magnify the moments indicated by each callout and show the body-heading arrow drawn at that moment. (b) A Grevy's zebra. (c) Posterior distribution of the equally weighted mean direction of the 18 focal zebras before and after the approach: the loop traces the relative density of the group-mean-direction posterior draws (radial scale 0 to 1) and the marker the posterior mean direction. (d) Group-level alignment: the resultant length of the 18 fitted individual mean directions, with the posterior mean before and after the approach. (e) Individual-level mean directions: the posterior density of each fitted individual mean direction (loops) and each animal's observed circular-mean heading (markers). (f) Individual-level concentration: each animal's posterior mean resultant length with 95% HDI, before and after the approach, paired within animal across conditions. Panels c-f are evaluated from a saved hierarchical von Mises fit of the block-averaged body orientations (4 chains x 1,000 draws, zero divergent transitions); the 'group' in c-d is the finite focal group, not a population parameter.",
   "outputs_sha256": {
-    ".svg": "46c338fb8436f5a39f1b8419c7053fd706961978dc4b261cf648cf30a0d8b134",
-    ".pdf": "51acecfa902c086da4017c759b1666d1bad66b4042d81b9b4b0f1794d3493705",
-    ".png": "522d7757599d55a71ca60035c2f8c148bd677f8028456435d22dcb56d774aa82",
-    ".html": "a3f658122ab1b1a147d092b099dccebb5e7a172254daf45225430d25cd53a103"
+    ".svg": "28c6c3ca99225f58cffdca92c4f61b0c220ff95fd38b077a5575bf93e2a2d560",
+    ".pdf": "798835c23f66fbd7cf36d5f8427b8c1a056a5b9d3e5a81c178766333db2c43cb",
+    ".png": "8a0e989a846308a60cfdc859f0004abdb50de964613563cbe2db91dc91705e15",
+    ".html": "2fd83d06b9ed7e876709731a8475fab28be20ed7f0489317b1c817382f5182f1"
   }
 }
