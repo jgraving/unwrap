@@ -6,6 +6,7 @@ The layout test compares the measured layout constants against the
 committed reference PDF, and the restore test verifies that the original
 JPEG streams survive the SVG/PDF round trip.
 """
+import base64
 import hashlib
 import json
 import sys
@@ -15,7 +16,6 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -273,115 +273,65 @@ def test_write_outputs_round_trip(tmp_path, idata, df_blocks):
         assert meta["outputs_sha256"][suffix] == figure.sha256(
             stem.with_suffix(suffix))
     with Image.open(stem.with_suffix(".png")) as img:
-        assert img.size == (4 * 900, 4 * 1080)
+        assert img.size == (1800, 2160)
 
 
-def test_restore_pdf_source_images_keeps_jpeg_streams(tmp_path):
-    import cairosvg
+def test_exported_photos_match_reference(tmp_path, idata, df_blocks):
+    """Compare the actual four exports with the author artwork in page space."""
     import fitz
+    from PIL import Image
 
-    jpeg = small_jpeg(tmp_path / "src.jpg", 72, 48, seed=9)
-    rect = (10.0, 10.0, 70.0, 50.0)  # page points, y down
-    fig = plt.figure(figsize=(1.0, 1.0))
-    ax = fig.add_axes([0, 0, 1, 1])
-    ax.set_xlim(0, 72)
-    ax.set_ylim(72, 0)
-    ax.axis("off")
-    ax.imshow(plt.imread(str(jpeg)), extent=(rect[0], rect[2],
-                                             rect[3], rect[1]),
-              aspect="auto")
-    svg_path = tmp_path / "fig.svg"
-    fig.savefig(svg_path, format="svg",
-                metadata={"Date": None})
-    plt.close(fig)
+    ctx = make_context(tmp_path, idata, df_blocks)
+    ctx["photo"] = figure.ASSETS / "zebra_photo.jpg"
+    ctx["inset_assets"] = {k: figure.ASSETS / f"drone_inset_{k}.jpg"
+                           for k in ("pre", "post")}
+    svg = figure.draw_figure(ctx, family="DejaVu Sans")
+    stem = figure.write_outputs(tmp_path, ctx, svg, {}, family="DejaVu Sans")
+    assert svg in stem.with_suffix(".html").read_text()
 
-    pdf_path = tmp_path / "fig.pdf"
-    cairosvg.svg2pdf(bytestring=svg_path.read_bytes(), write_to=str(pdf_path))
+    with fitz.open(figure.ASSETS / "reference.pdf") as ref, \
+            fitz.open(stem.with_suffix(".pdf")) as out:
+        def placements(doc):
+            return {doc.extract_image(i["xref"])["image"]: i["transform"]
+                    for i in doc[0].get_image_info(xrefs=True)}
 
-    def decode_first_image(path):
-        with fitz.open(path) as doc:
-            row = doc[0].get_images(full=True)[0]
-            filter_ = doc.xref_get_key(row[0], "Filter")
-            pix = fitz.Pixmap(doc, row[0])
-            data = bytes(pix.samples)
-            info = doc[0].get_image_info()[0]
-            bbox = [round(v, 2) for v in info["bbox"]]
-        return filter_, row[2], row[3], data, bbox
+        expected, actual = placements(ref), placements(out)
+        for path in (ctx["photo"], *ctx["inset_assets"].values()):
+            jpeg = path.read_bytes()
+            # Signed affine coefficients distinguish a mirror or rotation
+            # even when the bounding rectangle is unchanged.
+            assert actual[jpeg] == pytest.approx(expected[jpeg], abs=0.1)
 
-    filter_before, w_before, h_before, _, bbox_before = \
-        decode_first_image(pdf_path)
-    assert filter_before[1] != "/DCTDecode"  # cairosvg re-encodes as flate
-    # cairosvg resampled the embed to display resolution, not 72 x 48
-    assert (w_before, h_before) != (72, 48)
-
-    figure.restore_pdf_source_images(pdf_path, [(jpeg, rect)])
-
-    filter_after, w_after, h_after, data_after, bbox_after = \
-        decode_first_image(pdf_path)
-    assert filter_after == ("name", "/DCTDecode")
-    assert (w_after, h_after) == (72, 48)
-    # decoding the restored object matches a fresh embed-decode of the
-    # same source file (same stream, same decoder -> identical pixels)
-    with fitz.open() as src_doc:
-        src_page = src_doc.new_page()
-        src_page.insert_image(fitz.Rect(0, 0, 72, 48), filename=str(jpeg),
-                              keep_proportion=False)
-        src_row = src_page.get_images(full=True)[0]
-        src_pix = fitz.Pixmap(src_doc, src_row[0])
-        src_data = bytes(src_pix.samples)
-    assert data_after == src_data
-    # placement is untouched (get_image_info's bbox carries a sub-point
-    # transform overshoot, so compare against the placed rect with slack)
-    placed = fitz.Rect(*rect)
-    assert bbox_after == bbox_before
-    assert all(abs(a - b) <= 0.5 for a, b in zip(bbox_after,
-                                                 (placed.x0, placed.y0,
-                                                  placed.x1, placed.y1)))
+        # These patches are inside the circular masks clear of the vector
+        # arrows and labels. A reversed image, wrong zoom or wrong crop
+        # changes the rendered pixels even if the PDF inventory looks right.
+        preview = np.asarray(Image.open(stem.with_suffix(".png")).convert("RGB"))
+        for rect in [(475, 50, 770, 280), (84, 285, 143, 309),
+                     (80, 754, 137, 776)]:
+            clip = fitz.Rect(rect)
+            matrix = fitz.Matrix(2, 2)
+            pix = ref[0].get_pixmap(matrix=matrix, clip=clip)
+            target = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width, 3)
+            x0, y0, x1, y1 = (v * 2 for v in rect)
+            crop = preview[y0:y1, x0:x1].astype(float)
+            assert np.abs(crop - target).mean() < 3
 
 
-def test_restore_pdf_source_images_refuses_ambiguous_placement(tmp_path):
-    """Two exported rasters near one source rect must raise."""
+def test_restore_pdf_refuses_mismatched_pixels(tmp_path):
     import cairosvg
 
-    # The 1.0-inch figure is a 72 x 72 point page and each axes covers
-    # the whole of it in page coordinates (no scaling, so the image
-    # placement rectangles are exact). The two images must live on two
-    # separate axes: this matplotlib's SVG backend emits at most one
-    # <image> element per axes in a fresh figure (with or without
-    # distinct content), while the real composite runs a canvas draw
-    # before adding its overlay images and is exercised by
-    # test_write_outputs_round_trip instead. The 72 x 48 JPEGs match
-    # the 60 x 40 pt boxes (aspect 1.5), so cairosvg does not
-    # letterbox the embeds.
-    fig = plt.figure(figsize=(1.0, 1.0))
-    ax_a = fig.add_axes([0, 0, 1, 1], zorder=1)
-    ax_b = fig.add_axes([0, 0, 1, 1], zorder=2)
-    for ax in (ax_a, ax_b):
-        ax.set_xlim(0, 72)
-        ax.set_ylim(72, 0)
-        ax.set_facecolor("none")
-        ax.axis("off")
-    jpeg = small_jpeg(tmp_path / "src.jpg", 72, 48)
-    rect = (10.0, 10.0, 70.0, 50.0)
-    # One raster exactly on the source rect; the other's centre is 2.1
-    # pt away -- inside the 5 pt destination tolerance, yet far enough
-    # to keep the 1 pt scratch embedding unambiguous
-    ax_a.imshow(plt.imread(str(small_jpeg(tmp_path / "a.jpg", 72, 48,
-                                          seed=20))),
-                extent=(rect[0], rect[2], rect[3], rect[1]),
-                aspect="auto")
-    ax_b.imshow(plt.imread(str(small_jpeg(tmp_path / "b.jpg", 72, 48,
-                                          seed=21))),
-                extent=(rect[0] + 1.5, rect[2] + 1.5,
-                        rect[3] + 1.5, rect[1] + 1.5),
-                aspect="auto")
-    svg_path = tmp_path / "fig.svg"
-    fig.savefig(svg_path, format="svg", metadata={"Date": None})
-    plt.close(fig)
-    pdf_path = tmp_path / "fig.pdf"
-    cairosvg.svg2pdf(bytestring=svg_path.read_bytes(), write_to=str(pdf_path))
-    with pytest.raises(ValueError, match="exactly one exported raster"):
-        figure.restore_pdf_source_images(pdf_path, [(jpeg, rect)])
+    def svg_with(jpeg):
+        data = base64.b64encode(jpeg.read_bytes()).decode("ascii")
+        return (f'<svg xmlns="{SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink" '
+                f'width="72" height="48"><image width="72" height="48" '
+                f'xlink:href="data:image/jpeg;base64,{data}"/></svg>')
+
+    pdf = tmp_path / "input.pdf"
+    svg = svg_with(small_jpeg(tmp_path / "a.jpg", 72, 48, seed=1))
+    cairosvg.svg2pdf(bytestring=svg.encode(), write_to=str(pdf))
+    wrong = svg_with(small_jpeg(tmp_path / "b.jpg", 72, 48, seed=2))
+    with pytest.raises(ValueError, match="matches the decoded SVG JPEG"):
+        figure.restore_pdf_source_images(pdf, wrong)
 
 
 def test_stabilize_pdf_id_pins_the_trailer_id():

@@ -1,0 +1,9 @@
+{
+  "sector_center_degrees": 202.5,
+  "sector_halfwidth_degrees": 45.0,
+  "sector_center_basis": "Nominal compass bearing of the published south-southwest description; approximate, not a surveyed lamp azimuth",
+  "bearing_convention": "Clockwise from north, viewed from above",
+  "source_doi": "10.1016/j.cub.2021.06.038",
+  "source_location": "Results: Light pollution alters orientation behavior; Figure 3A",
+  "source_note": "The paper's 210-degree statistic is the beetles' mean heading, not a measured lamp bearing. The previous 225-degree analysis centre represented southwest."
+}

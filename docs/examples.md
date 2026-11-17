@@ -59,20 +59,12 @@ orientation over 10 s windows. The hierarchical model separates three
 complementary aspects of the escape response: a group-level shift in the
 mean direction, alignment between individuals (how the individual mean
 directions cluster), and within-individual consistency (how tightly each
-zebra's observations cluster around its own mean direction).
-
-### Zebra escape-response map figure
-
-<p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/zebra_map/">Python</a>
-</p>
-
-The companion map figure to the escape notebook above: each zebra's
-trajectory drawn over the aerial orthomosaic of the grazing site, with the
-focal animal's body-orientation arrows (orange before the approach, purple
-after) placed every 5 m of travel or every 20 s of time. No models are fit
-here -- positions, bearings and the imagery load from `unwrap.datasets`,
-and everything is plotted as recorded.
+zebra's observations cluster around its own mean direction). The Python
+example also redraws those bearings in space as the map panels of the
+published figure: each animal's trajectory over the aerial orthomosaic of
+the grazing site, with the focal animal's body-orientation arrows (orange
+before the approach, purple after) placed every 5 m of travel or every
+20 s of time -- plotted as recorded, no models fit there.
 
 ### Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
 

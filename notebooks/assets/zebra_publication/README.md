@@ -1,23 +1,17 @@
 # Zebra publication figure inputs
 
-Raster and reference inputs for
-`notebooks/zebra_publication_figure.py`, all hash-pinned in `images.json`
-(the generator refuses to run if any file is missing or altered).
+The author-supplied Keynote PDF defines the page geometry, image placements
+and circular clips. The reduced reference keeps its text, vectors and clips.
+Only the panel-b photo and aerial mosaic image streams were replaced.
 
-| File | Role | Notes |
-|---|---|---|
-| `reference.pdf` | The published composite figure (900 x 1080 pt), the layout the generator reproduces | Provided by the authors; Keynote/Quartz production. Layout constants in the generator are measured from this file. |
-| `drone_inset_pre.jpg` | Drone crop of the focal zebra before the approach (callout inset a, orange) | 160 x 160 px, author-provided crop; 160 px is marginal at 300 dpi, so the inset is intentionally small in the layout. |
-| `drone_inset_post.jpg` | Drone crop of the focal zebra after the approach (callout inset a, purple) | 160 x 160 px, author-provided crop. |
-| `zebra_photo.jpg` | Species photograph for panel b | 2000 x 1333 px, author-provided. |
-| `images.json` | SHA-256 manifest for the files above plus `reference.pdf` | Checked by `zebra_publication_figure.check_assets()`. |
+| Working file | Source and preparation |
+| --- | --- |
+| `reference.pdf` | 900 × 1080 pt author composite. The mosaic retains its 640 × 1940 pixels at JPEG quality 92 with 4:4:4 chroma. Panel b uses the working photo below. |
+| `zebra_photo.jpg` | `2009_Jul30_IMG_5242.JPG`, resized from 2048 × 1365 to 1600 × 1066 with Lanczos, JPEG quality 92, 4:4:4 chroma and its ICC profile. At the published panel size this gives 238 ppi. |
+| `drone_inset_pre.jpg` | Original 160 × 160 JPEG from 09.32.58. The orange inset rotates it 90° counterclockwise. |
+| `drone_inset_post.jpg` | Original 160 × 160 JPEG from 09.35.58. The purple inset rotates it 45° counterclockwise. |
+| `images.json` | SHA-256 hashes for the author files and the committed working files. The generator verifies the working files before drawing. |
 
-The insets are raw crops: the circular ring, the callout cones, and the
-body-heading arrows are drawn by code on top of them. The heading arrows
-are the circular-mean compass bearing over the +/- 0.5 s window centred on
-the recovered anchor frame on the focal track (the paper's hand-drawn
-arrows differ by up to ~20 degrees; see `notebooks/ZEBRA_FIGURE.md`).
-
-Everything else the figure draws (mosaic, trajectories, bearings, fit)
-comes from `jgraving/unwrap-data` at the pinned revision; see
-`notebooks/ZEBRA_FIGURE.md` for the data and fit provenance.
+The exported map uses the georeferenced tiles, trajectories and bearings
+from `jgraving/unwrap-data`. The statistics use the saved fit at the same
+pinned revision. See [the reproduction notes](../../ZEBRA_FIGURE.md).

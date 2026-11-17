@@ -1,0 +1,56 @@
+{
+  "source_repository": "jgraving/unwrap",
+  "source_revision": "075cb7274f8d80f284346dbe30bdc3e0f20dfd89",
+  "source_path": "notebooks/locust_density_order.ipynb",
+  "source_sha256": "073d9272f24ce6b648f92550ac25156b269c4a52599b58be00a05bf874e971a7",
+  "cell_index": 23,
+  "basis": "Saved Python screening output; 440 recording mean directions; printed to six decimals",
+  "recompute": "locust_density_posthoc.model_sweep(screen_df, draws=1000, seed=123)",
+  "models": [
+    {
+      "name": "Density \u00d7 Order",
+      "elpd": -590.814957,
+      "delta": 0.0,
+      "se": 0.0,
+      "pareto_k_max": 0.349546,
+      "best": "Density \u00d7 Order",
+      "has_order": true
+    },
+    {
+      "name": "Density + Order",
+      "elpd": -593.249415,
+      "delta": -2.434459,
+      "se": 2.454244,
+      "pareto_k_max": 0.261412,
+      "best": "Density \u00d7 Order",
+      "has_order": true
+    },
+    {
+      "name": "Order",
+      "elpd": -599.675344,
+      "delta": -8.860387,
+      "se": 5.846474,
+      "pareto_k_max": 0.127786,
+      "best": "Density \u00d7 Order",
+      "has_order": true
+    },
+    {
+      "name": "Density",
+      "elpd": -666.522883,
+      "delta": -75.707926,
+      "se": 11.227931,
+      "pareto_k_max": 0.162298,
+      "best": "Density \u00d7 Order",
+      "has_order": false
+    },
+    {
+      "name": "Intercept-only",
+      "elpd": -669.259555,
+      "delta": -78.444598,
+      "se": 11.598301,
+      "pareto_k_max": 0.071369,
+      "best": "Density \u00d7 Order",
+      "has_order": false
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "source_repository": "jgraving/circstats",
+  "source_revision": "9bef710eb44fd8d20a61a7119a12e4933d02ce6d",
+  "source_path": "figures/locust_density_order_figure.pdf",
+  "source_sha256": "48609fdc9185e20227ae0b1c20dd377301d5aa962c7d57078ef1bf5873d0bf21",
+  "page": 1,
+  "images": {
+    "vr_arena.jpeg": {
+      "xref": 11,
+      "width": 2233,
+      "height": 962,
+      "sha256": "37cdc7a9d643a3382b2be89a2a1660b821b6515bf9972664ee23229e40ec53c4",
+      "manuscript_width": 803,
+      "manuscript_height": 346,
+      "manuscript_sha256": "83fa4e192f279d6722424791d103b69be0f6f97065ea502f979f924bcdb117e0"
+    },
+    "real_locust.jpeg": {
+      "xref": 12,
+      "width": 2179,
+      "height": 1226,
+      "sha256": "0146fc66a7b8cc3d7c2ae7d92ab8408752811c5c7e06e386f615af7695260020",
+      "manuscript_width": 784,
+      "manuscript_height": 441,
+      "manuscript_sha256": "e0a43a3ba709e59039ba41d8fc12f92cb891d21d9a7e7130ab4919ca89e63b24"
+    },
+    "virtual_locust_lateral.jpeg": {
+      "xref": 13,
+      "width": 1165,
+      "height": 653,
+      "sha256": "436213bb56a20ec82a258c9100779277a0afae657fa356465e0c87fb3a101ab4",
+      "manuscript_width": 419,
+      "manuscript_height": 235,
+      "manuscript_sha256": "596a50a9f92e95575de784bdf430ecf58a5f008a9969bb0407bbe10479bdf8ef"
+    },
+    "virtual_locust_front.jpeg": {
+      "xref": 14,
+      "width": 866,
+      "height": 487,
+      "sha256": "d199353744b90f6db4746157fd8e2152487757b39ce430e5003a2513288c3db4",
+      "manuscript_width": 311,
+      "manuscript_height": 175,
+      "manuscript_sha256": "02ea621648b117fbe52afeb02e9e855f74c4251c6c12bed26305690ac053c0f7"
+    },
+    "virtual_locust_rear.jpeg": {
+      "xref": 15,
+      "width": 863,
+      "height": 485,
+      "sha256": "2feb4b1568fe9a164d749d8a2bdd9a62992840a6452298646acfc51901e6e9a7",
+      "manuscript_width": 310,
+      "manuscript_height": 174,
+      "manuscript_sha256": "603558d32964599d2af4bfe37dfd6527a3ce8599cb1b5ae946663e7223e87581"
+    },
+    "real_swarm.jpeg": {
+      "xref": 20,
+      "width": 720,
+      "height": 1080,
+      "sha256": "0258a39d00fe09d150ce00e1598df3c1f3e56eef9dba404545c6781c662e2ba9",
+      "manuscript_width": 490,
+      "manuscript_height": 735,
+      "manuscript_sha256": "4b8192e1dd14ee18a7706a3e4699e9a5aaf0944d6249e08a68a5e9dd2cbac746"
+    },
+    "virtual_swarm.jpeg": {
+      "xref": 21,
+      "width": 1235,
+      "height": 1235,
+      "sha256": "2ccc19712be2e4e348f2031be0adb5ad3189e6765b2e752217d23c267f0553d9",
+      "manuscript_width": 445,
+      "manuscript_height": 445,
+      "manuscript_sha256": "c43412a2c60facadd011fa4dc24840a627b9863370035a01a7762486d09e4d4c"
+    }
+  },
+  "original_panels": {
+    "file": "original_panels.svg",
+    "sha256": "684b95dc0027d4ddd7d253e2988d1bf0f072bc9095fb5ef8f7658212febfc192",
+    "page_points": [
+      750,
+      525
+    ],
+    "retained_panel_pixel_changes": 0,
+    "verification_pixels_per_point": 2,
+    "scale_bar_source_endpoints": [
+      139.50950622558594,
+      163.97853088378906
+    ],
+    "scale_bar_label": "10 cm",
+    "extractor": "PyMuPDF 1.26.6"
+  },
+  "credit": "Centre for the Advanced Study of Collective Behaviour; manuscript states used with permission. No additional redistribution licence is inferred.",
+  "high_resolution_export": {
+    "path": "locust_density_order_figure.pdf",
+    "sha256": "4b953238e985098c1d87c82e7ce6c8f25de6374aefc528900a4ee1cd6e471bf2",
+    "creator": "Keynote, macOS 15.8.3 (24H241) Quartz PDFContext",
+    "page_points": [
+      750,
+      525
+    ],
+    "policy": "rasters resized to at most 400 effective dpi (never above native), JPEG quality 88, sRGB without ICC profile, rows cropped to match the manuscript crops for the two virtual views; per-image transform scale preserves each display box"
+  }
+}

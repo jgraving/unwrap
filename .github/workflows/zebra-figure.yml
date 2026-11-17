@@ -60,11 +60,10 @@ jobs:
           uv run --no-project python notebooks/zebra_publication_figure.py \
             --download --font-family "Liberation Sans" \
             --output-dir /tmp/zebra-ci-1
-          sha256sum /tmp/zebra-ci-1/zebra_publication.svg > /tmp/zebra.sha256
           uv run --no-project python notebooks/zebra_publication_figure.py \
             --download --font-family "Liberation Sans" \
             --output-dir /tmp/zebra-ci-2
-          sha256sum --check /tmp/zebra.sha256
+          diff -qr /tmp/zebra-ci-1 /tmp/zebra-ci-2
       - uses: actions/upload-artifact@v4
         with:
           name: zebra-figure-exports

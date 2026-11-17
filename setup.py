@@ -22,6 +22,8 @@ setup(
         # raster export, PDF image-object restore, and netcdf fit caches
         "figure": [
             "cairosvg>=2.7,<3",
+            "pyarrow>=16",
+            "seaborn>=0.13",
             "xarray>=2024.1.0",
             "h5netcdf>=1.3",
             "h5py>=3.10",

@@ -17,6 +17,7 @@ are gitignored.
 
 Palette: light OFF is grey, light ON is gold (matching the paper figures).
 """
+import json
 from pathlib import Path
 
 import matplotlib as mpl
@@ -48,6 +49,14 @@ FIG_DIR = Path(__file__).resolve().parent.parent / "figures" / "beetles"
 # Light OFF is grey, light ON is gold (matches the paper figures).
 OFF = "#9e9e9e"
 ON = "#f4a300"
+
+# Shared by the Python/R notebooks and publication figure. The paper reports
+# south-southwest, not a surveyed azimuth: 202.5 degrees is its nominal compass
+# bearing. Do not substitute the paper's 210-degree mean *beetle* heading.
+STUDY_PATH = Path(__file__).with_name("beetles_study.json")
+STUDY = json.loads(STUDY_PATH.read_text(encoding="utf-8"))
+FLOOD_DIR = np.deg2rad(STUDY["sector_center_degrees"])
+FLOOD_HALFWIDTH = np.deg2rad(STUDY["sector_halfwidth_degrees"])
 
 #: Study-specific rcParams on top of the house style (the house style already
 #: sets Arial, the 100/300 dpi tiers, type-42 PDF outlines and hairline
@@ -163,7 +172,7 @@ def _summary_polar(ax, angles, radial_max, color):
 # Figure 2 (panel b): polar KDE of the population-level mu posterior.
 # ---------------------------------------------------------------------------
 def plot_polar_mu_kde(idata_treat, df, circular_modulo, flood_dir=None,
-                      flood_halfwidth=np.deg2rad(45), theta_grid_n=361,
+                      flood_halfwidth=FLOOD_HALFWIDTH, theta_grid_n=361,
                       kappa_bw=80.0, *, save=True,
                       save_path="figures/beetles/treat_polar_mu_kde_clean.pdf"):
     """Polar kernel density of the population-level posterior of mu under each
@@ -262,10 +271,12 @@ def _mean_hdi(samples, hdi_prob=0.89):
 def _errorbar_mean_hdi(ax, x, samples, color, hdi_prob=0.89, capsize=3, lw=1, ms=6,
                        label=None):
     m, lo, hi = _mean_hdi(samples, hdi_prob=hdi_prob)
-    low = m - lo
-    high = hi - m
-    ax.errorbar([x], [m], yerr=[[low], [high]], fmt="o", color=color, ecolor=color,
-                elinewidth=lw, capsize=capsize, markersize=ms, label=label, zorder=5)
+    # A mean can lie outside a shortest HDI (or a roundoff-width interval).
+    # Draw the interval independently instead of inventing negative yerr.
+    midpoint = (lo + hi) / 2
+    ax.errorbar([x], [midpoint], yerr=[(hi - lo) / 2], fmt="none",
+                ecolor=color, elinewidth=lw, capsize=capsize, zorder=5)
+    ax.plot([x], [m], "o", color=color, markersize=ms, label=label, zorder=6)
 
 
 def _vonmises_interval_mass(mu, kappa, a, b):
@@ -279,7 +290,7 @@ def _vonmises_interval_mass(mu, kappa, a, b):
 
 
 def plot_concentration(idata_treat, df, circular_modulo, softplus,
-                       flood_dir=np.deg2rad(-135), hdi_prob=0.89, *,
+                       flood_dir=FLOOD_DIR, hdi_prob=0.89, *,
                        save=True,
                        save_path="figures/beetles/treat_concentration_plus_floodlight.pdf"):
     """Four panels: within-individual concentration (MRL), between-individual
@@ -313,7 +324,7 @@ def plot_concentration(idata_treat, df, circular_modulo, softplus,
     mu_pop_off = circular_modulo(post["Intercept"].values.reshape(-1))
     mu_pop_on = circular_modulo((post["Intercept"] + post["Light"]).values.reshape(-1))
 
-    halfwidth = np.deg2rad(45)
+    halfwidth = FLOOD_HALFWIDTH
     a = flood_dir - halfwidth
     b = flood_dir + halfwidth
     mass_off = _vonmises_interval_mass(mu_pop_off, kappa_off, a, b)
@@ -354,7 +365,10 @@ def plot_concentration(idata_treat, df, circular_modulo, softplus,
     _errorbar_mean_hdi(ax, 0, mass_diff, ON, hdi_prob=hdi_prob, capsize=3)
     ax.set_xticks([0], ["On - Off"])
     ax.set_ylabel("Difference in\npredictive mass (+-45 deg)")
-    ax.set_ylim(0.0, 1.0)
+    lower = min(0.0, min(_mean_hdi(mass_diff, hdi_prob)) - 0.025)
+    ax.set_ylim(lower, 1.0)
+    if lower < 0:
+        ax.axhline(0, color="k", lw=0.6, zorder=1)
 
     yt_mrl = np.linspace(0, 1.0, 6)
     for i in [0, 1]:

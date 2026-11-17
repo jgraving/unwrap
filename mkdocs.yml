@@ -10,8 +10,10 @@ plugins:
       execute: false
       markdown_cell_processor: jupyter
       custom_template: docs/jupyter_templates/notebook.html.j2
+      ignore_h1_titles: true
 hooks:
   - docs_hooks/notebook_css.py
+  - docs_hooks/notebook_titles.py
 edit_uri: blob/main/docs/
 theme:
   name: material
@@ -63,8 +65,6 @@ nav:
       - Grevy's zebra body orientation during an escape response:
           - Python: notebooks/zebra_escape.ipynb
           - R: notebooks_r/zebra_escape.ipynb
-      - Zebra escape-response map figure:
-          - Python: notebooks/zebra_map.ipynb
       - Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing:
           - Python: notebooks/goldshtein_bats.ipynb
           - R: notebooks_r/goldshtein_bats.ipynb

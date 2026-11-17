@@ -1,0 +1,112 @@
+{
+  "data_repository": "jgraving/unwrap-data",
+  "data_revision": "31eb4bdb4a0fe9a0c0bd20df7f101dbd884a8dcc",
+  "inputs_sha256": {
+    "beetle_security_light/SecurityLightBergsig.txt": "5a3acd579c166c4357204566fbf9eca1233d220af0faf48cffd87ccf2155f78f",
+    "fit_cache/beetles_fit.nc": "f985f7e55f6a28ffb9d6ec544c624b03d8195b7447ec575a43a82351247bf5d1",
+    "fit_cache/beetles_fit.meta.json": "51dbcdd857bd26f3e2dadfe90dac85633c2d4698e868cd07330d722f20bbd278"
+  },
+  "code_revision": "cc05f72afe1558f2e68673e714f9bd386019ee4e",
+  "source_sha256": {
+    "notebooks/beetles_figure.py": "6b31f658b64b6d3efbfc2ae81edb0055e8f15c0f870604534d20091c20ea5f95",
+    "notebooks/assets/beetle_arena.svg": "f7474fd7213af4001b7a802ceb2ed6a7cdda3667880f35ef3e89c3ce303b3862",
+    "notebooks/assets/beetle_floodlight.svg": "366174ea1cebc388142e8af043673d79f494bffdf82f978a80318ff6704f4f24",
+    "notebooks/beetles_study.json": "66bf3ca03c6a3047a917da0a2d51749ca8bc6aa7be03da25ee40a88ca5b30222",
+    "notebooks/beetles_plots.py": "ce02544e291a34dbfa2e04a4654fc623ca859cadb4e09100053d1b8d0d14f4e4",
+    "notebooks/beetles_preprocess.py": "8ffaf8e181f079f963c1116f2215ef4e68ee9391c2f6d318daca615b30ba249d",
+    "unwrap/circular.py": "55c26262dbee6e71bfe1cbfdf0cb664d0a52e305665e7cf5d2f6e80c739defc2",
+    "unwrap/bessel.py": "2fac0a114d83b63cf05c02f26a62863a426ed038284aa972cb6ff4e3d04a27f8",
+    "unwrap/link/numpy.py": "f598dda5da67f935dcd405b8ea379e46d0f90c5a1b80f853208c5607b64ceaf3"
+  },
+  "python": "3.12.14",
+  "packages": {
+    "numpy": "2.5.5",
+    "scipy": "1.18.1",
+    "pandas": "3.1.1",
+    "matplotlib": "3.11.2",
+    "arviz": "1.3.0",
+    "xarray": "2026.9.0",
+    "h5netcdf": "1.8.3",
+    "h5py": "3.16.0",
+    "cairosvg": "2.9.1"
+  },
+  "font_family": "Arial",
+  "fonts": {
+    "normal": {
+      "file": "Arial.ttf",
+      "sha256": "525979822591a3447cfc49d943d6f7683508e25543407871c0ed8fed05fd2bd9"
+    },
+    "bold": {
+      "file": "Arial-Bold.ttf",
+      "sha256": "d72db21f9242aedd6b917d8549ad5921766b24d5f8d0becfda2ff4c620b3c2e0"
+    }
+  },
+  "posterior_chains": 4,
+  "posterior_draws_per_chain": 2000,
+  "divergences": 0,
+  "observations": {
+    "off": 100,
+    "on": 96
+  },
+  "hdi_probability": 0.89,
+  "kde_kappa": 80.0,
+  "sector_center_degrees": 202.5,
+  "sector_halfwidth_degrees": 45.0,
+  "sector_center_basis": "Nominal compass bearing of the published south-southwest description; approximate, not a surveyed lamp azimuth",
+  "bearing_convention": "Clockwise from north, viewed from above",
+  "source_doi": "10.1016/j.cub.2021.06.038",
+  "source_location": "Results: Light pollution alters orientation behavior; Figure 3A",
+  "source_note": "The paper's 210-degree statistic is the beetles' mean heading, not a measured lamp bearing. The previous 225-degree analysis centre represented southwest.",
+  "caption": "Artificial light shifts dung beetle orientation at multiple levels. (a) Each of ten beetles repeatedly exits the arena, with ten trials per lighting condition; four light-on bearings are missing. Matched light-off and light-on arena schematics show the two conditions experienced by the same beetles. Illustrative exits are dispersed with the light off and cluster toward the floodlight with the light on. Paths and beetle positions are schematic, not observed trajectories or a fitted sample. (b) Curves show kernel density estimates of the posterior population mean direction, with a common radial density scale; dots show each beetle's observed circular mean bearing. Bearings increase clockwise from north, viewed from above. The lamp icon is schematic. The arc is centred at 202.5\u00b0 with a 45\u00b0 half-width, using the nominal south-southwest bearing reported by Foster et al. (2021), rather than a surveyed azimuth. Sector probabilities and intervals are conditional on this approximate centre. (c) Population-level within-individual concentration, converted to mean resultant length using I\u2081(\u03ba)/I\u2080(\u03ba). (d) Between-individual concentration: the resultant length of the ten fitted individual mean directions, calculated in each draw. (e) Probability of an exit within the marked sector, using population direction and concentration (individual offsets set to zero); the dashed line marks the uniform expectation of 0.25. (f) The paired draw-wise difference in this probability, on minus off. Points show posterior means and bars show 89% highest-density intervals.",
+  "summaries": {
+    "within": {
+      "off": {
+        "mean": 0.8898756014473879,
+        "hdi_low": 0.8672054333233085,
+        "hdi_high": 0.9147502625610926
+      },
+      "on": {
+        "mean": 0.9188493583192255,
+        "hdi_low": 0.9011520821221727,
+        "hdi_high": 0.9379348738543752
+      }
+    },
+    "between": {
+      "off": {
+        "mean": 0.28210867936607775,
+        "hdi_low": 0.21816818627629642,
+        "hdi_high": 0.34449988002473775
+      },
+      "on": {
+        "mean": 0.8923148090469922,
+        "hdi_low": 0.8569980480077646,
+        "hdi_high": 0.9305276406475117
+      }
+    },
+    "mass": {
+      "off": {
+        "mean": 0.2285876820152037,
+        "hdi_low": 8.563658631591253e-05,
+        "hdi_high": 0.5475297939633187
+      },
+      "on": {
+        "mean": 0.7784219495127329,
+        "hdi_low": 0.48255642241295166,
+        "hdi_high": 0.9708524716648854
+      }
+    },
+    "difference": {
+      "on_minus_off": {
+        "mean": 0.5498342674975293,
+        "hdi_low": 0.10955677635595495,
+        "hdi_high": 0.9323540102427864
+      }
+    }
+  },
+  "outputs_sha256": {
+    ".svg": "43b900654d24cceba7b8f86ebd99c4e595cba44f68e16f9147258c947b0f1cd8",
+    ".pdf": "f438ea9312b7c217aca6125ca71f5b28c756d39c7ec70538357e89fa47d3b77a",
+    ".png": "7277ecbf5522d7b9928bc26629ae94cd0690afdcda861f8eacb9bf4c11d04ac4",
+    ".html": "a41871689883515f46d4a0f899b08f3451868a6f93010e1bf990c82f71d75970"
+  }
+}

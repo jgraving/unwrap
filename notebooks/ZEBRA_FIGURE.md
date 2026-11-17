@@ -3,7 +3,7 @@
 `notebooks/zebra_publication_figure.py` rebuilds the circstats paper's
 zebra composite figure from stored data only. The committed
 `notebooks/assets/zebra_publication/reference.pdf` (900 × 1080 points) is
-the published composite; every layout constant in the generator is
+a reduced copy of the author-supplied composite. The layout is
 measured from it, and the exports redraw panels c–f from the cached
 posterior while retaining the composite's page geometry, typography and
 palette.
@@ -13,9 +13,8 @@ palette.
   trajectories of `observation088` (focal in black, group in white) and
   the focal animal's body-orientation arrows every 5 m of straight-line
   travel (orange pre-approach, purple post). The two circular callout
-  insets magnify the anchor moments (below) with the body-heading arrow
-  drawn at the data bearing; the tangent cones are drawn from the anchor
-  position to the inset rings.
+  insets show the rotated photographs and arrows from the published artwork.
+  The cone tangents connect the data-derived anchors to the inset rings.
 - **b** — the species photograph (author-provided asset).
 - **c** — group-level mean direction: posterior KDE of the equally
   weighted mean of the 18 fitted individual mean directions, radial scale
@@ -28,7 +27,7 @@ palette.
   resultant length (A(kappa)) with 95% HDI, paired within animal
   (house jitter, seed 123, sd 0.15).
 
-c–f come from `zebra_posthog.summary_stats` — the same path the
+c–f come from `zebra_posthoc.summary_stats` — the same path the
 `zebra_escape.ipynb` notebook uses, so the composite and the notebook
 figure cannot disagree on the numbers.
 
@@ -69,8 +68,8 @@ The outputs default to `assets/zebra-publication/` (committed for review):
 | Output | Content |
 | --- | --- |
 | `zebra_publication.svg` | Vector figure, lettering outlined, four raster embeds |
-| `zebra_publication.pdf` | 900 × 1080 pt composite; the original JPEG sources are restored to their image objects (DCT streams, ICC profiles); placements verified unchanged |
-| `zebra_publication.png` | 3600 × 4320 px preview rendered from the PDF |
+| `zebra_publication.pdf` | 900 × 1080 pt composite with the same four JPEGs, transforms and clips as the SVG |
+| `zebra_publication.png` | 1800 × 2160 px preview rendered from the PDF |
 | `zebra_publication.html` | Self-contained page with the caption |
 | `zebra_publication.json` | Provenance: data/code revisions, hashes, fonts, packages, fit diagnostics, layout constants, and every summary number below |
 
@@ -88,14 +87,11 @@ The outputs default to `assets/zebra-publication/` (committed for review):
   generator rejects the fit otherwise.
 - Map window: UTM 37N `x ∈ [267525, 267680]`, `y ∈ [37300, 37770]`,
   mosaic read window `y ∈ [37290, 37770]` (the 10 m strip at the bottom
-  is clipped by the panel), frames capped at 90,698; mosaic downsampled
-  to a 2600-px side (house value). The SVG backend embeds rasters at the
-  figure's display resolution, so the export's mosaic raster is set by
-  `FIG_DPI` (150): the 350 × 1060 pt map backdrop embeds at roughly
-  729 × 2200 px -- above the published composite's own 640 × 1940 px
-  mosaic raster (the paper's fidelity ceiling for that backdrop). The
-  mosaic is 0.02707 m/px; the calibrated 20 m scale bar and the north
-  arrow sit at their measured positions (45.1 pt = 20 m at the map's
+  is clipped by the panel), frames capped at 90,698; mosaic assembled at a maximum
+  side of 2600 px, then reduced to 1940 px before the map window is
+  clipped. The visible mosaic is 627 × 1900 px at about 129 ppi.
+  The source mosaic resolution is 0.02707 m/px. The calibrated 20 m scale bar and
+  the north arrow sit at their measured positions (45.1 pt = 20 m at the map's
   0.4430 m/pt).
 - The trajectories are vector. In the exports their vertices are
   decimated at 1 m of straight-line travel (`MAP_VERTEX_SPACING_M`,
@@ -106,9 +102,9 @@ The outputs default to `assets/zebra-publication/` (committed for review):
   keeps the map layers at ~48k vector segments -- the size at which the
   SVG backend (one element per collection segment) stays in the house
   artwork range. The heading arrows (every 5 m) are computed from the
-  full-resolution trajectory exactly as in `zebra_map.ipynb`.
+  full-resolution trajectory exactly as in the map section of `zebra_escape.ipynb`.
 - The pre/post arrow split on the map uses the per-frame `pre_scare`
-  flag of `load_zebra_bearings_raw()`, exactly as `zebra_map.ipynb`
+  flag of `load_zebra_bearings_raw()`, exactly as the map section of `zebra_escape.ipynb`
   does: it flips at frame **53,902** for all 18 `observation088` tracks.
   `scare_frames.csv` lists `observation088` later (frame 72,703); the
   discrepancy is recorded in the provenance and left as published.
@@ -127,15 +123,16 @@ focal track (`observation088-5`, keypoint 0) gives:
 
 The paper's hand-drawn cone lines deviate 2.5-4° from the exact
 tangents from the anchor positions to the inset disc; the generator
-draws the exact tangents (a documented programmatic choice). The inset
-heading arrows are drawn at the 0.5 s circular-mean bearings above; the
-paper's hand-drawn arrows differ by up to about 20°, and the code draws
-the data values.
+draws the exact tangents. The inset arrows follow the visible animals in
+the rotated photographs.
+The provenance records the measured compass bearings separately.
 
-The inset crops are 160 × 160 px author-provided images; 160 px is
-marginal at 300 dpi, so the composite keeps them small. They fill the
-square inscribed in the ring, circle-clipped; the ring (5 pt), the
-cones (3 pt) and the arrows (20/15/6 pt head/tail) are vector.
+The 09.32.58 drone crop is the orange pre-stimulus inset. Its 208.78 pt
+square rotates 90° counterclockwise about (115.04, 331.45) pt, behind a
+65.25 pt radius mask. The 09.35.58 crop is the purple post-stimulus inset.
+Its 214.90 pt square rotates 45° counterclockwise about (115.04, 743.02)
+pt, behind a 67.16 pt radius mask. Both JPEGs retain the author's original
+160 × 160 pixels. The rings, arrows and cone lines remain vector.
 
 ## Baseline numbers (from the pinned fit)
 
@@ -146,8 +143,8 @@ markers are drawn on. The house notebook's figure uses the same axis
 45°-step tick labels run clockwise from north, so the on-axis readings
 below are what the published panels display. An on-axis reading is not
 the geographic compass bearing of the fitted direction (that would be
-(90° − model angle) mod 360°); only panel a's map and inset arrows use
-true compass bearings, straight from the per-frame bearing data.
+(90° − model angle) mod 360°); the trajectory arrows in panel a use
+true compass bearings from the per-frame data.
 
 - Group mean direction (on-axis): **104.5° pre → 232.0° post**
   (posterior mean of the equally weighted per-track means).
@@ -169,10 +166,9 @@ no licensed fonts): synthetic-fit statistics cross-checked against
 direct circular computations and 2π-wrap invariance, a double-render
 SHA-256 determinism + no-`<text>` check of the vector export with DejaVu
 Sans, the `prepare_inputs` tamper/refusal behavior, the committed-asset
-manifest, a tiny-JPEG fixture for the PDF source-image restore (DCT
-stream round trip and placement invariance), and a drift guard that
-re-reads the committed `reference.pdf` and verifies the mosaic/photo
-rects and the 32-pt panel letters against the layout constants.
+manifest, a pixel-mismatch rejection test, and an end-to-end comparison
+of the final photo and inset JPEG streams, signed placement matrices and
+rendered image patches against the author's reference.
 
 `tests/test_zebra_map.py` covers the `draw_escape_map` extraction itself
 (the refactor keeps `plot_escape_map` a thin wrapper and
@@ -182,9 +178,7 @@ standalone defaults preserved; all 16 pre-existing tests pass).
 
 CI (`.github/workflows/zebra-figure.yml`) runs the hermetic tests and a
 deterministic-render job that downloads the pinned data, renders the
-figure twice with Liberation Sans, and compares the SVG hashes; the CI
+figure twice with Liberation Sans, and compares both output directories; the CI
 render is not byte-compared against the committed Arial exports.
-Consecutive local renders are byte-identical for all five exports,
-including the PDF: the cairo wall-clock CreationDate is cleared during
-the source-image restore step, and the provenance JSON records each
-export's SHA-256.
+The PDF export removes the Cairo creation timestamp. The provenance JSON
+records the SHA-256 of each graphical export.

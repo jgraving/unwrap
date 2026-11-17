@@ -97,6 +97,24 @@ the docs build never executes a notebook, and the files the build reads are
 plain copies made by `sync_docs_notebooks.py` (gitignored; the notebooks in
 `notebooks/` are the source of truth).
 
+`mkdocs-jupyter` 0.27 also appends a broken CSS footer to each notebook
+page: a `<style>` block whose content is the Python repr of the page's
+list of styles instead of CSS. `docs_hooks/notebook_css.py`, registered in
+`mkdocs.yml`, strips it from the rendered page. The strip has to run at
+`on_page_content` rather than `on_page_markdown`: with
+`markdown_cell_processor: jupyter` (which this repo uses to avoid a
+double-escaping bug in notebook math) the plugin renders notebook pages
+through nbconvert's HTML instead of the markdown pipeline, so
+markdown-stage hooks never see them. The hook's regex matches only the
+trailing list repr, so it becomes a no-op once the plugin stops emitting
+the footer. The bug is fixed upstream (danielfrg/mkdocs-jupyter#287,
+merged 2026-11-16) but not yet in a stable release; 0.27.0 (2026-10-22)
+is the newest release and still contains it. To drop the hook, bump
+`requirements-docs.txt` past 0.27 to the first release that includes
+#287, delete `docs_hooks/notebook_css.py` and its `hooks:` entry in
+`mkdocs.yml`, rebuild, and check that no footer text appears at the
+bottom of a notebook page.
+
 The documentation workflow builds with strict link validation and uploads the
 static site as a GitHub Actions artifact for every PR. Pushes to `main` also
 publish the site to <https://jgraving.github.io/unwrap/> through GitHub Pages.

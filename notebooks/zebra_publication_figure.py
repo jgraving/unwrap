@@ -38,6 +38,7 @@ Run from the repository root; see ``ZEBRA_FIGURE.md`` for provenance.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import importlib.metadata
 import io
@@ -47,6 +48,7 @@ import platform
 import re
 import subprocess
 import urllib.request
+import xml.etree.ElementTree as ET
 
 import matplotlib as mpl
 
@@ -118,7 +120,7 @@ INPUT_HASHES = {
 }
 
 # ---------------------------------------------------------------------------
-# Published map-window constants (notebooks/zebra_map.ipynb, PR #154)
+# Published map window (map section of notebooks/zebra_escape.ipynb)
 # ---------------------------------------------------------------------------
 OBS = "observation088"
 FOCAL_TRACK = f"{OBS}-5"
@@ -129,9 +131,7 @@ PANEL_YLIM = (37300.0, 37770.0)
 MOSAIC_YLIM = (37290.0, 37770.0)     # mosaic read window (10 m clip below)
 MOSAIC_MAX_SIDE_PX = 2600       # downsampled mosaic side (house value)
 #: The published composite embeds the mosaic as a 640 x 1940 px raster.
-# The export draws the mosaic at exactly that resolution (the paper's
-# own fidelity ceiling); the 2600-px data mosaic stays the pipeline
-# input so the composite and the zebra-map notebook agree.
+# Limit the input raster before clipping it to the displayed map window.
 MOSAIC_EMBED_SIDE = 1940         # long side of the embedded mosaic, px
 FOCAL_LW = 2.5                 # focal trajectory width (measured on the paper)
 #: Trajectory vertex spacing (meters) for the composite's map panel:
@@ -197,28 +197,20 @@ LETTERS = [
 GRID_COLOR = "black"
 TICK_LW = 1.5
 
-# circular callout insets (ring centre, ring radius in pt, anchor frame on
-# the focal track, source asset). The anchor frames are the presentation
-# choice of the published figure, recovered by back-solving the callout
-# cone apexes from the reference PDF (within 1.09 m and 0.05 m of the
-# focal track); the inset arrows point along the circular-mean bearing over
-# the 0.5 s window centred on the anchor frame (the paper's hand-drawn
-# arrows differ by up to ~20 degrees; the code draws the data values).
-INSET_PRE = dict(center=(118.2, 331.45), r=68.4, anchor_frame=17623,
+# Page coordinates (pt, y down). The full photographs extend beyond
+# their circular masks. Rotations and arrow endpoints are from the artwork.
+INSET_PRE = dict(center=(115.04, 331.45), r=65.25, side=208.7775, rotation=-90,
+                 arrow=((81.36, 316.29), (129.57, 342.03)), anchor_frame=17623,
                  asset="drone_inset_pre.jpg")
-INSET_POST = dict(center=(115.05, 743.0), r=67.15, anchor_frame=80780,
+INSET_POST = dict(center=(115.04, 743.02), r=67.16, side=214.9035, rotation=-45,
+                  arrow=((149.63, 713.68), (108.58, 750.25)), anchor_frame=80780,
                   asset="drone_inset_post.jpg")
 RING_LW = 5.0
 CONE_LW = 3.0
 ANCHOR_WINDOW_FRAMES = 15       # +/- 0.5 s at 30 fps
-INSET_ARROW_TAIL_PT = 20.0      # heading arrow: tail distance from centre
-INSET_ARROW_TIP_PT = 26.0       # tip distance from centre
-INSET_ARROW_HEAD_W = 20.0       # head width (pt)
-INSET_ARROW_HEAD_L = 15.0       # head length (pt)
-INSET_ARROW_TAIL_W = 6.0        # tail width (pt)
 
-# map legend (measured box centre x=103.35 -> axes fraction ~0.22)
-MAP_LEGEND_ANCHOR = (0.22, 0.5)
+# Map legend centre x=103.35 pt in the 349.9-pt map panel.
+MAP_LEGEND_ANCHOR = (0.25, 0.5)
 
 # scale bar and north arrow, measured
 SCALE_RECTS = ((296.5, 1014.2, 22.5, 8.7), (319.0, 1014.2, 22.6, 8.7))
@@ -261,14 +253,7 @@ LW_HDI = 2.0
 LW_PAIRED = 1.4
 
 JITTER_SEED = 123               # per-track paired-offset seed (house value)
-#: The SVG backend embeds rasters at the figure's display resolution,
-# not the asset sizes, so the export's raster fidelity is set by the
-# figure dpi. 150 dpi embeds the 350 x 1060 pt map mosaic at roughly
-# 729 x 2200 px -- above the published composite's own 640 x 1940 px
-# mosaic raster (the paper's fidelity ceiling for that backdrop).
-FIG_DPI = 150
-
-
+PREVIEW_SCALE = 2               # 1800 x 2160 px at the published page size
 JITTER_SD = 0.15
 
 #: The figure caption (fresh wording; the older manuscript caption called
@@ -588,13 +573,6 @@ def _figure_rect(rect):
             (x1 - x0) / PAGE_W, (y1 - y0) / PAGE_H]
 
 
-def _inset_rect(spec):
-    """The page rect of the square inscribed in the inset ring."""
-    cx, cy = spec["center"]
-    r = spec["r"]
-    return (cx - r, cy - r, cx + r, cy + r)
-
-
 def _tangent_endpoints(apex, center, radius):
     """The two tangent points from ``apex`` to the circle (same units).
 
@@ -619,7 +597,7 @@ def _tangent_endpoints(apex, center, radius):
     return ends
 
 
-def _draw_inset(map_ax, overlay, fig, spec, asset_path, anchor, color):
+def _draw_inset(map_ax, overlay, fig, key, spec, anchor, color):
     """One circular callout: tangent cone on the map, inset image, ring,
     and body-heading arrow on the overlay plane."""
     cx, cy = spec["center"]
@@ -639,25 +617,12 @@ def _draw_inset(map_ax, overlay, fig, spec, asset_path, anchor, color):
         map_ax.plot([apex[0], end[0]], [apex[1], end[1]], color=color,
                     lw=CONE_LW, solid_capstyle="butt", zorder=6)
 
-    # inset image clipped to the disc, then the ring on top
-    im = overlay.imshow(plt.imread(str(asset_path)),
-                        extent=(cx - r, cx + r, cy + r, cy - r),
-                        aspect="auto", interpolation="lanczos", zorder=1)
-    im.set_clip_path(Circle((cx, cy), r, transform=overlay.transData,
-                            fill=False))
-    overlay.add_patch(Circle((cx, cy), r, transform=overlay.transData,
-                             facecolor="none", edgecolor=color, lw=RING_LW,
-                             zorder=2))
-
-    # body-heading arrow along the circular-mean bearing at the anchor
-    theta = np.deg2rad(anchor["arrow_bearing_deg"])
-    dx, dy = np.sin(theta), -np.cos(theta)
-    tail = (cx - INSET_ARROW_TAIL_PT * dx, cy - INSET_ARROW_TAIL_PT * dy)
-    tip = (cx + INSET_ARROW_TIP_PT * dx, cy + INSET_ARROW_TIP_PT * dy)
+    # The JPEG will be drawn beneath this ring, in page coordinates.
+    overlay.add_patch(Circle((cx, cy), r, facecolor="none", edgecolor=color,
+                             lw=RING_LW, zorder=2, gid=f"inset-{key}"))
     overlay.add_patch(FancyArrowPatch(
-        tail, tip, arrowstyle=ArrowStyle.Simple(
-            head_length=INSET_ARROW_HEAD_L, head_width=INSET_ARROW_HEAD_W,
-            tail_width=INSET_ARROW_TAIL_W),
+        *spec["arrow"], arrowstyle=ArrowStyle.Simple(
+            head_length=18.0, head_width=20.0, tail_width=5.0),
         mutation_scale=1.0, shrinkA=0, shrinkB=0,
         facecolor=color, edgecolor="none", zorder=3))
 
@@ -686,17 +651,61 @@ def _style_bar(ax):
                    colors=GRID_COLOR)
 
 
-def _annotate_svg(svg):
-    """Insert the title/description and accessibility attributes."""
-    match = re.search(r"<svg[^>]*>", svg)
-    if not match:
-        raise ValueError("SVG export has no <svg> root element")
-    tag = (match.group(0)[:-1]
-           + ' role="img" aria-labelledby="figure-title '
-             'figure-description">')
-    title = ('<title id="figure-title">Zebra escape response</title>'
-             '<desc id="figure-description">' + CAPTION + "</desc>")
-    return svg[:match.start()] + tag + title + svg[match.end():]
+SVG_NS = "http://www.w3.org/2000/svg"
+XLINK = "{http://www.w3.org/1999/xlink}href"
+
+
+def _embed_artwork(svg, ctx):
+    """Place JPEGs directly in SVG page space, shared by all four exports."""
+    from PIL import Image
+
+    ET.register_namespace("", SVG_NS)
+    ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+    ns = "{" + SVG_NS + "}"
+    root = ET.fromstring(svg)
+    root.set("role", "img")
+    root.set("aria-labelledby", "figure-title figure-description")
+    for tag, name, value in (("title", "figure-title", "Zebra escape response"),
+                             ("desc", "figure-description", CAPTION)):
+        el = ET.Element(ns + tag, id=name)
+        el.text = value
+        root.insert(0, el)
+
+    def jpeg(parent, path, **geometry):
+        el = ET.SubElement(parent, ns + "image", geometry)
+        el.set("preserveAspectRatio", "none")
+        el.set(XLINK, "data:image/jpeg;base64," +
+               base64.b64encode(path.read_bytes()).decode("ascii"))
+
+    # Keep the map renderer's georeferencing and clip. Its backdrop is
+    # white, including any no-data pixels in the RGBA mosaic.
+    mosaic = root.find(f".//{ns}image")
+    raster = Image.open(io.BytesIO(base64.b64decode(mosaic.get(XLINK).split(",")[1])))
+    rgba = raster.convert("RGBA")
+    rgb = Image.new("RGB", rgba.size, "white")
+    rgb.paste(rgba, mask=rgba.getchannel("A"))
+    buf = io.BytesIO()
+    rgb.save(buf, "JPEG", quality=92, subsampling=0)
+    mosaic.set(XLINK, "data:image/jpeg;base64," +
+               base64.b64encode(buf.getvalue()).decode("ascii"))
+    mosaic.attrib.pop("style", None)
+
+    x0, y0, x1, y1 = PHOTO_RECT
+    jpeg(root.find(".//*[@id='page-background']"), ctx["photo"],
+         x=str(x0), y=str(y0), width=str(x1 - x0), height=str(y1 - y0))
+    defs = root.find(ns + "defs")
+    for key, spec in (("pre", INSET_PRE), ("post", INSET_POST)):
+        cx, cy = spec["center"]
+        side = spec["side"]
+        clip_id = f"crop-{key}"
+        clip = ET.SubElement(defs, ns + "clipPath", id=clip_id)
+        ET.SubElement(clip, ns + "circle", cx=str(cx), cy=str(cy), r=str(spec["r"]))
+        group = ET.Element(ns + "g", {"clip-path": f"url(#{clip_id})"})
+        root.find(f".//*[@id='inset-{key}']").insert(0, group)
+        jpeg(group, ctx["inset_assets"][key], x=str(-side / 2), y=str(-side / 2),
+             width=str(side), height=str(side),
+             transform=f"translate({cx} {cy}) rotate({spec['rotation']})")
+    return ET.tostring(root, encoding="unicode") + "\n"
 
 
 def draw_figure(ctx, *, family="Arial"):
@@ -715,7 +724,7 @@ def draw_figure(ctx, *, family="Arial"):
           "svg.fonttype": "path",
           "svg.hashsalt": "unwrap-zebra-publication-v1"}
     with mpl.rc_context(rc):
-        fig = plt.figure(figsize=(PAGE_W / 72.0, PAGE_H / 72.0), dpi=FIG_DPI)
+        fig = plt.figure(figsize=(PAGE_W / 72.0, PAGE_H / 72.0), dpi=72)
         fig.patch.set_facecolor("white")
 
         def page_axes(zorder):
@@ -728,6 +737,7 @@ def draw_figure(ctx, *, family="Arial"):
 
         # -- layer 0: page backing ----------------------------------------
         base = page_axes(0)
+        base.set_gid("page-background")
         base.add_patch(Rectangle((0, 0), PAGE_W, PAGE_H,
                                  facecolor="white", edgecolor="none",
                                  zorder=1))
@@ -736,12 +746,6 @@ def draw_figure(ctx, *, family="Arial"):
             base.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0,
                                      facecolor="white", edgecolor="none",
                                      zorder=2))
-
-        # -- panel b: the species photograph -------------------------------
-        photo_ax = fig.add_axes(_figure_rect(PHOTO_RECT), zorder=3)
-        photo_ax.imshow(plt.imread(str(ctx["photo"])), aspect="auto",
-                        interpolation="lanczos")
-        photo_ax.axis("off")
 
         # -- panel a: the escape map ----------------------------------------
         map_ax = fig.add_axes(_figure_rect(MAP_RECT), aspect="equal",
@@ -752,6 +756,7 @@ def draw_figure(ctx, *, family="Arial"):
             arrow_mode="distance", arrows_every_m=5.0, arrow_length=12.0,
             other_stride=3, focal_stride=2, frame_max=FRAME_MAX,
             decimate_m=MAP_VERTEX_SPACING_M)
+        map_ax.images[0].set_interpolation("none")
         plots._finish_escape_map(
             map_ax, ctx["extent"], PANEL_XLIM, PANEL_YLIM, None,
             "black", FOCAL_LW, "white", pre, post,
@@ -851,8 +856,8 @@ def draw_figure(ctx, *, family="Arial"):
         fig.canvas.draw()
         for key in ("pre", "post"):
             spec = INSET_PRE if key == "pre" else INSET_POST
-            _draw_inset(map_ax, overlay, fig, spec,
-                        ctx["inset_assets"][key], ctx["anchors"][key],
+            _draw_inset(map_ax, overlay, fig, key, spec,
+                        ctx["anchors"][key],
                         pre if key == "pre" else post)
 
         for (x, y, w, h), col in zip(SCALE_RECTS, SCALE_RECT_COLORS):
@@ -919,31 +924,12 @@ def draw_figure(ctx, *, family="Arial"):
                               "Creator":
                                   "unwrap zebra_publication_figure.py"})
         plt.close(fig)
-    return _annotate_svg(buffer.getvalue())
+    return _embed_artwork(buffer.getvalue(), ctx)
 
 
 # ---------------------------------------------------------------------------
 # PDF export helpers
 # ---------------------------------------------------------------------------
-def _pdf_image_inventory(page):
-    inventory = []
-    for row in page.get_images(full=True):
-        for rect in page.get_image_rects(row[0]):
-            inventory.append({
-                "xref": row[0], "width": row[2], "height": row[3],
-                "bbox": [round(v, 2) for v in (rect.x0, rect.y0,
-                                               rect.x1, rect.y1)]})
-    return inventory
-
-
-def _center(rect):
-    return ((rect[0] + rect[2]) / 2.0, (rect[1] + rect[3]) / 2.0)
-
-
-def _near(point, other, tol):
-    return abs(point[0] - other[0]) <= tol and abs(point[1] - other[1]) <= tol
-
-
 _PDF_ID_RE = re.compile(rb"/ID\[<([0-9A-Fa-f]{32})>"
                         rb"<([0-9A-Fa-f]{32})>\]")
 
@@ -970,76 +956,47 @@ def _stabilize_pdf_id(data):
     return out
 
 
-def restore_pdf_source_images(pdf_path, sources):
-    """Replace the re-encoded raster xobjects with the original image objects.
+def restore_pdf_source_images(pdf_path, svg):
+    """Restore each SVG JPEG only to a PDF image with identical decoded pixels.
 
-    Matplotlib's SVG backend resamples every embedded image to display
-    resolution, and cairosvg re-encodes it flate-compressed on the way to
-    the PDF, so the source JPEGs lose their DCT streams (and the photo and
-    inset crops lose resolution beyond the display sampling). For each
-    ``(asset, page_rect)`` source this embeds the original image on a
-    scratch page (``insert_image`` keeps the DCT stream, ICC profile and
-    pixel data), drags it into the exported document, and copies it over
-    the matching export raster -- matched by placement centre, so no
-    placement, crop or drawing command changes. The scratch page is
-    deleted and the image placements verified to be byte-for-byte
-    unmoved; cairo's wall-clock CreationDate is cleared and the
-    write-time-derived trailer /ID pinned to a content hash before the
-    file is rewritten, so re-renders are byte-identical.
+    CairoSVG stores decoded RGB pixels in the PDF. Matching those pixels
+    before copying the JPEG stream preserves every placement and clip,
+    including rotated crops and the orientation of the mosaic.
     """
-    import fitz
+    import pymupdf as fitz
+    from PIL import Image
 
-    pdf_path = Path(pdf_path)
-    document = fitz.open(pdf_path)
-    page = document[0]
-    export = _pdf_image_inventory(page)
+    with fitz.open(pdf_path) as doc:
+        page = doc[0]
+        rasters = {}
+        for row in page.get_images(full=True):
+            pix = fitz.Pixmap(doc, row[0])
+            key = (pix.width, pix.height, hashlib.sha256(pix.samples).digest())
+            rasters.setdefault(key, set()).add(row[0])
 
-    scratch = fitz.open()
-    scratch_page = scratch.new_page(width=PAGE_W, height=PAGE_H)
-    for asset, rect in sources:
-        scratch_page.insert_image(fitz.Rect(*rect), filename=str(asset),
-                                  keep_proportion=False)
-    scratch_index = len(document)
-    document.insert_pdf(scratch, from_page=0, to_page=0)
-    scratch.close()
-    scratch_images = _pdf_image_inventory(document[scratch_index])
-
-    for asset, rect in sources:
-        want = _center(rect)
-        srcs = [i for i in scratch_images if _near(_center(i["bbox"]), want, 1.0)]
-        dsts = [i for i in export if _near(_center(i["bbox"]), want, 5.0)]
-        if len(srcs) != 1:
-            raise ValueError(
-                f"Expected one scratch image for {Path(asset).name} at "
-                f"{rect}, found {len(srcs)}")
-        if len(dsts) != 1:
-            raise ValueError(
-                f"Expected exactly one exported raster near {rect} for "
-                f"{Path(asset).name}, found {len(dsts)}")
-        document.xref_copy(srcs[0]["xref"], dsts[0]["xref"])
-
-    document.delete_page(scratch_index)
-    # delete_page invalidates the held Page object; re-fetch from the doc
-    page = document[0]
-    if [i["bbox"] for i in _pdf_image_inventory(page)] != \
-            [i["bbox"] for i in export]:
-        raise ValueError("Image placement changed during source-image restore")
-    # cairo's PDF surface stamps a wall-clock CreationDate; drop it so
-    # re-renders are byte-identical
-    meta = dict(document.metadata)
-    meta.update(creationDate="", modDate="")
-    document.set_metadata(meta)
-    data = document.tobytes(garbage=4, deflate=True)
-    document.close()
+        scratch = doc.new_page()
+        used = set()
+        for el in ET.fromstring(svg).iter("{" + SVG_NS + "}image"):
+            mime, encoded = el.get(XLINK).split(",", 1)
+            if mime != "data:image/jpeg;base64":
+                raise ValueError("Expected an embedded JPEG in the zebra figure")
+            data = base64.b64decode(encoded)
+            with Image.open(io.BytesIO(data)) as im:
+                key = (*im.size, hashlib.sha256(im.convert("RGB").tobytes()).digest())
+            targets = rasters.get(key)
+            if not targets:
+                raise ValueError("No PDF raster matches the decoded SVG JPEG")
+            src = scratch.insert_image(fitz.Rect(0, 0, 1, 1), stream=data)
+            for dst in targets:
+                doc.xref_copy(src, dst)
+                doc.xref_set_key(dst, "Interpolate", "true")
+            used.update(targets)
+        if used != {xref for targets in rasters.values() for xref in targets}:
+            raise ValueError("PDF contains an unexpected raster")
+        doc.delete_page(-1)
+        doc.set_metadata(dict(doc.metadata, creationDate="", modDate=""))
+        data = doc.tobytes(garbage=4, deflate=True)
     pdf_path.write_bytes(_stabilize_pdf_id(data))
-
-
-def _pdf_source_images(ctx):
-    return [
-        (ctx["photo"], PHOTO_RECT),
-        (ctx["inset_assets"]["pre"], _inset_rect(INSET_PRE)),
-        (ctx["inset_assets"]["post"], _inset_rect(INSET_POST)),
-    ]
 
 
 def _html_page(svg):
@@ -1058,7 +1015,7 @@ def write_outputs(output_dir, ctx, svg, metadata, *, family):
     pdf, png, html, json}`` next to it).
     """
     import cairosvg
-    import fitz
+    import pymupdf as fitz
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1066,10 +1023,9 @@ def write_outputs(output_dir, ctx, svg, metadata, *, family):
     stem.with_suffix(".svg").write_text(svg)
     cairosvg.svg2pdf(bytestring=svg.encode(),
                      write_to=str(stem.with_suffix(".pdf")))
-    restore_pdf_source_images(stem.with_suffix(".pdf"),
-                              _pdf_source_images(ctx))
+    restore_pdf_source_images(stem.with_suffix(".pdf"), svg)
     with fitz.open(stem.with_suffix(".pdf")) as document:
-        document[0].get_pixmap(matrix=fitz.Matrix(4, 4)).save(
+        document[0].get_pixmap(matrix=fitz.Matrix(PREVIEW_SCALE, PREVIEW_SCALE)).save(
             str(stem.with_suffix(".png")))
     stem.with_suffix(".html").write_text(_html_page(svg))
     metadata["outputs_sha256"] = {s: sha256(stem.with_suffix(s))
@@ -1099,7 +1055,7 @@ def main(argv=None):
 
     fonts = resolve_fonts(args.font_dir, args.font_family)
     root = prepare_inputs(args.data_root, download=args.download)
-    check_assets()
+    artwork = check_assets()
     ctx = build_context(root)
 
     # the notebook's convergence gate on the cached fit (same read as
@@ -1153,6 +1109,8 @@ def main(argv=None):
                        "mosaic_max_side_px": MOSAIC_MAX_SIDE_PX,
                        "mosaic_embed_side_px": MOSAIC_EMBED_SIDE,
                        "trajectory_vertex_spacing_m": MAP_VERTEX_SPACING_M},
+        "artwork": artwork,
+        "inset_layout": {"pre": INSET_PRE, "post": INSET_POST},
         "inset_anchors": ctx["anchors"],
         "inset_anchor_note": (
             "Anchor frames back-solved from the published callout cone "
@@ -1160,18 +1118,15 @@ def main(argv=None):
             "paper's pre-cone, frame 80780 ~5 m from the post-cone apex "
             "at the path bend. The paper's hand-drawn cone lines deviate "
             "2.5-4 degrees from the exact tangents from the anchor "
-            "positions; the generator draws the exact tangents. Inset "
-            "heading arrows are the circular-mean compass bearing over "
-            "the +/- 0.5 s window centred on the anchor frame; the "
-            "paper's hand-drawn arrows differ by up to ~20 degrees, and "
-            "the code draws the data values."),
+            "positions. Measured compass bearings are recorded in inset_anchors. "
+            "The two inset arrows follow the animals in the rotated photographs "
+            "as drawn in the reference."),
         "scare_frame_note": SCARE_FRAME_NOTE,
         "summary_numbers": {k: v for k, v in numbers.items()
                             if k != "stats"},
         "caption": CAPTION,
     }
-    stem = write_outputs(args.output_dir, ctx, svg, metadata,
-                         family=args.font_family)
+    stem = write_outputs(args.output_dir, ctx, svg, metadata, family=args.font_family)
     print(f"Wrote SVG, PDF, PNG, HTML and provenance JSON: {stem}")
 
 
