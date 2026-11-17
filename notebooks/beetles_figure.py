@@ -234,10 +234,10 @@ def rolling_beetle(original, prefix, index, position, radial, size):
              anchor=(221.41477, 115.67518), head=(199.5, 102), flip=(1, 1), lift=1,
              hips=((203.35827, 104.24067), (213.2612, 101.5208))),
         dict(ball=25, body=(26, 32, 33), ground=(27, 28, 29),
-             anchor=(151.07448, 22.453), head=(150, 36), flip=(1, -1), lift=5,
+             anchor=(151.07448, 22.453), head=(150, 36), flip=(1, -1), lift=8,
              hips=((145.1332, 30.884533), (156.314, 31.298667))),
         dict(ball=34, body=(35, 41, 42), ground=(37, 38, 39),
-             anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1), lift=8,
+             anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1), lift=12,
              hips=((82.757467, 40.500533), (91.170133, 38.514533))),
         dict(ball=5, body=(8, 7, 6), ground=(9, 10, 11),
              anchor=(239.24303, 38.07613), head=(210.5, 40.5), flip=(-1, 1), lift=0,
@@ -277,7 +277,7 @@ def rolling_beetle(original, prefix, index, position, radial, size):
                       d=f"M {points[0]} L {points[1]} L {points[2]} L {points[3]}",
                       style=f"fill:none;stroke:#3b493e;stroke-width:{1.1 * size:.8g};"
                             "stroke-linecap:round;stroke-linejoin:round")
-    return beetle
+    return beetle, linear @ np.array(pose["head"]) + body_shift
 
 
 def arena_vector(condition):
@@ -307,9 +307,10 @@ def arena_vector(condition):
         direction = radial / np.linalg.norm(radial)
         depth = (rim[1] - ARENA_CENTRE[1]) / ARENA_RADII[1]
         size = 0.94 + 0.08 * depth
+        beetle, trail_end = rolling_beetle(original, prefix, index, rim, radial, size)
         # Two gentle cubic curves reach the back of each beetle. Monotone
         # progress along the exit ray avoids loops when the path is short.
-        target = radial - 26 * size * direction
+        target = trail_end - ARENA_CENTRE
         normal = np.array([-direction[1], direction[0]])
         bend = 3.2 if index % 2 == 0 else -3.2
         points = [ARENA_CENTRE + fraction * target + offset * normal
@@ -319,7 +320,6 @@ def arena_vector(condition):
         path = deepcopy(original[f"{prefix}-{path_id}"])
         path.set("d", f"M {coordinates[0]} C {' '.join(coordinates[1:4])} C {' '.join(coordinates[4:])}")
         root.append(path)
-        beetle = rolling_beetle(original, prefix, index, rim, radial, size)
         beetles.append((rim[1], beetle))
     for _, beetle in sorted(beetles, key=lambda item: item[0]):
         root.append(beetle)
