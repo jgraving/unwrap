@@ -55,6 +55,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
+from matplotlib.lines import Line2D
 from matplotlib.patches import (ArrowStyle, Circle, FancyArrowPatch,
                                 FancyBboxPatch, Rectangle)
 import numpy as np
@@ -610,7 +611,8 @@ def _tangent_endpoints(apex, center, radius):
     return ends
 
 
-def _draw_inset(map_ax, overlay, fig, key, spec, anchor, color):
+def _draw_inset(map_ax, overlay, fig, key, spec, anchor, color, *,
+                cone_lw, ring_lw):
     """One circular callout: tangent cone on the map, inset image, ring,
     and body-heading arrow on the overlay plane."""
     cx, cy = spec["center"]
@@ -628,11 +630,11 @@ def _draw_inset(map_ax, overlay, fig, key, spec, anchor, color):
     radius_data = float(page_to_data(cx + r, cy)[0] - center_data[0])
     for end in _tangent_endpoints(apex, center_data, radius_data):
         map_ax.plot([apex[0], end[0]], [apex[1], end[1]], color=color,
-                    lw=CONE_LW, solid_capstyle="butt", zorder=6)
+                    lw=cone_lw, solid_capstyle="butt", zorder=6)
 
     # The JPEG will be drawn beneath this ring, in page coordinates.
     overlay.add_patch(Circle((cx, cy), r, facecolor="none", edgecolor=color,
-                             lw=RING_LW, zorder=2, gid=f"inset-{key}"))
+                             lw=ring_lw, zorder=2, gid=f"inset-{key}"))
     overlay.add_patch(FancyArrowPatch(
         *spec["arrow"], arrowstyle=ArrowStyle.Simple(
             head_length=18.0, head_width=20.0, tail_width=5.0),
@@ -640,7 +642,7 @@ def _draw_inset(map_ax, overlay, fig, key, spec, anchor, color):
         facecolor=color, edgecolor="none", zorder=3))
 
 
-def _style_polar(ax):
+def _style_polar(ax, *, grid_color, grid_lw):
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
     ax.set_rlim(0, POLAR_RMAX)
@@ -648,20 +650,20 @@ def _style_polar(ax):
     ax.set_xticks(np.deg2rad(np.arange(0.0, 360.0, 45.0)))
     ax.set_xticklabels([""] * 8)          # spokes only; labels are manual
     ax.set_yticklabels([])                # radial labels are manual
-    ax.grid(True, color=POLAR_GRID_COLOR, linewidth=POLAR_GRID_LW)
+    ax.grid(True, color=grid_color, linewidth=grid_lw)
     ax.spines["polar"].set_visible(False)   # no edge circle, as published
     ax.tick_params(axis="x", which="major", length=0, pad=0)
     ax.tick_params(axis="y", which="major", length=0, pad=0)
 
 
-def _style_bar(ax):
+def _style_bar(ax, *, tick_color, tick_lw):
     ax.set_facecolor("white")
     for side, spine in ax.spines.items():
         spine.set_visible(side in ("left", "bottom"))
-        spine.set_linewidth(TICK_LW)
-        spine.set_color(GRID_COLOR)
-    ax.tick_params(axis="both", which="major", length=5, width=TICK_LW,
-                   colors=GRID_COLOR)
+        spine.set_linewidth(tick_lw)
+        spine.set_color(tick_color)
+    ax.tick_params(axis="both", which="major", length=5, width=tick_lw,
+                   colors=tick_color)
 
 
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -739,6 +741,11 @@ def draw_figure(ctx, *, family="Arial", style="published"):
         raise ValueError(f"Unknown zebra figure style: {style!r}")
     companion = style == "companion"
     sizes = COMPANION_FS if companion else FS
+    polar_grid = ({"grid_color": "0.81", "grid_lw": 0.85} if companion
+                  else {"grid_color": POLAR_GRID_COLOR, "grid_lw": POLAR_GRID_LW})
+    bar_axes = ({"tick_color": "0.22", "tick_lw": 1.0} if companion
+                else {"tick_color": GRID_COLOR, "tick_lw": TICK_LW})
+    interval_lw = 1.6 if companion else LW_HDI
     numbers = ctx["numbers"]
     prep = numbers["stats"]
     nT = int(prep["nT"])
@@ -792,9 +799,11 @@ def draw_figure(ctx, *, family="Arial", style="published"):
         plots._finish_escape_map(
             map_ax, ctx["extent"], PANEL_XLIM, PANEL_YLIM, None,
             "black", FOCAL_LW, "white", pre, post,
-            tight_layout=False, legend_loc="center",
-            legend_anchor=MAP_LEGEND_ANCHOR, fancybox=True,
-            legend_arrow_size=8 * MAP_ARROW_SCALE,
+            tight_layout=False,
+            legend_loc="center left" if companion else "center",
+            legend_anchor=(0.025, 0.5) if companion else MAP_LEGEND_ANCHOR,
+            fancybox=not companion, legend_ncols=2 if companion else 1,
+            legend_arrow_size=9 if companion else 8 * MAP_ARROW_SCALE,
             legend_arrow_edge_width=MAP_ARROW_SCALE,
             framealpha=0.85, scale_bar=False, compass=False)
 
@@ -803,9 +812,10 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             (POLAR_C[0] - POLAR_R_EDGE_PT, POLAR_C[1] - POLAR_R_EDGE_PT,
              POLAR_C[0] + POLAR_R_EDGE_PT, POLAR_C[1] + POLAR_R_EDGE_PT)),
             projection="polar", zorder=5)
-        _style_polar(ax_c)
-        ax_c.plot(theta, prep["r_group_pre"], color=pre, lw=LW_GROUP_LOOP)
-        ax_c.plot(theta, prep["r_group_post"], color=post, lw=LW_GROUP_LOOP)
+        _style_polar(ax_c, **polar_grid)
+        group_lw = 3.0 if companion else LW_GROUP_LOOP
+        ax_c.plot(theta, prep["r_group_pre"], color=pre, lw=group_lw)
+        ax_c.plot(theta, prep["r_group_post"], color=post, lw=group_lw)
         ax_c.scatter([prep["mu_group_pre_mean"]], [R_DOT],
                      s=MS_GROUP_PRE ** 2, facecolor=pre, edgecolor="none",
                      marker=plots.PRE_MARK, zorder=5)
@@ -815,7 +825,7 @@ def draw_figure(ctx, *, family="Arial", style="published"):
 
         # -- panel d: group-level alignment ---------------------------------
         ax_d = fig.add_axes(_figure_rect(BAR_D), zorder=5)
-        _style_bar(ax_d)
+        _style_bar(ax_d, **bar_axes)
         ax_d.set_xlim(-0.5, 1.5)
         ax_d.set_ylim(0.0, 1.0)
         ax_d.set_xticks([0.0, 1.0])
@@ -823,9 +833,9 @@ def draw_figure(ctx, *, family="Arial", style="published"):
         ax_d.set_yticks([0.0, 0.5, 1.0])
         ax_d.set_ylabel("Mean resultant length", labelpad=10, fontsize=sizes["axis"])
         ax_d.vlines(0.0, prep["R_group_pre_lo"], prep["R_group_pre_hi"],
-                    color=pre, lw=LW_HDI, alpha=0.95, zorder=2)
+                    color=pre, lw=interval_lw, alpha=0.95, zorder=2)
         ax_d.vlines(1.0, prep["R_group_post_lo"], prep["R_group_post_hi"],
-                    color=post, lw=LW_HDI, alpha=0.95, zorder=2)
+                    color=post, lw=interval_lw, alpha=0.95, zorder=2)
         ax_d.scatter([0.0], [prep["R_group_pre_mean"]], s=MS_GROUP_PRE ** 2,
                      facecolor=pre, edgecolor="none", marker=plots.PRE_MARK,
                      zorder=3)
@@ -838,7 +848,7 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             (POLAR_E[0] - POLAR_R_EDGE_PT, POLAR_E[1] - POLAR_R_EDGE_PT,
              POLAR_E[0] + POLAR_R_EDGE_PT, POLAR_E[1] + POLAR_R_EDGE_PT)),
             projection="polar", zorder=5)
-        _style_polar(ax_e)
+        _style_polar(ax_e, **polar_grid)
         for j in range(nT):
             ax_e.plot(theta, prep["r_ind_pre"][j], color=pre, lw=LW_IND_LOOP,
                       alpha=IND_LOOP_ALPHA)
@@ -856,7 +866,7 @@ def draw_figure(ctx, *, family="Arial", style="published"):
 
         # -- panel f: individual-level concentration -------------------------
         ax_f = fig.add_axes(_figure_rect(BAR_F), zorder=5)
-        _style_bar(ax_f)
+        _style_bar(ax_f, **bar_axes)
         ax_f.set_xlim(-0.5, 1.5)
         ax_f.set_ylim(0.0, 1.0)
         ax_f.set_xticks([0.0, 1.0])
@@ -869,16 +879,17 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             ax_f.plot([delta[j], 1.0 + delta[j]],
                       [prep["R_ind_pre_mean"][j],
                        prep["R_ind_post_mean"][j]],
-                      color="black", lw=LW_PAIRED, zorder=0)
+                      color="0.60" if companion else "black",
+                      lw=0.8 if companion else LW_PAIRED, zorder=0)
         for j in range(nT):
             lo, hi = prep["R_ind_pre_hdi"][j]
-            ax_f.vlines(delta[j], lo, hi, color=pre, lw=LW_HDI, zorder=1)
+            ax_f.vlines(delta[j], lo, hi, color=pre, lw=interval_lw, zorder=1)
             ax_f.scatter([delta[j]], [prep["R_ind_pre_mean"][j]],
                          s=MS_CONC_PRE ** 2, facecolor=pre, edgecolor="none",
                          marker=plots.PRE_MARK, zorder=2)
         for j in range(nT):
             lo, hi = prep["R_ind_post_hdi"][j]
-            ax_f.vlines(1.0 + delta[j], lo, hi, color=post, lw=LW_HDI,
+            ax_f.vlines(1.0 + delta[j], lo, hi, color=post, lw=interval_lw,
                         zorder=1)
             ax_f.scatter([1.0 + delta[j]], [prep["R_ind_post_mean"][j]],
                          s=MS_CONC_POST ** 2, facecolor=post, edgecolor="none",
@@ -892,7 +903,9 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             spec = INSET_PRE if key == "pre" else INSET_POST
             _draw_inset(map_ax, overlay, fig, key, spec,
                         ctx["anchors"][key],
-                        pre if key == "pre" else post)
+                        pre if key == "pre" else post,
+                        cone_lw=1.75 if companion else CONE_LW,
+                        ring_lw=3.0 if companion else RING_LW)
 
         for (x, y, w, h), col in zip(SCALE_RECTS, SCALE_RECT_COLORS):
             overlay.add_patch(Rectangle((x, y), w, h, facecolor=col,
@@ -912,26 +925,37 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             facecolor="black", edgecolor="black", linewidth=MAP_ARROW_SCALE,
             joinstyle="miter", zorder=8))
 
-        bx0, by0, bx1, by1 = LEGEND_BOX
-        overlay.add_patch(FancyBboxPatch(
-            (bx0, by0), bx1 - bx0, by1 - by0,
-            boxstyle="round,pad=0,rounding_size=6.0", mutation_aspect=1.0,
-            facecolor="white", edgecolor=LEGEND_EDGE, linewidth=2.5,
-            zorder=8))
-        for (x0, ya, x1, yb), col in zip((LEGEND_PRE_LINE,
-                                          LEGEND_POST_LINE), (pre, post)):
-            overlay.plot([x0, x1], [ya, yb], color=col, lw=4.0,
-                         solid_capstyle="butt", zorder=9)
-        x, y, w, h = LEGEND_PRE_MARK
-        overlay.add_patch(Rectangle((x, y), w, h, facecolor=pre,
-                                    edgecolor="none", zorder=9))
-        x, y, d, _ = LEGEND_POST_MARK
-        overlay.add_patch(Circle((x + d / 2, y + d / 2), d / 2,
-                                 facecolor=post, edgecolor="none", zorder=9))
-        for text, tx, ty in LEGEND_TEXTS:
-            overlay.text(tx, ty, text, ha="center", va="center",
-                         fontsize=sizes["bottom_legend"], color="black",
-                         zorder=9)
+        if companion:
+            handles = [
+                Line2D([], [], color=col, lw=2.7, marker=marker,
+                       markersize=7, markeredgewidth=0, label=label)
+                for col, marker, label in (
+                    (pre, plots.PRE_MARK, "Pre"), (post, plots.POST_MARK, "Post"))
+            ]
+            overlay.legend(handles=handles, loc="center",
+                           bbox_to_anchor=(0.71, 0.022), ncols=2,
+                           frameon=False, fontsize=sizes["bottom_legend"])
+        else:
+            bx0, by0, bx1, by1 = LEGEND_BOX
+            overlay.add_patch(FancyBboxPatch(
+                (bx0, by0), bx1 - bx0, by1 - by0,
+                boxstyle="round,pad=0,rounding_size=6.0", mutation_aspect=1.0,
+                facecolor="white", edgecolor=LEGEND_EDGE, linewidth=2.5,
+                zorder=8))
+            for (x0, ya, x1, yb), col in zip((LEGEND_PRE_LINE,
+                                              LEGEND_POST_LINE), (pre, post)):
+                overlay.plot([x0, x1], [ya, yb], color=col, lw=4.0,
+                             solid_capstyle="butt", zorder=9)
+            x, y, w, h = LEGEND_PRE_MARK
+            overlay.add_patch(Rectangle((x, y), w, h, facecolor=pre,
+                                        edgecolor="none", zorder=9))
+            x, y, d, _ = LEGEND_POST_MARK
+            overlay.add_patch(Circle((x + d / 2, y + d / 2), d / 2,
+                                     facecolor=post, edgecolor="none", zorder=9))
+            for text, tx, ty in LEGEND_TEXTS:
+                overlay.text(tx, ty, text, ha="center", va="center",
+                             fontsize=sizes["bottom_legend"], color="black",
+                             zorder=9)
 
         for index, (text, tx, ty) in enumerate(TITLES):
             if companion:
@@ -944,6 +968,8 @@ def draw_figure(ctx, *, family="Arial", style="published"):
         for character, lx, ly, color in LETTERS:
             if companion and character in "cdef":
                 ly = 380.0 if character in "cd" else 736.0
+                if character in "df":
+                    lx = 649.1
             overlay.text(lx, ly, character + ".", ha="left", va="center",
                          fontsize=sizes["letter"], weight="bold", color=color,
                          zorder=9)

@@ -960,14 +960,15 @@ def _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
                        legend_anchor=(0.02, 0.5), fancybox=False,
                        framealpha=0.9, scale_bar=True, compass=True,
                        legend_loc="center left", legend_arrow_size=8,
-                       legend_arrow_edge_width=None):
+                       legend_arrow_edge_width=None, legend_ncols=1):
     """Equal aspect, panel limits, legend, scale bar and compass.
 
     ``tight_layout`` runs ``plt.tight_layout()`` on the current figure at
     the end (keep it on for the standalone panel; turn it off when the
     map is one panel of a composite figure). ``legend_anchor`` /
     ``fancybox`` / ``framealpha`` tune the legend box (the defaults are
-    the standalone panel's); ``scale_bar`` and ``compass`` turn the house
+    the standalone panel's). ``legend_ncols`` sets the number of columns.
+    ``scale_bar`` and ``compass`` turn the house
     scale bar and north arrow on and off (composite figures may draw
     their own).
     """
@@ -990,7 +991,7 @@ def _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
     ]
     ax.legend(handles=handles, loc=legend_loc, bbox_to_anchor=legend_anchor,
               frameon=True, framealpha=framealpha, facecolor="lightgrey",
-              fancybox=fancybox)
+              fancybox=fancybox, ncols=legend_ncols)
 
     for spine in ax.spines.values():
         spine.set_visible(False)

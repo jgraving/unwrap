@@ -73,6 +73,23 @@ The outputs default to `assets/zebra-publication/` (committed for review):
 | `zebra_publication.html` | Self-contained page with the caption |
 | `zebra_publication.json` | Provenance: data/code revisions, hashes, fonts, packages, fit diagnostics, layout constants, and every summary number below |
 
+### Companion styling
+
+Use `--style companion` for the typography and lighter plotting guides
+used across the locust and beetle figures:
+
+```bash
+python notebooks/zebra_publication_figure.py --style companion --font-dir /path/to/arial-fonts
+```
+
+The companion style uses smaller panel letters, bold row-aligned
+headings, a frameless Pre/Post key, and a two-column map key. The polar
+grid, pairing lines, and map callouts use lighter strokes. Both styles
+use the same layout geometry, artwork, data, and cached summaries. The
+JSON records the style. By default the companion files are written to
+`assets/zebra-companion/`, and `--style published` remains the default
+for reproducing the reference composite.
+
 ## Fit and data
 
 - Fit: hierarchical von Mises GLM on the 5,417 block-averaged headings

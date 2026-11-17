@@ -239,11 +239,12 @@ def test_paired_turn_is_circular(idata, df_blocks):
 # ---------------------------------------------------------------------------
 # Vector export (synthetic context, DejaVu Sans)
 # ---------------------------------------------------------------------------
+@pytest.mark.parametrize("style", ["published", "companion"])
 def test_vector_export_deterministic_and_text_free(tmp_path, idata,
-                                                   df_blocks):
+                                                   df_blocks, style):
     ctx = make_context(tmp_path, idata, df_blocks)
-    svg = figure.draw_figure(ctx, family="DejaVu Sans")
-    assert svg == figure.draw_figure(ctx, family="DejaVu Sans")
+    svg = figure.draw_figure(ctx, family="DejaVu Sans", style=style)
+    assert svg == figure.draw_figure(ctx, family="DejaVu Sans", style=style)
     root = ET.fromstring(svg)
     # mosaic, photo and the two inset crops: four raster embeds, all text
     # outlined to paths
