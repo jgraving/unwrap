@@ -176,7 +176,7 @@ def panel_heading(fig, x, y, letter, title, title_x, *, align="center"):
 
 
 def draw_polar(fig, arrays, df):
-    ax = fig.add_axes([0.61, 0.54, 0.32, 0.375], projection="polar")
+    ax = fig.add_axes([0.66, 0.54, 0.32, 0.375], projection="polar")
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
     ax.set_axis_off()
@@ -260,26 +260,33 @@ def build_svg(arrays, df, *, family="Arial"):
         fig = plt.figure(figsize=(7.2, 4.8), dpi=160)
         panel_heading(fig, 0.025, 0.973, "a", "Repeated exit bearings",
                       0.27)
-        panel_heading(fig, 0.545, 0.973, "b", "Reorientation", 0.77)
-        fig.text(0.77, 0.938, "Population-level mean", ha="center", va="top",
-                 fontsize=8, color=INK)
+        panel_heading(fig, 0.545, 0.973, "b", "Reorientation", 0.82)
         fig.text(0.402, 0.832, "Exit\nbearing", ha="center", fontsize=8.5, color=INK, linespacing=1.2)
         lamp_xy = draw_polar(fig, arrays, df)
         fig.text(lamp_xy[0], lamp_xy[1] - 0.052, "Floodlight", ha="center",
                  va="top", fontsize=8.5, color=INK)
-        handles = [Line2D([], [], color=c, lw=1.7, marker="o", ms=4, label=t)
+        handles = [Line2D([], [], color=c, lw=1.7, label=t)
                    for c, t in ((OFF, "Light off"), (ON, "Light on"))]
-        fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.77, 0.902),
+        fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.82, 0.918),
                    ncol=2, frameon=False, fontsize=8, handlelength=1.6, columnspacing=1.7)
+        levels = [
+            Line2D([], [], color=INK, lw=1.7, label="Population-level\nmean"),
+            Line2D([], [], color=INK, lw=0, marker="o", ms=4,
+                   label="Individual-level\nmeans"),
+        ]
+        fig.legend(handles=levels, loc="upper left", bbox_to_anchor=(0.535, 0.82),
+                   frameon=False, fontsize=8, handlelength=1.6, labelspacing=1.4,
+                   borderaxespad=0, handletextpad=0.8)
         for x, letter, title, ylabel, key in (
             (0.025, "c", "Within-individual", "Mean resultant length", "within"),
             (0.270, "d", "Between-individual", "Mean resultant length", "between"),
             (0.515, "e", "Floodlight attraction", "Exit probability (±45°)", "mass"),
             (0.760, "f", "Treatment effect", "Change in exit\nprobability (±45°)", "difference"),
         ):
-            panel_heading(fig, x, 0.431, letter, title, x + 0.040, align="left")
-            draw_summary(fig, x, arrays[key], ylabel,
-                         difference=(key == "difference"), uniform=(key == "mass"))
+            ax = draw_summary(fig, x, arrays[key], ylabel,
+                              difference=(key == "difference"), uniform=(key == "mass"))
+            box = ax.get_position()
+            panel_heading(fig, x, 0.431, letter, title, box.x0 + box.width / 2)
         buffer = io.StringIO()
         fig.savefig(buffer, format="svg", metadata={"Date": None, "Creator": "unwrap beetles_figure.py"})
         plt.close(fig)
