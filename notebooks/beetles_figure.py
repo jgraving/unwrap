@@ -222,53 +222,37 @@ def svg_matrix(linear, translation):
     return "matrix(" + " ".join(f"{v:.9g}" for v in values) + ")"
 
 
-def add_beetle_leg(parent, leg_id, centres, size, *, hind=False):
-    """Draw one complete, tapered leg in the original filled polygon style."""
-    centres = np.asarray(centres)
-    segments = np.diff(centres, axis=0)
-    normals = np.column_stack((-segments[:, 1], segments[:, 0]))
-    normals /= np.linalg.norm(normals, axis=1)[:, None]
-    joints = np.vstack((normals[0], normals[:-1] + normals[1:], normals[-1]))
-    joints /= np.linalg.norm(joints, axis=1)[:, None]
-    half_widths = size * np.array([0.95, 1.15, 0.42, 0.08] if hind else
-                                  [0.6, 0.8, 0.28, 0.06])
-    mitres = np.ones(4)
-    mitres[1:-1] = np.clip(np.sum(joints[1:-1] * normals[:-1], axis=1), 0.5, 1)
-    offsets = joints * (half_widths / mitres)[:, None]
-    outline = np.vstack((centres + offsets, (centres - offsets)[::-1]))
-    points = [" ".join(f"{value:.8g}" for value in point) for point in outline]
-    ET.SubElement(parent, f"{{{SVG}}}path", id=leg_id,
-                  d="M " + " L ".join(points) + " Z",
-                  attrib={"data-leg-kind": "hind" if hind else "walking"},
-                  style=f"fill:#575756;stroke:#3b493e;stroke-width:{0.548 * size:.8g};"
-                        "stroke-linecap:butt;stroke-linejoin:miter")
-
-
 def rolling_beetle(original, prefix, index, position, radial, size):
-    """Reuse four original views with raised hind legs resting on each ball.
+    """Place four original articulated poses with the abdomen over the ball.
 
-    Keep the camera's upright direction: choose/mirror the closest view and
-    limit its turn to 25 degrees. Rest the abdomen over the upper ball
-    surface. Four walking legs brace on the arena and two hind legs rest
-    on the ball; all six are complete polygons beneath the body outline.
+    Each view keeps its own compact, foreshortened leg artwork. Transform
+    the legs together with their body, so their joints and proportions do
+    not depend on the arena radius or on a synthetic radial skeleton.
     """
     poses = (
-        dict(ball=14, body=(22, 21, 20),
+        dict(ball=14, body=(22, 21, 20), legs=(15, 16, 17, 18, 19),
              anchor=(221.41477, 115.67518), head=(199.5, 102), flip=(1, 1),
-             abdomen=(211.61821, 106.32956), rest=(-7, -8), feet=((1, -10), (7, -5.5)),
-             hips=((203.35827, 104.24067), (213.2612, 101.5208))),
-        dict(ball=25, body=(26, 32, 33),
+             abdomen=(211.61821, 106.32956), rest=(-7, -8),
+             leg_shapes={18: "M 203.35827 104.24067 L 204.8 109.8 L 210.3 114.0"}),
+        dict(ball=25, body=(26, 32, 33), legs=(27, 28, 29, 30, 31),
              anchor=(151.07448, 22.453), head=(150, 36), flip=(1, -1),
-             abdomen=(150.7357, 28.51591), rest=(1, -6.5), feet=((-7, -6), (7, -6)),
-             hips=((145.1332, 30.884533), (156.314, 31.298667))),
-        dict(ball=34, body=(35, 41, 42),
+             abdomen=(150.7357, 28.51591), rest=(1, -8),
+             leg_shapes={
+                 27: "M 152.69067 35.371467 L 157.1 35.6 L 158.2 32.8",
+                 28: "M 147.83747 35.852133 L 143.1 36.1 L 142.4 32.6",
+                 30: "M 145.1332 30.884533 L 141.81987 28.192533 L 143.2 25.8",
+                 31: "M 156.314 31.298667 L 159.834 28.0 L 158.8 25.5"}),
+        dict(ball=34, body=(35, 41, 42), legs=(36, 37, 38, 39, 40),
              anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1),
-             abdomen=(85.29976, 36.01711), rest=(3.5, -5), feet=((-7, -5), (10.5, -5.5)),
-             hips=((82.757467, 40.500533), (91.170133, 38.514533))),
-        dict(ball=5, body=(8, 7, 6),
+             abdomen=(85.29976, 36.01711), rest=(3.5, -7),
+             leg_shapes={
+                 38: "M 80.8 41.8 L 81.0 44.2 L 84.777467 43.808267",
+                 39: "M 89.890933 43.4808 L 93.0 42.5 L 94.0 39.5",
+                 40: "M 91.170133 38.514533 L 95.0 37.0 L 94.8 35.1"}),
+        dict(ball=5, body=(8, 7, 6), legs=(9, 10, 11, 12, 13),
              anchor=(239.24303, 38.07613), head=(210.5, 40.5), flip=(-1, 1),
-             abdomen=(221.47183, 29.21353), rest=(8, -8), feet=((-7, -5), (0, -9.5)),
-             hips=((226.02587, 31.765467), (223.12053, 28.860133))),
+             abdomen=(221.47183, 29.21353), rest=(8, -8),
+             leg_shapes={12: "M 226.02587 31.765467 L 228.7 31.7 L 232.4 31.3"}),
     )
     pose = poses[index]
     mirror = np.diag(pose["flip"])
@@ -288,48 +272,18 @@ def rolling_beetle(original, prefix, index, position, radial, size):
         part = deepcopy(original[f"{prefix}-path{number}"])
         part.set("id", f"{prefix}-beetle-{index}-path{number}")
         part.set("transform", svg_matrix(linear, shift))
+        if number in pose["leg_shapes"]:
+            # Redraw only the distal bend, in the source pose's coordinates.
+            # Keep the original filled-triangle silhouette and stroke weight.
+            part.set("d", pose["leg_shapes"][number])
         beetle.append(part)
 
     add_part(pose["ball"], ball_shift)
-    head = linear @ np.array(pose["head"]) + body_shift
-    abdomen = linear @ np.array(pose["abdomen"]) + body_shift
-    axis = abdomen - head
-    body_direction = axis / np.linalg.norm(axis)
-    body_side = np.array([-body_direction[1], body_direction[0]])
-    outward = radial / np.linalg.norm(radial)
-    ground_side = np.array([-outward[1], outward[0]])
-    if np.dot(body_side, ground_side) < 0:
-        body_side = -body_side
-    # Short fore/middle pairs follow each pose's body axis, with four distinct
-    # feet on the arena rather than hidden behind the ball.
-    for pair, fraction, reach, span in (("fore", 0.2, -3.5, 6), ("middle", 0.5, 3, 8)):
-        root = head + fraction * axis
-        for side in (-1, 1):
-            hip = root + side * size * (1.8 if pair == "fore" else 2.6) * body_side
-            foot = hip + size * (reach * body_direction + side * span * body_side
-                                 + np.array([0, 1 if pair == "fore" else 2]))
-            foot = hip + 1.35 * (foot - hip)
-            if np.linalg.norm(foot - position) < 14 * size:
-                inward = np.dot(foot - position, -outward)
-                foot -= outward * max(0, 14 * size - inward)
-            floor_radius = np.linalg.norm((foot - ARENA_CENTRE) / ARENA_RADII)
-            if floor_radius > 0.97:
-                foot = ARENA_CENTRE + (foot - ARENA_CENTRE) * 0.97 / floor_radius
-            knee = (hip + foot) / 2 + size * (side * 1.8 * body_side - 0.35 * body_direction)
-            terminal = foot - knee
-            toe = foot + 1.5 * size * terminal / np.linalg.norm(terminal)
-            add_beetle_leg(beetle, f"{prefix}-beetle-{index}-{pair}-{side}",
-                           (hip, knee, foot, toe), size)
-    hips = sorted((linear @ np.array(hip) + body_shift for hip in pose["hips"]),
-                  key=lambda point: point[0])
-    for side, hip, foot in zip((-1, 1), hips, pose["feet"]):
-        contact = position + size * np.array(foot)
-        knee = (hip + contact) / 2 + size * np.array([side * 2.8, -3.5])
-        toe = contact + size * np.array([side * 0.7, 1.3])
-        add_beetle_leg(beetle, f"{prefix}-beetle-{index}-hind-{side}",
-                       (hip, knee, contact, toe), size, hind=True)
-    # The abdomen overlaps the ball; the body also hides the leg roots, as
-    # in the original artwork. Foot contacts remain visible on the surface.
+    # Keep the five visible leg silhouettes of each original view. Far-side
+    # limbs are naturally occluded; drawing six separate legs would flatten
+    # the perspective and turn the compact beetle into a radial starburst.
+    for number in pose["legs"]:
+        add_part(number, body_shift)
     for number in pose["body"]:
         add_part(number, body_shift)
     return beetle, linear @ np.array(pose["head"]) + body_shift
