@@ -222,27 +222,50 @@ def svg_matrix(linear, translation):
     return "matrix(" + " ".join(f"{v:.9g}" for v in values) + ")"
 
 
+def add_beetle_leg(parent, leg_id, centres, size, *, hind=False):
+    """Draw one complete, tapered leg in the original filled polygon style."""
+    centres = np.asarray(centres)
+    segments = np.diff(centres, axis=0)
+    normals = np.column_stack((-segments[:, 1], segments[:, 0]))
+    normals /= np.linalg.norm(normals, axis=1)[:, None]
+    joints = np.vstack((normals[0], normals[:-1] + normals[1:], normals[-1]))
+    joints /= np.linalg.norm(joints, axis=1)[:, None]
+    half_widths = size * np.array([0.95, 1.15, 0.42, 0.08] if hind else
+                                  [0.8, 1.0, 0.36, 0.08])
+    mitres = np.ones(4)
+    mitres[1:-1] = np.clip(np.sum(joints[1:-1] * normals[:-1], axis=1), 0.5, 1)
+    offsets = joints * (half_widths / mitres)[:, None]
+    outline = np.vstack((centres + offsets, (centres - offsets)[::-1]))
+    points = [" ".join(f"{value:.8g}" for value in point) for point in outline]
+    ET.SubElement(parent, f"{{{SVG}}}path", id=leg_id,
+                  d="M " + " L ".join(points) + " Z",
+                  attrib={"data-leg-kind": "hind" if hind else "walking"},
+                  style=f"fill:#575756;stroke:#3b493e;stroke-width:{0.548 * size:.8g};"
+                        "stroke-linecap:butt;stroke-linejoin:miter")
+
+
 def rolling_beetle(original, prefix, index, position, radial, size):
     """Reuse four original views with raised hind legs resting on each ball.
 
     Keep the camera's upright direction: choose/mirror the closest view and
     limit its turn to 25 degrees. Rest the abdomen over the upper ball
-    surface, with filled hind legs beneath the body and feet on the ball.
+    surface. Four walking legs brace on the arena and two hind legs rest
+    on the ball; all six are complete polygons beneath the body outline.
     """
     poses = (
-        dict(ball=14, body=(22, 21, 20), ground=(15, 16, 17),
+        dict(ball=14, body=(22, 21, 20),
              anchor=(221.41477, 115.67518), head=(199.5, 102), flip=(1, 1),
              abdomen=(211.61821, 106.32956), rest=(-7, -8), feet=((0, -9.5), (7, -5.5)),
              hips=((203.35827, 104.24067), (213.2612, 101.5208))),
-        dict(ball=25, body=(26, 32, 33), ground=(27, 28, 29),
+        dict(ball=25, body=(26, 32, 33),
              anchor=(151.07448, 22.453), head=(150, 36), flip=(1, -1),
              abdomen=(150.7357, 28.51591), rest=(1, -6.5), feet=((-7, -6), (7, -6)),
              hips=((145.1332, 30.884533), (156.314, 31.298667))),
-        dict(ball=34, body=(35, 41, 42), ground=(37, 38, 39),
+        dict(ball=34, body=(35, 41, 42),
              anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1),
              abdomen=(85.29976, 36.01711), rest=(3.5, -5), feet=((-7, -5), (8, -9)),
              hips=((82.757467, 40.500533), (91.170133, 38.514533))),
-        dict(ball=5, body=(8, 7, 6), ground=(9, 10, 11),
+        dict(ball=5, body=(8, 7, 6),
              anchor=(239.24303, 38.07613), head=(210.5, 40.5), flip=(-1, 1),
              abdomen=(221.47183, 29.21353), rest=(8, -8), feet=((-7, -5), (0, -9.5)),
              hips=((226.02587, 31.765467), (223.12053, 28.860133))),
@@ -267,33 +290,39 @@ def rolling_beetle(original, prefix, index, position, radial, size):
         part.set("transform", svg_matrix(linear, shift))
         beetle.append(part)
 
-    for number in pose["ground"]:
-        add_part(number, body_shift)
     add_part(pose["ball"], ball_shift)
+    head = linear @ np.array(pose["head"]) + body_shift
+    abdomen = linear @ np.array(pose["abdomen"]) + body_shift
+    axis = abdomen - head
+    body_direction = axis / np.linalg.norm(axis)
+    body_side = np.array([-body_direction[1], body_direction[0]])
+    outward = radial / np.linalg.norm(radial)
+    ground_side = np.array([-outward[1], outward[0]])
+    if np.dot(body_side, ground_side) < 0:
+        body_side = -body_side
+    # Explicit fore/middle pairs: enough separation to remain visible at
+    # publication size, with all four feet planted inside the arena ellipse.
+    for pair, fraction, reach, span in (("fore", 0.2, 30, 9), ("middle", 0.5, 21, 12)):
+        root = head + fraction * axis
+        for side in (-1, 1):
+            hip = root + side * size * (1.8 if pair == "fore" else 2.6) * body_side
+            foot = position + size * (-reach * outward + side * span * ground_side)
+            floor_radius = np.linalg.norm((foot - ARENA_CENTRE) / ARENA_RADII)
+            if floor_radius > 0.97:
+                foot = ARENA_CENTRE + (foot - ARENA_CENTRE) * 0.97 / floor_radius
+            knee = (hip + foot) / 2 + size * (side * 3.5 * ground_side
+                                             - (1.5 if pair == "fore" else -0.5) * outward)
+            toe = foot + size * (-1.5 * outward + side * 0.35 * ground_side)
+            add_beetle_leg(beetle, f"{prefix}-beetle-{index}-{pair}-{side}",
+                           (hip, knee, foot, toe), size)
     hips = sorted((linear @ np.array(hip) + body_shift for hip in pose["hips"]),
                   key=lambda point: point[0])
     for side, hip, foot in zip((-1, 1), hips, pose["feet"]):
         contact = position + size * np.array(foot)
         knee = (hip + contact) / 2 + size * np.array([side * 2.8, -3.5])
         toe = contact + size * np.array([side * 0.7, 1.3])
-        centres = np.array([hip, knee, contact, toe])
-        segments = np.diff(centres, axis=0)
-        normals = np.column_stack((-segments[:, 1], segments[:, 0]))
-        normals /= np.linalg.norm(normals, axis=1)[:, None]
-        joints = np.vstack((normals[0], normals[:-1] + normals[1:], normals[-1]))
-        joints /= np.linalg.norm(joints, axis=1)[:, None]
-        # Broad articulated upper leg, narrowing through the shank to the
-        # foot. Mitred edges match the angular filled legs in the source SVG.
-        half_widths = size * np.array([0.95, 1.15, 0.42, 0.08])
-        mitres = np.ones(4)
-        mitres[1:-1] = np.clip(np.sum(joints[1:-1] * normals[:-1], axis=1), 0.5, 1)
-        offsets = joints * (half_widths / mitres)[:, None]
-        outline = np.vstack((centres + offsets, (centres - offsets)[::-1]))
-        points = [" ".join(f"{value:.8g}" for value in point) for point in outline]
-        ET.SubElement(beetle, f"{{{SVG}}}path", id=f"{prefix}-beetle-{index}-hind-{side}",
-                      d="M " + " L ".join(points) + " Z",
-                      style=f"fill:#575756;stroke:#3b493e;stroke-width:{0.548 * size:.8g};"
-                            "stroke-linecap:butt;stroke-linejoin:miter")
+        add_beetle_leg(beetle, f"{prefix}-beetle-{index}-hind-{side}",
+                       (hip, knee, contact, toe), size, hind=True)
     # The abdomen overlaps the ball; the body also hides the leg roots, as
     # in the original artwork. Foot contacts remain visible on the surface.
     for number in pose["body"]:
