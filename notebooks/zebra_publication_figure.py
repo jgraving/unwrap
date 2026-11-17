@@ -663,6 +663,16 @@ def _embed_artwork(svg, ctx):
     ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
     ns = "{" + SVG_NS + "}"
     root = ET.fromstring(svg)
+    # Older Matplotlib versions hash object addresses into polar clip IDs.
+    # Preserve every clip and reference, naming them in document order.
+    clip_urls = {}
+    for index, clip in enumerate(root.iter(ns + "clipPath")):
+        name = f"mpl-clip-{index}"
+        clip_urls[f"url(#{clip.get('id')})"] = f"url(#{name})"
+        clip.set("id", name)
+    for el in root.iter():
+        if el.get("clip-path") in clip_urls:
+            el.set("clip-path", clip_urls[el.get("clip-path")])
     root.set("role", "img")
     root.set("aria-labelledby", "figure-title figure-description")
     for tag, name, value in (("title", "figure-title", "Zebra escape response"),

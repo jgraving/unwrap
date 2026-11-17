@@ -257,6 +257,8 @@ def test_vector_export_deterministic_and_text_free(tmp_path, idata,
 
 
 def test_write_outputs_round_trip(tmp_path, idata, df_blocks):
+    pytest.importorskip("cairosvg")
+    pytest.importorskip("pymupdf")
     from PIL import Image
     ctx = make_context(tmp_path, idata, df_blocks)
     svg = figure.draw_figure(ctx, family="DejaVu Sans")
@@ -278,7 +280,8 @@ def test_write_outputs_round_trip(tmp_path, idata, df_blocks):
 
 def test_exported_photos_match_reference(tmp_path, idata, df_blocks):
     """Compare the actual four exports with the author artwork in page space."""
-    import fitz
+    pytest.importorskip("cairosvg")
+    fitz = pytest.importorskip("pymupdf")
     from PIL import Image
 
     ctx = make_context(tmp_path, idata, df_blocks)
@@ -318,7 +321,8 @@ def test_exported_photos_match_reference(tmp_path, idata, df_blocks):
 
 
 def test_restore_pdf_refuses_mismatched_pixels(tmp_path):
-    import cairosvg
+    cairosvg = pytest.importorskip("cairosvg")
+    pytest.importorskip("pymupdf")
 
     def svg_with(jpeg):
         data = base64.b64encode(jpeg.read_bytes()).decode("ascii")
@@ -416,7 +420,7 @@ def test_committed_assets_match_manifest():
 # Layout constants vs the committed reference PDF
 # ---------------------------------------------------------------------------
 def test_reference_layout_matches_constants():
-    import fitz
+    fitz = pytest.importorskip("pymupdf")
 
     with fitz.open(figure.ASSETS / "reference.pdf") as doc:
         page = doc[0]
