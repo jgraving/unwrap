@@ -11,18 +11,13 @@ bearings or fitted draws. Both treatments use thicker, round-ended paths
 
 The light-on paths are gentle cubic curves that connect to each beetle's
 revised position. Each of the four original beetle views is used once.
-Views are mirrored as needed and receive a turn of at most 25°, preserving
-the artwork's upright appearance. Bodies and balls are placed separately
-so the abdomens rest over the upper ball surfaces. Rear legs are tapered,
-filled polygons with the original grey fill and dark green outlines. They
-are drawn above the balls and beneath the bodies, keeping leg roots hidden
-and feet visible on the surface.
-Each light-on beetle has three complete articulated pairs: two forelegs and
-two middle legs bracing on the arena, plus two hind legs on the ball. All
-six use tapered, filled polygons. The walking pairs have compact proportions
-and distinct foot positions, rather than reusing partially hidden limbs
-from the source poses. All 24 foot contacts and tips are checked against
-the body silhouettes; the sixteen walking contacts sit inside the arena.
+The legs retain the original pose-specific silhouettes and their attachment
+to the body, including the compact bends and occluded far-side limbs.
+Small edits in each source pose turn reflected front feet toward the ground
+and place hind-foot contacts on the ball shoulders.
+The abdomens overlap the upper ball surfaces. Bodies are drawn over the
+leg roots, while the hind feet contact the balls. The original grey fill
+and dark green outlines keep the illustration consistent between treatments.
 Uniform transforms preserve the ball and body shapes. Slight depth scaling
 and back-to-front drawing order keep them visually grounded. The lamp and
 exit positions share the same elliptical projection. Each vector copy
