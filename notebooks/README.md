@@ -56,4 +56,5 @@ level is being summarised.
 For the statistical framework and biological context, see the
 [model guide](../docs/models.md) and
 [mathematical guide](../docs/math/von-mises.md).
-
+The locust density–order manuscript figure has a saved-fit publication
+renderer with original source images: [reproduction instructions](LOCUST_DENSITY_FIGURE.md).
