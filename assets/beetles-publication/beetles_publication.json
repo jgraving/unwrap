@@ -6,11 +6,13 @@
     "fit_cache/beetles_fit.nc": "f985f7e55f6a28ffb9d6ec544c624b03d8195b7447ec575a43a82351247bf5d1",
     "fit_cache/beetles_fit.meta.json": "51dbcdd857bd26f3e2dadfe90dac85633c2d4698e868cd07330d722f20bbd278"
   },
-  "code_revision": "714cf26b965bf83c741b02ebe5fb3e76df4d7e4c",
+  "code_revision": "a57293d760a42bda4b477835764007894584df09",
   "source_sha256": {
-    "notebooks/beetles_figure.py": "b81ba8222e802c99efbec7396c40b6b3bd540450253c4da584e49ecf5dae952c",
+    "notebooks/beetles_figure.py": "533a5758862414a00286b7cafa817233f385a29dde17857abfacff16a8137f02",
     "notebooks/assets/beetle_arena.svg": "f7474fd7213af4001b7a802ceb2ed6a7cdda3667880f35ef3e89c3ce303b3862",
-    "notebooks/beetles_plots.py": "a8ec3cfc5f63756d425a4d67b7b8030e86b54288a50def5c0af6add4d0588ef1",
+    "notebooks/assets/beetle_floodlight.svg": "47e4635edae502e3088dc21a13a13e85a420c5052eef6732ebbc4688685a752f",
+    "notebooks/beetles_study.json": "66bf3ca03c6a3047a917da0a2d51749ca8bc6aa7be03da25ee40a88ca5b30222",
+    "notebooks/beetles_plots.py": "ce02544e291a34dbfa2e04a4654fc623ca859cadb4e09100053d1b8d0d14f4e4",
     "notebooks/beetles_preprocess.py": "8ffaf8e181f079f963c1116f2215ef4e68ee9391c2f6d318daca615b30ba249d",
     "unwrap/circular.py": "55c26262dbee6e71bfe1cbfdf0cb664d0a52e305665e7cf5d2f6e80c739defc2",
     "unwrap/bessel.py": "2fac0a114d83b63cf05c02f26a62863a426ed038284aa972cb6ff4e3d04a27f8",
@@ -48,9 +50,14 @@
   },
   "hdi_probability": 0.89,
   "kde_kappa": 80.0,
-  "floodlight_degrees": -135,
-  "sector_halfwidth_degrees": 45,
-  "caption": "Artificial light shifts dung beetle orientation at multiple levels. (a) Each of ten beetles repeatedly exits the arena, with ten trials per lighting condition; four light-on bearings are missing. The arena drawing is schematic. (b) Curves show kernel density estimates of the posterior population mean direction, with a common radial density scale; dots show each beetle's observed circular mean bearing. The southwest arc marks the sector within 45\u00b0 of the floodlight. (c) Population-level within-individual concentration, converted to mean resultant length using I\u2081(\u03ba)/I\u2080(\u03ba). (d) Between-individual concentration: the resultant length of the ten fitted individual mean directions, calculated in each draw. (e) Probability of an exit within the marked sector, using population direction and concentration (individual offsets set to zero); the dashed line marks the uniform expectation of 0.25. (f) The paired draw-wise difference in this probability, on minus off. Points show posterior means and bars show 89% highest-density intervals.",
+  "sector_center_degrees": 202.5,
+  "sector_halfwidth_degrees": 45.0,
+  "sector_center_basis": "Nominal compass bearing of the published south-southwest description; approximate, not a surveyed lamp azimuth",
+  "bearing_convention": "Clockwise from north, viewed from above",
+  "source_doi": "10.1016/j.cub.2021.06.038",
+  "source_location": "Results: Light pollution alters orientation behavior; Figure 3A",
+  "source_note": "The paper's 210-degree statistic is the beetles' mean heading, not a measured lamp bearing. The previous 225-degree analysis centre represented southwest.",
+  "caption": "Artificial light shifts dung beetle orientation at multiple levels. (a) Each of ten beetles repeatedly exits the arena, with ten trials per lighting condition; four light-on bearings are missing. The arena drawing is schematic. (b) Curves show kernel density estimates of the posterior population mean direction, with a common radial density scale; dots show each beetle's observed circular mean bearing. Bearings increase clockwise from north, viewed from above. The lamp icon is schematic. The arc is centred at 202.5\u00b0 with a 45\u00b0 half-width, using the nominal south-southwest bearing reported by Foster et al. (2021), rather than a surveyed azimuth. Sector probabilities and intervals are conditional on this approximate centre. (c) Population-level within-individual concentration, converted to mean resultant length using I\u2081(\u03ba)/I\u2080(\u03ba). (d) Between-individual concentration: the resultant length of the ten fitted individual mean directions, calculated in each draw. (e) Probability of an exit within the marked sector, using population direction and concentration (individual offsets set to zero); the dashed line marks the uniform expectation of 0.25. (f) The paired draw-wise difference in this probability, on minus off. Points show posterior means and bars show 89% highest-density intervals.",
   "summaries": {
     "within": {
       "off": {
@@ -78,28 +85,28 @@
     },
     "mass": {
       "off": {
-        "mean": 0.0908437804770996,
-        "hdi_low": 1.7865951334183894e-05,
-        "hdi_high": 0.2387433773969564
+        "mean": 0.2285876820152037,
+        "hdi_low": 8.563658631591253e-05,
+        "hdi_high": 0.5475297939633187
       },
       "on": {
-        "mean": 0.6943378303068461,
-        "hdi_low": 0.2848705642915298,
-        "hdi_high": 0.96897535599845
+        "mean": 0.7784219495127329,
+        "hdi_low": 0.48255642241295166,
+        "hdi_high": 0.9708524716648854
       }
     },
     "difference": {
       "on_minus_off": {
-        "mean": 0.6034940498297467,
-        "hdi_low": 0.21817965133530182,
-        "hdi_high": 0.9291384543252755
+        "mean": 0.5498342674975293,
+        "hdi_low": 0.10955677635595495,
+        "hdi_high": 0.9323540102427864
       }
     }
   },
   "outputs_sha256": {
-    ".svg": "7354af43abecf83bb18d6e015c8915c484f5e1770a21bb977097831d43e8aec6",
-    ".pdf": "d2fa73971bb3a1dd67f842ab615301eb8e6b7ea18760496731513865aef2c39e",
-    ".png": "4782ce8896082098e272b88d885ea01c40f6fbd6621fd37eff3746c3be376c6b",
-    ".html": "7b90334b4141b488d0402fd1f301ae6a149029aa188d9d511b8d5128966eaa42"
+    ".svg": "ec4b84d7849ea8dd1f9c2ac6c77a0a0e4aaca1365557b4cf1586fda629d07ba5",
+    ".pdf": "5970032ef1f22b0735d2dac1afcb5f70cd2af1f049a50e7e5a2b32dfaacb1ca4",
+    ".png": "f4404fc78a66e53f52df765d1f03cf54e5caaea71a20de811e0415397e3d0c0c",
+    ".html": "e1223b35653e116bb908f969946bece8c2f7ca6d8f702056986ab780db00fdaf"
   }
 }
