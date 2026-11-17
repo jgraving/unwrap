@@ -54,8 +54,11 @@ SVG = "http://www.w3.org/2000/svg"
 CAPTION = (
     "Artificial light shifts dung beetle orientation at multiple levels. "
     "(a) Each of ten beetles repeatedly exits the arena, with ten trials per "
-    "lighting condition; four light-on bearings are missing. The arena drawing "
-    "is schematic. (b) Curves show kernel density estimates of the posterior "
+    "lighting condition; four light-on bearings are missing. Matched light-off "
+    "and light-on arena schematics show the two conditions experienced by the "
+    "same beetles. The repeated exit paths are illustrative, with the same "
+    "geometry in both conditions; they are not observed trajectories. "
+    "(b) Curves show kernel density estimates of the posterior "
     "population mean direction, with a common radial density scale; dots show "
     "each beetle's observed circular mean bearing. Bearings increase clockwise "
     "from north, viewed from above. The lamp icon is schematic. The arc is "
@@ -184,6 +187,25 @@ def panel_heading(fig, x, y, letter, title, title_x, *, align="center", letter_g
              ha=letter_align, color=INK)
 
 
+def placed_vector(asset, prefix, *, x, y, width, height, path_color=None):
+    """Place the original path-only artwork with unique IDs for each copy.
+
+    Arena copies share exactly the same geometry. Only the four schematic
+    exit-path colours change with treatment; beetle and ground artwork is kept.
+    """
+    root = ET.parse(asset).getroot()
+    for element in root.iter():
+        original_id = element.get("id")
+        if path_color is not None and original_id in {"path3", "path4", "path23", "path24"}:
+            element.set("style", element.get("style").replace("stroke:#3e1f51", f"stroke:{path_color}"))
+        if original_id:
+            element.set("id", f"{prefix}-{original_id}")
+    root.set("id", prefix)
+    for key, value in (("x", x), ("y", y), ("width", width), ("height", height)):
+        root.set(key, str(value))
+    return root
+
+
 def draw_polar(fig, arrays, df):
     ax = fig.add_axes([0.66, 0.54, 0.32, 0.375], projection="polar")
     ax.set_theta_zero_location("N")
@@ -269,8 +291,12 @@ def build_svg(arrays, df, *, family="Arial"):
         fig = plt.figure(figsize=(7.2, 4.8), dpi=160)
         panel_heading(fig, 0.025, 0.973, "a", "Repeated exit bearings",
                       0.27)
+        for centre, label in ((75 / 518.4, "Light off"), (200 / 518.4, "Light on")):
+            fig.text(centre, 0.845, label, ha="center", va="top",
+                     fontsize=9, weight="bold", color=INK)
+        fig.text(174 / 518.4, 1 - 158 / 345.6, "Floodlight", ha="center",
+                 va="top", fontsize=8, color=INK)
         panel_heading(fig, 0.545, 0.973, "b", "Reorientation", 0.82)
-        fig.text(0.402, 0.832, "Exit\nbearing", ha="center", fontsize=8.5, color=INK, linespacing=1.2)
         lamp_xy = draw_polar(fig, arrays, df)
         fig.text(lamp_xy[0], lamp_xy[1] - 0.052, "Floodlight", ha="center",
                  va="top", fontsize=8.5, color=INK)
@@ -312,20 +338,18 @@ def build_svg(arrays, df, *, family="Arial"):
     desc.text = CAPTION
     root.insert(0, title)
     root.insert(1, desc)
-    # Original arena artwork, as vector paths only. Coordinates are SVG points.
-    arena = ET.parse(ASSET).getroot()
-    arena.set("x", "32")
-    arena.set("y", "59")
-    arena.set("width", "224")
-    arena.set("height", "103")
-    root.append(arena)
-    lamp = ET.parse(FLOODLIGHT_ASSET).getroot()
+    # Matched treatment schematics from the same original vector artwork.
+    # Coordinates are SVG points; paths illustrate the protocol, not data.
+    for condition, color, x in (("off", OFF, 20), ("on", ON, 145)):
+        root.append(placed_vector(ASSET, f"arena-light-{condition}",
+                                  x=x, y=70, width=110, height=110 * 122 / 262,
+                                  path_color=color))
+    root.append(placed_vector(FLOODLIGHT_ASSET, "arena-floodlight",
+                              x=164, y=132, width=20, height=20))
     width, height = 7.2 * 72, 4.8 * 72
-    lamp.set("x", str(lamp_xy[0] * width - 13))
-    lamp.set("y", str((1 - lamp_xy[1]) * height - 13))
-    lamp.set("width", "26")
-    lamp.set("height", "26")
-    root.append(lamp)
+    root.append(placed_vector(FLOODLIGHT_ASSET, "polar-floodlight",
+                              x=lamp_xy[0] * width - 13,
+                              y=(1 - lamp_xy[1]) * height - 13, width=26, height=26))
     return "\n".join(line.rstrip() for line in ET.tostring(root, encoding="unicode").splitlines()) + "\n"
 
 
