@@ -240,6 +240,9 @@ LEGEND_TEXTS = [("Pre", 608.95, 1056.1), ("Post", 706.6, 1056.1)]
 FS = dict(letter=32.0, title=17.5, degree=17.5, radial=15.0,
           tick=17.5, axis=17.5, bottom_legend=17.5, scale=15.2,
           north=18.2, map_legend=15.2)
+COMPANION_FS = dict(letter=22.0, title=15.0, degree=13.0, radial=12.0,
+                    tick=14.0, axis=14.0, bottom_legend=14.0, scale=13.0,
+                    north=15.0, map_legend=13.0)
 
 # marker sizes (points) and line widths, measured
 MS_GROUP_PRE = 9.9          # c/d pre square side, pt
@@ -728,10 +731,14 @@ def _embed_artwork(svg, ctx):
     return ET.tostring(root, encoding="unicode") + "\n"
 
 
-def draw_figure(ctx, *, family="Arial"):
+def draw_figure(ctx, *, family="Arial", style="published"):
     """Render the composite to an SVG string (fonts outlined, no text)."""
     import zebra_plots as plots
 
+    if style not in ("published", "companion"):
+        raise ValueError(f"Unknown zebra figure style: {style!r}")
+    companion = style == "companion"
+    sizes = COMPANION_FS if companion else FS
     numbers = ctx["numbers"]
     prep = numbers["stats"]
     nT = int(prep["nT"])
@@ -739,8 +746,8 @@ def draw_figure(ctx, *, family="Arial"):
     pre, post = plots.PRE_COLOR, plots.POST_COLOR
 
     rc = {"font.family": family,
-          "font.size": FS["tick"],
-          "legend.fontsize": FS["map_legend"],
+          "font.size": sizes["tick"],
+          "legend.fontsize": sizes["map_legend"],
           "svg.fonttype": "path",
           "svg.hashsalt": "unwrap-zebra-publication-v1"}
     with mpl.rc_context(rc):
@@ -814,7 +821,7 @@ def draw_figure(ctx, *, family="Arial"):
         ax_d.set_xticks([0.0, 1.0])
         ax_d.set_xticklabels(["Pre", "Post"])
         ax_d.set_yticks([0.0, 0.5, 1.0])
-        ax_d.set_ylabel("Mean resultant length", labelpad=10)
+        ax_d.set_ylabel("Mean resultant length", labelpad=10, fontsize=sizes["axis"])
         ax_d.vlines(0.0, prep["R_group_pre_lo"], prep["R_group_pre_hi"],
                     color=pre, lw=LW_HDI, alpha=0.95, zorder=2)
         ax_d.vlines(1.0, prep["R_group_post_lo"], prep["R_group_post_hi"],
@@ -855,7 +862,7 @@ def draw_figure(ctx, *, family="Arial"):
         ax_f.set_xticks([0.0, 1.0])
         ax_f.set_xticklabels(["Pre", "Post"])
         ax_f.set_yticks([0.0, 0.5, 1.0])
-        ax_f.set_ylabel("Mean resultant length", labelpad=10)
+        ax_f.set_ylabel("Mean resultant length", labelpad=10, fontsize=sizes["axis"])
         rng = np.random.default_rng(JITTER_SEED)
         delta = rng.normal(0.0, JITTER_SD, size=nT)
         for j in range(nT):
@@ -892,10 +899,10 @@ def draw_figure(ctx, *, family="Arial"):
                                         edgecolor="black", linewidth=1.2,
                                         zorder=8))
         overlay.text(SCALE_LABEL[0], SCALE_LABEL[1], "20 m",
-                     ha="center", va="center", fontsize=FS["scale"],
+                     ha="center", va="center", fontsize=sizes["scale"],
                      color="black", zorder=8)
         overlay.text(NORTH_X, NORTH_Y, "N", ha="center", va="center",
-                     fontsize=FS["north"], color="black", zorder=8)
+                     fontsize=sizes["north"], color="black", zorder=8)
         overlay.add_patch(FancyArrowPatch(
             (NORTH_X, NORTH_BASE_Y), (NORTH_X, NORTH_TIP_Y),
             arrowstyle=ArrowStyle.Simple(head_length=NORTH_HEAD_LEN,
@@ -923,23 +930,29 @@ def draw_figure(ctx, *, family="Arial"):
                                  facecolor=post, edgecolor="none", zorder=9))
         for text, tx, ty in LEGEND_TEXTS:
             overlay.text(tx, ty, text, ha="center", va="center",
-                         fontsize=FS["bottom_legend"], color="black",
+                         fontsize=sizes["bottom_legend"], color="black",
                          zorder=9)
 
-        for text, tx, ty in TITLES:
-            overlay.text(tx, ty, text, ha="center", va="center",
-                         fontsize=FS["title"], color="black",
+        for index, (text, tx, ty) in enumerate(TITLES):
+            if companion:
+                ty = (371.0, 727.0)[index // 2]
+            overlay.text(tx, ty, text, ha="center",
+                         va="top" if companion else "center",
+                         fontsize=sizes["title"], color="black",
+                         weight="bold" if companion else "normal",
                          linespacing=1.05, zorder=9)
         for character, lx, ly, color in LETTERS:
+            if companion and character in "cdef":
+                ly = 380.0 if character in "cd" else 736.0
             overlay.text(lx, ly, character + ".", ha="left", va="center",
-                         fontsize=FS["letter"], weight="bold", color=color,
+                         fontsize=sizes["letter"], weight="bold", color=color,
                          zorder=9)
         for text, tx, ty in DEGREE_LABELS_C + DEGREE_LABELS_E:
             overlay.text(tx, ty, text, ha="center", va="center",
-                         fontsize=FS["degree"], color="black", zorder=9)
+                         fontsize=sizes["degree"], color="black", zorder=9)
         for text, tx, ty in RADIAL_LABEL_C + RADIAL_LABEL_E:
             overlay.text(tx, ty, text, ha="center", va="center",
-                         fontsize=FS["radial"], color="black", zorder=9)
+                         fontsize=sizes["radial"], color="black", zorder=9)
 
         buffer = io.StringIO()
         fig.savefig(buffer, format="svg",
@@ -1070,7 +1083,11 @@ def main(argv=None):
     parser.add_argument("--download", action="store_true",
                         help="fetch any missing pinned unwrap-data files")
     parser.add_argument("--output-dir", type=Path,
-                        default=ROOT / "assets/zebra-publication")
+                        help="export directory (default: assets/zebra-publication "
+                             "or assets/zebra-companion, depending on style)")
+    parser.add_argument("--style", choices=("published", "companion"),
+                        default="published",
+                        help="published reference or companion figure styling")
     parser.add_argument("--font-dir", type=Path,
                         help="directory of licensed font files")
     parser.add_argument("--font-family", default="Arial")
@@ -1101,11 +1118,12 @@ def main(argv=None):
             f"{flagged} cached-fit estimates fail the notebook convergence "
             f"gate (bulk ESS < 400 or R-hat > 1.01)")
 
-    svg = draw_figure(ctx, family=args.font_family)
+    svg = draw_figure(ctx, family=args.font_family, style=args.style)
     post = ctx["idata"].posterior
     numbers = ctx["numbers"]
     metadata = {
         "figure": "zebra_circ_stats_figure",
+        "style": args.style,
         "layout": ("Published 900 x 1080-point composite geometry, measured "
                    "from the reference PDF (see ZEBRA_FIGURE.md)"),
         "data_repository": "jgraving/unwrap-data",
@@ -1149,7 +1167,11 @@ def main(argv=None):
                             if k != "stats"},
         "caption": CAPTION,
     }
-    stem = write_outputs(args.output_dir, ctx, svg, metadata, family=args.font_family)
+    output_dir = args.output_dir
+    if output_dir is None:
+        output_dir = ROOT / "assets" / (
+            "zebra-companion" if args.style == "companion" else "zebra-publication")
+    stem = write_outputs(output_dir, ctx, svg, metadata, family=args.font_family)
     print(f"Wrote SVG, PDF, PNG, HTML and provenance JSON: {stem}")
 
 
