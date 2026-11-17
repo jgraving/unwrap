@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install PDF inspection tools
-        run: python -m pip install pymupdf pillow
+        run: python -m pip install pymupdf==1.26.6 pillow
       - name: Compare source artwork and unit typography
         shell: python
         run: |
@@ -27,12 +27,11 @@ jobs:
           from PIL import Image, ImageDraw
           import xml.etree.ElementTree as ET
           
-          url = "https://raw.githubusercontent.com/jgraving/circstats/9bef710eb44fd8d20a61a7119a12e4933d02ce6d/figures/locust_density_order_figure.pdf"
-          raw = urllib.request.urlopen(url, timeout=60).read()
+          raw = Path("notebooks/assets/locust_density_order/reference.pdf").read_bytes()
           assert hashlib.sha256(raw).hexdigest() == "48609fdc9185e20227ae0b1c20dd377301d5aa962c7d57078ef1bf5873d0bf21"
           original = fitz.open(stream=raw, filetype="pdf")
           current = fitz.open("assets/locust-density-publication/locust_density_publication.pdf")
-          report = {"original_fonts": original[0].get_fonts(full=True), "original_text": original[0].get_text("dict"), "original_images": original[0].get_images(full=True), "current_images": current[0].get_images(full=True)}
+          report = {"original_fonts": original[0].get_fonts(full=True), "original_text": original[0].get_text("dict", flags=fitz.TEXTFLAGS_DICT & ~fitz.TEXT_PRESERVE_IMAGES), "original_images": original[0].get_images(full=True), "current_images": current[0].get_images(full=True)}
           report["original_image_21"] = original.xref_object(21)
           report["original_image_21_sha256"] = hashlib.sha256(original.extract_image(21)["image"]).hexdigest()
           root = ET.parse("assets/locust-density-publication/locust_density_publication.svg").getroot()
