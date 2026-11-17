@@ -1,9 +1,16 @@
 # Reproduce the beetle publication figure
 
 The six-panel figure combines the original arena and floodlight illustrations with newly
-rendered statistical panels. It retains Arial and the existing grey/gold
-palette (`#9e9e9e` / `#f4a300`), with concise panel headings, measurement
-labels on the c–f y-axes, with each heading centred over its plotting area.
+rendered statistical panels. Panel a composes matched light-off and light-on
+arenas from the same SVG paths, at the same scale, with the floodlight beside
+the light-on arena. The grey/gold exit paths illustrate the measurement
+protocol: identical schematic geometry is reused across conditions. Each
+vector copy receives unique IDs. All placement and recolouring are in
+`beetles_figure.py`; no manually edited or generated illustration is needed.
+
+The figure retains Arial and the existing grey/gold palette
+(`#9e9e9e` / `#f4a300`), with concise panel headings centred over the plotting
+areas and measurement labels on the c–f y-axes.
 The polar plot has light crosshairs and N/E/S/W labels. A condition legend
 sits above the plot, while a separate key beside it distinguishes the
 population-level mean curves from the individual-level mean points.
@@ -73,8 +80,10 @@ environment replication, preserve the JSON and pin those versions.
 
 ## What each panel means
 
-- **a:** The original schematic of repeated arena exits. Ten beetles have
-  ten trials in each condition; four light-on bearings are missing.
+- **a:** Matched light-off and light-on schematics show the two conditions
+  experienced by the same ten beetles. The original arena and beetle artwork
+  is reused in both; exit paths are illustrative, not observed trajectories.
+  Each beetle has ten trials per condition; four light-on bearings are missing.
 - **b:** Von Mises kernel densities of the posterior population mean
   direction, using the notebook's bandwidth concentration of 80 and a common
   radial density scale. Dots are **observed circular mean bearings per beetle**,
