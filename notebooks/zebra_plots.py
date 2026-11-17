@@ -728,6 +728,7 @@ def draw_escape_map(
     arrows_start_offset_m=0.0,
     arrow_length=12.0,
     tail_width_pt=1.2, head_width_pt=6.0, head_length_pt=7.5,
+    arrow_shrink_pt=2.0,
     arrow_pre_color=None, arrow_post_color=None, arrow_alpha=0.85,
     arrow_edge_color="black", arrow_edge_width=0.7, arrow_edge_alpha=0.95,
     arrow_zorder=4.0,
@@ -886,6 +887,7 @@ def draw_escape_map(
             patch = FancyArrowPatch(
                 (x0, y0), (x0 + u * arrow_length, y0 + v * arrow_length),
                 arrowstyle=arrow_style, mutation_scale=1.0,
+                shrinkA=arrow_shrink_pt, shrinkB=arrow_shrink_pt,
                 linewidth=arrow_edge_width, edgecolor=arrow_edge_color,
                 facecolor=arrow_pre_color if is_pre else arrow_post_color,
                 alpha=arrow_alpha, zorder=arrow_zorder, joinstyle="miter",
@@ -957,7 +959,8 @@ def _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
                        *, tight_layout=True,
                        legend_anchor=(0.02, 0.5), fancybox=False,
                        framealpha=0.9, scale_bar=True, compass=True,
-                       legend_loc="center left"):
+                       legend_loc="center left", legend_arrow_size=8,
+                       legend_arrow_edge_width=None):
     """Equal aspect, panel limits, legend, scale bar and compass.
 
     ``tight_layout`` runs ``plt.tight_layout()`` on the current figure at
@@ -978,9 +981,11 @@ def _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
         Line2D([], [], color=focal_line_color, lw=focal_lw, label="Focal"),
         Line2D([], [], color=str(other_color), lw=2.4, alpha=1.0,
                label="Non-focal"),
-        Line2D([], [], color=arrow_pre_color, marker=">", lw=0, ms=8,
+        Line2D([], [], color=arrow_pre_color, marker=">", lw=0,
+               ms=legend_arrow_size, mew=legend_arrow_edge_width,
                label="Pre-stimulus"),
-        Line2D([], [], color=arrow_post_color, marker=">", lw=0, ms=8,
+        Line2D([], [], color=arrow_post_color, marker=">", lw=0,
+               ms=legend_arrow_size, mew=legend_arrow_edge_width,
                label="Post-stimulus"),
     ]
     ax.legend(handles=handles, loc=legend_loc, bbox_to_anchor=legend_anchor,

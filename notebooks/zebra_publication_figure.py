@@ -56,7 +56,7 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
 from matplotlib.patches import (ArrowStyle, Circle, FancyArrowPatch,
-                                FancyBboxPatch, Polygon, Rectangle)
+                                FancyBboxPatch, Rectangle)
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -211,6 +211,9 @@ ANCHOR_WINDOW_FRAMES = 15       # +/- 0.5 s at 30 fps
 
 # Map legend centre x=103.35 pt in the 349.9-pt map panel.
 MAP_LEGEND_ANCHOR = (0.25, 0.5)
+# The reference scales the original map's point-based arrow styling by
+# 1.519. The heading arrows' nominal length is still 12 UTM meters.
+MAP_ARROW_SCALE = 1.5188
 
 # scale bar and north arrow, measured
 SCALE_RECTS = ((296.5, 1014.2, 22.5, 8.7), (319.0, 1014.2, 22.6, 8.7))
@@ -218,11 +221,11 @@ SCALE_RECT_COLORS = ("white", "black")
 SCALE_LABEL = (319.05, 1039.35)
 NORTH_X = 319.05
 NORTH_Y = 911.4                 # "N" text centre
-NORTH_TIP_Y = 929.0
-NORTH_HEAD_LEN = 30.0
-NORTH_HEAD_HALF_W = 11.5
-NORTH_TAIL_HALF_W = 2.8
-NORTH_BASE_Y = 1006.0
+NORTH_TIP_Y = 930.48
+NORTH_BASE_Y = 988.19
+NORTH_HEAD_LEN = 21.27
+NORTH_HEAD_WIDTH = 18.23
+NORTH_TAIL_WIDTH = 3.80
 
 # bottom Pre/Post legend (box, lines, markers, texts), measured
 LEGEND_BOX = (542.8, 1042.6, 731.1, 1072.6)
@@ -764,6 +767,11 @@ def draw_figure(ctx, *, family="Arial"):
             map_ax, ctx["img"], ctx["extent"], ctx["df_pos"],
             ctx["df_bearings"], FOCAL_TRACK,
             arrow_mode="distance", arrows_every_m=5.0, arrow_length=12.0,
+            tail_width_pt=1.2 * MAP_ARROW_SCALE,
+            head_width_pt=6.0 * MAP_ARROW_SCALE,
+            head_length_pt=7.5 * MAP_ARROW_SCALE,
+            arrow_shrink_pt=2.0 * MAP_ARROW_SCALE,
+            arrow_edge_width=0.7 * MAP_ARROW_SCALE, arrow_alpha=0.87,
             other_stride=3, focal_stride=2, frame_max=FRAME_MAX,
             decimate_m=MAP_VERTEX_SPACING_M)
         map_ax.images[0].set_interpolation("none")
@@ -772,6 +780,8 @@ def draw_figure(ctx, *, family="Arial"):
             "black", FOCAL_LW, "white", pre, post,
             tight_layout=False, legend_loc="center",
             legend_anchor=MAP_LEGEND_ANCHOR, fancybox=True,
+            legend_arrow_size=8 * MAP_ARROW_SCALE,
+            legend_arrow_edge_width=MAP_ARROW_SCALE,
             framealpha=0.85, scale_bar=False, compass=False)
 
         # -- panel c: group-level mean direction (polar) -------------------
@@ -879,18 +889,14 @@ def draw_figure(ctx, *, family="Arial"):
                      color="black", zorder=8)
         overlay.text(NORTH_X, NORTH_Y, "N", ha="center", va="center",
                      fontsize=FS["north"], color="black", zorder=8)
-        head_bottom = NORTH_TIP_Y + NORTH_HEAD_LEN
-        overlay.add_patch(Polygon(
-            [[NORTH_X - NORTH_HEAD_HALF_W, head_bottom],
-             [NORTH_X, NORTH_TIP_Y],
-             [NORTH_X + NORTH_HEAD_HALF_W, head_bottom]],
-            closed=True, facecolor="black", edgecolor="none", zorder=8))
-        overlay.add_patch(Polygon(
-            [[NORTH_X - NORTH_TAIL_HALF_W, head_bottom],
-             [NORTH_X - NORTH_TAIL_HALF_W, NORTH_BASE_Y],
-             [NORTH_X + NORTH_TAIL_HALF_W, NORTH_BASE_Y],
-             [NORTH_X + NORTH_TAIL_HALF_W, head_bottom]],
-            closed=True, facecolor="black", edgecolor="none", zorder=8))
+        overlay.add_patch(FancyArrowPatch(
+            (NORTH_X, NORTH_BASE_Y), (NORTH_X, NORTH_TIP_Y),
+            arrowstyle=ArrowStyle.Simple(head_length=NORTH_HEAD_LEN,
+                                         head_width=NORTH_HEAD_WIDTH,
+                                         tail_width=NORTH_TAIL_WIDTH),
+            mutation_scale=1.0, shrinkA=0, shrinkB=0,
+            facecolor="black", edgecolor="black", linewidth=MAP_ARROW_SCALE,
+            joinstyle="miter", zorder=8))
 
         bx0, by0, bx1, by1 = LEGEND_BOX
         overlay.add_patch(FancyBboxPatch(

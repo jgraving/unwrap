@@ -103,6 +103,9 @@ The outputs default to `assets/zebra-publication/` (committed for review):
   SVG backend (one element per collection segment) stays in the house
   artwork range. The heading arrows (every 5 m) are computed from the
   full-resolution trajectory exactly as in the map section of `zebra_escape.ipynb`.
+  Their printed length is 21.01 pt, with a 9.11 pt-wide head and a 1.06 pt
+  outline, as measured in the reference PDF. The legend triangles and
+  the 57.72 pt north arrow also follow the reference dimensions.
 - The pre/post arrow split on the map uses the per-frame `pre_scare`
   flag of `load_zebra_bearings_raw()`, exactly as the map section of `zebra_escape.ipynb`
   does: it flips at frame **53,902** for all 18 `observation088` tracks.

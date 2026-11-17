@@ -320,6 +320,50 @@ def test_exported_photos_match_reference(tmp_path, idata, df_blocks):
             assert np.abs(crop - target).mean() < 3
 
 
+def test_exported_map_arrow_sizes_match_reference(tmp_path, idata, df_blocks):
+    cairosvg = pytest.importorskip("cairosvg")
+    fitz = pytest.importorskip("pymupdf")
+    ctx = make_context(tmp_path, idata, df_blocks)
+    svg = figure.draw_figure(ctx, family="DejaVu Sans")
+    pdf = cairosvg.svg2pdf(bytestring=svg.encode())
+
+    def map_arrows(page):
+        heading, legend, north = [], [], []
+        for path in page.get_drawings():
+            box = path["rect"]
+            if path["type"] != "fs" or box.x1 > figure.MAP_RECT[2]:
+                continue
+            items = path["items"]
+            if len(items) == 7 and path["color"] == (0, 0, 0):
+                if path["fill"] == (0, 0, 0):
+                    if 920 < box.y0 < 940 and 980 < box.y1 < 1000:
+                        north.append((*box, path["width"]))
+                else:
+                    head_a, tip, head_b = items[2][1], items[2][-1], items[3][-1]
+                    tail_a, tail_b = items[0][1], items[5][-1]
+                    heading.append((abs(tip - (tail_a + tail_b) / 2),
+                                    abs(tip - (head_a + head_b) / 2),
+                                    abs(head_a - head_b), abs(tail_a - tail_b),
+                                    path["width"]))
+            elif len(items) == 3 and 535 < box.y0 < 580 and box.x1 < 85:
+                legend.append((box.width, box.height, path["width"]))
+        return heading, legend, north
+
+    with fitz.open(figure.ASSETS / "reference.pdf") as ref, \
+            fitz.open(stream=pdf, filetype="pdf") as out:
+        expected_heading, expected_legend, expected_north = map_arrows(ref[0])
+        heading, legend, north = map_arrows(out[0])
+
+    assert heading and expected_heading
+    for dimensions in heading:
+        assert dimensions == pytest.approx(expected_heading[0], abs=0.03)
+    assert len(legend) == len(expected_legend) == 2
+    for actual, expected in zip(legend, expected_legend):
+        assert actual == pytest.approx(expected, abs=0.03)
+    assert len(north) == len(expected_north) == 1
+    assert north[0] == pytest.approx(expected_north[0], abs=0.03)
+
+
 def test_restore_pdf_refuses_mismatched_pixels(tmp_path):
     cairosvg = pytest.importorskip("cairosvg")
     pytest.importorskip("pymupdf")
