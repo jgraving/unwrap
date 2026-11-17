@@ -226,21 +226,25 @@ def rolling_beetle(original, prefix, index, position, radial, size):
     """Reuse four original views with raised hind legs resting on each ball.
 
     Keep the camera's upright direction: choose/mirror the closest view and
-    limit its turn to 25 degrees. Place the body and ball separately, drawing
-    the ball in front and two filled, tapered hind legs over its upper cap.
+    limit its turn to 25 degrees. Rest the abdomen over the upper ball
+    surface, with filled hind legs beneath the body and feet on the ball.
     """
     poses = (
         dict(ball=14, body=(22, 21, 20), ground=(15, 16, 17),
-             anchor=(221.41477, 115.67518), head=(199.5, 102), flip=(1, 1), lift=1,
+             anchor=(221.41477, 115.67518), head=(199.5, 102), flip=(1, 1),
+             abdomen=(211.61821, 106.32956), rest=(-7, -8), feet=((0, -9.5), (7, -5.5)),
              hips=((203.35827, 104.24067), (213.2612, 101.5208))),
         dict(ball=25, body=(26, 32, 33), ground=(27, 28, 29),
-             anchor=(151.07448, 22.453), head=(150, 36), flip=(1, -1), lift=8,
+             anchor=(151.07448, 22.453), head=(150, 36), flip=(1, -1),
+             abdomen=(150.7357, 28.51591), rest=(1, -6.5), feet=((-7, -6), (7, -6)),
              hips=((145.1332, 30.884533), (156.314, 31.298667))),
         dict(ball=34, body=(35, 41, 42), ground=(37, 38, 39),
-             anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1), lift=12,
+             anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1),
+             abdomen=(85.29976, 36.01711), rest=(3.5, -5), feet=((-7, -5), (8, -9)),
              hips=((82.757467, 40.500533), (91.170133, 38.514533))),
         dict(ball=5, body=(8, 7, 6), ground=(9, 10, 11),
-             anchor=(239.24303, 38.07613), head=(210.5, 40.5), flip=(-1, 1), lift=0,
+             anchor=(239.24303, 38.07613), head=(210.5, 40.5), flip=(-1, 1),
+             abdomen=(221.47183, 29.21353), rest=(8, -8), feet=((-7, -5), (0, -9.5)),
              hips=((226.02587, 31.765467), (223.12053, 28.860133))),
     )
     pose = poses[index]
@@ -252,7 +256,8 @@ def rolling_beetle(original, prefix, index, position, radial, size):
     linear = size * np.array([[np.cos(angle), -np.sin(angle)],
                               [np.sin(angle), np.cos(angle)]]) @ mirror
     ball_shift = position - linear @ np.array(pose["anchor"])
-    body_shift = ball_shift - np.array([0, pose["lift"] * size])
+    body_shift = (position + size * np.array(pose["rest"])
+                  - linear @ np.array(pose["abdomen"]))
     beetle = ET.Element(f"{{{SVG}}}g", id=f"{prefix}-beetle-{index}",
                         attrib={"data-source-pose": str(pose["ball"])})
 
@@ -262,13 +267,13 @@ def rolling_beetle(original, prefix, index, position, radial, size):
         part.set("transform", svg_matrix(linear, shift))
         beetle.append(part)
 
-    for number in (*pose["ground"], *pose["body"]):
+    for number in pose["ground"]:
         add_part(number, body_shift)
     add_part(pose["ball"], ball_shift)
     hips = sorted((linear @ np.array(hip) + body_shift for hip in pose["hips"]),
                   key=lambda point: point[0])
-    for side, hip in zip((-1, 1), hips):
-        contact = position + size * np.array([side * 5.0, -8.5])
+    for side, hip, foot in zip((-1, 1), hips, pose["feet"]):
+        contact = position + size * np.array(foot)
         knee = (hip + contact) / 2 + size * np.array([side * 2.8, -3.5])
         toe = contact + size * np.array([side * 0.7, 1.3])
         centres = np.array([hip, knee, contact, toe])
@@ -289,6 +294,10 @@ def rolling_beetle(original, prefix, index, position, radial, size):
                       d="M " + " L ".join(points) + " Z",
                       style=f"fill:#575756;stroke:#3b493e;stroke-width:{0.548 * size:.8g};"
                             "stroke-linecap:butt;stroke-linejoin:miter")
+    # The abdomen overlaps the ball; the body also hides the leg roots, as
+    # in the original artwork. Foot contacts remain visible on the surface.
+    for number in pose["body"]:
+        add_part(number, body_shift)
     return beetle, linear @ np.array(pose["head"]) + body_shift
 
 
