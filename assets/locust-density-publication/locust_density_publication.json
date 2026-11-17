@@ -5,14 +5,14 @@
     "fit_cache/locust_density_hier.nc": "af8df700a42354c59fa673e8635d25e4c11f038f404cdb9513aaf5b853176498",
     "fit_cache/locust_density_hier.meta.json": "ebbbd2a67f5145961da05357a32c1cb9f48181b37bd598050a48c4efaeaeec49"
   },
-  "code_revision": "5f6a3472c25dd2326da77eb32442f0bf26ed53c3",
+  "code_revision": "212e3c3e624c19b922967c33dbc92beddd6e49de",
   "source_sha256": {
-    "notebooks/locust_density_figure.py": "d58e1c58bbdecc7711d429ee477618b78b0011dbb910cc99bf7171a57865b8f0",
+    "notebooks/locust_density_figure.py": "83c43d63c21af38c3e19412adce88a6b1569237e7ab985da2a118dd60a0d7fcb",
     "tools/prepare_locust_figure_assets.py": "653eb4ed2e5f69a149301b3e39eafaa22a97eac75009437fb01f6ca90f0e29ea",
     "unwrap/link/numpy.py": "f598dda5da67f935dcd405b8ea379e46d0f90c5a1b80f853208c5607b64ceaf3",
     "unwrap/circular.py": "55c26262dbee6e71bfe1cbfdf0cb664d0a52e305665e7cf5d2f6e80c739defc2",
     "unwrap/bessel.py": "2fac0a114d83b63cf05c02f26a62863a426ed038284aa972cb6ff4e3d04a27f8",
-    "notebooks/assets/locust_density_order/README.md": "d733fbf3c72814abf39964eb8a94d400df1915a7b1e3b09caa5fd9d59f1cfc23",
+    "notebooks/assets/locust_density_order/README.md": "cfeeab43d40bfc03e2699b35b6e770efe4d3a327d7ae84d4f3b4faaf84e44648",
     "notebooks/assets/locust_density_order/images.json": "19a8217270533edf963c5e403d104a7029efcffda3d020d0c4c4d2fdd915a2a3",
     "notebooks/assets/locust_density_order/original_panels.svg": "46f1ccea80a692a10bd7f5656d146f5dce902230ba0b231fc6fc19af4f5ee4e4",
     "notebooks/assets/locust_density_order/real_locust.jpeg": "e0a43a3ba709e59039ba41d8fc12f92cb891d21d9a7e7130ab4919ca89e63b24",
@@ -107,8 +107,18 @@
   "prediction_basis": "Original scaled coordinates of stored Bambi coefficients; concentration offset zero",
   "prediction_summary": "exp(mean(log density at zero)); exponentiated 90% log-density HDI",
   "coefficient_hdi_probability": 0.95,
-  "layout": "Original 750 \u00d7 525-point manuscript layout",
+  "layout": "Polished original 750 \u00d7 525-point manuscript layout",
   "illustration_basis": "Original PDF artwork for panels a\u2013e, including calibrated scale bar",
+  "presentation": {
+    "panel_letter_points": 16,
+    "title_points": 11,
+    "title_weight": "bold",
+    "statistical_label_points": 9,
+    "prediction_line_points": 1.5,
+    "prediction_band_alpha": 0.16,
+    "legend_columns": 1,
+    "legend_frames": false
+  },
   "caption": "Order and density of a virtual swarm shape locust directional responses. (a) Real locust. (b) Original front, lateral, and rear renderings of the virtual locust. (c) Panoramic VR arena and spherical treadmill, with the projection screen raised. (d) Real and virtual swarms; arrow indicates the virtual march direction. (e) Seeded illustrations of density and motion order; these are stimulus schematics, not recorded trajectories. (f) Five screening specifications fitted to 440 recording mean directions; points show PSIS-LOO ELPD differences from the best model, bars \u00b11 standard error. Values reproduce the versioned Python notebook's saved screening table, printed to six decimals. (g) Population fixed-effect coefficients from the saved hierarchical fit to 18,641 headings from 440 recordings. Points show posterior means (circular for the direction intercept), bars 95% highest-density intervals. Density is log\u2082-scaled from 1\u201364 m\u207b\u00b2 to [\u22121, 1]; order is scaled from 0\u20131 to [\u22121, 1]. Coefficients are on the pre-link scale. (h) Reference density at the march direction, f(0), with the recording concentration offset set to zero. Curves are exp(mean(log f(0))), with exponentiated 90% highest-density intervals of log f(0). These are geometric posterior summaries of density per radian, not probabilities or ELPD scores. Dashed lines mark uniform density 1/(2\u03c0). Curves use the original scaled coordinates of the stored Bambi coefficients, correcting the notebook helper's extra centering. Photos and stimulus renderings are extracted from the manuscript figure; photo credit: Centre for the Advanced Study of Collective Behaviour (manuscript states used with permission).",
   "summaries": {
     "coefficients": [
@@ -255,9 +265,9 @@
     ]
   },
   "outputs_sha256": {
-    ".svg": "f37a342cae7ea78533efa512f8e6ca1ebb315cbc81057ac75c69e3b7b2e6bfea",
-    ".pdf": "38831f6caf01e304bee477d19cfb2da11130202e52b7a350ba270fe1e33bb39e",
-    ".png": "52361303659cd1a186b1d7fb59c86e5b3e9c50f7edf6c59937007b5fbe756d88",
-    ".html": "5754557b602bce132f713561c6c309f1b01a6daf3b9472a9b85a97e79bbec448"
+    ".svg": "a5ea6c5a4ff0202692a354b8fcfca8d95c72a588aeca0a8d60400caa5688b0b8",
+    ".pdf": "ed431fd7f64ab527cbab5e209253b547e7f1c53bf26de88e531bfc6d588f7295",
+    ".png": "7e77f3373a7c92168685fcd7d6131015081bb41f20802855cdb196d38ef62e01",
+    ".html": "975c1935747c5e8e4a8f9d0e8fcfc799f5f9874e19989103d1a60968b438edde"
   }
 }
