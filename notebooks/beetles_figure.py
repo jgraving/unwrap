@@ -231,7 +231,7 @@ def add_beetle_leg(parent, leg_id, centres, size, *, hind=False):
     joints = np.vstack((normals[0], normals[:-1] + normals[1:], normals[-1]))
     joints /= np.linalg.norm(joints, axis=1)[:, None]
     half_widths = size * np.array([0.95, 1.15, 0.42, 0.08] if hind else
-                                  [0.8, 1.0, 0.36, 0.08])
+                                  [0.6, 0.8, 0.28, 0.06])
     mitres = np.ones(4)
     mitres[1:-1] = np.clip(np.sum(joints[1:-1] * normals[:-1], axis=1), 0.5, 1)
     offsets = joints * (half_widths / mitres)[:, None]
@@ -308,14 +308,16 @@ def rolling_beetle(original, prefix, index, position, radial, size):
             hip = root + side * size * (1.8 if pair == "fore" else 2.6) * body_side
             foot = hip + size * (reach * body_direction + side * span * body_side
                                  + np.array([0, 1 if pair == "fore" else 2]))
+            foot = hip + 1.35 * (foot - hip)
             if np.linalg.norm(foot - position) < 14 * size:
                 inward = np.dot(foot - position, -outward)
                 foot -= outward * max(0, 14 * size - inward)
             floor_radius = np.linalg.norm((foot - ARENA_CENTRE) / ARENA_RADII)
             if floor_radius > 0.97:
                 foot = ARENA_CENTRE + (foot - ARENA_CENTRE) * 0.97 / floor_radius
-            knee = (hip + foot) / 2 + size * (side * 2.5 * body_side - 0.8 * body_direction)
-            toe = foot + size * (-1.2 * body_direction + side * 0.35 * body_side)
+            knee = (hip + foot) / 2 + size * (side * 1.8 * body_side - 0.35 * body_direction)
+            terminal = foot - knee
+            toe = foot + 1.5 * size * terminal / np.linalg.norm(terminal)
             add_beetle_leg(beetle, f"{prefix}-beetle-{index}-{pair}-{side}",
                            (hip, knee, foot, toe), size)
     hips = sorted((linear @ np.array(hip) + body_shift for hip in pose["hips"]),
