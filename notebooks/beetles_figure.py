@@ -261,13 +261,15 @@ def build_svg(arrays, df, *, family="Arial"):
         panel_heading(fig, 0.025, 0.973, "a", "Repeated exit bearings",
                       0.27)
         panel_heading(fig, 0.545, 0.973, "b", "Reorientation", 0.77)
+        fig.text(0.77, 0.938, "Population-level mean", ha="center", va="top",
+                 fontsize=8, color=INK)
         fig.text(0.402, 0.832, "Exit\nbearing", ha="center", fontsize=8.5, color=INK, linespacing=1.2)
         lamp_xy = draw_polar(fig, arrays, df)
         fig.text(lamp_xy[0], lamp_xy[1] - 0.052, "Floodlight", ha="center",
                  va="top", fontsize=8.5, color=INK)
         handles = [Line2D([], [], color=c, lw=1.7, marker="o", ms=4, label=t)
                    for c, t in ((OFF, "Light off"), (ON, "Light on"))]
-        fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.77, 0.918),
+        fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.77, 0.902),
                    ncol=2, frameon=False, fontsize=8, handlelength=1.6, columnspacing=1.7)
         fig.add_artist(Line2D([0.025, 0.975], [0.456, 0.456],
                               transform=fig.transFigure, color=RULE, lw=0.7))
