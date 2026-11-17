@@ -6,6 +6,7 @@ No sampling, notebook execution, browser, or manuscript checkout is needed.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import hashlib
 import importlib.metadata
 import io
@@ -51,13 +52,19 @@ HALFWIDTH = FLOOD_HALFWIDTH
 HDI_PROB = 0.89
 KDE_KAPPA = 80.0
 SVG = "http://www.w3.org/2000/svg"
+ARENA_CENTRE = np.array([151.31826, 77.6316])
+ARENA_RADII = np.array([128.976, 50.27067])
+ARENA_BOUNDS = {condition: (x, 70, 110, 110 * 122 / 262)
+                for condition, x in (("off", 20), ("on", 145))}
+SCHEMATIC_PATH_WIDTH = 3.4
 CAPTION = (
     "Artificial light shifts dung beetle orientation at multiple levels. "
     "(a) Each of ten beetles repeatedly exits the arena, with ten trials per "
     "lighting condition; four light-on bearings are missing. Matched light-off "
     "and light-on arena schematics show the two conditions experienced by the "
-    "same beetles. The repeated exit paths are illustrative, with the same "
-    "geometry in both conditions; they are not observed trajectories. "
+    "same beetles. Illustrative exits are dispersed with the light off and "
+    "cluster toward the floodlight with the light on. Paths and beetle "
+    "positions are schematic, not observed trajectories or a fitted sample. "
     "(b) Curves show kernel density estimates of the posterior "
     "population mean direction, with a common radial density scale; dots show "
     "each beetle's observed circular mean bearing. Bearings increase clockwise "
@@ -190,20 +197,97 @@ def panel_heading(fig, x, y, letter, title, title_x, *, align="center", letter_g
 def placed_vector(asset, prefix, *, x, y, width, height, path_color=None):
     """Place the original path-only artwork with unique IDs for each copy.
 
-    Arena copies share exactly the same geometry. Only the four schematic
-    exit-path colours change with treatment; beetle and ground artwork is kept.
+    The four arena exit paths use a common, legible stroke width.
     """
     root = ET.parse(asset).getroot()
     for element in root.iter():
         original_id = element.get("id")
         if path_color is not None and original_id in {"path3", "path4", "path23", "path24"}:
-            element.set("style", element.get("style").replace("stroke:#3e1f51", f"stroke:{path_color}"))
+            element.set("style", element.get("style")
+                        .replace("stroke:#3e1f51", f"stroke:{path_color}")
+                        .replace("stroke-width:1.33333", f"stroke-width:{SCHEMATIC_PATH_WIDTH}")
+                        .replace("stroke-linecap:butt", "stroke-linecap:round")
+                        .replace("stroke-linejoin:miter", "stroke-linejoin:round"))
         if original_id:
             element.set("id", f"{prefix}-{original_id}")
     root.set("id", prefix)
     for key, value in (("x", x), ("y", y), ("width", width), ("height", height)):
         root.set(key, str(value))
+    root.set("overflow", "visible")
     return root
+
+
+def svg_matrix(linear, translation):
+    values = (*linear[:, 0], *linear[:, 1], *translation)
+    return "matrix(" + " ".join(f"{v:.9g}" for v in values) + ")"
+
+
+def arena_vector(condition):
+    """Compose the treatment schematic from original vector paths.
+
+    The on exits fan toward the nominal lamp bearing on the arena ellipse.
+    Beetles use the original foreground view, placed and rigidly rotated to
+    face outward. This preserves round dung balls and the body proportions;
+    their size and drawing order vary gently with foreground depth.
+    """
+    prefix = f"arena-light-{condition}"
+    x, y, width, height = ARENA_BOUNDS[condition]
+    root = placed_vector(ASSET, prefix, x=x, y=y, width=width, height=height,
+                         path_color=OFF if condition == "off" else ON)
+    if condition == "off":
+        return root
+    original = {element.get("id"): element for element in root}
+    ground = original[f"{prefix}-path2"]
+    title = root.find(f"{{{SVG}}}title")
+    root[:] = [title, ground]
+    # Endpoints and foreground sprite anchors in the original SVG coordinates.
+    source_ends = [("path3", (236.71679, 40.834534)),
+                   ("path4", (208.62413, 122.27693)),
+                   ("path23", (146.9688, 27.535868)),
+                   ("path24", (90.390132, 43.903867))]
+    bearings = FLOOD_DIR + np.deg2rad([-40, -12, 13, 40])
+    beetles = []
+    for index, ((path_id, source_end), bearing) in enumerate(zip(source_ends, bearings)):
+        rim = ARENA_CENTRE + ARENA_RADII * np.array([np.sin(bearing), -np.cos(bearing)])
+        radial = rim - ARENA_CENTRE
+        direction = radial / np.linalg.norm(radial)
+        depth = (rim[1] - ARENA_CENTRE[1]) / ARENA_RADII[1]
+        size = 0.94 + 0.08 * depth
+        # Map each original wavy path to the back of its newly placed beetle.
+        target = radial - 26 * size * direction
+        source = np.asarray(source_end) - ARENA_CENTRE
+        angle = np.arctan2(target[1], target[0]) - np.arctan2(source[1], source[0])
+        scale = np.linalg.norm(target) / np.linalg.norm(source)
+        rotation = np.array([[np.cos(angle), -np.sin(angle)],
+                             [np.sin(angle), np.cos(angle)]])
+        linear = scale * rotation
+        path = deepcopy(original[f"{prefix}-{path_id}"])
+        path.set("transform", svg_matrix(linear, ARENA_CENTRE - linear @ ARENA_CENTRE))
+        # Compensate for the path transform so all displayed strokes match.
+        path.set("style", path.get("style").replace(
+            f"stroke-width:{SCHEMATIC_PATH_WIDTH}",
+            f"stroke-width:{SCHEMATIC_PATH_WIDTH / scale:.9g}"))
+        root.append(path)
+        angle = np.arctan2(radial[1], radial[0]) - np.arctan2(12, 16)
+        linear = size * np.array([[np.cos(angle), -np.sin(angle)],
+                                  [np.sin(angle), np.cos(angle)]])
+        beetle = ET.Element(f"{{{SVG}}}g", id=f"{prefix}-beetle-{index}",
+                            transform=svg_matrix(linear, rim - linear @ np.array([222, 117])))
+        for number in range(14, 23):
+            part = deepcopy(original[f"{prefix}-path{number}"])
+            part.set("id", f"{prefix}-beetle-{index}-path{number}")
+            beetle.append(part)
+        beetles.append((rim[1], beetle))
+    for _, beetle in sorted(beetles, key=lambda item: item[0]):
+        root.append(beetle)
+    return root
+
+
+def schematic_lamp_position():
+    """Project the nominal lamp bearing onto the same ellipse as the exits."""
+    point = ARENA_CENTRE + 2.05 * ARENA_RADII * np.array([np.sin(FLOOD_DIR), -np.cos(FLOOD_DIR)])
+    x, y, width, _ = ARENA_BOUNDS["on"]
+    return np.array([x, y]) + (point - np.array([20, 8])) * width / 262
 
 
 def draw_polar(fig, arrays, df):
@@ -287,6 +371,7 @@ def build_svg(arrays, df, *, family="Arial"):
         "svg.fonttype": "path", "svg.hashsalt": "unwrap-beetles-publication-v1",
         "figure.facecolor": "white", "axes.facecolor": "white",
     }
+    arena_lamp_xy = schematic_lamp_position()
     with mpl.rc_context(style):
         fig = plt.figure(figsize=(7.2, 4.8), dpi=160)
         panel_heading(fig, 0.025, 0.973, "a", "Repeated exit bearings",
@@ -294,7 +379,8 @@ def build_svg(arrays, df, *, family="Arial"):
         for centre, label in ((75 / 518.4, "Light off"), (200 / 518.4, "Light on")):
             fig.text(centre, 0.845, label, ha="center", va="top",
                      fontsize=9, weight="bold", color=INK)
-        fig.text(174 / 518.4, 1 - 158 / 345.6, "Floodlight", ha="center",
+        fig.text(arena_lamp_xy[0] / 518.4, 1 - (arena_lamp_xy[1] + 16) / 345.6,
+                 "Floodlight", ha="center",
                  va="top", fontsize=8, color=INK)
         panel_heading(fig, 0.545, 0.973, "b", "Reorientation", 0.82)
         lamp_xy = draw_polar(fig, arrays, df)
@@ -339,13 +425,12 @@ def build_svg(arrays, df, *, family="Arial"):
     root.insert(0, title)
     root.insert(1, desc)
     # Matched treatment schematics from the same original vector artwork.
-    # Coordinates are SVG points; paths illustrate the protocol, not data.
-    for condition, color, x in (("off", OFF, 20), ("on", ON, 145)):
-        root.append(placed_vector(ASSET, f"arena-light-{condition}",
-                                  x=x, y=70, width=110, height=110 * 122 / 262,
-                                  path_color=color))
+    # Coordinates are SVG points; paths illustrate the treatment result.
+    for condition in ("off", "on"):
+        root.append(arena_vector(condition))
     root.append(placed_vector(FLOODLIGHT_ASSET, "arena-floodlight",
-                              x=164, y=132, width=20, height=20))
+                              x=arena_lamp_xy[0] - 10, y=arena_lamp_xy[1] - 10,
+                              width=20, height=20))
     width, height = 7.2 * 72, 4.8 * 72
     root.append(placed_vector(FLOODLIGHT_ASSET, "polar-floodlight",
                               x=lamp_xy[0] * width - 13,
