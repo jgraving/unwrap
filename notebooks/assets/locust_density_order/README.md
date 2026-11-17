@@ -32,5 +32,9 @@ checks that retained a–e pixels are unchanged, excluding the unit line.
 The original scale-label backing and its transparency mask are retained.
 `images.json` records the SVG hash and preservation result. The generator
 rebuilds statistical panels f–h in code and inserts a correctly typeset unit.
+The presentation pass edits a parsed copy of this asset to reduce panel
+letters, replace f–h titles with bold versions of the same wording, and
+lighten d/e borders. Image geometry, clipping, and the complete scale-bar
+path are preserved; the source asset itself is not rewritten.
 
 To repeat extraction, see [the figure instructions](../../LOCUST_DENSITY_FIGURE.md).

@@ -1,21 +1,25 @@
 # Reproduce the locust density–order figure
 
-The generator reproduces the original manuscript's 750 × 525-point layout
-as the baseline. Panels a–e retain the original artwork, image crops,
-proportions, lettering, panel d's calibrated 10 cm scale bar, and panel e's
-vector density/order schematic. Panels f–h are rebuilt from numerical inputs
-in their original positions, with the original titles, full predictor names,
-boxed axes, and vertical legends. The density unit is typeset as one math
-expression, `(m⁻²)`, with the exponent inside the parentheses.
-Every panel letter and subplot title is retained from the source PDF as
-vector paths, including the original f–h titles.
+The generator starts from the original manuscript's 750 × 525-point layout
+and applies a restrained presentation pass. Image crops, proportions,
+panel d's calibrated 10 cm scale bar, and panel e's complete vector schematic
+retain their original geometry. Panels f–h use the same numerical inputs
+and positions, with the original title wording and full predictor names.
+
+The current styling uses 16-point panel letters, bold 11-point f–h titles,
+9-point statistical labels, thin left/bottom axes, and vertical legends
+without frames. Prediction lines are 1.5 points with 0.16-alpha bands.
+Borders around d/e are lighter. Order legend entries use 1.0 through 0.0.
+Density units are single math expressions, `(m⁻²)` and `(rad⁻¹)`, keeping
+the exponent inside the parentheses.
 
 Arial and the original red/purple, brown/green, and blue/orange palettes are
 retained. Statistical curves, bands, axes, schematics, and typography remain
 vector. Photos/renderings and the source scale-label backing/mask retain
 their original raster content. No generated imagery or screenshots of
-statistical panels are used. The earlier redesign remains in git history;
-the current output establishes the reproduction baseline for later edits.
+statistical panels are used. The faithful reproduction baseline is retained
+at commit `fb1ad2d60e58facca79c16d597d0d9fbc2b1a9f8`; the current rendering
+applies the approved polish to that baseline.
 
 ## Generate
 
@@ -95,6 +99,15 @@ throughout a–e, excluding only the unit line being replaced. The scale bar
 keeps its original endpoints, 139.509506 to 163.978531 PDF points, alongside
 the unmodified photo transform and 10 cm label. This avoids recalibrating a
 scale bar after changing an image crop.
+
+The baseline asset stays unchanged by styling. The renderer parses a copy,
+shrinks only the identified panel-letter glyphs, replaces f–h title glyphs
+with bold typesetting of the same wording, and lightens only the d/e frame
+strokes. Targeted structure checks guard against editing unexpected paths.
+Every source image attribute and ancestor transform/clipping attribute,
+and every scale-bar path attribute, is checked for equality before and after
+this presentation pass. Source-preparation pixel comparisons refer to the
+preserved baseline, before these deliberate typographic/frame edits.
 
 To repeat the extraction from a local copy of the **pinned** source PDF and
 notebook (PyMuPDF is needed only for this optional preparation step):
@@ -183,7 +196,8 @@ Checks cover the Bambi/PyMC graph comparison, stable density against SciPy,
 HDIs against ArviZ, periodicity, dimension order, the analytic uniform case,
 input integrity, original image hashes, deterministic SVG generation, and
 SVG/PDF export, unique composed SVG IDs, and the checksum of the preserved
-a–e artwork. The source-preparation command also verifies pixel preservation
-of the original panels. Review the PNG and an independently rendered PDF at
+a–e artwork. The presentation check verifies photo geometry and calibrated
+scale-bar preservation. Source preparation also verifies pixel preservation
+of the original baseline panels. Review the PNG and an independently rendered PDF at
 intended manuscript size. This PDF contains the source photographs and the
 original scale-label backing/mask; statistical content remains vector.

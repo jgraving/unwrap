@@ -12,6 +12,7 @@ import io
 import json
 from pathlib import Path
 import platform
+import re
 import subprocess
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -170,34 +171,39 @@ def statistics(post):
 
 
 def style_axis(ax):
-    for spine in ax.spines.values():
-        spine.set_visible(True)
-        spine.set_linewidth(1.02)
-        spine.set_color("black")
-    ax.tick_params(length=3.5, width=1.02, pad=3, colors="black", labelsize=8.93)
+    for side, spine in ax.spines.items():
+        spine.set_visible(side in ("left", "bottom"))
+        spine.set_linewidth(.65)
+        spine.set_color(INK)
+    ax.tick_params(length=3, width=.65, pad=3, colors=INK, labelsize=9)
     ax.grid(False)
 
 
 def draw_figure(stats, selection, *, family="Arial"):
-    """Reproduce the manuscript's 750 × 525-point multipanel layout.
+    """Polish the manuscript's 750 × 525-point multipanel layout.
 
-    a–e retain the original artwork and image transforms. Only f–h are
-    redrawn from numerical inputs; the density unit is corrected as one
-    math expression so its exponent stays inside the parentheses.
+    Source photo transforms and the calibrated scale bar are retained.
+    The presentation pass lightens frames, updates typography, and redraws
+    f–h from the same numerical inputs. Units remain single math expressions.
     """
     width, height = 750, 525
     def axes_at(fig, x, y, w, h):
         return fig.add_axes([x/width, (height-y-h)/height, w/width, h/height])
 
-    with mpl.rc_context({"font.family": family, "font.size": 8.93,
-                         "text.color": "black", "axes.labelcolor": "black",
+    with mpl.rc_context({"font.family": family, "font.size": 9,
+                         "text.color": INK, "axes.labelcolor": INK,
                          "mathtext.fontset": "custom", "mathtext.rm": family,
                          "mathtext.it": family + ":italic", "mathtext.bf": family + ":bold",
                          "mathtext.cal": family, "svg.fonttype": "path",
-                         "svg.hashsalt": "unwrap-locust-density-baseline-v1"}):
+                         "svg.hashsalt": "unwrap-locust-density-polish-v1"}):
         fig = plt.figure(figsize=(width/72, height/72))
         fig.patch.set_visible(False)
-        # All panel letters/titles are retained as original source paths.
+        # Retain the original title wording and positions with a common weight.
+        for text, x, y in (("Model selection", 471.45, 198.81),
+                           ("Population-level\ncoefficients", 663.04, 193.39),
+                           ("Population-level summary", 547.97, 377.55)):
+            fig.text(x/width, 1-y/height, text, ha="center", va="top",
+                     fontsize=11, weight="bold", linespacing=1)
         fig.text(245.4/width, 1-225/height, r"$(\mathrm{m}^{-2})$",
                  ha="center", va="baseline", fontsize=11)
         ax = axes_at(fig, 420.534, 220.492, 107.159, 116.196)
@@ -208,14 +214,14 @@ def draw_figure(stats, selection, *, family="Arial"):
             ax.errorbar(row["delta"], y, xerr=row["se"], color=color,
                         fmt="o" if row["has_order"] else "s", ms=5.7,
                         capsize=3, elinewidth=1.1, capthick=1)
-        ax.axvline(0, lw=1, color="black", ls=(0, (4, 3)))
+        ax.axvline(0, lw=.8, color=MUTED, ls=(0, (4, 3)))
         ax.set_yticks(range(5), [r["name"] for r in rows[::-1]])
         ax.set_ylim(-.2, 4.2); ax.set_xlim(-95, 5); ax.set_xticks([-50, 0])
         ax.set_xlabel("ELPD difference", labelpad=6)
         ax.legend(handles=[Line2D([], [], color=c, marker=m, label=t, ms=5.5)
                            for c, m, t in (("#1f77b4", "o", "Order included"),
                                            ("#ff7f0e", "s", "Order excluded"))],
-                  loc="upper left", frameon=True, fontsize=8.93, borderpad=.25,
+                  loc="upper left", frameon=False, fontsize=9, borderpad=.25,
                   handlelength=.8, handletextpad=.35, labelspacing=.15)
         ax = axes_at(fig, 607.833, 220.492, 107.159, 116.196)
         style_axis(ax)
@@ -227,13 +233,13 @@ def draw_figure(stats, selection, *, family="Arial"):
                 ax.errorbar(midpoint, y, xerr=(high-low)/2, color=color,
                             fmt="none", capsize=3, elinewidth=1.1, capthick=1)
                 ax.plot(mean, y, marker, ms=6, color=color)
-        ax.axvline(0, lw=1, color="black", ls=(0, (4, 3)))
+        ax.axvline(0, lw=.8, color=MUTED, ls=(0, (4, 3)))
         ax.set_yticks(range(4), ["Density × Order", "Order", "Density", "Intercept"])
         ax.set_ylim(-.25, 3.25); ax.set_xlim(-.35, 3.02); ax.set_xticks([0, 2])
         ax.set_xlabel("Coefficient value", labelpad=6)
         ax.legend(handles=[Line2D([], [], color=c, marker=m, label=t, ms=6)
                            for c, m, t in ((MU_COLOR, "D", "μ"), (KAPPA_COLOR, "^", "κ"))],
-                  loc="upper right", frameon=True, fontsize=8.93, borderpad=.25,
+                  loc="upper right", frameon=False, fontsize=9, borderpad=.25,
                   handlelength=.8, handletextpad=.35, labelspacing=.15)
         for key, grid, x, levels, cmap, xlabel in (
             ("over_order", "order_grid", 405.066, DENSITY_LEVELS, plt.cm.Reds, "Order"),
@@ -245,28 +251,70 @@ def draw_figure(stats, selection, *, family="Arial"):
             for i in range(len(levels)-1, -1, -1):
                 curve = stats[key][i]
                 color = cmap(.45 + .10*i)
-                ax.fill_between(stats[grid], curve["low"], curve["high"], color=color, alpha=.35, lw=0)
-                line, = ax.plot(stats[grid], curve["mean"], color=color, lw=1.27)
+                ax.fill_between(stats[grid], curve["low"], curve["high"], color=color, alpha=.16, lw=0)
+                line, = ax.plot(stats[grid], curve["mean"], color=color, lw=1.5)
                 handles.append(line)
-            ax.axhline(1/(2*np.pi), color="black", lw=1.15, ls=(0, (4, 3)))
+            ax.axhline(1/(2*np.pi), color=MUTED, lw=.8, ls=(0, (4, 3)))
             ax.set_ylim(0, 1); ax.set_yticks(np.linspace(0, 1, 6))
             ax.set_xlabel(xlabel, labelpad=6)
             if key == "over_order":
                 ax.set_xlim(0, 1); ax.set_xticks(np.linspace(0, 1, 6))
                 ax.set_xticklabels(["0", "0.2", "0.4", "0.6", "0.8", "1.0"])
-                ax.set_ylabel("Predictive density", labelpad=4)
+                ax.set_ylabel(r"Predictive density $(\mathrm{rad}^{-1})$", labelpad=4)
             else:
                 ax.set_xscale("log", base=2); ax.set_xlim(1, 64)
                 ax.set_xticks([1, 2, 4, 8, 16, 32, 64], ["1", "2", "4", "8", "16", "32", "64"])
-            ax.legend(handles=handles, labels=[f"{v:g}" for v in levels[::-1]],
+            labels = [f"{v:g}" if key == "over_order" else f"{v:.1f}" for v in levels[::-1]]
+            ax.legend(handles=handles, labels=labels,
                       title="Density" if key=="over_order" else "Order",
                       loc="center left", bbox_to_anchor=(1.035, .5), ncol=1,
-                      frameon=True, fontsize=8.93, title_fontsize=8.93,
+                      frameon=False, fontsize=9, title_fontsize=9,
                       handlelength=1.2, handletextpad=.4, labelspacing=.15, borderpad=.3)
         buffer = io.StringIO()
         fig.savefig(buffer, format="svg", metadata={"Date": None, "Creator": "unwrap locust_density_figure.py"})
         plt.close(fig)
     return embed_original_panels(buffer.getvalue())
+
+
+def polish_original_panels(root):
+    """Style selected vector elements without moving photos or the scale bar.
+
+    Operate on a parsed copy; the checksum-verified reproduction asset stays
+    intact. The source SVG retains its original PDF coordinates and clips.
+    """
+    parents = {child: parent for parent in root.iter() for child in parent}
+    anchors = [(28.97936, 25.457), (237.8304, 25.739808), (377.0035, 24.89151),
+               (28.45983, 209.1947), (189.6003, 209.1947), (351.6703, 209.1947),
+               (557.7246, 209.1947), (349.0309, 392.63349)]
+    changed_letters = removed_titles = schematic_borders = photo_borders = 0
+    for node in list(root.iter()):
+        transform = node.get("transform", "")
+        match = re.fullmatch(r"matrix\(([^)]+)\)", transform)
+        values = [float(v) for v in re.split(r"[ ,]+", match[1])] if match else []
+        if node.tag == f"{{{SVG}}}use" and len(values) == 6:
+            size, _, _, _, x, y = values
+            if abs(size - 19) < .001:
+                ax, ay = min(anchors, key=lambda a: abs(a[0]-x) + 10*abs(a[1]-y))
+                scale = 16/19
+                node.set("transform", f"matrix(16,0,0,-16,{ax+(x-ax)*scale},{ay-1.5})")
+                changed_letters += 1
+            elif abs(size - 11) < .001 and x > 420 and (198 < y < 215 or 385 < y < 390):
+                parents[node].remove(node)
+                removed_titles += 1
+        if node.tag != f"{{{SVG}}}path" or node.get("stroke") != "#000000":
+            continue
+        path = node.get("d", "")
+        if transform.startswith("matrix(1.651933,") and node.get("stroke-width") == ".8" \
+                and re.fullmatch(r"M[\d.]+ [\d.]+[VH][\d.]+", path):
+            node.set("stroke-width", ".4")
+            node.set("stroke", "#858585")
+            schematic_borders += 1
+        elif node.get("stroke-width") == "1.5" and path == "M0 0V119.125H119.4375V0H0ZM0 0":
+            node.set("stroke-width", ".75")
+            node.set("stroke", "#858585")
+            photo_borders += 1
+    if (changed_letters, schematic_borders, photo_borders) != (16, 48, 2) or removed_titles < 50:
+        raise ValueError("Original SVG structure changed; review the targeted presentation edits")
 
 
 def embed_original_panels(svg):
@@ -279,6 +327,7 @@ def embed_original_panels(svg):
     if sha256(path) != info["sha256"]:
         raise ValueError("Original panel artwork checksum mismatch")
     original = ET.parse(path).getroot()
+    polish_original_panels(original)
     original.set("x", "0"); original.set("y", "0")
     title = ET.Element(f"{{{SVG}}}title", id="figure-title"); title.text = "Locust density and order"
     desc = ET.Element(f"{{{SVG}}}desc", id="figure-description"); desc.text = CAPTION
@@ -342,8 +391,12 @@ def main(argv=None):
         "divergences": divergences, "selection_source": selection,
         "prediction_basis": "Original scaled coordinates of stored Bambi coefficients; concentration offset zero",
         "prediction_summary": "exp(mean(log density at zero)); exponentiated 90% log-density HDI",
-        "coefficient_hdi_probability": .95, "layout": "Original 750 × 525-point manuscript layout",
-        "illustration_basis": "Original PDF artwork for panels a–e, including calibrated scale bar", "caption": CAPTION}
+        "coefficient_hdi_probability": .95, "layout": "Polished original 750 × 525-point manuscript layout",
+        "illustration_basis": "Original PDF artwork for panels a–e, including calibrated scale bar",
+        "presentation": {"panel_letter_points": 16, "title_points": 11, "title_weight": "bold",
+                         "statistical_label_points": 9, "prediction_line_points": 1.5,
+                         "prediction_band_alpha": .16, "legend_columns": 1, "legend_frames": False},
+        "caption": CAPTION}
     stem = write_outputs(args.output_dir, statistics(post), selection, metadata, family=args.font_family)
     print(f"Wrote SVG, PDF, PNG, HTML and provenance JSON: {stem}")
 

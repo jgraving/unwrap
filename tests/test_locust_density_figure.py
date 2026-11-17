@@ -115,3 +115,34 @@ def test_assets_selection_and_vector_export(posterior, tmp_path):
     stem = figure.write_outputs(tmp_path, stats, selection, {}, family="DejaVu Sans")
     assert stem.with_suffix(".pdf").read_bytes().startswith(b"%PDF-")
     assert stem.with_suffix(".png").read_bytes().startswith(b"\x89PNG")
+
+
+def test_polish_preserves_photo_geometry_and_calibrated_scale():
+    """Presentation edits must not change any image or its ancestor transforms.
+
+    The scale bar's full path attributes remain identical, preserving its
+    length, location, and thickness alongside the unchanged photo geometry.
+    """
+    from copy import deepcopy
+
+    original = ET.parse(figure.ASSETS / "original_panels.svg").getroot()
+    polished = deepcopy(original)
+    def image_geometry(root):
+        parents = {child: parent for parent in root.iter() for child in parent}
+        result = []
+        for node in root.iter(f"{{{figure.SVG}}}image"):
+            chain = []
+            ancestor = node
+            while ancestor in parents:
+                ancestor = parents[ancestor]
+                chain.append(dict(ancestor.attrib))
+            result.append((dict(node.attrib), chain))
+        return result
+    def scale_bar(root):
+        return [dict(node.attrib) for node in root.iter(f"{{{figure.SVG}}}path")
+                if node.get("d") == "M0 0H24.46902"]
+    before_geometry, before_bar = image_geometry(original), scale_bar(original)
+    assert len(before_geometry) == 9 and len(before_bar) == 1
+    figure.polish_original_panels(polished)
+    assert image_geometry(polished) == before_geometry
+    assert scale_bar(polished) == before_bar
