@@ -6,9 +6,9 @@
     "fit_cache/beetles_fit.nc": "f985f7e55f6a28ffb9d6ec544c624b03d8195b7447ec575a43a82351247bf5d1",
     "fit_cache/beetles_fit.meta.json": "51dbcdd857bd26f3e2dadfe90dac85633c2d4698e868cd07330d722f20bbd278"
   },
-  "code_revision": "31398e1af0442bd42f3ae8741a9dd3142a3bb8aa",
+  "code_revision": "5fda8248c47db62e6ad2690df038bf949a1b3dfb",
   "source_sha256": {
-    "notebooks/beetles_figure.py": "ac1378c0f4018912650c124a0807bcd8356b01b2d2bc52351b794a3990c765d9",
+    "notebooks/beetles_figure.py": "34024147a2fd6c0c6ac923f5f12772b0c940560dc063cc3630e3ad167dbf2612",
     "notebooks/assets/beetle_arena.svg": "f7474fd7213af4001b7a802ceb2ed6a7cdda3667880f35ef3e89c3ce303b3862",
     "notebooks/assets/beetle_floodlight.svg": "366174ea1cebc388142e8af043673d79f494bffdf82f978a80318ff6704f4f24",
     "notebooks/beetles_study.json": "66bf3ca03c6a3047a917da0a2d51749ca8bc6aa7be03da25ee40a88ca5b30222",
@@ -57,7 +57,7 @@
   "source_doi": "10.1016/j.cub.2021.06.038",
   "source_location": "Results: Light pollution alters orientation behavior; Figure 3A",
   "source_note": "The paper's 210-degree statistic is the beetles' mean heading, not a measured lamp bearing. The previous 225-degree analysis centre represented southwest.",
-  "caption": "Artificial light shifts dung beetle orientation at multiple levels. (a) Each of ten beetles repeatedly exits the arena, with ten trials per lighting condition; four light-on bearings are missing. Matched light-off and light-on arena schematics show the two conditions experienced by the same beetles. The repeated exit paths are illustrative, with the same geometry in both conditions; they are not observed trajectories. (b) Curves show kernel density estimates of the posterior population mean direction, with a common radial density scale; dots show each beetle's observed circular mean bearing. Bearings increase clockwise from north, viewed from above. The lamp icon is schematic. The arc is centred at 202.5\u00b0 with a 45\u00b0 half-width, using the nominal south-southwest bearing reported by Foster et al. (2021), rather than a surveyed azimuth. Sector probabilities and intervals are conditional on this approximate centre. (c) Population-level within-individual concentration, converted to mean resultant length using I\u2081(\u03ba)/I\u2080(\u03ba). (d) Between-individual concentration: the resultant length of the ten fitted individual mean directions, calculated in each draw. (e) Probability of an exit within the marked sector, using population direction and concentration (individual offsets set to zero); the dashed line marks the uniform expectation of 0.25. (f) The paired draw-wise difference in this probability, on minus off. Points show posterior means and bars show 89% highest-density intervals.",
+  "caption": "Artificial light shifts dung beetle orientation at multiple levels. (a) Each of ten beetles repeatedly exits the arena, with ten trials per lighting condition; four light-on bearings are missing. Matched light-off and light-on arena schematics show the two conditions experienced by the same beetles. Illustrative exits are dispersed with the light off and cluster toward the floodlight with the light on. Paths and beetle positions are schematic, not observed trajectories or a fitted sample. (b) Curves show kernel density estimates of the posterior population mean direction, with a common radial density scale; dots show each beetle's observed circular mean bearing. Bearings increase clockwise from north, viewed from above. The lamp icon is schematic. The arc is centred at 202.5\u00b0 with a 45\u00b0 half-width, using the nominal south-southwest bearing reported by Foster et al. (2021), rather than a surveyed azimuth. Sector probabilities and intervals are conditional on this approximate centre. (c) Population-level within-individual concentration, converted to mean resultant length using I\u2081(\u03ba)/I\u2080(\u03ba). (d) Between-individual concentration: the resultant length of the ten fitted individual mean directions, calculated in each draw. (e) Probability of an exit within the marked sector, using population direction and concentration (individual offsets set to zero); the dashed line marks the uniform expectation of 0.25. (f) The paired draw-wise difference in this probability, on minus off. Points show posterior means and bars show 89% highest-density intervals.",
   "summaries": {
     "within": {
       "off": {
@@ -104,9 +104,9 @@
     }
   },
   "outputs_sha256": {
-    ".svg": "cba3b0edbb2998caad4674b1f0db3b9df03b745a93859715436ebf733a597c74",
-    ".pdf": "80b62ad15e8fff1d8e61558ad44e6ebae7cdc21b5c51ae1ad0efeee5d8c2fa13",
-    ".png": "09c68076b9808d1b23b527c90b36ad732428d29c7b5fdc022b8a5b040c567450",
-    ".html": "917d5bf096c904687d2edc71c005e5f03bb9aecb2e9e1fc4b20a7518f48ea893"
+    ".svg": "7ada1f234c2292bcb6db02955aee1d1d70b7b050614cc10f47f38013742adb50",
+    ".pdf": "0e2ec85e053882edf4c8648ce09879e544680dc62cffc0888e3dbc114a73facd",
+    ".png": "78dd9ee054d69ec331331e1f9a115243a3352cc81a57f6d1c03f920ec1811d5e",
+    ".html": "46d323212f8d38a643cbef8519289f2776fb05dfc14152bd70734b7e02639040"
   }
 }

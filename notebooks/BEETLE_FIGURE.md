@@ -2,10 +2,19 @@
 
 The six-panel figure combines the original arena and floodlight illustrations with newly
 rendered statistical panels. Panel a composes matched light-off and light-on
-arenas from the same SVG paths, at the same scale, with the floodlight beside
-the light-on arena. The grey/gold exit paths illustrate the measurement
-protocol: identical schematic geometry is reused across conditions. Each
-vector copy receives unique IDs. All placement and recolouring are in
+arenas from the original SVG artwork at the same scale, with the floodlight
+beside the light-on arena. Dispersed grey exits contrast with gold exits
+clustered toward the lamp. Four illustrative light-on bearings span offsets
+of −40°, −12°, +13°, and +40° from its nominal bearing; they are not observed
+bearings or fitted draws. Both treatments use thicker, round-ended paths
+(3.4 source units, about 1.43 points in the exported figure).
+
+The light-on paths are gentle cubic curves. Beetles reuse the original
+foreground view, translated and rigidly rotated to face outward; the dung
+balls remain round and body proportions are preserved. Slight depth scaling
+and back-to-front drawing order keep them visually grounded. The lamp and
+exit positions share the same elliptical projection. Each vector copy
+receives unique IDs. All placement, path construction, and recolouring are in
 `beetles_figure.py`; no manually edited or generated illustration is needed.
 
 The figure retains Arial and the existing grey/gold palette
@@ -82,7 +91,8 @@ environment replication, preserve the JSON and pin those versions.
 
 - **a:** Matched light-off and light-on schematics show the two conditions
   experienced by the same ten beetles. The original arena and beetle artwork
-  is reused in both; exit paths are illustrative, not observed trajectories.
+  is reused, with light-on exits clustered toward the lamp. Exit paths and
+  beetle positions are illustrative, not observed trajectories or fitted draws.
   Each beetle has ten trials per condition; four light-on bearings are missing.
 - **b:** Von Mises kernel densities of the posterior population mean
   direction, using the notebook's bandwidth concentration of 80 and a common
