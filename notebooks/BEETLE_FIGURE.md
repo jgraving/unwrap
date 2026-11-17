@@ -4,7 +4,8 @@ The six-panel figure combines the original arena and floodlight illustrations wi
 rendered statistical panels. It retains Arial and the existing grey/gold
 palette (`#9e9e9e` / `#f4a300`), with concise panel headings, measurement
 labels on the c–f y-axes, and a shared condition legend. The polar plot has
-light crosshairs and N/E/S/W labels; a thin separator divides the two rows.
+light crosshairs and N/E/S/W labels, with “Population-level mean” beneath
+“Reorientation”. White space separates the two rows.
 The statistical panels have ticked axes with only zero and uniform reference
 lines. Explanatory details live in the caption. The statistical
 estimands and 89% highest-density intervals match `beetles_plots.py`.
