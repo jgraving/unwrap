@@ -149,16 +149,17 @@ def test_polish_preserves_photo_geometry_and_calibrated_scale():
 
 
 def test_pdf_export_preserves_native_photo_streams(posterior, tmp_path):
-    """PDF rendering must retain each original compressed image and ICC profile."""
+    """PDF rendering must retain each checked-in high-resolution JPEG stream."""
     fitz = pytest.importorskip("fitz")
     selection = json.loads((figure.ASSETS / "selection.json").read_text())
     stem = figure.write_outputs(tmp_path, figure.statistics(posterior), selection, {},
                                 family="DejaVu Sans")
-    with fitz.open(figure.ASSETS / "reference.pdf") as original, fitz.open(stem.with_suffix(".pdf")) as exported:
-        expected = {(row[2], row[3]): original.xref_stream_raw(row[0])
-                    for row in original[0].get_images(full=True) if row[2] > 24}
+    with fitz.open(stem.with_suffix(".pdf")) as exported:
         actual = {(row[2], row[3]): exported.xref_stream_raw(row[0])
                   for row in exported[0].get_images(full=True) if row[2] > 24}
+        expected = {(item["width"], item["height"]): (figure.ASSETS / name).read_bytes()
+                    for name, item in
+                    json.loads((figure.ASSETS / "images.json").read_text())["images"].items()}
         assert len(actual) == 7
         assert actual == expected
         for row in exported[0].get_images(full=True):

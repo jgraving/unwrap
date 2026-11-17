@@ -17,9 +17,10 @@ parentheses or extra-high superscripts are used.
 
 Arial and the original red/purple, brown/green, and blue/orange palettes are
 retained. Statistical curves, bands, axes, schematics, and typography remain
-vector. PDF export restores the original JPEG image objects, including their ICC
-profiles and interpolation settings, without changing image placement or
-pixel dimensions. PNG previews are rendered from that PDF at 3000 × 2100.
+vector. PDF export restores the checked-in high-resolution JPEG image
+objects from the author's Keynote export, with interpolation settings,
+without changing image placement or pixel dimensions. PNG previews are
+rendered from that PDF at 3000 × 2100.
 The source scale-label backing/mask retains its original raster content. No generated imagery or screenshots of
 statistical panels are used. The faithful reproduction baseline is retained
 at commit `fb1ad2d60e58facca79c16d597d0d9fbc2b1a9f8`; the current rendering
@@ -72,7 +73,7 @@ python notebooks/locust_density_figure.py --download --font-dir /path/to/arial-f
 | --- | --- |
 | `locust_density_publication.svg` | Vector figure with embedded original JPEG streams |
 | `locust_density_publication.pdf` | Manuscript export with vector statistics and original raster photos |
-| `locust_density_publication.png` | 2,200-pixel review preview |
+| `locust_density_publication.png` | 3,000-pixel review preview rendered from the PDF |
 | `locust_density_publication.html` | Self-contained review page and full caption |
 | `locust_density_publication.json` | Input, source, font and output hashes; versions; numeric summaries |
 
@@ -83,17 +84,40 @@ the recorded package versions to reproduce a rendering environment exactly.
 
 ## Source images
 
-Seven **native JPEG image streams** were extracted from page 1 of
-`figures/locust_density_order_figure.pdf` in `jgraving/circstats`, revision
-`9bef710eb44fd8d20a61a7119a12e4933d02ce6d`. Their dimensions, PDF object
-numbers, and checksums are in
+Seven **native rasters** back panels a–e. The framing and PDF object numbers
+come from page 1 of `figures/locust_density_order_figure.pdf` in
+`jgraving/circstats`, revision `9bef710eb44fd8d20a61a7119a12e4933d02ce6d`
+(SHA-256 `48609fdc9185e20227ae0b1c20dd377301d5aa962c7d57078ef1bf5873d0bf21`),
+whose checked-in JPEG streams were originally 144–216 effective dpi. The
+files now carry the higher-resolution pixels of the author's Keynote export
+of the same figure (SHA-256
+`4b953238e985098c1d87c82e7ce6c8f25de6374aefc528900a4ee1cd6e471bf2`): each
+raster is resized to at most 400 effective pixels per display point, never
+above native, encoded at JPEG quality 88 without its ICC profile (the source
+profiles are sRGB-family; measured per-channel bias before dropping them is
+below 0.5/255). Inside `original_panels.svg` each replacement image keeps
+its ancestor transforms and clipping byte-identical and carries a per-image
+`transform="scale(...)"` equal to the manuscript/stored pixel ratio, so
+every display box — panel d's calibrated 10 cm scale bar included — stays
+exactly as published. Dimensions, policy, and checksums for both
+resolutions are in
 [`assets/locust_density_order/images.json`](assets/locust_density_order/images.json).
-The PDF SHA-256 is
-`48609fdc9185e20227ae0b1c20dd377301d5aa962c7d57078ef1bf5873d0bf21`.
 The JPEG files are checked in, so normal generation does not need access to
-the manuscript repository. `original_panels.svg` additionally preserves
+either source PDF. `original_panels.svg` additionally preserves
 the original a–e artwork and all PDF clipping/image transforms, rather than
-inventing new image crops. The source image files remain intact.
+inventing new image crops.
+
+To repeat the resolution upgrade after a fresh extraction (PyMuPDF is
+needed only for these optional preparation steps):
+
+```bash
+python -m pip install 'pymupdf>=1.26.6,<2'
+python tools/upgrade_locust_figure_images.py --export-pdf /path/to/locust_density_order_figure.pdf
+```
+
+`tools/refresh_locust_figure_artwork.py` re-applies the same upgrade
+automatically after every artwork re-extraction, so the high-resolution
+payloads survive a refresh deterministically.
 
 The preparation command removes the old f–h statistical drawings while
 keeping their panel letters/titles, and removes the old unit line. It
@@ -210,11 +234,15 @@ original scale-label backing/mask; statistical content remains vector.
 
 `notebooks/assets/locust_density_order/reference.pdf` is the checksum-pinned
 original figure from circstats at the revision above. It allows offline
-comparison of typography, image streams, colours, interpolation and crops.
-The virtual swarm embedded in that original is 445 × 445 pixels. Export now
-preserves its original compressed stream and colour profile; increasing the
-preview dimensions does not create additional image detail. A higher resolution
-source can replace this image once provided, without changing the panel crop.
+comparison of typography, crops, interpolation and the originally embedded
+low-resolution image streams; the virtual swarm embedded in that original was
+445 × 445 pixels at 144 effective dpi.
+
+The figure now uses the author's Keynote export of the same page as its
+raster source (see "Source images"): every photo and rendering has a
+higher-resolution native source, stored at up to 400 effective dpi, while
+panel crops, placements, the calibrated scale bar and the 10 cm label remain
+exactly as in the original.
 
 The cloud workflow `Locust figure fidelity` compares source and exported artwork
 and runs the scientific/export tests. All changes in this pass concern typography

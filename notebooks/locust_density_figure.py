@@ -219,25 +219,29 @@ def add_compact_unit_label(fig, x, y, label, unit, exponent, *,
 
 
 def restore_pdf_source_images(path):
-    """Keep the original JPEG streams, ICC profiles and PDF interpolation.
+    """Keep the checked-in high-resolution JPEG streams in the exported PDF.
 
     CairoSVG preserves the pixel dimensions but decodes/re-encodes the source
-    images into DeviceRGB. Copy the source image objects back without changing
-    any placement, crop, scale bar or drawing command.
+    images into Flate DeviceRGB. The stored JPEGs are the high-resolution
+    rasters from the author's Keynote export (see images.json); copy those
+    image objects back without changing any placement, crop, scale bar or
+    drawing command.
     """
     import fitz
-    reference = ASSETS / "reference.pdf"
     manifest = json.loads((ASSETS / "images.json").read_text())
-    if sha256(reference) != manifest["source_sha256"]:
-        raise ValueError("Original PDF checksum mismatch")
     document = fitz.open(path)
     geometry = document[0].get_image_info()
     targets = {(item[2], item[3]): item[0]
                for item in document[0].get_images(full=True)
                if item[2] > 24}
     temporary_page = len(document)
-    with fitz.open(reference) as original:
-        document.insert_pdf(original, from_page=0, to_page=0)
+    scratch = fitz.open()
+    scratch.new_page(width=750, height=525)
+    for name, item in manifest["images"].items():
+        scratch[0].insert_image(fitz.Rect(0, 0, item["width"], item["height"]),
+                                filename=str(ASSETS / name))
+    document.insert_pdf(scratch)
+    scratch.close()
     sources = {(item[2], item[3]): item[0]
                for item in document[temporary_page].get_images(full=True)
                if item[2] > 24}
@@ -245,6 +249,7 @@ def restore_pdf_source_images(path):
         raise ValueError("Source photo inventory changed; review image replacements")
     for dimensions, target in targets.items():
         document.xref_copy(sources[dimensions], target)
+        document.xref_set_key(target, "Interpolate", "true")
     document.delete_page(temporary_page)
     if [item["bbox"] for item in geometry] != [item["bbox"] for item in document[0].get_image_info()]:
         raise ValueError("Photo placement changed during PDF export")

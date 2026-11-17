@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT / "notebooks"))
 sys.path.insert(0, str(ROOT / "tools"))
 import locust_density_figure as figure
 import prepare_locust_figure_assets as prepare
+import upgrade_locust_figure_images as upgrade_tool
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -40,6 +41,7 @@ def main(argv=None):
         font_bytes = original.extract_font(10)[3]
         source_svg, changed = prepare.extract_original_panels(original)
     assert changed == 0
+    source_svg = upgrade_tool.upgrade_svg_payloads(source_svg)
     (figure.ASSETS / "original_panels.svg").write_text(source_svg)
     manifest_path = figure.ASSETS / "images.json"
     manifest = json.loads(manifest_path.read_text())
@@ -118,7 +120,7 @@ def main(argv=None):
         "superscript_scale": figure.SUPERSCRIPT_SCALE,
         "superscript_rise_em": figure.SUPERSCRIPT_RISE,
         "density_unit": "Retained original vector artwork",
-        "pdf_photos": "Original JPEG streams, ICC profiles and interpolation",
+        "pdf_photos": "Checked-in high-resolution JPEG streams (Keynote export)",
         "png_pixels": [3000, 2100],
         "numerical_summaries": "Unchanged"
     }
