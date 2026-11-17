@@ -5,9 +5,9 @@
     "fit_cache/locust_density_hier.nc": "af8df700a42354c59fa673e8635d25e4c11f038f404cdb9513aaf5b853176498",
     "fit_cache/locust_density_hier.meta.json": "ebbbd2a67f5145961da05357a32c1cb9f48181b37bd598050a48c4efaeaeec49"
   },
-  "code_revision": "212e3c3e624c19b922967c33dbc92beddd6e49de",
+  "code_revision": "98acb570eac6d4807109d57073a42cfea3368884",
   "source_sha256": {
-    "notebooks/locust_density_figure.py": "83c43d63c21af38c3e19412adce88a6b1569237e7ab985da2a118dd60a0d7fcb",
+    "notebooks/locust_density_figure.py": "80f43885f57588051ef8dc8675f59dcd162a87db24d6014c376d8b6d2c68f573",
     "tools/prepare_locust_figure_assets.py": "653eb4ed2e5f69a149301b3e39eafaa22a97eac75009437fb01f6ca90f0e29ea",
     "unwrap/link/numpy.py": "f598dda5da67f935dcd405b8ea379e46d0f90c5a1b80f853208c5607b64ceaf3",
     "unwrap/circular.py": "55c26262dbee6e71bfe1cbfdf0cb664d0a52e305665e7cf5d2f6e80c739defc2",
@@ -265,9 +265,9 @@
     ]
   },
   "outputs_sha256": {
-    ".svg": "a5ea6c5a4ff0202692a354b8fcfca8d95c72a588aeca0a8d60400caa5688b0b8",
-    ".pdf": "ed431fd7f64ab527cbab5e209253b547e7f1c53bf26de88e531bfc6d588f7295",
-    ".png": "7e77f3373a7c92168685fcd7d6131015081bb41f20802855cdb196d38ef62e01",
-    ".html": "975c1935747c5e8e4a8f9d0e8fcfc799f5f9874e19989103d1a60968b438edde"
+    ".svg": "2adf367ae305c9bd6549156564b766c68dc935558efad87f5f680099e9ef8387",
+    ".pdf": "5729a1223af846cf84d04bae3596198bcbb52a87d117ebd7c4bf57c834d799f3",
+    ".png": "54bc54b22ff72c41bbf9ac04c66106f95d66f990e8bb5486816870a6463a96dc",
+    ".html": "250c91460f7b08cd16219236205ec3564e38fdd9ad86f247e8a008c338560dd7"
   }
 }
