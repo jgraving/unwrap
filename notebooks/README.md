@@ -19,6 +19,13 @@ what that run validated.
 | [Artificial light reorients nocturnal dung beetles](beetles.ipynb) | How do manipulated orientation cues affect heading? | Security-light trials pulled from `unwrap-data` (`load_beetle_security_light`); fully rerun and validated from this checkout (seeded 2000+2000 von Mises Bambi fit of light ON/OFF heading with non-centered per-individual concentration random effects, zero divergences; circular summaries of the mean and concentration parameters; per-individual mean directions with the between-individual concentration kappa_mu of the individual means (intercept / light / difference) and the per-draw summary; the PPC figure with the per-observation log-likelihood cross-checked against the PyMC graph, working around the bambi vonmises kappa link bug, bambinos/bambi#1084) |
 | [Periodic but not circular](periodic_not_circular.ipynb) | Illustrate the distinction between periodic functions and circular responses | Simulated 24-hour activity data (seeded); fully rerun and validated from this checkout (seeded 1000+1000 NUTS fit of the beta-process activity rhythm with harmonic time-of-day predictors on the mean (logit link) and the concentration (softplus link), zero divergences; the figure overlays the posterior-predictive median and 50%/90% HDI on the simulated rhythm) |
 | [Von Mises navigation policy](von_mises_policy.ipynb) | Explore a von Mises directional policy | Simulated trajectories (seeded); fully rerun and validated from this checkout (exact von Mises densities as radial modulations and seeded Monte-Carlo steering-policy trajectories, one panel per concentration 0 / 0.5 / 2 / 5; a single two-resolution figure) |
+## Publication figure
+
+The beetle figure can be regenerated as SVG and PDF from the saved posterior,
+without running the notebook or sampling again. See the
+[reproduction instructions](BEETLE_FIGURE.md) and the
+[rendered preview](../assets/beetles-publication/beetles_publication.png).
+
 ## Setup
 
 Follow the [Python setup guide](../docs/getting-started.md). The animal-behaviour

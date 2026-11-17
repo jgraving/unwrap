@@ -130,7 +130,7 @@ polar_mu_kde_plot <- function(mu_kde, theta, r_pts, flood_arc, flood_ticks,
 # floodlight attraction (dashed Uniform reference at the 25% sector mass)
 # and the ON-minus-OFF change in that mass. Vertical error bars per
 # condition (Off grey / On gold), mean marker + 89% HDI with caps, value on
-# a 0-1 y axis.
+# a 0-1 y axis, extended below zero when the difference interval needs it.
 treatment_hdi_row <- function(population_kappa, group_alignment, flood_mass,
   condition_colors) {
   off_idx <- 1L
@@ -153,20 +153,22 @@ treatment_hdi_row <- function(population_kappa, group_alignment, flood_mass,
   }
   hdi_bar <- function(rows, title, ylab, cols, xlims) {
     rows$key <- paste(rows$kind, rows$cond, sep = "_")
+    y_min <- min(0, floor(min(rows$low, rows$value) * 5) / 5)
     p <- ggplot(rows, aes(x = pos, y = value, colour = cond, fill = key)) +
       geom_errorbar(aes(ymin = low, ymax = high), width = 0.16,
         linewidth = 0.3) +
       geom_point(shape = 16, size = 1.5) +
       scale_x_continuous(limits = xlims, breaks = unique(rows$pos),
         labels = rows$cond[order(rows$pos)], expand = c(0, 0)) +
-      scale_y_continuous(limits = c(0, 1), expand = c(0, 0),
-        breaks = seq(0, 1, by = 0.2),
+      scale_y_continuous(limits = c(y_min, 1), expand = c(0, 0),
+        breaks = seq(y_min, 1, by = 0.2),
         labels = function(v) format(v, digits = 1)) +
       scale_colour_manual(values = cols, guide = "none") +
       scale_fill_manual(values = hdi_fill_values(rows, cols), guide = "none") +
       labs(x = "", y = ylab, title = title) +
       theme_classic(base_size = 10) +
       theme(plot.title = element_text(hjust = 0.5, size = 11))
+    if (y_min < 0) p <- p + geom_hline(yintercept = 0, linewidth = 0.3)
     p
   }
   within_df <- rbind(add_hdi(A1_safe(population_kappa[, off_idx]), "Off", 1L),

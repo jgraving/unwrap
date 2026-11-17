@@ -36,7 +36,7 @@ We revisit a field experiment by
 [Foster et al. (2021)](https://doi.org/10.1016/j.cub.2021.06.038)
 with nocturnal dung beetles (*Scarabaeus satyrus*) in South Africa.
 The same beetles rolled their balls under natural nighttime illumination
-and with a floodlight to the southwest. If the lamp acts as a beacon,
+and with a floodlight to the south-southwest. If the lamp acts as a beacon,
 we expect bearings to shift toward it and different beetles to head
 in more similar directions. A separate question is whether the lamp
 changes how reliably each beetle repeats its own bearing.
@@ -126,9 +126,14 @@ c(R = as.character(getRversion()),
 ## Compare the lighting conditions
 
 Gray marks the natural-light control (floodlight off), and gold marks
-the floodlight treatment. The lamp's position defines the same southwest
-reference bearing in both conditions. That lets us ask how often beetles
-would exit toward that part of the arena even with the lamp off.
+the floodlight treatment. Bearings increase clockwise from north in our
+plan view; the original paper's upward sky photographs have east on the
+left instead. Foster et al. describe the lamp as south-southwest. We use
+its nominal compass bearing, 202.5°, as an approximate reference in both
+conditions, replacing the earlier southwest (225°) setting. The paper's
+210° statistic is the beetles' mean heading, not a measured lamp azimuth.
+The shared `notebooks/beetles_study.json` records this choice for the
+Python notebook, R twin, and publication figure.
 
 
 ```{r}
@@ -440,7 +445,7 @@ save_figure(p_trace, "trace", 9, 6)
 The curves on the polar plot show the posterior distribution of the
 population mean direction $\mu$ in each condition. The points on the
 outer ring show the observed mean bearing of each beetle. With the
-light on, the gold curve moves toward the marked southwest sector and
+light on, the gold curve moves toward the marked south-southwest sector and
 the individual means bunch near it. The estimated population shift is
 about 72° on average. The width of each curve describes uncertainty
 about the population mean direction. To see how tightly an individual
@@ -476,8 +481,9 @@ beetle repeated its exits, look at the concentration panel.
 ### How likely was an exit near the floodlight?
 
 For each posterior draw we calculate how much of the von Mises
-distribution falls within 45° of the lamp on either side. The
-calculation uses the population direction and concentration, which
+distribution falls within 45° of the approximate 202.5° lamp bearing
+on either side: the 157.5°–247.5° sector. The calculation uses the
+population direction and concentration, which
 describe a beetle whose individual offsets are zero. This probability
 combines direction and concentration. Tighter exits increase the
 probability when they cluster near the lamp and can decrease it when
@@ -485,12 +491,16 @@ they cluster elsewhere.
 
 The sector occupies $90^\circ/360^\circ=25\%$ of the circle, so the
 dashed line shows the prediction if all bearings were equally likely.
-The fitted probability rises from roughly 10% with the lamp off to
-70% with it on. The final panel subtracts off from on within each
-draw, giving an estimated increase of about 60 percentage points.
-The points and bars are posterior means and 89% highest-density
-intervals. The change is clearly positive in the figure, with
-substantial uncertainty about its size.
+The final panel subtracts off from on within each draw. The points and
+bars are posterior means and 89% highest-density intervals, conditional
+on the chosen reference bearing; they do not include uncertainty in the
+lamp's actual position. The pinned Python fit used for the publication
+figure gives about 23% off, 78% on, and a 55 percentage-point increase
+(89% interval: 11–93 points). These are Python-cache summaries, not
+precomputed results for the R fit. Recompute the summaries when rebaking.
+The sector centre matters: see the sensitivity check in
+[the figure notes](../notebooks/BEETLE_FIGURE.md#sector-centre-sensitivity)
+before interpreting this as a precisely measured lamp-centred effect.
 
 The additional density plot shows the full posterior for the change.
 Values to the right of the zero line represent an increase in the
@@ -520,6 +530,12 @@ save_figure(p_individual, "individual_posteriors", 10, 6)
 
 ```{r}
 #| cell-id: "beetles-19"
+# Shared with the Python notebook and publication figure. The nominal
+# south-southwest bearing (202.5 degrees) is an approximation from Foster
+# et al. (2021), not a surveyed azimuth or the beetles' 210-degree mean.
+beetle_study <- jsonlite::fromJSON(file.path(repo_root, "notebooks", "beetles_study.json"))
+FLOOD_DIR <- beetle_study$sector_center_degrees * pi / 180
+FLOOD_HALFWIDTH <- beetle_study$sector_halfwidth_degrees * pi / 180
 fixed <- as.data.frame(posterior::as_draws_df(fit))
 population_mu <- cbind(mod_circular(fixed$b_beta0_Intercept),
   mod_circular(fixed$b_beta0_Intercept + fixed$b_beta0_Light))
@@ -533,22 +549,22 @@ mu_kde <- do.call(rbind, lapply(1:2, function(c) {
 # plot_polar_mu_kde): the radius is 0.5 + 0.5 * kde/max_kde, so the
 # density-zero ring sits at radius 0.5 and the shared peak at 1.0. The
 # outer reference ring at radius 1.11 carries each beetle's per-condition
-# circular mean; the floodlight sector at -135 +/- 45 degrees is a black
+# circular mean; the approximate floodlight sector is a black
 # arc with end-and-centre ticks. The twin carries no tick labels here.
 max_kde_mu <- max(mu_kde$density)
 ring_base <- 0.5
 mu_kde$base <- ring_base
 mu_kde$r <- ring_base + 0.5 * mu_kde$density / max_kde_mu
 r_pts <- ring_base + 0.5 * 1.22
-# The marked arc is the +/-45-degree floodlight sector, centered at -135.
-flood_dir <- -3 * pi / 4
+# Mark the same sector that is integrated below.
+flood_dir <- FLOOD_DIR
 r_on_max <- max(mu_kde$r[mu_kde$condition == condition_labels[2]])
 r_mark <- r_on_max + 0.4 * (r_pts - r_on_max)
 cap <- 0.03 * r_pts
-flood_arc <- data.frame(theta = seq(flood_dir - pi / 4, flood_dir + pi / 4,
+flood_arc <- data.frame(theta = seq(flood_dir - FLOOD_HALFWIDTH, flood_dir + FLOOD_HALFWIDTH,
   length.out = 100L) %% (2 * pi), r = r_mark)
-flood_ticks <- data.frame(theta = c(flood_dir - pi / 4, flood_dir,
-  flood_dir + pi / 4) %% (2 * pi), lo = r_mark - cap, hi = r_mark + cap)
+flood_ticks <- data.frame(theta = c(flood_dir - FLOOD_HALFWIDTH, flood_dir,
+  flood_dir + FLOOD_HALFWIDTH) %% (2 * pi), lo = r_mark - cap, hi = r_mark + cap)
 ind_means <- do.call(rbind, lapply(split(data, list(data$Individual,
   data$condition), drop = TRUE), function(g) data.frame(
     theta = circ_mean(g$HeadingRadians) %% (2 * pi),
@@ -563,8 +579,7 @@ save_figure(p_mu, "treat_polar_mu_kde_clean", 3.0, 3.0)
 # the observed individuals or a marginal prediction for a new individual.
 population_kappa <- cbind(softplus(fixed$b_kappa_Intercept),
   softplus(fixed$b_kappa_Intercept + fixed$b_kappa_Light))
-FLOOD_DIR <- -135 * pi / 180
-arc <- seq(FLOOD_DIR - pi / 4, FLOOD_DIR + pi / 4, length.out = 181)
+arc <- seq(FLOOD_DIR - FLOOD_HALFWIDTH, FLOOD_DIR + FLOOD_HALFWIDTH, length.out = 181)
 delta <- diff(arc)[1]
 flood_mass <- matrix(0, nrow = nrow(population_mu), ncol = 2)
 for (j in 1:2) {
