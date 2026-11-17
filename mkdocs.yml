@@ -63,6 +63,8 @@ nav:
       - Grevy's zebra body orientation during an escape response:
           - Python: notebooks/zebra_escape.ipynb
           - R: notebooks_r/zebra_escape.ipynb
+      - Zebra escape-response map figure:
+          - Python: notebooks/zebra_map.ipynb
       - Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing:
           - Python: notebooks/goldshtein_bats.ipynb
           - R: notebooks_r/goldshtein_bats.ipynb
