@@ -567,6 +567,36 @@ def frames_every_distance_greedy(x, y, spacing_m, *, start_offset_m=0.0):
     return np.array(out, dtype=int)
 
 
+def _decimate_points(x, y, spacing_m):
+    """Greedy distance decimation of trajectory vertices.
+
+    Keeps the first and last valid position and walks forward placing a
+    vertex whenever the straight-line distance from the last kept vertex
+    reaches ``spacing_m``. The composite figure's export needs only
+    panel-scale vertices (one meter is ~2.3 points in the published
+    350-point map panel), and this matplotlib's SVG backend emits one
+    element per collection segment. NaN runs never select vertices; the
+    segment builder downstream joins across them exactly as with the
+    strided frames.
+    """
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    valid = np.isfinite(x) & np.isfinite(y)
+    idx = np.flatnonzero(valid)
+    if idx.size < 2:
+        return idx
+    out = [int(idx[0])]
+    ax_, ay_ = x[idx[0]], y[idx[0]]
+    s2 = float(spacing_m) ** 2
+    for i in idx[1:-1]:
+        dx, dy = x[i] - ax_, y[i] - ay_
+        if dx * dx + dy * dy >= s2:
+            out.append(int(i))
+            ax_, ay_ = x[i], y[i]
+    out.append(int(idx[-1]))
+    return np.asarray(out, dtype=int)
+
+
 def add_scale_bar_dual(
     ax,
     total_length_m=20.0,
@@ -682,7 +712,8 @@ def add_compass(
             units="points"))
 
 
-def plot_escape_map(
+def draw_escape_map(
+    ax,
     img,
     extent,
     pos,
@@ -692,6 +723,7 @@ def plot_escape_map(
     other_color="white", other_alpha=0.7, other_lw=0.8, other_stride=1,
     focal_line_color="black", focal_lw=2.2, focal_stride=1,
     arrow_mode="distance",
+    decimate_m=None,
     fps=30.0,
     arrow_every_s=20.0,
     arrows_every_m=5.0,
@@ -702,15 +734,20 @@ def plot_escape_map(
     arrow_edge_color="black", arrow_edge_width=0.7, arrow_edge_alpha=0.95,
     arrow_zorder=4.0,
     frame_max=None,
-    xlim=None, ylim=None, title=None,
-    figsize=(10, 10),
-    save=True,
-    save_path="figures/zebra_map/escape_map.pdf",
 ):
-    """Draw one escape-response map panel on the aerial mosaic.
+    """Draw one escape-response map panel onto an existing axes.
+
+    The aerial mosaic backdrop, the group's non-focal trajectories, the
+    focal animal's trajectory, and its orientation arrows are drawn onto
+    ``ax``. The standalone wrapper :func:`plot_escape_map` creates the
+    axes, adds the legend, scale bar and compass
+    (:func:`_finish_escape_map`) and exports; callers that embed the map
+    panel in a larger composite figure call this directly instead.
 
     Parameters
     ----------
+    ax
+        The axes to draw on (the mosaic fills it via ``imshow``).
     img, extent
         RGBA mosaic crop (``H, W, 4`` uint8) and its ``(left, right,
         bottom, top)`` extent in UTM 37N meters, from
@@ -733,6 +770,13 @@ def plot_escape_map(
     frame_max
         Optional inclusive frame cap (recorded footage extends slightly
         past the usable tracking, e.g. the published panels use 90698).
+    decimate_m
+        Optional vertex spacing in meters. When set, both trajectory
+        layers are drawn from the greedy distance-decimated vertices
+        of :func:`_decimate_points` (it overrides the strided-frame
+        decimation); the composite figure's vector export only needs
+        panel-scale vertices, since the SVG backend emits one element
+        per collection segment.
 
     Arrow fills are the house pre/post colors unless overridden.
     """
@@ -762,7 +806,6 @@ def plot_escape_map(
         clip = focal_frame <= int(frame_max)
         focal_x, focal_y, focal_frame = focal_x[clip], focal_y[clip], focal_frame[clip]
 
-    fig, ax = plt.subplots(figsize=figsize)
     ax.imshow(img, extent=(left, right, bottom, top), origin="upper")
 
     # ---- non-focal trajectories (faint context) ----
@@ -774,8 +817,14 @@ def plot_escape_map(
         g = g.sort_values("frame")
         if frame_max is not None:
             g = g[g["frame"] <= int(frame_max)]
-        gx = g["kp0_x"].to_numpy(float)[::other_stride]
-        gy = g["kp0_y"].to_numpy(float)[::other_stride]
+        gx = g["kp0_x"].to_numpy(float)
+        gy = g["kp0_y"].to_numpy(float)
+        if decimate_m is None:
+            gx = gx[::other_stride]
+            gy = gy[::other_stride]
+        else:
+            sel = _decimate_points(gx, gy, decimate_m)
+            gx, gy = gx[sel], gy[sel]
         s = _line_segments(gx, gy)
         if s.size:
             segs.append(s)
@@ -786,7 +835,12 @@ def plot_escape_map(
 
     # ---- focal trajectory ----
     focal_stride = max(int(focal_stride), 1)
-    seg_focal = _line_segments(focal_x[::focal_stride], focal_y[::focal_stride])
+    fx = focal_x[::focal_stride]
+    fy = focal_y[::focal_stride]
+    if decimate_m is not None:
+        sel = _decimate_points(focal_x, focal_y, decimate_m)
+        fx, fy = focal_x[sel], focal_y[sel]
+    seg_focal = _line_segments(fx, fy)
     if seg_focal.size:
         ax.add_collection(LineCollection(
             seg_focal, colors=focal_line_color, linewidths=focal_lw, zorder=3))
@@ -797,12 +851,6 @@ def plot_escape_map(
     if frame_max is not None:
         b = b[b["frame"] <= int(frame_max)]
     b = b.sort_values("frame").set_index("frame")
-
-    if b.empty:
-        _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
-                           focal_lw, other_color, arrow_pre_color, arrow_post_color)
-        _save_map(fig, save, save_path)
-        return fig
 
     # positions per frame for arrow anchors (frame -> row lookup)
     frame_to_row = {int(fr): r for r, fr in enumerate(focal_frame)}
@@ -848,6 +896,58 @@ def plot_escape_map(
                 patch.set_edgecolor(to_rgba(arrow_edge_color, arrow_edge_alpha))
             ax.add_patch(patch)
 
+
+def plot_escape_map(
+    img,
+    extent,
+    pos,
+    bearings,
+    focal_track,
+    *,
+    other_color="white", other_alpha=0.7, other_lw=0.8, other_stride=1,
+    focal_line_color="black", focal_lw=2.2, focal_stride=1,
+    arrow_mode="distance",
+    fps=30.0,
+    arrow_every_s=20.0,
+    arrows_every_m=5.0,
+    arrows_start_offset_m=0.0,
+    arrow_length=12.0,
+    tail_width_pt=1.2, head_width_pt=6.0, head_length_pt=7.5,
+    arrow_pre_color=None, arrow_post_color=None, arrow_alpha=0.85,
+    arrow_edge_color="black", arrow_edge_width=0.7, arrow_edge_alpha=0.95,
+    arrow_zorder=4.0,
+    frame_max=None,
+    xlim=None, ylim=None, title=None,
+    figsize=(10, 10),
+    save=True,
+    save_path="figures/zebra_map/escape_map.pdf",
+):
+    """Standalone escape-response map panel.
+
+    Creates the figure and axes, draws via :func:`draw_escape_map`, adds
+    the legend, scale bar and compass (:func:`_finish_escape_map`) and
+    exports through the house two-res saver under ``FIG_MAP_DIR``. See
+    :func:`draw_escape_map` for the panel parameters.
+    """
+    if arrow_pre_color is None:
+        arrow_pre_color = PRE_COLOR
+    if arrow_post_color is None:
+        arrow_post_color = POST_COLOR
+    fig, ax = plt.subplots(figsize=figsize)
+    draw_escape_map(
+        ax, img, extent, pos, bearings, focal_track,
+        other_color=other_color, other_alpha=other_alpha, other_lw=other_lw,
+        other_stride=other_stride, focal_line_color=focal_line_color,
+        focal_lw=focal_lw, focal_stride=focal_stride, arrow_mode=arrow_mode,
+        fps=fps, arrow_every_s=arrow_every_s, arrows_every_m=arrows_every_m,
+        arrows_start_offset_m=arrows_start_offset_m, arrow_length=arrow_length,
+        tail_width_pt=tail_width_pt, head_width_pt=head_width_pt,
+        head_length_pt=head_length_pt, arrow_pre_color=arrow_pre_color,
+        arrow_post_color=arrow_post_color, arrow_alpha=arrow_alpha,
+        arrow_edge_color=arrow_edge_color,
+        arrow_edge_width=arrow_edge_width, arrow_edge_alpha=arrow_edge_alpha,
+        arrow_zorder=arrow_zorder, frame_max=frame_max,
+    )
     _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
                        focal_lw, other_color, arrow_pre_color, arrow_post_color)
     _save_map(fig, save, save_path)
@@ -855,8 +955,21 @@ def plot_escape_map(
 
 
 def _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
-                       focal_lw, other_color, arrow_pre_color, arrow_post_color):
-    """Equal aspect, panel limits, legend, scale bar and compass."""
+                       focal_lw, other_color, arrow_pre_color, arrow_post_color,
+                       *, tight_layout=True,
+                       legend_anchor=(0.02, 0.5), fancybox=False,
+                       framealpha=0.9, scale_bar=True, compass=True,
+                       legend_loc="center left"):
+    """Equal aspect, panel limits, legend, scale bar and compass.
+
+    ``tight_layout`` runs ``plt.tight_layout()`` on the current figure at
+    the end (keep it on for the standalone panel; turn it off when the
+    map is one panel of a composite figure). ``legend_anchor`` /
+    ``fancybox`` / ``framealpha`` tune the legend box (the defaults are
+    the standalone panel's); ``scale_bar`` and ``compass`` turn the house
+    scale bar and north arrow on and off (composite figures may draw
+    their own).
+    """
     ax.set_aspect("equal", adjustable="box")
     if title:
         ax.set_title(title)
@@ -872,8 +985,9 @@ def _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
         Line2D([], [], color=arrow_post_color, marker=">", lw=0, ms=8,
                label="Post-stimulus"),
     ]
-    ax.legend(handles=handles, loc="center left", bbox_to_anchor=(0.02, 0.5),
-              frameon=True, framealpha=0.9, facecolor="lightgrey")
+    ax.legend(handles=handles, loc=legend_loc, bbox_to_anchor=legend_anchor,
+              frameon=True, framealpha=framealpha, facecolor="lightgrey",
+              fancybox=fancybox)
 
     for spine in ax.spines.values():
         spine.set_visible(False)
@@ -882,12 +996,15 @@ def _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
     ax.set_xticks([])
     ax.set_yticks([])
 
-    add_scale_bar_dual(ax, total_length_m=20, n_segments=2,
-                       segment_colors=("white", "black"), segment_height_pt=8,
-                       edgewidth=0.8, ax_xy=(0.97, 0.10), align="right",
-                       direction="left", label=True, label_above=False)
-    add_compass(ax, ax_xy=(0.92, 0.18), arrow_len_pt=42, head_width_pt=12,
-                head_length_pt=14, tail_width_pt=2.5, color="black",
-                edgecolor="black", edgewidth=1.0, draw_N=True, N_fontsize=12,
-                N_offset_pt=(0, 4))
-    plt.tight_layout()
+    if scale_bar:
+        add_scale_bar_dual(ax, total_length_m=20, n_segments=2,
+                           segment_colors=("white", "black"), segment_height_pt=8,
+                           edgewidth=0.8, ax_xy=(0.97, 0.10), align="right",
+                           direction="left", label=True, label_above=False)
+    if compass:
+        add_compass(ax, ax_xy=(0.92, 0.18), arrow_len_pt=42, head_width_pt=12,
+                    head_length_pt=14, tail_width_pt=2.5, color="black",
+                    edgecolor="black", edgewidth=1.0, draw_N=True, N_fontsize=12,
+                    N_offset_pt=(0, 4))
+    if tight_layout:
+        plt.tight_layout()

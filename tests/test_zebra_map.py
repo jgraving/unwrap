@@ -190,6 +190,36 @@ def test_greedy_sampler_bad_spacing():
 
 
 # ---------------------------------------------------------------------------
+def test_decimate_points_endpoints_and_spacing():
+    rng = np.random.default_rng(7)
+    x = np.cumsum(rng.normal(0.05, 0.1, 2000))
+    y = np.cumsum(rng.normal(0.0, 0.1, 2000))
+    sel = plots._decimate_points(x, y, spacing_m=1.0)
+    assert sel[0] == 0 and sel[-1] == 1999
+    assert np.all(np.diff(sel) > 0)
+    pts = np.column_stack([x[sel], y[sel]])
+    d = np.hypot(np.diff(pts[:, 0]), np.diff(pts[:, 1]))
+    # every greedy-placed vertex is at least spacing_m from the previous
+    # kept vertex (the final endpoint is appended unconditionally)
+    assert np.all(d[:-1] >= 1.0 - 1e-9)
+
+
+def test_decimate_points_nan_runs_select_nothing():
+    x = np.arange(100, dtype=float)
+    y = np.zeros(100)
+    x[40:60] = np.nan
+    sel = plots._decimate_points(x, y, 10.0)
+    assert not np.isin(sel, np.arange(40, 60)).any()
+    assert sel[0] == 0 and sel[-1] == 99
+
+
+def test_decimate_points_two_valid_points():
+    x = np.array([1.0, np.nan, np.nan, 4.0])
+    y = np.array([0.0, np.nan, np.nan, 0.0])
+    sel = plots._decimate_points(x, y, 10.0)
+    assert list(sel) == [0, 3]
+
+
 # plot_escape_map smoke
 # ---------------------------------------------------------------------------
 

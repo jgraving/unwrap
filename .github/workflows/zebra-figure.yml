@@ -1,0 +1,71 @@
+name: Zebra figure fidelity
+on:
+  push:
+    branches: [feat/zebra-publication-figure]
+    paths:
+      - '.github/workflows/zebra-figure.yml'
+      - 'notebooks/zebra_publication_figure.py'
+      - 'notebooks/zebra_plots.py'
+      - 'notebooks/assets/zebra_publication/**'
+      - 'tests/test_zebra_publication_figure.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: zebra-artwork-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install figure and test dependencies
+        run: |
+          uv venv
+          uv pip install -e '.[test,figure]'
+      - name: Check scientific results and export fidelity
+        run: uv run --no-project python -m pytest -q tests/test_zebra_publication_figure.py
+  deterministic-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-liberation
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install figure and test dependencies
+        run: |
+          uv venv
+          uv pip install -e '.[test,figure]'
+      - name: Refresh exports twice and compare (Liberation Sans)
+        run: |
+          uv run --no-project python notebooks/zebra_publication_figure.py \
+            --download --font-family "Liberation Sans" \
+            --output-dir /tmp/zebra-ci-1
+          sha256sum /tmp/zebra-ci-1/zebra_publication.svg > /tmp/zebra.sha256
+          uv run --no-project python notebooks/zebra_publication_figure.py \
+            --download --font-family "Liberation Sans" \
+            --output-dir /tmp/zebra-ci-2
+          sha256sum --check /tmp/zebra.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zebra-figure-exports
+          path: /tmp/zebra-ci-1

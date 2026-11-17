@@ -1,0 +1,20 @@
+{
+ "source_sha256": "0747eb1c18e1eecea18b9a77c2e0d0d94c2fa7cb1239495b591fd619e6e580ec",
+ "images": {
+  "drone_inset_pre.jpg": {
+   "sha256": "a43e27e80d0b609fd8f68f56d8fdb7caa749d3ef04461af559ac19f985903f49",
+   "width": 160,
+   "height": 160
+  },
+  "drone_inset_post.jpg": {
+   "sha256": "3b3054bdeb47d6a194a84f00e429f362aa08c2e705aa454a7472a41de3ad9d16",
+   "width": 160,
+   "height": 160
+  },
+  "zebra_photo.jpg": {
+   "sha256": "b7e23892cf26b99e3d28aa846910ddb2bb3f56598ba4969b31a51ed7094ac3fb",
+   "width": 2000,
+   "height": 1333
+  }
+ }
+}
