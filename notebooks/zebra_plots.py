@@ -487,7 +487,7 @@ def plot_ppc(idata, model, df_blocks, *, save=True,
 
 
 # ---------------------------------------------------------------------------
-# Escape-response map figure (used by zebra_map.ipynb).
+# Escape-response map figure (the map section of zebra_escape.ipynb).
 #
 # Group trajectories plus the focal animal's body-orientation arrows drawn
 # on the aerial orthomosaic crop. Data comes from the loaders in
@@ -498,14 +498,12 @@ def plot_ppc(idata, model, df_blocks, *, save=True,
 # (orange pre-stimulus, purple post-stimulus).
 # ---------------------------------------------------------------------------
 
-FIG_MAP_DIR = Path(__file__).resolve().parent.parent / "figures" / "zebra_map"
-
 
 def _save_map(fig, save, save_path):
-    """Write ``fig`` under ``figures/zebra_map/`` (house two-res saver)."""
+    """Write ``fig`` under ``figures/zebra/`` (house two-res saver)."""
     if not save:
         return
-    _plots.save_by_path(fig, FIG_MAP_DIR, save_path)
+    _plots.save_by_path(fig, FIG_DIR, save_path)
 
 
 def frames_every_distance_greedy(x, y, spacing_m, *, start_offset_m=0.0):
@@ -705,7 +703,7 @@ def plot_escape_map(
     xlim=None, ylim=None, title=None,
     figsize=(10, 10),
     save=True,
-    save_path="figures/zebra_map/escape_map.pdf",
+    save_path="figures/zebra/escape_map.pdf",
 ):
     """Draw one escape-response map panel on the aerial mosaic.
 
