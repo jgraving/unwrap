@@ -3,6 +3,7 @@
 Use after typography/artwork edits; statistical paths and numerical summaries
 are retained. Full figure regeneration remains locust_density_figure.py.
 """
+import argparse
 import base64
 from copy import deepcopy
 import hashlib
@@ -28,7 +29,10 @@ sys.path.insert(0, str(ROOT / "tools"))
 import locust_density_figure as figure
 import prepare_locust_figure_assets as prepare
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--preview", action="store_true", help="Emit review PNGs as base64")
+    args = parser.parse_args(argv)
     reference = figure.ASSETS / "reference.pdf"
     assert figure.sha256(reference) == prepare.PDF_SHA
     # Re-extract with the original compact density unit preserved.
@@ -49,7 +53,9 @@ def main():
     # These named groups are the previous h label and generated e unit only.
     for identifier in ("text_33", "text_65"):
         node = next((item for item in root.iter() if item.get("id") == identifier), None)
-        if node is not None:
+        if node is not None and any("Cmex10" in value
+                                    for child in node.iter()
+                                    for value in child.attrib.values()):
             parents[node].remove(node)
     previous_label = next((item for item in root.iter()
                            if item.get("id") == "predictive-density-label"), None)
@@ -84,16 +90,17 @@ def main():
     figure.restore_pdf_source_images(stem.with_suffix(".pdf"))
     with fitz.open(stem.with_suffix(".pdf")) as output:
         output[0].get_pixmap(matrix=fitz.Matrix(4, 4)).save(stem.with_suffix(".png"))
-        preview = output[0].get_pixmap(matrix=fitz.Matrix(2, 2))
-        print("FIGURE_PREVIEW_START")
-        print(base64.b64encode(preview.tobytes("png")).decode())
-        print("FIGURE_PREVIEW_END")
-        for name, rect in (("units", (225, 199, 267, 232)),
-                           ("ylabel", (368, 389, 387, 503))):
-            pix = output[0].get_pixmap(matrix=fitz.Matrix(5, 5), clip=fitz.Rect(rect))
-            print("PREVIEW_" + name + "_START")
-            print(base64.b64encode(pix.tobytes("png")).decode())
-            print("PREVIEW_" + name + "_END")
+        if args.preview:
+            preview = output[0].get_pixmap(matrix=fitz.Matrix(2, 2))
+            print("FIGURE_PREVIEW_START")
+            print(base64.b64encode(preview.tobytes("png")).decode())
+            print("FIGURE_PREVIEW_END")
+            for name, rect in (("units", (225, 199, 267, 232)),
+                               ("ylabel", (368, 389, 387, 503))):
+                pix = output[0].get_pixmap(matrix=fitz.Matrix(5, 5), clip=fitz.Rect(rect))
+                print("PREVIEW_" + name + "_START")
+                print(base64.b64encode(pix.tobytes("png")).decode())
+                print("PREVIEW_" + name + "_END")
     html = stem.with_suffix(".html").read_text()
     html = re.sub(r"<svg\b[\s\S]*</svg>", lambda m: svg.rstrip(), html, count=1)
     stem.with_suffix(".html").write_text(html)
@@ -101,8 +108,9 @@ def main():
     metadata["code_revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     for relative in list(metadata["source_sha256"]):
         metadata["source_sha256"][relative] = figure.sha256(ROOT / relative)
-    relative = reference.relative_to(ROOT).as_posix()
-    metadata["source_sha256"][relative] = figure.sha256(reference)
+    for path in (reference, Path(__file__)):
+        relative = path.relative_to(ROOT).as_posix()
+        metadata["source_sha256"][relative] = figure.sha256(path)
     metadata["artwork_refresh"] = {
         "source": "Original circstats PDF",
         "source_font": "Embedded ArialMT (xref 10), used for the h label",

@@ -34,7 +34,11 @@ jobs:
           uv venv
           uv pip install -e '.[test,figure]' 'pymupdf==1.26.6'
       - name: Refresh units and native image export
-        run: uv run --no-project python tools/refresh_locust_figure_artwork.py
+        run: |
+          uv run --no-project python tools/refresh_locust_figure_artwork.py
+          sha256sum assets/locust-density-publication/locust_density_publication.svg > /tmp/locust-svg.sha256
+          uv run --no-project python tools/refresh_locust_figure_artwork.py
+          sha256sum --check /tmp/locust-svg.sha256
       - name: Check scientific results and image fidelity
         run: uv run --no-project python -m pytest -q tests/test_locust_density_figure.py
       - uses: actions/upload-artifact@v4
@@ -44,37 +48,3 @@ jobs:
             assets/locust-density-publication
             notebooks/assets/locust_density_order/original_panels.svg
             notebooks/assets/locust_density_order/images.json
-
-  exports:
-    needs: refresh
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    strategy:
-      matrix:
-        file:
-          - assets/locust-density-publication/locust_density_publication.svg
-          - assets/locust-density-publication/locust_density_publication.pdf
-          - assets/locust-density-publication/locust_density_publication.png
-          - assets/locust-density-publication/locust_density_publication.html
-          - assets/locust-density-publication/locust_density_publication.json
-          - notebooks/assets/locust_density_order/original_panels.svg
-          - notebooks/assets/locust_density_order/images.json
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: locust-figure-exports
-      - name: Return one verified export
-        env:
-          EXPORT_FILE: ${{ matrix.file }}
-        shell: python
-        run: |
-          import base64, hashlib, json, os
-          from pathlib import Path
-          path = Path(os.environ["EXPORT_FILE"])
-          raw = path.read_bytes()
-          print("EXPORT_META " + json.dumps({"path": str(path), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}))
-          print("EXPORT_START " + str(path))
-          encoded = base64.b64encode(raw).decode()
-          for i in range(0, len(encoded), 1000):
-              print(encoded[i:i+1000])
-          print("EXPORT_END")

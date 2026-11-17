@@ -5,16 +5,16 @@
     "fit_cache/locust_density_hier.nc": "af8df700a42354c59fa673e8635d25e4c11f038f404cdb9513aaf5b853176498",
     "fit_cache/locust_density_hier.meta.json": "ebbbd2a67f5145961da05357a32c1cb9f48181b37bd598050a48c4efaeaeec49"
   },
-  "code_revision": "98acb570eac6d4807109d57073a42cfea3368884",
+  "code_revision": "86eb654f8fa3a8915203926e5dc90e279c124f6c",
   "source_sha256": {
-    "notebooks/locust_density_figure.py": "80f43885f57588051ef8dc8675f59dcd162a87db24d6014c376d8b6d2c68f573",
-    "tools/prepare_locust_figure_assets.py": "653eb4ed2e5f69a149301b3e39eafaa22a97eac75009437fb01f6ca90f0e29ea",
+    "notebooks/locust_density_figure.py": "b2ca69a0115b5d757781d7dbf735df2e6550418d35efca8788acb2f4c6b3dac6",
+    "tools/prepare_locust_figure_assets.py": "2a4631ae4ae2aeec97c2c76039a890b401573bc11fa12dd96389aa6125963320",
     "unwrap/link/numpy.py": "f598dda5da67f935dcd405b8ea379e46d0f90c5a1b80f853208c5607b64ceaf3",
     "unwrap/circular.py": "55c26262dbee6e71bfe1cbfdf0cb664d0a52e305665e7cf5d2f6e80c739defc2",
     "unwrap/bessel.py": "2fac0a114d83b63cf05c02f26a62863a426ed038284aa972cb6ff4e3d04a27f8",
     "notebooks/assets/locust_density_order/README.md": "cfeeab43d40bfc03e2699b35b6e770efe4d3a327d7ae84d4f3b4faaf84e44648",
-    "notebooks/assets/locust_density_order/images.json": "19a8217270533edf963c5e403d104a7029efcffda3d020d0c4c4d2fdd915a2a3",
-    "notebooks/assets/locust_density_order/original_panels.svg": "46f1ccea80a692a10bd7f5656d146f5dce902230ba0b231fc6fc19af4f5ee4e4",
+    "notebooks/assets/locust_density_order/images.json": "69b6f2638a983c1e5d283cbe4310173ecb8746a14809e4b592fdc6b2d422b55c",
+    "notebooks/assets/locust_density_order/original_panels.svg": "8a2507c13c941d0762e5f74fd47b96480f3beb42c8ed2e9d5642b4188d7741f8",
     "notebooks/assets/locust_density_order/real_locust.jpeg": "e0a43a3ba709e59039ba41d8fc12f92cb891d21d9a7e7130ab4919ca89e63b24",
     "notebooks/assets/locust_density_order/real_swarm.jpeg": "4b8192e1dd14ee18a7706a3e4699e9a5aaf0944d6249e08a68a5e9dd2cbac746",
     "notebooks/assets/locust_density_order/selection.json": "ae81cfa499d2d3aacd413548b6bd50b6ce6930f27fb90fa857cfc28a6573b82d",
@@ -22,7 +22,8 @@
     "notebooks/assets/locust_density_order/virtual_locust_lateral.jpeg": "596a50a9f92e95575de784bdf430ecf58a5f008a9969bb0407bbe10479bdf8ef",
     "notebooks/assets/locust_density_order/virtual_locust_rear.jpeg": "603558d32964599d2af4bfe37dfd6527a3ce8599cb1b5ae946663e7223e87581",
     "notebooks/assets/locust_density_order/virtual_swarm.jpeg": "c43412a2c60facadd011fa4dc24840a627b9863370035a01a7762486d09e4d4c",
-    "notebooks/assets/locust_density_order/vr_arena.jpeg": "83fa4e192f279d6722424791d103b69be0f6f97065ea502f979f924bcdb117e0"
+    "notebooks/assets/locust_density_order/vr_arena.jpeg": "83fa4e192f279d6722424791d103b69be0f6f97065ea502f979f924bcdb117e0",
+    "notebooks/assets/locust_density_order/reference.pdf": "48609fdc9185e20227ae0b1c20dd377301d5aa962c7d57078ef1bf5873d0bf21"
   },
   "python": "3.12.14",
   "font_family": "Arial",
@@ -265,9 +266,23 @@
     ]
   },
   "outputs_sha256": {
-    ".svg": "2adf367ae305c9bd6549156564b766c68dc935558efad87f5f680099e9ef8387",
-    ".pdf": "5729a1223af846cf84d04bae3596198bcbb52a87d117ebd7c4bf57c834d799f3",
-    ".png": "54bc54b22ff72c41bbf9ac04c66106f95d66f990e8bb5486816870a6463a96dc",
-    ".html": "250c91460f7b08cd16219236205ec3564e38fdd9ad86f247e8a008c338560dd7"
+    ".svg": "cbf0f4abf1e454e6f712948145c4d59e056ac461ebc459490fb9005f6571762a",
+    ".pdf": "ee05e0ab72ec6ada9391a40cf927e792be0e7c80e1fd0d44812b13a4e1ff5dba",
+    ".png": "4d8990aa9d4bd339f5d437d2b1103f377bbc84c35ddbb9c08d06cb0a26f438ba",
+    ".html": "480e44fa8d9dd134ba54ef6773f4f8f1647c127fb30e6ebf36fd56e890dcff73"
+  },
+  "artwork_refresh": {
+    "source": "Original circstats PDF",
+    "source_font": "Embedded ArialMT (xref 10), used for the h label",
+    "font_sha256": "cbf50db0105bfab518f87f9ac3c39a80af704082ac4b6608c5c238a511ca67ac",
+    "superscript_scale": 0.6666666666666666,
+    "superscript_rise_em": 0.23876954545454546,
+    "density_unit": "Retained original vector artwork",
+    "pdf_photos": "Original JPEG streams, ICC profiles and interpolation",
+    "png_pixels": [
+      3000,
+      2100
+    ],
+    "numerical_summaries": "Unchanged"
   }
 }
