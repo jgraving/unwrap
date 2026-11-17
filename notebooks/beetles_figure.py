@@ -300,19 +300,22 @@ def rolling_beetle(original, prefix, index, position, radial, size):
     ground_side = np.array([-outward[1], outward[0]])
     if np.dot(body_side, ground_side) < 0:
         body_side = -body_side
-    # Explicit fore/middle pairs: enough separation to remain visible at
-    # publication size, with all four feet planted inside the arena ellipse.
-    for pair, fraction, reach, span in (("fore", 0.2, 30, 9), ("middle", 0.5, 21, 12)):
+    # Short fore/middle pairs follow each pose's body axis, with four distinct
+    # feet on the arena rather than hidden behind the ball.
+    for pair, fraction, reach, span in (("fore", 0.2, -3.5, 6), ("middle", 0.5, 3, 8)):
         root = head + fraction * axis
         for side in (-1, 1):
             hip = root + side * size * (1.8 if pair == "fore" else 2.6) * body_side
-            foot = position + size * (-reach * outward + side * span * ground_side)
+            foot = hip + size * (reach * body_direction + side * span * body_side
+                                 + np.array([0, 1 if pair == "fore" else 2]))
+            if np.linalg.norm(foot - position) < 14 * size:
+                inward = np.dot(foot - position, -outward)
+                foot -= outward * max(0, 14 * size - inward)
             floor_radius = np.linalg.norm((foot - ARENA_CENTRE) / ARENA_RADII)
             if floor_radius > 0.97:
                 foot = ARENA_CENTRE + (foot - ARENA_CENTRE) * 0.97 / floor_radius
-            knee = (hip + foot) / 2 + size * (side * 3.5 * ground_side
-                                             - (1.5 if pair == "fore" else -0.5) * outward)
-            toe = foot + size * (-1.5 * outward + side * 0.35 * ground_side)
+            knee = (hip + foot) / 2 + size * (side * 2.5 * body_side - 0.8 * body_direction)
+            toe = foot + size * (-1.2 * body_direction + side * 0.35 * body_side)
             add_beetle_leg(beetle, f"{prefix}-beetle-{index}-{pair}-{side}",
                            (hip, knee, foot, toe), size)
     hips = sorted((linear @ np.array(hip) + body_shift for hip in pose["hips"]),
