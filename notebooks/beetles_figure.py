@@ -255,7 +255,7 @@ def rolling_beetle(original, prefix, index, position, radial, size):
     poses = (
         dict(ball=14, body=(22, 21, 20),
              anchor=(221.41477, 115.67518), head=(199.5, 102), flip=(1, 1),
-             abdomen=(211.61821, 106.32956), rest=(-7, -8), feet=((0, -9.5), (7, -5.5)),
+             abdomen=(211.61821, 106.32956), rest=(-7, -8), feet=((1, -10), (7, -5.5)),
              hips=((203.35827, 104.24067), (213.2612, 101.5208))),
         dict(ball=25, body=(26, 32, 33),
              anchor=(151.07448, 22.453), head=(150, 36), flip=(1, -1),
@@ -263,7 +263,7 @@ def rolling_beetle(original, prefix, index, position, radial, size):
              hips=((145.1332, 30.884533), (156.314, 31.298667))),
         dict(ball=34, body=(35, 41, 42),
              anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1),
-             abdomen=(85.29976, 36.01711), rest=(3.5, -5), feet=((-7, -5), (8, -9)),
+             abdomen=(85.29976, 36.01711), rest=(3.5, -5), feet=((-7, -5), (10.5, -5.5)),
              hips=((82.757467, 40.500533), (91.170133, 38.514533))),
         dict(ball=5, body=(8, 7, 6),
              anchor=(239.24303, 38.07613), head=(210.5, 40.5), flip=(-1, 1),
