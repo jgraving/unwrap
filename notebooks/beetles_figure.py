@@ -240,33 +240,27 @@ def arena_vector(condition):
     ground = original[f"{prefix}-path2"]
     title = root.find(f"{{{SVG}}}title")
     root[:] = [title, ground]
-    # Endpoints and foreground sprite anchors in the original SVG coordinates.
-    source_ends = [("path3", (236.71679, 40.834534)),
-                   ("path4", (208.62413, 122.27693)),
-                   ("path23", (146.9688, 27.535868)),
-                   ("path24", (90.390132, 43.903867))]
+    # Original path IDs and foreground sprite anchors in SVG coordinates.
+    path_ids = ("path3", "path4", "path23", "path24")
     bearings = FLOOD_DIR + np.deg2rad([-40, -12, 13, 40])
     beetles = []
-    for index, ((path_id, source_end), bearing) in enumerate(zip(source_ends, bearings)):
+    for index, (path_id, bearing) in enumerate(zip(path_ids, bearings)):
         rim = ARENA_CENTRE + ARENA_RADII * np.array([np.sin(bearing), -np.cos(bearing)])
         radial = rim - ARENA_CENTRE
         direction = radial / np.linalg.norm(radial)
         depth = (rim[1] - ARENA_CENTRE[1]) / ARENA_RADII[1]
         size = 0.94 + 0.08 * depth
-        # Map each original wavy path to the back of its newly placed beetle.
+        # Two gentle cubic curves reach the back of each beetle. Monotone
+        # progress along the exit ray avoids loops when the path is short.
         target = radial - 26 * size * direction
-        source = np.asarray(source_end) - ARENA_CENTRE
-        angle = np.arctan2(target[1], target[0]) - np.arctan2(source[1], source[0])
-        scale = np.linalg.norm(target) / np.linalg.norm(source)
-        rotation = np.array([[np.cos(angle), -np.sin(angle)],
-                             [np.sin(angle), np.cos(angle)]])
-        linear = scale * rotation
+        normal = np.array([-direction[1], direction[0]])
+        bend = 3.2 if index % 2 == 0 else -3.2
+        points = [ARENA_CENTRE + fraction * target + offset * normal
+                  for fraction, offset in ((0, 0), (0.15, bend), (0.35, -bend),
+                                           (0.5, 0), (0.65, bend), (0.85, -bend), (1, 0))]
+        coordinates = [" ".join(f"{value:.8g}" for value in point) for point in points]
         path = deepcopy(original[f"{prefix}-{path_id}"])
-        path.set("transform", svg_matrix(linear, ARENA_CENTRE - linear @ ARENA_CENTRE))
-        # Compensate for the path transform so all displayed strokes match.
-        path.set("style", path.get("style").replace(
-            f"stroke-width:{SCHEMATIC_PATH_WIDTH}",
-            f"stroke-width:{SCHEMATIC_PATH_WIDTH / scale:.9g}"))
+        path.set("d", f"M {coordinates[0]} C {' '.join(coordinates[1:4])} C {' '.join(coordinates[4:])}")
         root.append(path)
         angle = np.arctan2(radial[1], radial[0]) - np.arctan2(12, 16)
         linear = size * np.array([[np.cos(angle), -np.sin(angle)],
