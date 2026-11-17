@@ -14,7 +14,10 @@ setup(
     packages=find_packages(),
     install_requires=requirements,
     extras_require={
-        "test": ["pytest>=8,<10"],
+        # parquet engine needed by the dataset loader tests; >=16 is the
+        # first line compatible with numpy 2, which the minimum-deps CI
+        # job resolves
+        "test": ["pytest>=8,<10", "pyarrow>=16"],
         "notebook": [
             "jupyterlab>=4,<5",
             "nbclient>=0.10,<1",

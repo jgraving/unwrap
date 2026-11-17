@@ -8,7 +8,9 @@ experiments: the two locust studies (:func:`load_directional`,
 :func:`load_density_order`), the beetle security-light trials
 (:func:`load_beetle_security_light`), the zebra escape bearings
 (:func:`load_zebra_bearings`, plus :func:`load_zebra_bearings_raw` for the
-full per-frame raw source), and the bat homing-tracking tracks
+full per-frame raw source and :func:`load_zebra_postures` /
+:func:`load_zebra_mosaic` for the escape-map figure's posture positions
+and aerial-imagery backdrop), and the bat homing-tracking tracks
 (:func:`load_bats_tracks`, :func:`load_bats_info`,
 :func:`load_bats_lake_outline`).
 
@@ -348,6 +350,117 @@ def load_zebra_bearings_raw(
     if sort:
         df = df.sort_values("row_index", kind="mergesort").reset_index(drop=True)
     return df
+
+
+def load_zebra_postures(
+    data_root: Path | None = None,
+    *,
+    observation: str = "observation088",
+    tracks: list[int] | None = None,
+) -> pd.DataFrame:
+    """Load zebra posture keypoint positions (the input to the escape-map figure).
+
+    The original ``<observation>-postures.npy`` array
+    ``(tracks, frames, keypoints, 2)`` in UTM 37N meters was split per
+    tracked animal into wide float64 parquets
+    (``zebra_bearings/postures/<observation>-<track>.parquet``) so each
+    file stays within git's per-file limit; the split was verified
+    element-for-element against the npy (``tools/prepare_zebra_map_data.py``).
+
+    Returns ``frame`` (int, original frame index), ``track_number`` (str)
+    and one column per keypoint coordinate (``kp0_x, kp0_y, ..., kp9_y``,
+    float64, NaN where the keypoint was not detected). Keypoint 0 is the
+    animal's centre (its trajectory), and the per-frame body bearings from
+    keypoints 8 (rump) and 3 (shoulder) are already computed in
+    :func:`load_zebra_bearings_raw`.
+
+    ``tracks`` selects track numbers (the part after the dash in
+    ``track_number``); default loads every track of the observation.
+    """
+    base = _resolve_dir("zebra_bearings", data_root)
+    pos = base / "postures"
+    _require_dir(pos)
+    if tracks is None:
+        files = sorted(pos.glob(f"{observation}-*.parquet"))
+    else:
+        files = [pos / f"{observation}-{int(t)}.parquet" for t in tracks]
+    files = [f for f in files if f.exists()]
+    if not files:
+        raise FileNotFoundError(f"no posture files under {pos} for {observation}")
+    return pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+
+def load_zebra_mosaic(
+    data_root: Path | None = None,
+    *,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+    max_side_px: int | None = 4000,
+) -> tuple:
+    """Load the aerial orthomosaic behind the escape-map figure.
+
+    The published map panels crop the original 38645x44856 px orthomosaic
+    (RGBA uint8, 0.02707 m/px, UTM zone 37N) to a single native-resolution
+    window, stored losslessly as PNG row-strips plus a JSON manifest
+    (``zebra_bearings/mosaic/``; see ``tools/prepare_zebra_map_data.py``).
+
+    Returns ``(img, extent)`` where ``img`` is a ``(H, W, 4)`` uint8 RGBA
+    array and ``extent`` is ``(left, right, bottom, top)`` in UTM 37N
+    meters, ready for ``ax.imshow(img, extent=extent, origin="upper")``.
+
+    ``xlim``/``ylim`` (meters) return only the requested window; tiles and
+    columns outside it are never read. ``max_side_px`` downsamples the
+    returned image (nearest-neighbor) so it stays a sane size when
+    embedded in the saved PDF; pass ``None`` for the full 0.027 m/px crop.
+    """
+    import json
+
+    import numpy as np
+    from PIL import Image
+
+    base = _resolve_dir("zebra_bearings", data_root)
+    mos = base / "mosaic"
+    _require_dir(mos)
+    manifest = json.loads((mos / "manifest.json").read_text())
+    left, right = manifest["extent"]["left"], manifest["extent"]["right"]
+    top, bottom = manifest["extent"]["top"], manifest["extent"]["bottom"]
+    ps = manifest["pixel_size_m"]
+    n_rows, n_cols = manifest["n_rows"], manifest["n_cols"]
+
+    # global pixel window (row 0 = top = y == top; cols increase with x)
+    c0, c1 = 0, n_cols
+    if xlim is not None:
+        c0 = max(0, int(np.floor((min(xlim) - left) / ps)))
+        c1 = min(n_cols, int(np.ceil((max(xlim) - left) / ps)))
+    r0, r1 = 0, n_rows
+    if ylim is not None:
+        r0 = max(0, int(np.floor((top - max(ylim)) / ps)))
+        r1 = min(n_rows, int(np.ceil((top - min(ylim)) / ps)))
+    if c0 >= c1 or r0 >= r1:
+        raise ValueError("requested window lies outside the mosaic crop")
+
+    strips = []
+    for tile in manifest["tiles"]:
+        t0, t1 = tile["row0"], tile["row0"] + tile["nrows"]
+        if t1 <= r0 or t0 >= r1:
+            continue
+        img = Image.open(mos / tile["file"]).convert("RGBA")
+        a = np.asarray(img)
+        del img
+        if t0 < r0 or t0 + a.shape[0] > r1:  # keep only intersecting rows
+            lo, hi = max(r0 - t0, 0), min(r1 - t0, a.shape[0])
+            a = a[lo:hi]
+        strips.append(a[:, c0:c1])
+    out = np.concatenate(strips, axis=0)
+
+    extent = (left + c0 * ps, left + c1 * ps, top - r1 * ps, top - r0 * ps)
+    if max_side_px is not None and max(out.shape[:2]) > max_side_px:
+        scale = max_side_px / max(out.shape[:2])
+        w_new = max(1, int(round(out.shape[1] * scale)))
+        h_new = max(1, int(round(out.shape[0] * scale)))
+        img = Image.fromarray(out, mode="RGBA")
+        out = np.asarray(img.resize((w_new, h_new), Image.NEAREST))
+    return out, extent
 
 
 def _read_bats_excel(filename: str, data_root: Path | None, *,

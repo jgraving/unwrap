@@ -24,7 +24,10 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
+from matplotlib.patches import ArrowStyle, FancyArrowPatch
+from matplotlib.transforms import offset_copy
 
 from unwrap import plots as _plots
 from unwrap.circular import circ_xerr_from_interval as _circ_xerr
@@ -481,3 +484,410 @@ def plot_ppc(idata, model, df_blocks, *, save=True,
 
     _save(fig, save, save_path)
     return fig
+
+
+# ---------------------------------------------------------------------------
+# Escape-response map figure (used by zebra_map.ipynb).
+#
+# Group trajectories plus the focal animal's body-orientation arrows drawn
+# on the aerial orthomosaic crop. Data comes from the loaders in
+# ``unwrap.datasets`` (``load_zebra_mosaic`` for the backdrop,
+# ``load_zebra_postures`` for positions, ``load_zebra_bearings_raw`` for
+# the per-frame bearings); everything is plotted as recorded -- no
+# smoothing anywhere. Arrow fills follow the house pre/post palette
+# (orange pre-stimulus, purple post-stimulus).
+# ---------------------------------------------------------------------------
+
+FIG_MAP_DIR = Path(__file__).resolve().parent.parent / "figures" / "zebra_map"
+
+
+def _save_map(fig, save, save_path):
+    """Write ``fig`` under ``figures/zebra_map/`` (house two-res saver)."""
+    if not save:
+        return
+    _plots.save_by_path(fig, FIG_MAP_DIR, save_path)
+
+
+def frames_every_distance_greedy(x, y, spacing_m, *, start_offset_m=0.0):
+    """Pick frame indices at ~fixed straight-line spacing (greedy walk).
+
+    Start at the first valid (non-NaN) sample; walk forward and place a
+    point whenever the straight-line distance from the last anchor exceeds
+    the threshold -- ``start_offset_m`` for the first placement,
+    ``spacing_m`` thereafter. A NaN gap re-anchors at the next valid frame.
+    Returns indices into ``x``/``y``.
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+    assert x.ndim == y.ndim == 1 and x.shape == y.shape
+    spacing_m = float(spacing_m)
+    start_offset_m = float(start_offset_m)
+    if spacing_m <= 0:
+        raise ValueError("spacing_m must be > 0")
+
+    n = x.size
+    valid = np.isfinite(x) & np.isfinite(y)
+    out = []
+
+    i = 0
+    while i < n and not valid[i]:
+        i += 1
+    if i >= n:
+        return np.array([], dtype=int)
+
+    anchor = i
+    threshold = start_offset_m
+    placed_any = False
+
+    i += 1
+    while i < n:
+        if not valid[i]:
+            i += 1
+            while i < n and not valid[i]:
+                i += 1
+            if i >= n:
+                break
+            anchor = i
+            threshold = start_offset_m if not placed_any else spacing_m
+            i += 1
+            continue
+
+        dx = x[i] - x[anchor]
+        dy = y[i] - y[anchor]
+        dist = (dx * dx + dy * dy) ** 0.5
+        if dist >= threshold:
+            out.append(i)
+            anchor = i
+            placed_any = True
+            threshold = spacing_m
+            i += 1
+        else:
+            i += 1
+
+    return np.array(out, dtype=int)
+
+
+def add_scale_bar_dual(
+    ax,
+    total_length_m=20.0,
+    n_segments=2,
+    segment_colors=("white", "black"),
+    segment_height_pt=8,
+    edgecolor="black",
+    edgewidth=0.8,
+    label=True,
+    label_above=False,
+    label_kwargs=None,
+    ax_xy=(0.95, 0.08),
+    offset_pt=(0, -41),
+    align="right",
+    direction="left",
+    pad_text_pt=4,
+):
+    """Two-tone horizontal scale bar with a length in METERS (data units).
+
+    Placement uses axes coords plus a point offset; the bar is drawn as
+    rectangles in data coordinates.
+    """
+    if label_kwargs is None:
+        label_kwargs = dict(color="black", fontsize=10, ha="center", va="top")
+
+    base = offset_copy(ax.transAxes, fig=ax.figure, x=offset_pt[0],
+                       y=offset_pt[1], units="points")
+    x_disp, y_disp = base.transform(ax_xy)
+    x_anchor, y_anchor = ax.transData.inverted().transform((x_disp, y_disp))
+
+    seg_len = total_length_m / float(max(n_segments, 1))
+    if direction == "left":
+        x0 = x_anchor if align == "left" else x_anchor - total_length_m
+    elif direction == "right":
+        if align == "right":
+            x0 = x_anchor - total_length_m
+        else:
+            x0 = x_anchor
+    else:
+        raise ValueError("direction must be 'left' or 'right'")
+    xdir = +1
+
+    # height in points -> data units
+    fig_dpi = ax.figure.dpi
+    _, axpix_h = ax.figure.get_size_inches() * fig_dpi
+    y_min, y_max = ax.get_ylim()
+    pt_to_data_y = (y_max - y_min) / axpix_h
+    half_h = 0.5 * segment_height_pt * pt_to_data_y
+    yb, yt = y_anchor - half_h, y_anchor + half_h
+
+    colors = (segment_colors *
+              ((n_segments + len(segment_colors) - 1) // len(segment_colors))
+              )[:n_segments]
+    for i in range(n_segments):
+        xa = x0 + xdir * (i * seg_len)
+        xb = x0 + xdir * ((i + 1) * seg_len)
+        ax.add_patch(plt.Rectangle(
+            (min(xa, xb), yb), abs(xb - xa), yt - yb,
+            facecolor=colors[i], edgecolor=edgecolor, linewidth=edgewidth,
+            zorder=5))
+
+    if label:
+        x_center = x0 + xdir * (total_length_m / 2.0)
+        txt = ax.text(x_center, y_anchor, f"{int(total_length_m)} m",
+                      **label_kwargs)
+        dy = pad_text_pt if label_above else -pad_text_pt
+        txt.set_transform(offset_copy(ax.transData, fig=ax.figure, x=0,
+                                      y=dy, units="points"))
+
+
+def add_compass(
+    ax,
+    ax_xy=(0.92, 0.18),
+    offset_pt=(0, -95),
+    arrow_len_pt=42,
+    head_width_pt=12,
+    head_length_pt=14,
+    tail_width_pt=2.5,
+    color="black",
+    edgecolor="black",
+    edgewidth=1.0,
+    alpha=1.0,
+    draw_N=True,
+    N_fontsize=12,
+    N_offset_pt=(0, 4),
+):
+    """North arrow drawn in AXES coordinates (stays upright, fixed size)."""
+    base = offset_copy(ax.transAxes, fig=ax.figure, x=offset_pt[0],
+                       y=offset_pt[1], units="points")
+    fig_dpi = ax.figure.dpi
+    _, axpix_h = ax.figure.get_size_inches() * fig_dpi
+    dy_axes = arrow_len_pt / axpix_h
+
+    x_axes, y_axes = ax_xy
+    style = ArrowStyle.Simple(head_length=head_length_pt,
+                              head_width=head_width_pt,
+                              tail_width=tail_width_pt)
+    patch = FancyArrowPatch((x_axes, y_axes), (x_axes, y_axes + dy_axes),
+                            arrowstyle=style, mutation_scale=1.0,
+                            linewidth=edgewidth, edgecolor=edgecolor,
+                            facecolor=color, alpha=alpha, joinstyle="miter",
+                            capstyle="butt", zorder=6)
+    patch.set_transform(base)
+    ax.add_patch(patch)
+
+    if draw_N:
+        tx = ax.text(x_axes, y_axes + dy_axes, "N", transform=ax.transAxes,
+                     ha="center", va="bottom", fontsize=N_fontsize,
+                     color=color, zorder=6)
+        tx.set_transform(offset_copy(
+            ax.transAxes, fig=ax.figure,
+            x=N_offset_pt[0] + offset_pt[0], y=N_offset_pt[1] + offset_pt[1],
+            units="points"))
+
+
+def plot_escape_map(
+    img,
+    extent,
+    pos,
+    bearings,
+    focal_track,
+    *,
+    other_color="white", other_alpha=0.7, other_lw=0.8, other_stride=1,
+    focal_line_color="black", focal_lw=2.2, focal_stride=1,
+    arrow_mode="distance",
+    fps=30.0,
+    arrow_every_s=20.0,
+    arrows_every_m=5.0,
+    arrows_start_offset_m=0.0,
+    arrow_length=12.0,
+    tail_width_pt=1.2, head_width_pt=6.0, head_length_pt=7.5,
+    arrow_pre_color=None, arrow_post_color=None, arrow_alpha=0.85,
+    arrow_edge_color="black", arrow_edge_width=0.7, arrow_edge_alpha=0.95,
+    arrow_zorder=4.0,
+    frame_max=None,
+    xlim=None, ylim=None, title=None,
+    figsize=(10, 10),
+    save=True,
+    save_path="figures/zebra_map/escape_map.pdf",
+):
+    """Draw one escape-response map panel on the aerial mosaic.
+
+    Parameters
+    ----------
+    img, extent
+        RGBA mosaic crop (``H, W, 4`` uint8) and its ``(left, right,
+        bottom, top)`` extent in UTM 37N meters, from
+        :func:`unwrap.datasets.load_zebra_mosaic`.
+    pos
+        Posture positions from :func:`unwrap.datasets.load_zebra_postures`
+        (columns ``frame``, ``track_number``, ``kp0_x``, ``kp0_y``, ...);
+        keypoint 0 (the animal centre) is drawn as the trajectory.
+    bearings
+        Per-frame bearings from :func:`unwrap.datasets.load_zebra_bearings_raw`
+        (columns ``track_number``, ``frame``, ``compass_bearing``,
+        ``pre_scare``).
+    focal_track
+        ``track_number`` to draw black with orientation arrows; all other
+        tracks in the mosaic window become the faint background group.
+    arrow_mode
+        ``"distance"`` places arrows every ``arrows_every_m`` meters of
+        straight-line travel; ``"time"`` every ``arrow_every_s`` seconds at
+        ``fps`` video frames per second.
+    frame_max
+        Optional inclusive frame cap (recorded footage extends slightly
+        past the usable tracking, e.g. the published panels use 90698).
+
+    Arrow fills are the house pre/post colors unless overridden.
+    """
+    if arrow_pre_color is None:
+        arrow_pre_color = PRE_COLOR
+    if arrow_post_color is None:
+        arrow_post_color = POST_COLOR
+
+    def _line_segments(x, y):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        keep = np.isfinite(x) & np.isfinite(y)
+        x, y = x[keep], y[keep]
+        if x.size < 2:
+            return np.zeros((0, 2, 2))
+        pts = np.column_stack([x, y])
+        return np.stack([pts[:-1], pts[1:]], axis=1)
+
+    left, right, bottom, top = extent
+
+    # ---- focal positions, indexed by frame ----
+    focal = pos.loc[pos["track_number"] == focal_track].sort_values("frame")
+    focal_x = focal["kp0_x"].to_numpy(float)
+    focal_y = focal["kp0_y"].to_numpy(float)
+    focal_frame = focal["frame"].to_numpy(int)
+    if frame_max is not None:
+        clip = focal_frame <= int(frame_max)
+        focal_x, focal_y, focal_frame = focal_x[clip], focal_y[clip], focal_frame[clip]
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.imshow(img, extent=(left, right, bottom, top), origin="upper")
+
+    # ---- non-focal trajectories (faint context) ----
+    other_stride = max(int(other_stride), 1)
+    segs = []
+    for tg, g in pos.groupby("track_number", sort=False):
+        if tg == focal_track:
+            continue
+        g = g.sort_values("frame")
+        if frame_max is not None:
+            g = g[g["frame"] <= int(frame_max)]
+        gx = g["kp0_x"].to_numpy(float)[::other_stride]
+        gy = g["kp0_y"].to_numpy(float)[::other_stride]
+        s = _line_segments(gx, gy)
+        if s.size:
+            segs.append(s)
+    if segs:
+        ax.add_collection(LineCollection(
+            np.concatenate(segs, axis=0), colors=other_color,
+            linewidths=other_lw, alpha=other_alpha, zorder=2))
+
+    # ---- focal trajectory ----
+    focal_stride = max(int(focal_stride), 1)
+    seg_focal = _line_segments(focal_x[::focal_stride], focal_y[::focal_stride])
+    if seg_focal.size:
+        ax.add_collection(LineCollection(
+            seg_focal, colors=focal_line_color, linewidths=focal_lw, zorder=3))
+
+    # ---- focal bearings ----
+    b = bearings.loc[bearings["track_number"] == focal_track]
+    b = b[["frame", "compass_bearing", "pre_scare"]].dropna(subset=["compass_bearing"])
+    if frame_max is not None:
+        b = b[b["frame"] <= int(frame_max)]
+    b = b.sort_values("frame").set_index("frame")
+
+    if b.empty:
+        _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
+                           focal_lw, other_color, arrow_pre_color, arrow_post_color)
+        _save_map(fig, save, save_path)
+        return fig
+
+    # positions per frame for arrow anchors (frame -> row lookup)
+    frame_to_row = {int(fr): r for r, fr in enumerate(focal_frame)}
+
+    if str(arrow_mode).lower() == "time":
+        step = max(int(round(arrow_every_s * fps)), 1)
+        arrow_frames = b.index.to_numpy()[::step]
+    elif str(arrow_mode).lower() == "distance":
+        cand = frames_every_distance_greedy(
+            focal_x, focal_y, spacing_m=float(arrows_every_m),
+            start_offset_m=float(arrows_start_offset_m))
+        arrow_frames = b.index.intersection(cand).to_numpy()
+    else:
+        raise ValueError("arrow_mode must be 'time' or 'distance'")
+
+    if arrow_frames.size:
+        bearings_deg = b.loc[arrow_frames, "compass_bearing"].to_numpy(float)
+        pre_at = b.loc[arrow_frames, "pre_scare"].to_numpy().astype(bool)
+        theta = np.deg2rad((90.0 - bearings_deg) % 360.0)
+        ux, vy = np.cos(theta), np.sin(theta)
+        n = np.hypot(ux, vy)
+        n[n == 0] = 1.0
+        ux, vy = ux / n, vy / n
+
+        arrow_style = ArrowStyle.Simple(head_length=head_length_pt,
+                                        head_width=head_width_pt,
+                                        tail_width=tail_width_pt)
+        from matplotlib.colors import to_rgba
+
+        for fr, u, v, is_pre in zip(arrow_frames, ux, vy, pre_at):
+            r = frame_to_row.get(int(fr))
+            if r is None:
+                continue
+            x0, y0 = focal_x[r], focal_y[r]
+            patch = FancyArrowPatch(
+                (x0, y0), (x0 + u * arrow_length, y0 + v * arrow_length),
+                arrowstyle=arrow_style, mutation_scale=1.0,
+                linewidth=arrow_edge_width, edgecolor=arrow_edge_color,
+                facecolor=arrow_pre_color if is_pre else arrow_post_color,
+                alpha=arrow_alpha, zorder=arrow_zorder, joinstyle="miter",
+                capstyle="butt")
+            if arrow_edge_alpha is not None and arrow_edge_alpha != arrow_alpha:
+                patch.set_edgecolor(to_rgba(arrow_edge_color, arrow_edge_alpha))
+            ax.add_patch(patch)
+
+    _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
+                       focal_lw, other_color, arrow_pre_color, arrow_post_color)
+    _save_map(fig, save, save_path)
+    return fig
+
+
+def _finish_escape_map(ax, extent, xlim, ylim, title, focal_line_color,
+                       focal_lw, other_color, arrow_pre_color, arrow_post_color):
+    """Equal aspect, panel limits, legend, scale bar and compass."""
+    ax.set_aspect("equal", adjustable="box")
+    if title:
+        ax.set_title(title)
+    ax.set_xlim(sorted(xlim) if xlim is not None else (extent[0], extent[1]))
+    ax.set_ylim(sorted(ylim) if ylim is not None else (extent[2], extent[3]))
+
+    handles = [
+        Line2D([], [], color=focal_line_color, lw=focal_lw, label="Focal"),
+        Line2D([], [], color=str(other_color), lw=2.4, alpha=1.0,
+               label="Non-focal"),
+        Line2D([], [], color=arrow_pre_color, marker=">", lw=0, ms=8,
+               label="Pre-stimulus"),
+        Line2D([], [], color=arrow_post_color, marker=">", lw=0, ms=8,
+               label="Post-stimulus"),
+    ]
+    ax.legend(handles=handles, loc="center left", bbox_to_anchor=(0.02, 0.5),
+              frameon=True, framealpha=0.9, facecolor="lightgrey")
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    add_scale_bar_dual(ax, total_length_m=20, n_segments=2,
+                       segment_colors=("white", "black"), segment_height_pt=8,
+                       edgewidth=0.8, ax_xy=(0.97, 0.10), align="right",
+                       direction="left", label=True, label_above=False)
+    add_compass(ax, ax_xy=(0.92, 0.18), arrow_len_pt=42, head_width_pt=12,
+                head_length_pt=14, tail_width_pt=2.5, color="black",
+                edgecolor="black", edgewidth=1.0, draw_N=True, N_fontsize=12,
+                N_offset_pt=(0, 4))
+    plt.tight_layout()
