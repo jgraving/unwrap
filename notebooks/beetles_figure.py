@@ -227,7 +227,7 @@ def rolling_beetle(original, prefix, index, position, radial, size):
 
     Keep the camera's upright direction: choose/mirror the closest view and
     limit its turn to 25 degrees. Place the body and ball separately, drawing
-    the ball in front and the two articulated hind legs over its upper cap.
+    the ball in front and two filled, tapered hind legs over its upper cap.
     """
     poses = (
         dict(ball=14, body=(22, 21, 20), ground=(15, 16, 17),
@@ -271,12 +271,24 @@ def rolling_beetle(original, prefix, index, position, radial, size):
         contact = position + size * np.array([side * 5.0, -8.5])
         knee = (hip + contact) / 2 + size * np.array([side * 2.8, -3.5])
         toe = contact + size * np.array([side * 0.7, 1.3])
-        points = [" ".join(f"{value:.8g}" for value in point)
-                  for point in (hip, knee, contact, toe)]
+        centres = np.array([hip, knee, contact, toe])
+        segments = np.diff(centres, axis=0)
+        normals = np.column_stack((-segments[:, 1], segments[:, 0]))
+        normals /= np.linalg.norm(normals, axis=1)[:, None]
+        joints = np.vstack((normals[0], normals[:-1] + normals[1:], normals[-1]))
+        joints /= np.linalg.norm(joints, axis=1)[:, None]
+        # Broad articulated upper leg, narrowing through the shank to the
+        # foot. Mitred edges match the angular filled legs in the source SVG.
+        half_widths = size * np.array([0.95, 1.15, 0.42, 0.08])
+        mitres = np.ones(4)
+        mitres[1:-1] = np.clip(np.sum(joints[1:-1] * normals[:-1], axis=1), 0.5, 1)
+        offsets = joints * (half_widths / mitres)[:, None]
+        outline = np.vstack((centres + offsets, (centres - offsets)[::-1]))
+        points = [" ".join(f"{value:.8g}" for value in point) for point in outline]
         ET.SubElement(beetle, f"{{{SVG}}}path", id=f"{prefix}-beetle-{index}-hind-{side}",
-                      d=f"M {points[0]} L {points[1]} L {points[2]} L {points[3]}",
-                      style=f"fill:none;stroke:#3b493e;stroke-width:{1.1 * size:.8g};"
-                            "stroke-linecap:round;stroke-linejoin:round")
+                      d="M " + " L ".join(points) + " Z",
+                      style=f"fill:#575756;stroke:#3b493e;stroke-width:{0.548 * size:.8g};"
+                            "stroke-linecap:butt;stroke-linejoin:miter")
     return beetle, linear @ np.array(pose["head"]) + body_shift
 
 
