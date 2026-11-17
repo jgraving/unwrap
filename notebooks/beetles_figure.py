@@ -240,8 +240,9 @@ def rolling_beetle(original, prefix, index, position, radial, size):
              leg_shapes={
                  27: "M 152.69067 35.371467 L 157.1 35.6 L 158.2 32.8",
                  28: "M 147.83747 35.852133 L 143.1 36.1 L 142.4 32.6",
-                 30: "M 145.1332 30.884533 L 141.81987 28.192533 L 143.2 25.8",
-                 31: "M 156.314 31.298667 L 159.834 28.0 L 158.8 25.5"}),
+                 # Broader rear pair, with both toes still on the ball.
+                 30: "M 145.1332 30.884533 L 140.6 27.8 L 142.3 24.7",
+                 31: "M 156.314 31.298667 L 161.0 28.0 L 159.5 25.1"}),
         dict(ball=34, body=(35, 41, 42), legs=(36, 37, 38, 39, 40),
              anchor=(82.74406, 32.1399), head=(87.5, 45), flip=(1, -1),
              abdomen=(85.29976, 36.01711), rest=(3.5, -7),
@@ -252,7 +253,11 @@ def rolling_beetle(original, prefix, index, position, radial, size):
         dict(ball=5, body=(8, 7, 6), legs=(9, 10, 11, 12, 13),
              anchor=(239.24303, 38.07613), head=(210.5, 40.5), flip=(-1, 1),
              abdomen=(221.47183, 29.21353), rest=(8, -8),
-             leg_shapes={12: "M 226.02587 31.765467 L 228.7 31.7 L 232.4 31.3"}),
+             leg_shapes={
+                 # The middle leg steps toward the arena, clear of the two
+                 # hind legs that reach back onto the ball.
+                 11: "M 217.3 34.8 L 218.2 40.8 L 216.1 43.0",
+                 12: "M 226.02587 31.765467 L 228.7 31.7 L 232.4 31.3"}),
     )
     pose = poses[index]
     mirror = np.diag(pose["flip"])
@@ -273,8 +278,8 @@ def rolling_beetle(original, prefix, index, position, radial, size):
         part.set("id", f"{prefix}-beetle-{index}-path{number}")
         part.set("transform", svg_matrix(linear, shift))
         if number in pose["leg_shapes"]:
-            # Redraw only the distal bend, in the source pose's coordinates.
-            # Keep the original filled-triangle silhouette and stroke weight.
+            # Adjust individual legs in the source pose's coordinates,
+            # retaining its filled-triangle silhouette and stroke weight.
             part.set("d", pose["leg_shapes"][number])
         beetle.append(part)
 
