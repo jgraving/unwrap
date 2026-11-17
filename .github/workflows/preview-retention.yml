@@ -1,0 +1,68 @@
+name: Retain newest preview artifacts
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/preview-retention.yml']
+  workflow_run:
+    workflows: ["Documentation"]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: retain-newest-preview-artifacts
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: github.repository == 'jgraving/unwrap'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+    steps:
+      # Inline API-only cleanup: never checks out or executes pull request code.
+      - name: Keep latest completed preview of each type
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const repo = context.repo;
+            const expected = new Map([["documentation-site",".github/workflows/docs.yml"]]);
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              ...repo, per_page: 100
+            });
+            const runs = new Map();
+            const groups = new Map();
+            for (const artifact of artifacts) {
+              if (artifact.expired || !expected.has(artifact.name) || !artifact.workflow_run?.id) continue;
+              const created = Date.parse(artifact.created_at);
+              if (!Number.isFinite(created) || created > Date.now()) continue;
+              const runId = artifact.workflow_run.id;
+              if (!runs.has(runId)) {
+                runs.set(runId, (await github.rest.actions.getWorkflowRun({...repo, run_id: runId})).data);
+              }
+              const run = runs.get(runId);
+              // Restrict deletion to completed runs of the exact producing workflow.
+              if (run.status !== 'completed' || run.path !== expected.get(artifact.name)) continue;
+              if (!groups.has(artifact.name)) groups.set(artifact.name, []);
+              groups.get(artifact.name).push(artifact);
+            }
+            let deleted = 0;
+            let bytes = 0;
+            for (const [name, copies] of groups) {
+              copies.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id);
+              core.info('Keeping newest ' + name + ' (' + copies[0].id + ')');
+              for (const artifact of copies.slice(1)) {
+                try {
+                  await github.rest.actions.deleteArtifact({...repo, artifact_id: artifact.id});
+                  deleted++;
+                  bytes += artifact.size_in_bytes;
+                  core.info('Deleted superseded ' + name + ' (' + artifact.id + ')');
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                  core.info('Artifact already expired or removed: ' + artifact.id);
+                }
+              }
+            }
+            await core.summary.addHeading('Preview artifact cleanup')
+              .addRaw('Deleted ' + deleted + ' superseded artifacts (' + (bytes / 2 ** 30).toFixed(2) + ' GiB). Latest completed copy of each preview type retained. Deployment bundles and active runs are excluded.')
+              .write();
