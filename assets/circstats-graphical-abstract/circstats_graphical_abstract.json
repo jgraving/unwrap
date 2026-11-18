@@ -1,6 +1,6 @@
 {
   "figure": "circstats_graphical_abstract",
-  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, each polar curve is a prior or posterior predictive draw. Zero density starts on the inner ring, and dots show the observed angles. The two lanes use excerpts from three illustrative MCMC chains. Highlighted direction draws from different turns wrap to nearly the same angle; softplus maps concentration draws to positive values.",
+  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, each polar curve is a prior or posterior predictive draw. Zero density starts on the inner ring. The blue rug along its inside edge marks the observed angles. Each lane shows 160 consecutive draws from three illustrative MCMC chains. Direction traces use three equivalent turns and their highlighted draws wrap to nearly the same angle. Softplus maps concentration draws to positive values.",
   "page_pt": [
     599.0,
     342.0
@@ -49,6 +49,7 @@
     "seed": 159,
     "warmup": 600,
     "posterior_draws_per_chain": 1000,
+    "displayed_draws_per_chain": 160,
     "chains": 3,
     "initial_direction_turns": [
       -1,
@@ -64,9 +65,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "587ca67758878cadb1cf7a6453aebd8a455a076ebf5c37fc87d149b87d594bc8",
-    "pdf_sha256": "b9822eb0b9a676af6c4892795445b7061e22b9735391d30601019ea62f014a1d",
-    "png_sha256": "1862429badf773c3a93d9d3451721fb64bb3d08b611d1c8dc40522697c337301",
-    "html_sha256": "fb91c52d6b4b372a2b5d332fea9b1905305025de35145c5c297f5c31fd00dca3"
+    "svg_sha256": "b35399cb56fec99665f2d62cc7d133ae60547fde36e9fe7a662a6620ac3c1368",
+    "pdf_sha256": "11f75870431a49f9525370de851a9be0a4e9efaf59b59bedb42e188525d07e87",
+    "png_sha256": "30da3fb571908112d79443e27f1421c0271f083fb05d73e5a188fe2f059dd0fa",
+    "html_sha256": "bcaaed5339d827fb10da44b4785bf12f907c7c88f958e69e6ad5b1daf6dd7c60"
   }
 }

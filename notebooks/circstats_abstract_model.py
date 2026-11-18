@@ -160,9 +160,8 @@ def _sampling_diagram(fig, page, family, draws):
     mu_center = np.angle(np.exp(1j * circ_mod(draws[:, :, 0])).mean())
     mean_points = np.argmin(np.abs(circ_mod(mu_draws - mu_center)), axis=1)
     kappa_traces = traces[:, :, 1]
-    targets = [np.quantile(trace, q)
-               for trace, q in zip(kappa_traces, (0.20, 0.50, 0.80))]
-    kappa_points = np.argmin(np.abs(kappa_traces - np.array(targets)[:, None]), axis=1)
+    targets = np.quantile(kappa_traces, (0.05, 0.50, 0.95))
+    kappa_points = np.argmin(np.abs(kappa_traces - targets[:, None]), axis=1)
     x_trace = np.linspace(5, 57, traces.shape[1])
 
     def mark(x, y, color, *, size=10):
