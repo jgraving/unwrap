@@ -1,6 +1,6 @@
 {
   "figure": "circstats_graphical_abstract",
-  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, the polar plot shows mean prior and posterior predictive densities with pointwise 10th\u201390th percentile bands. Dots show the observed angles. The two lanes show how a seeded illustrative fit maps real-valued MCMC draws to a circular direction and a positive concentration.",
+  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, each polar curve is a prior or posterior predictive draw. Zero density starts on the inner ring, and dots show the observed angles. The two lanes use excerpts from three illustrative MCMC chains. Highlighted direction draws from different turns wrap to nearly the same angle; softplus maps concentration draws to positive values.",
   "page_pt": [
     599.0,
     342.0
@@ -10,9 +10,9 @@
     "reference_pdf_sha256": "5874a6da22930ff3b0e53f37c3ffd0074c2e88ddb25cdd4b909f7187a9e4e55c"
   },
   "fonts": {
-    "ArialMT": "LiberationSans-Regular.ttf",
-    "Arial-BoldMT": "LiberationSans-Bold.ttf",
-    "Helvetica": "LiberationSans-Regular.ttf",
+    "ArialMT": "arial.ttf",
+    "Arial-BoldMT": "arialbd.ttf",
+    "Helvetica": "arial.ttf",
     "Menlo-Regular": "DejaVuSansMono.ttf",
     "Menlo-Italic": "DejaVuSansMono-Oblique.ttf"
   },
@@ -48,7 +48,15 @@
     ],
     "seed": 159,
     "warmup": 600,
-    "posterior_draws": 1000
+    "posterior_draws_per_chain": 1000,
+    "chains": 3,
+    "initial_direction_turns": [
+      -1,
+      0,
+      1
+    ],
+    "concentration_updates_per_step": 2,
+    "concentration_proposal_sd": 1.6
   },
   "env": {
     "python": "3.12.14",
@@ -56,9 +64,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "13a56576a716042fe5da37705f848aca8257ea7b4a0baaed75aa97b08f91620b",
-    "pdf_sha256": "f15f3775ae2562e8d44c210d00ac7ee189b0b9ba1f16e58103219d90a9272201",
-    "png_sha256": "24c5f54cf1c83855202cbe6f935ea2378e64c7f9d2a5b2c903c25cecab7b5cc9",
-    "html_sha256": "ae141f6d9420e34fb1c1519a2bc3acf40e829297db8f2b8b6c96fd1238924538"
+    "svg_sha256": "587ca67758878cadb1cf7a6453aebd8a455a076ebf5c37fc87d149b87d594bc8",
+    "pdf_sha256": "b9822eb0b9a676af6c4892795445b7061e22b9735391d30601019ea62f014a1d",
+    "png_sha256": "1862429badf773c3a93d9d3451721fb64bb3d08b611d1c8dc40522697c337301",
+    "html_sha256": "fb91c52d6b4b372a2b5d332fea9b1905305025de35145c5c297f5c31fd00dca3"
   }
 }
