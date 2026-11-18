@@ -188,6 +188,8 @@ def test_seeded_example_recomputes_normalized_predictive_densities():
                                atol=1e-12)
     for samples in (prior, posterior):
         np.testing.assert_allclose(trapezoid(samples, x=theta), 1.0, atol=1e-10)
+    prior_resultants = trapezoid(prior * np.exp(1j * theta), x=theta, axis=-1)
+    assert np.abs(prior_resultants).mean() > 0.50
     center = np.angle(np.exp(1j * observed).mean())
     near_center = np.abs(ga.model.circ_mod(theta - center)) <= np.pi / 4
     prior_mass = trapezoid(prior[:, near_center].mean(axis=0), x=theta[near_center])
@@ -210,6 +212,7 @@ def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
     assert prov["counts"]["reference_paths_with_group_alpha"] > 0
     assert prov["illustrative_fit"]["seed"] == ga.model.SEED
     assert prov["illustrative_fit"]["chains"] == 3
+    assert prov["illustrative_fit"]["prior_mean"] == ga.model.PRIOR_MEAN
     np.testing.assert_allclose(
         prov["illustrative_fit"]["observed_degrees"], np.rad2deg(ga.model.example()[1]))
     assert len(prov["fonts"]) == len(ga.FONT_STACKS)

@@ -15,6 +15,8 @@ REFERENCE_OBSERVED_DEG = (-76, -55, -55, -33, -33, -33, -12, -12,
                            10, 10, 10, 31, 31, 53, 53, 75)
 # Bring the illustrative angles closer to their mean before fitting.
 OBSERVED_SPREAD = 0.70
+# Raises mean κ from 1.25 to 2.16 in the seeded prior draws.
+PRIOR_MEAN = (0.0, 1.5)
 PRIOR_SD = (3.5, 2.5)
 BURN_IN = 600
 N_DRAWS = 1000
@@ -23,6 +25,8 @@ MARKED_DRAWS_PER_CHAIN = 18
 DISPLAY_DOTS_PER_ANGLE = 4
 PRIOR_LINES = 36
 POSTERIOR_LINES = 44
+# A direction-only proposal improves within-turn mixing.
+MU_STEP = 0.42
 # Two concentration-only moves improve tail mixing at a fixed draw count.
 KAPPA_UPDATES = 2
 KAPPA_STEP = 1.6
@@ -62,7 +66,7 @@ def example():
     observed = np.deg2rad(REFERENCE_OBSERVED_DEG)
     center = np.angle(np.exp(1j * observed).mean())
     observed = circ_mod(center + OBSERVED_SPREAD * circ_mod(observed - center))
-    prior = rng.normal(scale=PRIOR_SD, size=(N_DRAWS, 2))
+    prior = rng.normal(loc=PRIOR_MEAN, scale=PRIOR_SD, size=(N_DRAWS, 2))
     resultant = np.exp(1j * observed).sum()
 
     def log_posterior(eta):
@@ -71,7 +75,8 @@ def example():
         log_likelihood = kappa * (
             (resultant * np.exp(-1j * mu)).real - observed.size
         ) - observed.size * np.log(i0e(kappa))
-        return log_likelihood - 0.5 * np.square(eta / PRIOR_SD).sum()
+        standardized = (eta - PRIOR_MEAN) / PRIOR_SD
+        return log_likelihood - 0.5 * np.square(standardized).sum()
 
     posterior = np.empty((len(WRAP_BRANCHES), N_DRAWS, 2))
     for chain, (branch, seed) in enumerate(zip(WRAP_BRANCHES, chain_seeds)):
@@ -79,10 +84,15 @@ def example():
         eta = np.array([2 * np.pi * branch, 0.0])
         logp = log_posterior(eta)
         for i in range(BURN_IN + N_DRAWS):
-            proposal = eta + rng.normal(scale=(0.42, 0.78))
+            proposal = eta + rng.normal(scale=(MU_STEP, 0.78))
             # Symmetric jumps let the chains visit equivalent wraps.
             if rng.random() < 0.12:
                 proposal[0] += rng.choice((-2 * np.pi, 2 * np.pi))
+            candidate = log_posterior(proposal)
+            if np.log(rng.random()) < candidate - logp:
+                eta, logp = proposal, candidate
+            proposal = eta.copy()
+            proposal[0] += rng.normal(scale=MU_STEP)
             candidate = log_posterior(proposal)
             if np.log(rng.random()) < candidate - logp:
                 eta, logp = proposal, candidate

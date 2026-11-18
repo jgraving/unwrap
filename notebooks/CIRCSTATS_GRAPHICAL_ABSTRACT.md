@@ -11,11 +11,14 @@ diagram showing how model draws are transformed.
 
 Panel B starts from the 16 blue angles digitized from the paper and uses
 70% of each angle's offset from their circular mean. This gives the
-illustrative data a clearer directional cluster. The script applies
-independent zero-mean normal priors to the two real-valued predictors
-and fits an intercept-only von Mises example with seeded random-walk
-Metropolis. It uses the package's circular modulo and softplus
-functions to move from the predictor scale to the parameter scale:
+illustrative data a clearer directional cluster. The script fits an
+intercept-only von Mises example with seeded random-walk Metropolis.
+It uses independent normal priors with means (0, 1.5) and standard
+deviations (3.5, 2.5) on the direction and concentration predictors.
+The higher concentration-predictor mean raises the mean κ of the seeded
+prior draws from 1.25 to 2.16. The individual curves peak at different
+angles. The package's circular modulo and softplus functions transform
+the predictors to the parameter scale:
 
 - **Direction μ** wraps into `[−π, π)` with circular modulo.
 - **Concentration κ** becomes positive with softplus.
@@ -34,19 +37,20 @@ display uses four translucent, jittered copies of each fitted angle, with
 a small gap between the dots and the inner ring.
 
 The illustrative fit uses seed 159, 600 warmup iterations, and 1,000
-retained draws per chain. Each iteration includes two extra
-concentration-only Metropolis proposals with a standard deviation of 1.6
-on the real predictor scale. With the tighter illustrative angles, the
-posterior median κ rose from 2.10 to 3.37. Rank R-hat and bulk/tail ESS
-passed checks of 1.01 and 400, respectively, on the identifiable
-quantities. The algorithm is random-walk Metropolis, so HMC divergence
-counts are inapplicable.
+retained draws per chain. Each iteration includes one direction-only
+proposal with standard deviation 0.42 and two concentration-only
+proposals with standard deviation 1.6. Tested on the original prior,
+the extra direction-only proposal raised tail ESS for cos μ from 443 to
+898. After raising the concentration-predictor prior mean, rank R-hat
+and bulk/tail ESS passed checks of 1.01 and 400 on all identifiable
+quantities. The posterior median κ was 3.68. HMC divergence counts are
+inapplicable to random-walk Metropolis.
 
 | Quantity | Rank R-hat | Bulk ESS | Tail ESS |
 | --- | ---: | ---: | ---: |
-| sin μ | 1.0060 | 594 | 628 |
-| cos μ | 1.0073 | 441 | 443 |
-| κ | 1.0007 | 923 | 1,293 |
+| sin μ | 1.0015 | 1,171 | 1,491 |
+| cos μ | 1.0017 | 1,017 | 1,226 |
+| κ | 1.0004 | 1,157 | 908 |
 
 ## Reference artwork and transparency
 
