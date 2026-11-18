@@ -1,6 +1,6 @@
 {
   "figure": "circstats_graphical_abstract",
-  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, the faint polar curves are prior and posterior predictive draws. The blue curve is the posterior mean and the dashed curve marks the uniform reference. Zero density starts on the inner ring. The 16 illustrative observations use 70% of the angles\u2019 original offsets from their circular mean. Translucent dots inside the ring show jittered copies of these observations. Each lane shows 400 consecutive draws from three illustrative MCMC chains. Sample dots follow the chains through the links to the likelihood parameters. Direction traces use three equivalent turns and softplus maps concentration draws to positive values.",
+  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, the faint polar curves are von Mises densities at individual prior and posterior draws of \u03bc and \u03ba. The blue curve is the posterior mean and the dashed curve marks the uniform reference. Zero density starts on the inner ring. The 16 illustrative observations use 70% of the angles\u2019 original offsets from their circular mean. Translucent dots inside the ring show jittered copies of these observations. Each lane shows 400 consecutive draws from three illustrative MCMC chains. Sample dots follow the chains through the links to the likelihood parameters. Direction traces use three equivalent turns and softplus maps concentration draws to positive values.",
   "page_pt": [
     599.0,
     342.0
@@ -93,9 +93,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "b143cfb8e78e5d1e36bfb813596a0c10934f0fddea7d5488bcb807525e00e013",
-    "pdf_sha256": "d81338ea34373ed0b2f078c0b80bb8af4daae864dd1e1c6c31265529518afa4a",
-    "png_sha256": "a68d021c9341ae2c9091b2047cd8be92885d0277c92c8da11488d52f965a106f",
-    "html_sha256": "c96ec6e0f77c68f5e9325e55584c6c26cda29772ea79eacd98297a5392b545fc"
+    "svg_sha256": "3ad419b9c159a561c68cac916a90bd6215f2ff1e4543fa3d8d3798add7858733",
+    "pdf_sha256": "8d95d54282d10ed0ffcc712fc53a1b196b11934a32d947e0d5a88c0483e8f3e8",
+    "png_sha256": "bcbefb2b150b0b32d7c9b8c4889268dbc308b33ae53fe027434e787eeb7bee39",
+    "html_sha256": "d4bb7f228323f5d3784a90cb291847a6be6e5516e7373b1fa4720e7321ceae1b"
   }
 }
