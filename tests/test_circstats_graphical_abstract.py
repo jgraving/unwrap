@@ -100,9 +100,9 @@ def test_svg_is_deterministic_vector_with_editable_text():
     assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 378
     labels = {"".join(node.itertext()) for node in root.findall(f".//{{{SVG_NS}}}text")}
     assert {"MCMC draws", "Circular modulo", "Softplus", "Predictive density",
-            "Observed angles", "Prior", "Posterior"} <= labels
-    assert "Posterior draw" not in labels
-    assert b"fill-opacity: 0.22" in a
+            "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
+    assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
+    assert b"stroke-opacity: 0.43" in a
 
 
 def test_seeded_example_recomputes_normalized_predictive_densities():
@@ -112,8 +112,12 @@ def test_seeded_example_recomputes_normalized_predictive_densities():
                                  ga.model.example(), strict=True):
         np.testing.assert_array_equal(previous, current)
     assert observed.size == 16
-    assert draws.shape == (ga.model.N_DRAWS, 2)
-    assert (np.abs(draws[:, 0]) > np.pi).any()
+    assert draws.shape == (3, ga.model.N_DRAWS, 2)
+    windows = ga.model._trace_windows(draws)
+    assert windows.shape[1] > 20
+    wraps = np.floor((windows[:, :, 0] + np.pi) / (2 * np.pi))
+    np.testing.assert_array_equal(wraps, np.broadcast_to(
+        np.array(ga.model.WRAP_BRANCHES)[:, None], wraps.shape))
     mu, kappa = ga.model._parameters(draws)
     assert ((-np.pi <= mu) & (mu < np.pi)).all()
     assert (kappa > 0).all()
@@ -136,6 +140,7 @@ def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
     assert prov["counts"]["reference_paths"] == 378
     assert prov["counts"]["reference_paths_with_group_alpha"] > 0
     assert prov["illustrative_fit"]["seed"] == ga.model.SEED
+    assert prov["illustrative_fit"]["chains"] == 3
     assert len(prov["fonts"]) == len(ga.FONT_STACKS)
     assert all(prov["fonts"].values())
     for name, digest in prov["exports"].items():
@@ -160,12 +165,11 @@ def test_pdf_round_trip_stays_vector_and_keeps_text(tmp_path):
     assert (page.rect.width, page.rect.height) == (599.0, 342.0)
     assert page.get_images(full=True) == []
     assert doc.metadata["creationDate"] == "D:20000101000000Z"
-    # Both the reference bands and the new polar ribbons retain their alpha
-    # through the vector PDF exporter.
-    fills = [drawing["fill_opacity"] for drawing in page.get_drawings()
-             if drawing["type"] in {"f", "fs"}]
-    for target in (0.22, 0.25):
-        assert any(abs(alpha - target) < 1e-4 for alpha in fills)
+    # The reference bands and individual polar traces retain their alpha.
+    drawings = page.get_drawings()
+    for key, target in (("fill_opacity", 0.25), ("stroke_opacity", 0.43)):
+        assert any(abs(drawing[key] - target) < 1e-4 for drawing in drawings
+                   if drawing.get(key) is not None)
     text = page.get_text()
     for needle in ("Experimental design", "Model summaries",
                    "Predictive density", "Softplus"):

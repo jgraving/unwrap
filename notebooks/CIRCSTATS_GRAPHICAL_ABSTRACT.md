@@ -18,12 +18,28 @@ parameter scale:
 - **Direction μ** wraps into `[−π, π)` with circular modulo.
 - **Concentration κ** becomes positive with softplus.
 
-Highlighted points in each trace are plotted again on the circle or
-positive axis after applying the link. The polar plot shows mean prior
-and posterior predictive densities, pointwise 10th–90th percentile
-bands across draws, and the observed angles around the rim. This is an
-illustrative model generated from the measured dots. Its results describe
-that example.
+Three independent chains start one turn apart. Each trace shows a
+contiguous excerpt from a different wrap branch. The same highlighted
+samples appear on each link curve and on the circle or positive axis.
+The polar plot gives each of 20 prior and 24 posterior predictive draws
+its own line. Zero density is at radius 1, followed by a common linear
+density scale. Observed dots sit among the posterior lines at their
+observed angles, with repeated observations staggered along the radius.
+
+The illustrative fit uses seed 159, 600 warmup iterations, and 1,000
+retained draws per chain. Each iteration includes two extra
+concentration-only Metropolis proposals with a standard deviation of 1.6
+on the real predictor scale. Those moves improved concentration's bulk
+and tail ESS from 222 and 170 to 1,322 and 1,520 at the same draw count.
+Rank R-hat and bulk/tail ESS passed checks of 1.01 and 400, respectively,
+on the identifiable quantities. The algorithm is random-walk Metropolis,
+so HMC divergence counts are inapplicable.
+
+| Quantity | Rank R-hat | Bulk ESS | Tail ESS |
+| --- | ---: | ---: | ---: |
+| sin μ | 1.0062 | 596 | 724 |
+| cos μ | 1.0097 | 576 | 477 |
+| κ | 1.0022 | 1,322 | 1,520 |
 
 ## Reference artwork and transparency
 
@@ -42,15 +58,16 @@ From the repository root, with Python 3.12 or newer:
 
 ```bash
 python -m pip install -e '.[figure]'
-python notebooks/circstats_graphical_abstract.py --font-family 'Liberation Sans'
+python notebooks/circstats_graphical_abstract.py --font-family Arial --font-dir /path/to/arial-fonts
 ```
 
 Rendering runs offline with the committed reference PDF and vector asset.
 The five exports go to `assets/circstats-graphical-abstract/`: editable
 SVG text and vector paths, vector PDF, 1797 × 1026 px PNG, self-contained
 HTML, and a JSON record of source and export hashes, fonts, and sampling
-settings. Use `--output-dir` to choose another location. The optional
-font override applies to proportional text. The editor window uses a
+settings. Use `--output-dir` to choose another location. The checked-in
+exports use Arial regular and bold. You can omit `--font-dir` if Arial is
+installed. CI renders with Liberation Sans. The editor window uses a
 monospace font.
 
 The CI workflow renders twice and compares all five outputs byte for

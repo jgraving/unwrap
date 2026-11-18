@@ -20,7 +20,8 @@ import matplotlib as mpl
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.font_manager import FontProperties, findfont  # noqa: E402
+from matplotlib.font_manager import (FontProperties, findSystemFonts, findfont,
+                                     fontManager)  # noqa: E402
 from matplotlib.path import Path as MplPath  # noqa: E402
 from matplotlib.patches import PathPatch  # noqa: E402
 from matplotlib.transforms import Bbox, TransformedBbox  # noqa: E402
@@ -38,10 +39,11 @@ PAGE_H = 342.0          # points
 FIGURE_NAME = "circstats_graphical_abstract"
 CAPTION = (
     "Overview of a modern Bayesian workflow for circular GLMs. In panel B, "
-    "the polar plot shows mean prior and posterior predictive densities with "
-    "pointwise 10th–90th percentile bands. Dots show the observed angles. "
-    "The two lanes show how a seeded illustrative fit maps real-valued MCMC "
-    "draws to a circular direction and a positive concentration."
+    "each polar curve is a prior or posterior predictive draw. Zero density "
+    "starts on the inner ring, and dots show the observed angles. The two "
+    "lanes use excerpts from three illustrative MCMC chains. Highlighted "
+    "direction draws from different turns wrap to nearly the same angle; "
+    "softplus maps concentration draws to positive values."
 )
 # The old Cartesian plots in B, leaving the code window and workflow arrows.
 _REPLACED_PATHS = set(range(11, 38)) | set(range(119, 240))
@@ -430,7 +432,11 @@ def render(output_dir: Path, *, family=None) -> dict:
             "prior_sd": model.PRIOR_SD,
             "seed": model.SEED,
             "warmup": model.BURN_IN,
-            "posterior_draws": model.N_DRAWS,
+            "posterior_draws_per_chain": model.N_DRAWS,
+            "chains": len(model.WRAP_BRANCHES),
+            "initial_direction_turns": model.WRAP_BRANCHES,
+            "concentration_updates_per_step": model.KAPPA_UPDATES,
+            "concentration_proposal_sd": model.KAPPA_STEP,
         },
         "env": {
             "python": sys.version.split()[0],
@@ -458,7 +464,13 @@ def main(argv=None):
     parser.add_argument("--font-family", default=None,
                         help="override the first family in proportional text "
                              "(CI uses 'Liberation Sans')")
+    parser.add_argument("--font-dir", type=Path,
+                        help="register local proportional fonts for this render")
     args = parser.parse_args(argv)
+    if args.font_dir is not None:
+        for path in findSystemFonts(fontpaths=[str(args.font_dir)]):
+            fontManager.addfont(path)
+        _font_name.cache_clear()
     prov = render(args.output_dir, family=args.font_family)
     for name, h in prov["exports"].items():
         print(f"{name}  {h[:16]}…")
