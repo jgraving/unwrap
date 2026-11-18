@@ -2,9 +2,10 @@
 
 The renderer uses the 599 × 342 pt graphical abstract from
 [jgraving/circstats](https://github.com/jgraving/circstats/blob/main/figures/Graphical%20Abstract.pdf).
-It keeps the paper's four-panel layout, vector artwork, code window, and
-workflow arrows. Panel B uses a polar predictive plot and a compact
-diagram showing how model draws are transformed.
+It keeps the paper's four-panel layout and vector artwork. Short panel
+headings and a lighter feedback arrow give the clockwise workflow a
+clearer reading order. Panel B uses a short model snippet, a polar
+predictive plot, and a diagram showing how model draws are transformed.
 
 ## What the renderer computes
 
@@ -48,17 +49,17 @@ so HMC divergence counts are inapplicable.
 ## Reference artwork and transparency
 
 The experimental illustrations and trajectories in A, the model
-diagnostics in C, the summaries in D, and the code window in B reproduce
-the paper's measured vector artwork from `artwork.json`. These elements
-are schematic reference drawings. The renderer reads the reference
+diagnostics in C, and the summaries in D use measured vector artwork
+from the paper. The renderer reads the reference
 PDF's nested graphics state with PyMuPDF to preserve the opacity and clip
 of each retained path. The retained text is typeset from the measured
 reference baselines using shared sizes for panel titles, labels, and
 legends. The model comparison and hypothesis plots use equally tall
 y-axes and centered 7 pt axis titles.
-Workflow arrowheads use the paper PDF's round joins. The polar
+The workflow arrows and panel C's data-summary arrows use rounded
+arrowheads. The polar
 graphs in B and D share a guide style, with spokes between the two gray
-rings. The 148 original plot paths in panel B are omitted from the export.
+rings. Panel B's plot paths and code snippet are drawn by the renderer.
 
 ## Generate the exports
 
