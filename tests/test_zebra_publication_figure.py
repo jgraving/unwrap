@@ -251,10 +251,26 @@ def test_vector_export_deterministic_and_text_free(tmp_path, idata,
     assert len(root.findall(f".//{{{SVG_NS}}}image")) == 4
     assert not root.findall(f".//{{{SVG_NS}}}text")
     desc = root.find(f"{{{SVG_NS}}}desc")
-    assert desc is not None and desc.text == figure.CAPTION
+    caption = figure.COMPANION_CAPTION if style == "companion" else figure.CAPTION
+    assert desc is not None and desc.text == caption
     title = root.find(f"{{{SVG_NS}}}title")
     assert title is not None and title.text == "Zebra escape response"
     assert root.get("role") == "img"
+
+
+def test_companion_polar_axes_use_geographic_bearings():
+    fig, ax = figure.plt.subplots(subplot_kw={"projection": "polar"})
+    try:
+        figure._style_polar(ax, grid_color="0.81", grid_lw=0.85, compass=True)
+        # Model headings in radians corresponding to north, east, south, west.
+        angles = [np.pi / 2, 0.0, -np.pi / 2, np.pi]
+        positions = ax.transData.transform([(angle, 1.0) for angle in angles])
+        xy = positions - ax.transData.transform((0.0, 0.0))
+        signs = np.sign(np.round(xy, decimals=9))
+        np.testing.assert_array_equal(signs, [[0, 1], [1, 0], [0, -1], [-1, 0]])
+        assert len(ax.get_xticks()) == 4
+    finally:
+        figure.plt.close(fig)
 
 
 def test_write_outputs_round_trip(tmp_path, idata, df_blocks):

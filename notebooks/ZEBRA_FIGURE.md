@@ -83,10 +83,12 @@ python notebooks/zebra_publication_figure.py --style companion --font-dir /path/
 ```
 
 The companion style uses smaller panel letters, bold row-aligned
-headings, a frameless Pre/Post key, and a two-column map key. The polar
-grid, pairing lines, and map callouts use lighter strokes. Both styles
-use the same layout geometry, artwork, data, and cached summaries. The
-JSON records the style. By default the companion files are written to
+headings, a frameless Pre/Post key, and a single-column map key.
+The polar panels use lighter guides and show geographic compass bearings
+with N, E, S, and W. The pairing lines and map callouts use lighter strokes.
+Both styles use the same layout geometry, artwork, data, and cached summaries.
+The JSON records the style and, for the companion, the plotted compass
+bearings. By default the companion files are written to
 `assets/zebra-companion/`, and `--style published` remains the default
 for reproducing the reference composite.
 

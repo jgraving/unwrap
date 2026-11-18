@@ -175,6 +175,8 @@ DEGREE_LABELS_C = [
     ("270°", 395.9, 542.9), ("315°", 427.5, 466.8)]
 DEGREE_LABELS_E = [(t, x, y + (POLAR_E[1] - POLAR_C[1]))
                    for t, x, y in DEGREE_LABELS_C]
+COMPASS_LABELS = [("N", 0, -96), ("E", 96, 0),
+                  ("S", 0, 96), ("W", -96, 0)]
 RADIAL_LABEL_C = [("0", 520.5, 505.8), ("1.0", 539.4, 475.2)]
 RADIAL_LABEL_E = [(t, x, y + (POLAR_E[1] - POLAR_C[1]))
                   for t, x, y in RADIAL_LABEL_C]
@@ -266,6 +268,9 @@ JITTER_SD = 0.15
 #: The figure caption (fresh wording; the older manuscript caption called
 #: panel c a "population mean", which the finite focal-group estimand is
 #: not).
+MODEL_ANGLE_NOTE = ("Panels c and e show model angles clockwise from 0° "
+                    "at the top. Panel a uses geographic compass bearings.")
+COMPASS_ANGLE_NOTE = "Panels a, c and e use geographic compass bearings."
 CAPTION = (
     "Escape response of a focal group of 18 Grevy's zebra (*Equus grevyi*) "
     "filmed from overhead drones at the Mpala Conservancy, Kenya. "
@@ -284,9 +289,8 @@ CAPTION = (
     "individual mean directions, with the posterior mean before and after "
     "the approach. (e) Individual-level mean directions: the posterior "
     "density of each fitted individual mean direction (loops) and each "
-    "animal's observed circular-mean heading (markers). Panels c and e show "
-    "model angles clockwise from 0° at the top. Panel a uses geographic "
-    "compass bearings. (f) Individual-level "
+    "animal's observed circular-mean heading (markers). " + MODEL_ANGLE_NOTE + " "
+    "(f) Individual-level "
     "concentration: each animal's posterior mean resultant length with 95% "
     "HDI, before and after the approach, paired within animal across "
     "conditions. Panels c-f are evaluated from a saved hierarchical von "
@@ -294,6 +298,7 @@ CAPTION = (
     "draws, zero divergent transitions); the 'group' in c-d is the finite "
     "focal group, not a population parameter."
 )
+COMPANION_CAPTION = CAPTION.replace(MODEL_ANGLE_NOTE, COMPASS_ANGLE_NOTE)
 
 SCARE_FRAME_NOTE = (
     "The per-frame pre_scare flag (used for the map's pre/post arrow "
@@ -642,16 +647,22 @@ def _draw_inset(map_ax, overlay, fig, key, spec, anchor, color, *,
         facecolor=color, edgecolor="none", zorder=3))
 
 
-def _style_polar(ax, *, grid_color, grid_lw):
-    ax.set_theta_zero_location("N")
-    ax.set_theta_direction(-1)
+def _style_polar(ax, *, grid_color, grid_lw, compass):
+    # The model uses mathematical angles (east = 0, increasing CCW).
+    # Plot in those coordinates to display geographic directions.
+    ax.set_theta_zero_location("E" if compass else "N")
+    ax.set_theta_direction(1 if compass else -1)
     ax.set_rlim(0, POLAR_RMAX)
     ax.set_rticks(POLAR_RTICKS)
-    ax.set_xticks(np.deg2rad(np.arange(0.0, 360.0, 45.0)))
-    ax.set_xticklabels([""] * 8)          # spokes only; labels are manual
+    angles = np.deg2rad(np.arange(0.0, 360.0, 90.0 if compass else 45.0))
+    ax.set_xticks(angles)
+    ax.set_xticklabels([""] * len(angles))  # spokes only; labels are manual
     ax.set_yticklabels([])                # radial labels are manual
     ax.grid(True, color=grid_color, linewidth=grid_lw)
-    ax.spines["polar"].set_visible(False)   # no edge circle, as published
+    ax.spines["polar"].set_visible(compass)
+    if compass:
+        ax.spines["polar"].set_edgecolor(grid_color)
+        ax.spines["polar"].set_linewidth(grid_lw)
     ax.tick_params(axis="x", which="major", length=0, pad=0)
     ax.tick_params(axis="y", which="major", length=0, pad=0)
 
@@ -670,7 +681,7 @@ SVG_NS = "http://www.w3.org/2000/svg"
 XLINK = "{http://www.w3.org/1999/xlink}href"
 
 
-def _embed_artwork(svg, ctx):
+def _embed_artwork(svg, ctx, *, caption):
     """Place JPEGs directly in SVG page space, shared by all four exports."""
     from PIL import Image
 
@@ -691,7 +702,7 @@ def _embed_artwork(svg, ctx):
     root.set("role", "img")
     root.set("aria-labelledby", "figure-title figure-description")
     for tag, name, value in (("title", "figure-title", "Zebra escape response"),
-                             ("desc", "figure-description", CAPTION)):
+                             ("desc", "figure-description", caption)):
         el = ET.Element(ns + tag, id=name)
         el.text = value
         root.insert(0, el)
@@ -799,10 +810,8 @@ def draw_figure(ctx, *, family="Arial", style="published"):
         plots._finish_escape_map(
             map_ax, ctx["extent"], PANEL_XLIM, PANEL_YLIM, None,
             "black", FOCAL_LW, "white", pre, post,
-            tight_layout=False,
-            legend_loc="center left" if companion else "center",
-            legend_anchor=(0.025, 0.5) if companion else MAP_LEGEND_ANCHOR,
-            fancybox=not companion, legend_ncols=2 if companion else 1,
+            tight_layout=False, legend_loc="center",
+            legend_anchor=MAP_LEGEND_ANCHOR, fancybox=True,
             legend_arrow_size=9 if companion else 8 * MAP_ARROW_SCALE,
             legend_arrow_edge_width=MAP_ARROW_SCALE,
             framealpha=0.85, scale_bar=False, compass=False)
@@ -812,7 +821,7 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             (POLAR_C[0] - POLAR_R_EDGE_PT, POLAR_C[1] - POLAR_R_EDGE_PT,
              POLAR_C[0] + POLAR_R_EDGE_PT, POLAR_C[1] + POLAR_R_EDGE_PT)),
             projection="polar", zorder=5)
-        _style_polar(ax_c, **polar_grid)
+        _style_polar(ax_c, **polar_grid, compass=companion)
         group_lw = 3.0 if companion else LW_GROUP_LOOP
         ax_c.plot(theta, prep["r_group_pre"], color=pre, lw=group_lw)
         ax_c.plot(theta, prep["r_group_post"], color=post, lw=group_lw)
@@ -848,7 +857,7 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             (POLAR_E[0] - POLAR_R_EDGE_PT, POLAR_E[1] - POLAR_R_EDGE_PT,
              POLAR_E[0] + POLAR_R_EDGE_PT, POLAR_E[1] + POLAR_R_EDGE_PT)),
             projection="polar", zorder=5)
-        _style_polar(ax_e, **polar_grid)
+        _style_polar(ax_e, **polar_grid, compass=companion)
         for j in range(nT):
             ax_e.plot(theta, prep["r_ind_pre"][j], color=pre, lw=LW_IND_LOOP,
                       alpha=IND_LOOP_ALPHA)
@@ -973,7 +982,10 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             overlay.text(lx, ly, character + ".", ha="left", va="center",
                          fontsize=sizes["letter"], weight="bold", color=color,
                          zorder=9)
-        for text, tx, ty in DEGREE_LABELS_C + DEGREE_LABELS_E:
+        angle_labels = ([(text, cx + dx, cy + dy) for cx, cy in (POLAR_C, POLAR_E)
+                         for text, dx, dy in COMPASS_LABELS]
+                        if companion else DEGREE_LABELS_C + DEGREE_LABELS_E)
+        for text, tx, ty in angle_labels:
             overlay.text(tx, ty, text, ha="center", va="center",
                          fontsize=sizes["degree"], color="black", zorder=9)
         for text, tx, ty in RADIAL_LABEL_C + RADIAL_LABEL_E:
@@ -986,7 +998,8 @@ def draw_figure(ctx, *, family="Arial", style="published"):
                               "Creator":
                                   "unwrap zebra_publication_figure.py"})
         plt.close(fig)
-    return _embed_artwork(buffer.getvalue(), ctx)
+    caption = COMPANION_CAPTION if companion else CAPTION
+    return _embed_artwork(buffer.getvalue(), ctx, caption=caption)
 
 
 # ---------------------------------------------------------------------------
@@ -1061,13 +1074,13 @@ def restore_pdf_source_images(pdf_path, svg):
     pdf_path.write_bytes(_stabilize_pdf_id(data))
 
 
-def _html_page(svg):
+def _html_page(svg, *, caption):
     return f'''<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Zebra escape response</title>
 <style>body{{margin:0;background:#f5f5f4;color:#262626;font:15px/1.65 Arial,sans-serif}}
 main{{max-width:1180px;margin:40px auto;padding:0 24px}}figure{{margin:0}}.figure{{background:white;padding:20px;border:1px solid #e6e6e6}}svg{{display:block;width:100%;height:auto}}figcaption{{max-width:96ch;margin:24px auto}}a{{color:#665017}}</style>
 <main><nav><a href="zebra_publication.svg">SVG</a> · <a href="zebra_publication.pdf">PDF</a></nav>
-<figure><div class="figure">{svg}</div><figcaption>{CAPTION}</figcaption></figure></main></html>'''
+<figure><div class="figure">{svg}</div><figcaption>{caption}</figcaption></figure></main></html>'''
 
 
 def write_outputs(output_dir, ctx, svg, metadata, *, family):
@@ -1089,7 +1102,8 @@ def write_outputs(output_dir, ctx, svg, metadata, *, family):
     with fitz.open(stem.with_suffix(".pdf")) as document:
         document[0].get_pixmap(matrix=fitz.Matrix(PREVIEW_SCALE, PREVIEW_SCALE)).save(
             str(stem.with_suffix(".png")))
-    stem.with_suffix(".html").write_text(_html_page(svg))
+    caption = metadata.get("caption", CAPTION)
+    stem.with_suffix(".html").write_text(_html_page(svg, caption=caption))
     metadata["outputs_sha256"] = {s: sha256(stem.with_suffix(s))
                                   for s in (".svg", ".pdf", ".png",
                                             ".html")}
@@ -1191,8 +1205,19 @@ def main(argv=None):
         "scare_frame_note": SCARE_FRAME_NOTE,
         "summary_numbers": {k: v for k, v in numbers.items()
                             if k != "stats"},
-        "caption": CAPTION,
+        "caption": COMPANION_CAPTION if args.style == "companion" else CAPTION,
     }
+    if args.style == "companion":
+        group = numbers["group_mean_direction_deg"]
+        individual = numbers["empirical_mean_direction_deg"]
+        metadata["plotted_compass_bearings_deg"] = {
+            "group_mean": {phase: (90.0 - angle) % 360.0
+                           for phase, angle in group.items()},
+            "individual_observed_mean": {
+                phase: [None if angle is None else (90.0 - angle) % 360.0
+                        for angle in angles]
+                for phase, angles in individual.items()},
+        }
     output_dir = args.output_dir
     if output_dir is None:
         output_dir = ROOT / "assets" / (
