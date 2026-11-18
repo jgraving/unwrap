@@ -877,6 +877,11 @@ def plot_destination_panels_compact(
     res_lw=1.35,
     res_alpha=0.95,
     basemap_alpha=1.0,
+    # offline basemap: an RGB raster (e.g. the published figure's own
+    # CartoDB tile raster) drawn over the unified data extent in place of
+    # a contextily fetch; the notebook default (None) keeps the network
+    # basemap
+    basemap_img=None,
     # gap style
     gap_lw=None,
     gap_alpha=0.85,
@@ -958,11 +963,15 @@ def plot_destination_panels_compact(
         ax.set_ylim(*ylim)
 
         # basemap (already raster by nature)
-        try:
-            with _cartodb_quiet():
-                cx.add_basemap(ax, source=_carto_auth(cx.providers.CartoDB.PositronNoLabels), attribution=False, alpha=basemap_alpha)
-        except Exception as e:
-            print("Basemap failed (continuing without tiles):", e)
+        if basemap_img is not None:
+            ax.imshow(basemap_img, extent=(*xlim, *ylim), aspect="auto",
+                      alpha=basemap_alpha, zorder=0)
+        else:
+            try:
+                with _cartodb_quiet():
+                    cx.add_basemap(ax, source=_carto_auth(cx.providers.CartoDB.PositronNoLabels), attribution=False, alpha=basemap_alpha)
+            except Exception as e:
+                print("Basemap failed (continuing without tiles):", e)
 
         # lake ONLY on Agamon panel (keep vector)
         if dest == "Agamon" and len(lake_gdf_3857):
@@ -4500,6 +4509,11 @@ def plot_tracks_pgoal_small_bigfont(
     # style
     basemap_source=cx.providers.CartoDB.Positron,
     basemap_alpha=1.0,
+    # offline basemap: an RGB raster (e.g. the published figure's own
+    # CartoDB tile raster) drawn over each panel's data extent in place of
+    # a contextily fetch; the notebook default (None) keeps the network
+    # basemap
+    basemap_img=None,
     lake_facecolor="tab:cyan",
     lake_alpha=0.25,
     lake_edge_lw=0.8,
@@ -4523,6 +4537,11 @@ def plot_tracks_pgoal_small_bigfont(
     cbar_width=0.60,
     cbar_ticksize=8,      # BIGGER
     cbar_labelsize=9,     # BIGGER
+    # explicit figure-fraction box for the colorbar axis; when given it
+    # overrides the four cbar_* fraction knobs above (the publication
+    # figure generator passes it so the gradient bar lands on the
+    # published composite's measured colorbar)
+    cbar_box=None,
     # colorbar name of the encoded per-step score (default keeps the
     # original directed-component probability figure unchanged)
     cbar_label="Directed-component probability",
@@ -4631,11 +4650,15 @@ def plot_tracks_pgoal_small_bigfont(
         ax.set_ylim(*ylim)
 
         # basemap (already raster by nature)
-        try:
-            with _cartodb_quiet():
-                cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
-        except Exception as e:
-            print("Basemap failed (continuing without tiles):", e)
+        if basemap_img is not None:
+            ax.imshow(basemap_img, extent=(*xlim, *ylim), aspect="auto",
+                      alpha=basemap_alpha, zorder=0)
+        else:
+            try:
+                with _cartodb_quiet():
+                    cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
+            except Exception as e:
+                print("Basemap failed (continuing without tiles):", e)
 
         # lake (keep vector)
         if len(lake_gdf):
@@ -4782,7 +4805,9 @@ def plot_tracks_pgoal_small_bigfont(
         hspace=hspace
     )
 
-    cax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
+    cax = fig.add_axes(
+        cbar_box if cbar_box is not None
+        else [cbar_left, cbar_bottom, cbar_width, cbar_height])
 
     sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
