@@ -187,13 +187,19 @@ def _sampling_diagram(fig, page, family, draws):
         flow.annotate("", (x1, y), (x0, y), arrowprops={
             "arrowstyle": "->", "color": color, "lw": 0.7, "mutation_scale": 6})
 
-    for i, (top, trace_label, link, support_label, points) in enumerate((
-        (0, "μ", "Circular modulo", "Mean direction μ", mean_points),
-        (63, "κ", "Softplus", "Concentration κ", kappa_points),
+    for i, (top, predictor, name_width, subscript, link, support_label, points) in enumerate((
+        (0, "Direction predictor", 49.5, "μ", "Circular modulo",
+         "Mean direction μ", mean_points),
+        (63, "Concentration predictor", 63.4, "κ", "Softplus",
+         "Concentration κ", kappa_points),
     )):
-        flow.text(29, top + 23, "η", **text_style)
-        flow.text(33, top + 24.6, trace_label, fontfamily=family, color=INK,
-                  fontsize=4.8, ha="center")
+        left = 35 - (name_width + 10) / 2
+        eta_x = left + name_width + 2
+        predictor_style = dict(fontfamily=family, color=INK, ha="left")
+        flow.text(left, top + 23, predictor, fontsize=6.1, **predictor_style)
+        flow.text(eta_x, top + 23, "η", fontsize=6.1, **predictor_style)
+        flow.text(eta_x + 3.4, top + 24.4, subscript, fontsize=4.6,
+                  **predictor_style)
         flow.text(100, top + 23, link, **text_style)
         flow.text(169, top + 23, support_label, **text_style)
         arrow(60, 72, top + 42)

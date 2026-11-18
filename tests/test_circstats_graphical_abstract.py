@@ -99,7 +99,8 @@ def test_svg_is_deterministic_vector_with_editable_text():
     assert not root.findall(f".//{{{SVG_NS}}}image")
     assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 378
     labels = {"".join(node.itertext()) for node in root.findall(f".//{{{SVG_NS}}}text")}
-    assert {"MCMC draws", "Circular modulo", "Softplus", "Predictive density",
+    assert {"MCMC draws", "Direction predictor", "Concentration predictor",
+            "Circular modulo", "Softplus", "Predictive density",
             "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
     assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
     assert b"stroke-opacity: 0.43" in a
