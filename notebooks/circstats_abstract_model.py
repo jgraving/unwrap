@@ -141,8 +141,8 @@ def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
     polar.set_yticks([])
     polar.spines["polar"].set_color(POLAR_GUIDE_COLOR)
     polar.spines["polar"].set_linewidth(POLAR_RING_WIDTH)
-    polar.set_title("Predictive density", fontfamily=family, fontsize=LABEL_SIZE,
-                    color=INK, pad=2.5)
+    polar.set_title("Predictive density · vM(μ, κ)", fontfamily=family,
+                    fontsize=LABEL_SIZE, color=INK, pad=2.5)
 
     # An additive radius keeps zero density on an inner circle rather than
     # at the origin. Both sets of draws use one radial scale.

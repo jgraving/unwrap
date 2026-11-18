@@ -120,6 +120,16 @@ def test_svg_is_deterministic_vector_with_editable_text():
             assert caption.get_text() == label
             assert caption.get_rotation() == 90
             assert caption.get_fontsize() == ga.model.LABEL_SIZE
+        for index, width in ga._PANEL_STROKE_WIDTHS.items():
+            if asset["drawings"][str(index)]["width"] is not None:
+                assert original_paths[index].get_linewidth() == width
+        for index in ga._ESTIMATE_DOTS:
+            reference = ga.path_from_items(asset["drawings"][str(index)]["items"])
+            before = reference.get_extents()
+            after = original_paths[index].get_path().get_extents()
+            np.testing.assert_allclose(after.p0 + after.size / 2,
+                                       before.p0 + before.size / 2)
+            assert 3.7 <= after.width <= 4.0
         buf = io.BytesIO()
         fig.savefig(buf, format="svg",
                     metadata={"Date": None})
@@ -140,6 +150,7 @@ def test_svg_is_deterministic_vector_with_editable_text():
     labels = {"".join(node.itertext()) for node in text_nodes}
     assert {"MCMC draws", "Direction predictor", "Concentration predictor",
             "Circular modulo", "Softplus", "Predictive density",
+            "Predictive density · vM(μ, κ)",
             "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
     assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
     fit_start, = [node for node in text_nodes if node.text == "idata"]

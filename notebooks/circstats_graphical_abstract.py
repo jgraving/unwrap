@@ -42,7 +42,8 @@ PAGE_H = 342.0          # points
 FIGURE_NAME = "circstats_graphical_abstract"
 CAPTION = (
     "Overview of a modern Bayesian workflow for circular GLMs. In panel B, "
-    "the faint polar curves are prior and posterior predictive draws. The "
+    "the faint polar curves are von Mises densities at individual prior and "
+    "posterior draws of μ and κ. The "
     "blue curve is the posterior mean and the dashed curve marks the "
     "uniform reference. Zero density starts on the inner ring. "
     f"The 16 illustrative observations use {model.OBSERVED_SPREAD:.0%} "
@@ -67,6 +68,14 @@ _SUMMARY_AXIS_LABELS = {107: "Predictive density difference",
                         273: "Predictive density"}
 _SUMMARY_AXIS_LABEL_SPANS = {53, 54, 230}
 _SUMMARY_AXIS_Y = (218.0, 317.0)  # common span enclosing both sets of intervals
+_ESTIMATE_DOTS = {115, 116, 117, 118, 281, 282, 283}
+_ESTIMATE_DOT_SCALE = 0.68
+_PANEL_STROKE_WIDTHS = {
+    **dict.fromkeys(set(range(109, 115)) | set(range(275, 281)), 1.05),  # intervals
+    **dict.fromkeys(_ESTIMATE_DOTS, 0.40),
+    **dict.fromkeys((44, 45, 48, 49), 1.10),  # population arrows
+    **dict.fromkeys(set(range(52, 77)) | set(range(79, 107)), 0.64),  # individual arrows
+}
 _EDITOR_SOURCE = (268.81, 24.07)
 _EDITOR_POSITION = (254.0, 20.5)
 _EDITOR_ZOOM = 1.19
@@ -227,10 +236,15 @@ def _reference_drawings():
 
 
 def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path,
-                 joinstyle="miter", transform=None):
+                 joinstyle="miter", transform=None, center_scale=1.0):
     """Render one pinned/reference drawing (fill and/or stroke)."""
     data_transform = ax.transData if transform is None else transform + ax.transData
     path = path_from_items(dr["items"])
+    if center_scale != 1.0:
+        bounds = path.get_extents()
+        x, y = bounds.p0 + bounds.size / 2
+        path = (Affine2D().translate(-x, -y).scale(center_scale).translate(x, y)
+                .transform_path(path))
     t = dr["type"]
     face = _color(dr["fill"], opacity * dr["fill_opacity"]) if "f" in t \
         else "none"
@@ -424,10 +438,13 @@ def draw_figure(asset, *, family=None):
                 dr = {**dr, "items": [("l", x, y0, x, y1)]}
             if i in editor_shapes and dr["width"] is not None:
                 dr = {**dr, "width": dr["width"] * _EDITOR_ZOOM}
+            if i in _PANEL_STROKE_WIDTHS and dr["width"] is not None:
+                dr = {**dr, "width": _PANEL_STROKE_WIDTHS[i]}
             draw_drawing(ax, dr, zorder=10 + i, opacity=opacity,
                          clip_box=box, clip_path=path,
                          joinstyle="round" if i in _WORKFLOW_ARROWHEADS else "miter",
-                         transform=editor_transform if i in editor_shapes else None)
+                         transform=editor_transform if i in editor_shapes else None,
+                         center_scale=_ESTIMATE_DOT_SCALE if i in _ESTIMATE_DOTS else 1.0)
             translucent += opacity < 1.0
 
     spans = [span for i, span in enumerate(asset["text_spans"])
