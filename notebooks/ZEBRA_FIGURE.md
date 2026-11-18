@@ -92,6 +92,8 @@ bearings. By default the companion files are written to
 `assets/zebra-companion/`, and `--style published` remains the default
 for reproducing the reference composite.
 
+[Preview the companion style in Arial](../assets/zebra-companion/zebra_companion_preview.jpg).
+
 ## Fit and data
 
 - Fit: hierarchical von Mises GLM on the 5,417 block-averaged headings

@@ -177,6 +177,8 @@ DEGREE_LABELS_E = [(t, x, y + (POLAR_E[1] - POLAR_C[1]))
                    for t, x, y in DEGREE_LABELS_C]
 COMPASS_LABELS = [("N", 0, -96), ("E", 96, 0),
                   ("S", 0, 96), ("W", -96, 0)]
+# The southeast quadrant leaves the radial labels clear of the mean markers.
+COMPASS_RADIAL_LABELS = [("0", 29, 29), ("1.0", 42, 41)]
 RADIAL_LABEL_C = [("0", 520.5, 505.8), ("1.0", 539.4, 475.2)]
 RADIAL_LABEL_E = [(t, x, y + (POLAR_E[1] - POLAR_C[1]))
                   for t, x, y in RADIAL_LABEL_C]
@@ -982,13 +984,19 @@ def draw_figure(ctx, *, family="Arial", style="published"):
             overlay.text(lx, ly, character + ".", ha="left", va="center",
                          fontsize=sizes["letter"], weight="bold", color=color,
                          zorder=9)
-        angle_labels = ([(text, cx + dx, cy + dy) for cx, cy in (POLAR_C, POLAR_E)
-                         for text, dx, dy in COMPASS_LABELS]
-                        if companion else DEGREE_LABELS_C + DEGREE_LABELS_E)
+        if companion:
+            angle_labels, radial_labels = (
+                [(text, cx + dx, cy + dy) for cx, cy in (POLAR_C, POLAR_E)
+                 for text, dx, dy in labels]
+                for labels in (COMPASS_LABELS, COMPASS_RADIAL_LABELS)
+            )
+        else:
+            angle_labels = DEGREE_LABELS_C + DEGREE_LABELS_E
+            radial_labels = RADIAL_LABEL_C + RADIAL_LABEL_E
         for text, tx, ty in angle_labels:
             overlay.text(tx, ty, text, ha="center", va="center",
                          fontsize=sizes["degree"], color="black", zorder=9)
-        for text, tx, ty in RADIAL_LABEL_C + RADIAL_LABEL_E:
+        for text, tx, ty in radial_labels:
             overlay.text(tx, ty, text, ha="center", va="center",
                          fontsize=sizes["radial"], color="black", zorder=9)
 
