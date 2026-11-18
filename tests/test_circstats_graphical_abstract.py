@@ -83,10 +83,8 @@ def test_svg_is_deterministic_vector_with_editable_text():
     def svg_bytes():
         fig, ax, _stats = ga.draw_figure(asset)
         original_paths = {patch.get_zorder() - 10: patch for patch in ax.patches}
-        for index in ga._WORKFLOW_ARROWHEADS | ga._DIAGNOSTIC_ARROWHEADS:
+        for index in ga._WORKFLOW_ARROWHEADS:
             assert original_paths[index].get_joinstyle() == "round"
-        assert original_paths[8].get_edgecolor()[0] > original_paths[3].get_edgecolor()[0]
-        assert original_paths[8].get_linewidth() < original_paths[3].get_linewidth()
         predictive_ring = fig.axes[1].spines["polar"]
         for index in ga._SUMMARY_POLAR_RINGS:
             ring = original_paths[index]
@@ -117,15 +115,12 @@ def test_svg_is_deterministic_vector_with_editable_text():
     assert root.get("height") == "342pt"
     assert root.get("viewBox") == "0 0 599 342"
     assert not root.findall(f".//{{{SVG_NS}}}image")
-    assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 369
+    assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 377
     labels = {"".join(node.itertext()) for node in root.findall(f".//{{{SVG_NS}}}text")}
     assert {"MCMC draws", "Direction predictor", "Concentration predictor",
             "Circular modulo", "Softplus", "Predictive density",
             "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
     assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
-    assert {title for _, _, title in ga._PANEL_TITLES} <= labels
-    assert "model.py — Python" not in labels
-    assert any("kappa ~ x" in label for label in labels)
     assert b"stroke-opacity: 0.43" in a
     assert b"fill-opacity: 0.48" in a
 
@@ -169,7 +164,7 @@ def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
     assert prov["page_pt"] == [599.0, 342.0]
     assert prov["inputs"]["artwork_sha256"] == ARTWORK_SHA
     assert prov["inputs"]["reference_pdf_sha256"] == REFERENCE_SHA
-    assert prov["counts"]["reference_paths"] == 369
+    assert prov["counts"]["reference_paths"] == 377
     assert prov["counts"]["reference_paths_with_group_alpha"] > 0
     assert prov["illustrative_fit"]["seed"] == ga.model.SEED
     assert prov["illustrative_fit"]["chains"] == 3
@@ -203,7 +198,7 @@ def test_pdf_round_trip_stays_vector_and_keeps_text(tmp_path):
         assert any(abs(drawing[key] - target) < 1e-4 for drawing in drawings
                    if drawing.get(key) is not None)
     text = page.get_text()
-    for needle in ("Experimental design", "Scientific inference",
+    for needle in ("Experimental design", "Model summaries",
                    "Predictive density", "Softplus"):
         assert needle in text
     doc.close()

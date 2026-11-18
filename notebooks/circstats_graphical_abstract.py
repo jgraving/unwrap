@@ -1,8 +1,8 @@
 """Rebuild the circstats graphical abstract with an executable model example.
 
-The illustrations and surrounding panels use vector artwork from the paper.
-Panel B's plots are regenerated from a seeded circular model and the
-package's parameter transforms.
+The illustrations, surrounding panels, and code window use vector artwork
+and typography from the paper. Panel B's plots are regenerated from a
+seeded circular model and the package's parameter transforms.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from matplotlib.colors import to_rgb  # noqa: E402
 from matplotlib.font_manager import (FontProperties, findSystemFonts, findfont,
                                      fontManager)  # noqa: E402
 from matplotlib.path import Path as MplPath  # noqa: E402
-from matplotlib.patches import FancyBboxPatch, PathPatch  # noqa: E402
+from matplotlib.patches import PathPatch  # noqa: E402
 from matplotlib.transforms import Bbox, TransformedBbox  # noqa: E402
 
 import circstats_abstract_model as model  # noqa: E402
@@ -48,26 +48,9 @@ CAPTION = (
     "Direction traces use three equivalent turns and softplus maps "
     "concentration draws to positive values."
 )
-# The old Cartesian plots and editor window in B, and D's duplicate inner ring.
-_REPLACED_PATHS = set(range(11, 38)) | set(range(119, 248)) | {255}
+# The old Cartesian plots in B and an overlapping copy of D's inner ring.
+_REPLACED_PATHS = set(range(11, 38)) | set(range(119, 240)) | {255}
 _WORKFLOW_ARROWHEADS = {1, 3, 6, 8, 10}
-_FEEDBACK_ARROW = {7, 8}
-_DIAGNOSTIC_ARROWHEADS = {39, 45, 49, 53, 55, 57, 59, 61, 63, 65, 67, 70, 72,
-                          74, 76, 80, 83, 85, 88, 90, 92, 94, 97, 99, 101, 103, 106}
-_PANEL_TITLES = (
-    (125, 16, "Experimental design and data"),
-    (426, 16, "Model specification and fitting"),
-    (473, 199, "Diagnostics and model comparison"),
-    (164, 199, "Scientific inference"),
-)
-_MODEL_CODE = (
-    "bmb.Model(",
-    '    bmb.Formula("y ~ x", "kappa ~ x"),',
-    '    data, family="vonmises",',
-    '    link={"mu": circ_mod,',
-    '          "kappa": softplus},',
-    ")",
-)
 _SUMMARY_POLAR_RINGS = {260, 261}
 _SUMMARY_POLAR_SPOKES = {256: (0, -1), 257: (1, 0), 258: (0, 1), 259: (-1, 0)}
 # The measured center and radii of the two gray rings in panel D, in points.
@@ -276,20 +259,6 @@ def _summary_polar_guide(index, drawing):
             "width": model.POLAR_SPOKE_WIDTH, "items": items}
 
 
-def _feedback_arrow(drawing):
-    """Scale the return arrow about the center of its measured footprint."""
-    center_x, center_y = 496.47, 169.78
-    scale = 0.80
-    items = [
-        (kind, center_x + scale * (x0 - center_x), center_y + scale * (y0 - center_y),
-         center_x + scale * (x1 - center_x), center_y + scale * (y1 - center_y))
-        for kind, x0, y0, x1, y1 in drawing["items"]
-    ]
-    gray = to_rgb("#777777")
-    return {**drawing, "width": drawing["width"] * scale, "items": items,
-            "color": gray, "fill": gray if drawing["fill"] is not None else None}
-
-
 # -------------------------------------------------------------------
 # typography
 # -------------------------------------------------------------------
@@ -315,6 +284,9 @@ def _resolved_fp(stack, *, bold, italic, size):
 
 def _label_size(span):
     size = span["size"]
+    # The editor mock retains the paper's original code-window typography.
+    if 268 <= span["x"] <= 376 and 23 <= span["y"] <= 81:
+        return size
     if size >= 17:
         return 18.0
     if size >= 10:
@@ -404,32 +376,19 @@ def draw_figure(asset, *, family=None):
                 _, x, _, _, _ = dr["items"][0]
                 y0, y1 = _SUMMARY_AXIS_Y
                 dr = {**dr, "items": [("l", x, y0, x, y1)]}
-            if i in _FEEDBACK_ARROW:
-                dr = _feedback_arrow(dr)
-            round_join = i in _WORKFLOW_ARROWHEADS or i in _DIAGNOSTIC_ARROWHEADS
             draw_drawing(ax, dr, zorder=10 + i, opacity=opacity,
                          clip_box=box, clip_path=path,
-                         joinstyle="round" if round_join else "miter")
+                         joinstyle="round" if i in _WORKFLOW_ARROWHEADS else "miter")
             translucent += opacity < 1.0
 
     spans = [span for i, span in enumerate(asset["text_spans"])
-             if i >= 5 and i not in _SUMMARY_AXIS_LABEL_SPANS
-             and not (span["x"] >= 250 and 23 <= span["y"] < 158)]
+             if i not in _SUMMARY_AXIS_LABEL_SPANS
+             and not (span["x"] >= 250 and 23 <= span["y"] < 158
+                      and not (268 <= span["x"] <= 376 and span["y"] <= 81))]
     drawn, skipped = draw_text(ax, spans, family_override=family)
     proportional = (family, *FONT_STACKS["ArialMT"]) if family else tuple(
         FONT_STACKS["ArialMT"])
     resolved_family = _font_name(proportional, False, False)
-    for x, y, title in _PANEL_TITLES:
-        ax.text(x, PAGE_H - y, title, ha="center", va="baseline",
-                fontfamily=resolved_family, fontsize=11, color=model.INK, zorder=1000)
-    ax.add_patch(FancyBboxPatch(
-        (263, PAGE_H - 82), 119, 54, boxstyle="round,pad=0,rounding_size=2",
-        facecolor="#f8f9fa", edgecolor="#d4d7d9", linewidth=0.5, zorder=900))
-    code_font = _resolved_fp(FONT_STACKS["Menlo-Regular"], bold=False,
-                             italic=False, size=4.7)
-    for row, line in enumerate(_MODEL_CODE):
-        ax.text(269, PAGE_H - (36 + 7.5 * row), line, fontproperties=code_font,
-                color=model.INK, ha="left", va="baseline", zorder=1000)
     y0, y1 = _SUMMARY_AXIS_Y
     for index, label in _SUMMARY_AXIS_LABELS.items():
         _, x, _, _, _ = drawings[str(index)]["items"][0]
