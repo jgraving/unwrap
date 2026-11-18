@@ -103,7 +103,7 @@ def test_svg_is_deterministic_vector_with_editable_text():
             "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
     assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
     assert b"stroke-opacity: 0.43" in a
-    assert b"stroke-opacity: 0.44" in a
+    assert b"fill-opacity: 0.48" in a
 
 
 def test_seeded_example_recomputes_normalized_predictive_densities():
@@ -113,6 +113,9 @@ def test_seeded_example_recomputes_normalized_predictive_densities():
                                  ga.model.example(), strict=True):
         np.testing.assert_array_equal(previous, current)
     assert observed.size == 16
+    display_angles, display_radii = ga.model._display_observations(observed)
+    assert len(display_angles) == len(display_radii) == 64
+    assert np.all(display_radii < 1)
     assert draws.shape == (3, ga.model.N_DRAWS, 2)
     traces = ga.model._display_traces(draws)
     assert traces.shape == (3, ga.model.TRACE_DRAWS, 2)

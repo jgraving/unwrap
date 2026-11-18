@@ -40,11 +40,12 @@ FIGURE_NAME = "circstats_graphical_abstract"
 CAPTION = (
     "Overview of a modern Bayesian workflow for circular GLMs. In panel B, "
     "each polar curve is a prior or posterior predictive draw. Zero density "
-    "starts on the inner ring. The blue rug along its inside edge marks "
-    "the observed angles. Each lane shows 160 consecutive draws from "
-    "three illustrative MCMC chains. Direction traces use three equivalent "
-    "turns and their highlighted draws wrap to nearly the same angle. "
-    "Softplus maps concentration draws to positive values."
+    "starts on the inner ring. Translucent dots just inside it show "
+    "jittered copies of the 16 observed angles. Each lane shows 400 "
+    "consecutive draws from three illustrative MCMC chains. Sample dots "
+    "follow the chains through the links to the likelihood parameters. "
+    "Direction traces use three equivalent turns and softplus maps "
+    "concentration draws to positive values."
 )
 # The old Cartesian plots in B, leaving the code window and workflow arrows.
 _REPLACED_PATHS = set(range(11, 38)) | set(range(119, 240))
@@ -435,6 +436,8 @@ def render(output_dir: Path, *, family=None) -> dict:
             "warmup": model.BURN_IN,
             "posterior_draws_per_chain": model.N_DRAWS,
             "displayed_draws_per_chain": model.TRACE_DRAWS,
+            "marked_draws_per_chain": model.MARKED_DRAWS_PER_CHAIN,
+            "display_dots_per_observation": model.DISPLAY_DOTS_PER_ANGLE,
             "chains": len(model.WRAP_BRANCHES),
             "initial_direction_turns": model.WRAP_BRANCHES,
             "concentration_updates_per_step": model.KAPPA_UPDATES,

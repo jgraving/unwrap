@@ -16,7 +16,9 @@ OBSERVED_DEG = (-76, -55, -55, -33, -33, -33, -12, -12,
 PRIOR_SD = (3.5, 2.5)
 BURN_IN = 600
 N_DRAWS = 1000
-TRACE_DRAWS = 160
+TRACE_DRAWS = 400
+MARKED_DRAWS_PER_CHAIN = 18
+DISPLAY_DOTS_PER_ANGLE = 4
 # Two concentration-only moves improve tail mixing at a fixed draw count.
 KAPPA_UPDATES = 2
 KAPPA_STEP = 1.6
@@ -100,6 +102,15 @@ def _display_traces(draws):
     return traces
 
 
+def _display_observations(observed):
+    """Spread copies of coincident angles for display without changing the fit."""
+    rng = np.random.default_rng(SEED + 1)
+    angles = np.repeat(observed, DISPLAY_DOTS_PER_ANGLE)
+    offsets = np.clip(rng.normal(0, 6.5, angles.size), -14, 14)
+    radii = rng.uniform(0.865, 0.965, angles.size)
+    return angles + np.deg2rad(offsets), radii
+
+
 def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
     polar = _page_axes(fig, page, 270, 94, 63, 63, projection="polar")
     polar.set_theta_zero_location("N")
@@ -124,17 +135,15 @@ def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
                                     (posterior_lines, BLUE, 0.43)):
         polar.plot(theta, 1 + sample.T / scale, color=color, alpha=opacity,
                    lw=0.48)
-    # Overlapping observation strokes form a circular rug just inside r = 1.
-    # Repeated angles darken the rug without stacking marks radially.
-    arc = np.deg2rad(np.linspace(-11.5, 11.5, 36))
-    for angle in observed:
-        polar.plot(angle + arc, np.full_like(arc, 0.95), color=BLUE,
-                   lw=1.45, alpha=0.44, solid_capstyle="round", zorder=5)
+    angles, radii = _display_observations(observed)
+    polar.scatter(angles, radii, s=2.75, color=BLUE, alpha=0.48,
+                  edgecolors="none", zorder=5)
 
     handles = [
         Line2D([], [], color=GRAY, lw=0.8, alpha=0.65, label="Prior"),
         Line2D([], [], color=BLUE, lw=0.8, label="Posterior"),
-        Line2D([], [], color=BLUE, lw=1.45, alpha=0.8, label="Observed"),
+        Line2D([], [], color=BLUE, marker="o", ms=2.5, lw=0, alpha=0.72,
+               label="Observed"),
     ]
     key = _page_axes(fig, page, 338, 100, 43, 51)
     key.set_axis_off()
@@ -163,10 +172,16 @@ def _sampling_diagram(fig, page, family, draws):
     targets = np.quantile(kappa_traces, (0.05, 0.50, 0.95))
     kappa_points = np.argmin(np.abs(kappa_traces - targets[:, None]), axis=1)
     x_trace = np.linspace(5, 57, traces.shape[1])
+    marked = np.linspace(0, traces.shape[1] - 1, MARKED_DRAWS_PER_CHAIN, dtype=int)
 
     def mark(x, y, color, *, size=10):
         flow.scatter([x], [y], s=size, color=color, edgecolors="white",
                      linewidths=0.35, zorder=5)
+
+    def cloud(x, y, color):
+        x, y = np.broadcast_arrays(x, y)
+        flow.scatter(x, y, s=4.2, color=color, alpha=0.38,
+                     edgecolors="none", zorder=4)
 
     def arrow(x0, x1, y, color="#848484"):
         flow.annotate("", (x1, y), (x0, y), arrowprops={
@@ -196,7 +211,8 @@ def _sampling_diagram(fig, page, family, draws):
             y_trace = top + 55 - 24 * scaled
         values = trace[np.arange(len(points)), points]
         for color, y, point in zip(CHAIN_COLORS[i], y_trace, points):
-            flow.plot(x_trace, y, color=color, alpha=0.62, lw=0.62)
+            flow.plot(x_trace, y, color=color, alpha=0.50, lw=0.5)
+            cloud(x_trace[marked], y[marked], color)
             mark(x_trace[point], y[point], color)
 
         left, width, baseline, height = 75, 50, top + 54, 24
@@ -209,14 +225,20 @@ def _sampling_diagram(fig, page, family, draws):
                           color="#bb6a3a", lw=0.8)
             flow.plot([left, left + width], [baseline - height / 2] * 2,
                       color=GRID, lw=0.5, zorder=0)
-            mapped = circ_mod(values)
-            for color, eta, mu in zip(CHAIN_COLORS[i], values, mapped):
-                mark(left + width * (eta + 3 * np.pi) / (6 * np.pi),
-                     baseline - height * (mu + np.pi) / (2 * np.pi), color)
             circle = np.linspace(-np.pi, np.pi, 181)
             flow.plot(169 + 10 * np.sin(circle), 41 - 10 * np.cos(circle),
                       color=GRID, lw=0.7)
-            for radius, mu, color in zip((7, 10, 13), mapped, CHAIN_COLORS[i]):
+            mapped = circ_mod(values)
+            for color, eta, mu, raw_samples, radius in zip(
+                CHAIN_COLORS[i], values, mapped, trace[:, marked], (7, 10, 13)
+            ):
+                samples = circ_mod(raw_samples)
+                cloud(left + width * (raw_samples + 3 * np.pi) / (6 * np.pi),
+                      baseline - height * (samples + np.pi) / (2 * np.pi), color)
+                mark(left + width * (eta + 3 * np.pi) / (6 * np.pi),
+                     baseline - height * (mu + np.pi) / (2 * np.pi), color)
+                cloud(169 + radius * np.sin(samples), 41 - radius * np.cos(samples),
+                      color)
                 mark(169 + radius * np.sin(mu), 41 - radius * np.cos(mu), color)
             flow.text(169, 59, "[−π, π)", **text_style)
         else:
@@ -230,14 +252,19 @@ def _sampling_diagram(fig, page, family, draws):
             flow.plot(np.interp(eta, input_limits, x_range),
                       np.interp(softplus(eta), support_limits, y_range),
                       color="#ad5b9a", lw=0.8)
-            mapped = softplus(values)
-            for color, raw, kappa in zip(CHAIN_COLORS[i], values, mapped):
-                mark(np.interp(raw, input_limits, x_range),
-                     np.interp(kappa, support_limits, y_range), color)
             arrow(147, 192, 107, GRID)
             flow.plot([148, 148], [104, 110], color="#848484", lw=0.6)
-            for color, kappa in zip(CHAIN_COLORS[i], mapped):
-                mark(148 + 41 * kappa / support_limit, 107, color)
+            for color, raw, kappa, raw_samples, y in zip(
+                CHAIN_COLORS[i], values, softplus(values), trace[:, marked],
+                (105.5, 107, 108.5)
+            ):
+                samples = softplus(raw_samples)
+                cloud(np.interp(raw_samples, input_limits, x_range),
+                      np.interp(samples, support_limits, y_range), color)
+                mark(np.interp(raw, input_limits, x_range),
+                     np.interp(kappa, support_limits, y_range), color)
+                cloud(148 + 41 * samples / support_limit, y, color)
+                mark(148 + 41 * kappa / support_limit, y, color)
             flow.text(169, 121, "κ > 0", **text_style)
 
 
