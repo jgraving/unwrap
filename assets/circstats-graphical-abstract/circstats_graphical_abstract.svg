@@ -23887,15 +23887,18 @@ L 537 136
     <text style="font-weight: 700; font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="34" transform="rotate(-0 558 34)">Likelihood parameters</text>
    </g>
    <g id="text_119">
-    <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="418" y="49" transform="rotate(-0 418 49)">η</text>
+    <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="394.25" y="49" transform="rotate(-0 394.25 49)">Direction predictor</text>
    </g>
    <g id="text_120">
-    <text style="font-size: 4.8px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="422" y="50.6" transform="rotate(-0 422 50.6)">μ</text>
+    <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="445.75" y="49" transform="rotate(-0 445.75 49)">η</text>
    </g>
    <g id="text_121">
-    <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="489" y="49" transform="rotate(-0 489 49)">Circular modulo</text>
+    <text style="font-size: 4.6px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="449.15" y="50.4" transform="rotate(-0 449.15 50.4)">μ</text>
    </g>
    <g id="text_122">
+    <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="489" y="49" transform="rotate(-0 489 49)">Circular modulo</text>
+   </g>
+   <g id="text_123">
     <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="49" transform="rotate(-0 558 49)">Mean direction μ</text>
    </g>
    <g id="patch_383">
@@ -23916,19 +23919,22 @@ L 526.220501 68
 L 523.820501 69.2 
 " style="fill: none; stroke: #848484; stroke-width: 0.7; stroke-linecap: round"/>
    </g>
-   <g id="text_123">
+   <g id="text_124">
     <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="85" transform="rotate(-0 558 85)">[−π, π)</text>
    </g>
-   <g id="text_124">
-    <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="418" y="112" transform="rotate(-0 418 112)">η</text>
-   </g>
    <g id="text_125">
-    <text style="font-size: 4.8px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="422" y="113.6" transform="rotate(-0 422 113.6)">κ</text>
+    <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="387.3" y="112" transform="rotate(-0 387.3 112)">Concentration predictor</text>
    </g>
    <g id="text_126">
-    <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="489" y="112" transform="rotate(-0 489 112)">Softplus</text>
+    <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="452.7" y="112" transform="rotate(-0 452.7 112)">η</text>
    </g>
    <g id="text_127">
+    <text style="font-size: 4.6px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="456.1" y="113.4" transform="rotate(-0 456.1 113.4)">κ</text>
+   </g>
+   <g id="text_128">
+    <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="489" y="112" transform="rotate(-0 489 112)">Softplus</text>
+   </g>
+   <g id="text_129">
     <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="112" transform="rotate(-0 558 112)">Concentration κ</text>
    </g>
    <g id="patch_385">
@@ -23958,7 +23964,7 @@ L 578.214979 133
 L 575.814979 134.2 
 " style="fill: none; stroke: #d4d7d9; stroke-width: 0.7; stroke-linecap: round"/>
    </g>
-   <g id="text_128">
+   <g id="text_130">
     <text style="font-size: 6.7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="147" transform="rotate(-0 558 147)">κ &gt; 0</text>
    </g>
    <g id="PathCollection_2">
