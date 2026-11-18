@@ -68,6 +68,8 @@ _SUMMARY_AXIS_LABELS = {107: "Predictive density difference",
                         273: "Predictive density"}
 _SUMMARY_AXIS_LABEL_SPANS = {53, 54, 230}
 _SUMMARY_AXIS_Y = (218.0, 317.0)  # common span enclosing both sets of intervals
+_ESTIMATE_CAPS = {109, 111, 112, 114, 276, 277, 279, 280}
+_ESTIMATE_CAP_WIDTH = 5.25
 _ESTIMATE_DOTS = {115, 116, 117, 118, 281, 282, 283}
 _ESTIMATE_DOT_SCALE = 0.68
 _PANEL_STROKE_WIDTHS = {
@@ -436,6 +438,12 @@ def draw_figure(asset, *, family=None):
                 _, x, _, _, _ = dr["items"][0]
                 y0, y1 = _SUMMARY_AXIS_Y
                 dr = {**dr, "items": [("l", x, y0, x, y1)]}
+            if i in _ESTIMATE_CAPS:
+                _, x0, y, x1, _ = dr["items"][0]
+                center = (x0 + x1) / 2
+                half_width = _ESTIMATE_CAP_WIDTH / 2
+                dr = {**dr, "items": [("l", center - half_width, y,
+                                       center + half_width, y)]}
             if i in editor_shapes and dr["width"] is not None:
                 dr = {**dr, "width": dr["width"] * _EDITOR_ZOOM}
             if i in _PANEL_STROKE_WIDTHS and dr["width"] is not None:

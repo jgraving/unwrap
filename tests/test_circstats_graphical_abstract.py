@@ -123,6 +123,13 @@ def test_svg_is_deterministic_vector_with_editable_text():
         for index, width in ga._PANEL_STROKE_WIDTHS.items():
             if asset["drawings"][str(index)]["width"] is not None:
                 assert original_paths[index].get_linewidth() == width
+        for index in ga._ESTIMATE_CAPS:
+            _, x0, y, x1, _ = asset["drawings"][str(index)]["items"][0]
+            vertices = original_paths[index].get_path().vertices
+            np.testing.assert_allclose(vertices.mean(axis=0),
+                                       [(x0 + x1) / 2, ga.PAGE_H - y])
+            assert np.ptp(vertices[:, 0]) == pytest.approx(5.25)
+            assert np.ptp(vertices[:, 1]) == 0
         for index in ga._ESTIMATE_DOTS:
             reference = ga.path_from_items(asset["drawings"][str(index)]["items"])
             before = reference.get_extents()
