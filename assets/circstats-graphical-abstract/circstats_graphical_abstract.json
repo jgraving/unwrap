@@ -1,6 +1,6 @@
 {
   "figure": "circstats_graphical_abstract",
-  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, the faint polar curves are prior and posterior predictive draws. The blue curve is the posterior mean and the dashed curve marks the uniform reference. Zero density starts on the inner ring. Translucent dots just inside it show jittered copies of the 16 observed angles. Each lane shows 400 consecutive draws from three illustrative MCMC chains. Sample dots follow the chains through the links to the likelihood parameters. Direction traces use three equivalent turns and softplus maps concentration draws to positive values.",
+  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, the faint polar curves are prior and posterior predictive draws. The blue curve is the posterior mean and the dashed curve marks the uniform reference. Zero density starts on the inner ring. The 16 illustrative observations use 70% of the angles\u2019 original offsets from their circular mean. Translucent dots inside the ring show jittered copies of these observations. Each lane shows 400 consecutive draws from three illustrative MCMC chains. Sample dots follow the chains through the links to the likelihood parameters. Direction traces use three equivalent turns and softplus maps concentration draws to positive values.",
   "page_pt": [
     599.0,
     342.0
@@ -23,7 +23,7 @@
     "reference_text_skipped": 85
   },
   "illustrative_fit": {
-    "observed_degrees": [
+    "reference_observed_degrees": [
       -76,
       -55,
       -55,
@@ -40,6 +40,25 @@
       53,
       53,
       75
+    ],
+    "observed_offset_factor": 0.7,
+    "observed_degrees": [
+      -53.979345636346714,
+      -39.27934563634668,
+      -39.27934563634668,
+      -23.8793456363467,
+      -23.8793456363467,
+      -23.8793456363467,
+      -9.1793456363467,
+      -9.1793456363467,
+      6.220654363653311,
+      6.220654363653311,
+      6.220654363653311,
+      20.920654363653288,
+      20.920654363653288,
+      36.3206543636533,
+      36.3206543636533,
+      51.7206543636533
     ],
     "method": "random-walk Metropolis on the unconstrained scale",
     "prior_sd": [
@@ -69,9 +88,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "347d14416693cf3b5101492be318b3a387229fe4ec2c7b9966cf5a4c44f427a3",
-    "pdf_sha256": "ac7e1a40b3837d51a5bb9c08438bdb113ba590c198f97ac1b97a1a43acf4aec6",
-    "png_sha256": "2aa5539f27bb40361c0619814702a198757767f41652967af9f17b7782481e86",
-    "html_sha256": "22539fbda7889a15420495d0579c7c9957405709af0c2387bacf20d8e39bf717"
+    "svg_sha256": "7f9ec5b0de7fbe1d7878b95a5316ce3b8ec98dd2f2cbf401af0f2dd1d81dc3da",
+    "pdf_sha256": "d1ed56cf2f81ce09983ad1b60aa447d0186d34ea48dcd500a8797e4a8d176ee2",
+    "png_sha256": "30ff9544f74f983ef517176f7b9acc49fc6c62740c2c2525bd3d976bbfac208f",
+    "html_sha256": "d2966c55229de617a87c9cbbe84216c0bcf77bc5011191224bf3c450c64b5430"
   }
 }
