@@ -1,6 +1,6 @@
 {
   "figure": "circstats_graphical_abstract",
-  "caption": "Overview of a modern Bayesian workflow for circular GLMs.",
+  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, the polar plot shows mean prior and posterior predictive densities with pointwise 10th\u201390th percentile bands. Dots show the observed angles. The two lanes show how a seeded illustrative fit maps real-valued MCMC draws to a circular direction and a positive concentration.",
   "page_pt": [
     599.0,
     342.0
@@ -10,26 +10,55 @@
     "reference_pdf_sha256": "5874a6da22930ff3b0e53f37c3ffd0074c2e88ddb25cdd4b909f7187a9e4e55c"
   },
   "fonts": {
-    "ArialMT": "Arial.ttf",
-    "Arial-BoldMT": "Arial.ttf",
-    "Helvetica": "Arial.ttf",
+    "ArialMT": "LiberationSans-Regular.ttf",
+    "Arial-BoldMT": "LiberationSans-Bold.ttf",
+    "Helvetica": "LiberationSans-Regular.ttf",
     "Menlo-Regular": "DejaVuSansMono.ttf",
-    "Menlo-Italic": "DejaVuSansMono.ttf"
+    "Menlo-Italic": "DejaVuSansMono-Oblique.ttf"
   },
   "counts": {
-    "drawings": 526,
-    "text_drawn": 149,
-    "text_skipped": 87
+    "reference_paths": 378,
+    "reference_paths_with_group_alpha": 19,
+    "reference_text_drawn": 111,
+    "reference_text_skipped": 85
+  },
+  "illustrative_fit": {
+    "observed_degrees": [
+      -76,
+      -55,
+      -55,
+      -33,
+      -33,
+      -33,
+      -12,
+      -12,
+      10,
+      10,
+      10,
+      31,
+      31,
+      53,
+      53,
+      75
+    ],
+    "method": "random-walk Metropolis on the unconstrained scale",
+    "prior_sd": [
+      3.5,
+      2.5
+    ],
+    "seed": 159,
+    "warmup": 600,
+    "posterior_draws": 1000
   },
   "env": {
-    "python": "3.12.3",
-    "matplotlib": "3.10.9",
-    "numpy": "2.4.6"
+    "python": "3.12.14",
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "2170f4d5f1c46d7e19aa57f670969c7a16c6295107b2b42677b9a2570bbf271f",
-    "pdf_sha256": "6e0b3aaca93e81daa6ba5519995a9eff7b42398cc43a65181879f1e30c63197d",
-    "png_sha256": "8780190d2d1a60a2dad74c5aa36f26b91d98a6acb0953fdd08f4405f2cd838af",
-    "html_sha256": "bbb551d125caa43ddf4f0934b36a24aadf94690df6eca9805c84039183ccba97"
+    "svg_sha256": "13a56576a716042fe5da37705f848aca8257ea7b4a0baaed75aa97b08f91620b",
+    "pdf_sha256": "f15f3775ae2562e8d44c210d00ac7ee189b0b9ba1f16e58103219d90a9272201",
+    "png_sha256": "24c5f54cf1c83855202cbe6f935ea2378e64c7f9d2a5b2c903c25cecab7b5cc9",
+    "html_sha256": "ae141f6d9420e34fb1c1519a2bc3acf40e829297db8f2b8b6c96fd1238924538"
   }
 }
