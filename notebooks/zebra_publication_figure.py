@@ -177,8 +177,6 @@ DEGREE_LABELS_E = [(t, x, y + (POLAR_E[1] - POLAR_C[1]))
                    for t, x, y in DEGREE_LABELS_C]
 COMPASS_LABELS = [("N", 0, -96), ("E", 96, 0),
                   ("S", 0, 96), ("W", -96, 0)]
-# The southeast quadrant leaves the radial labels clear of the mean markers.
-COMPASS_RADIAL_LABELS = [("0", 29, 29), ("1.0", 42, 41)]
 RADIAL_LABEL_C = [("0", 520.5, 505.8), ("1.0", 539.4, 475.2)]
 RADIAL_LABEL_E = [(t, x, y + (POLAR_E[1] - POLAR_C[1]))
                   for t, x, y in RADIAL_LABEL_C]
@@ -245,7 +243,7 @@ LEGEND_TEXTS = [("Pre", 608.95, 1056.1), ("Post", 706.6, 1056.1)]
 FS = dict(letter=32.0, title=17.5, degree=17.5, radial=15.0,
           tick=17.5, axis=17.5, bottom_legend=17.5, scale=15.2,
           north=18.2, map_legend=15.2)
-COMPANION_FS = dict(letter=22.0, title=15.0, degree=13.0, radial=12.0,
+COMPANION_FS = dict(letter=22.0, title=15.0, degree=13.0,
                     tick=14.0, axis=14.0, bottom_legend=14.0, scale=13.0,
                     north=15.0, map_legend=13.0)
 
@@ -985,20 +983,18 @@ def draw_figure(ctx, *, family="Arial", style="published"):
                          fontsize=sizes["letter"], weight="bold", color=color,
                          zorder=9)
         if companion:
-            angle_labels, radial_labels = (
-                [(text, cx + dx, cy + dy) for cx, cy in (POLAR_C, POLAR_E)
-                 for text, dx, dy in labels]
-                for labels in (COMPASS_LABELS, COMPASS_RADIAL_LABELS)
-            )
+            angle_labels = [(text, cx + dx, cy + dy)
+                            for cx, cy in (POLAR_C, POLAR_E)
+                            for text, dx, dy in COMPASS_LABELS]
         else:
             angle_labels = DEGREE_LABELS_C + DEGREE_LABELS_E
-            radial_labels = RADIAL_LABEL_C + RADIAL_LABEL_E
         for text, tx, ty in angle_labels:
             overlay.text(tx, ty, text, ha="center", va="center",
                          fontsize=sizes["degree"], color="black", zorder=9)
-        for text, tx, ty in radial_labels:
-            overlay.text(tx, ty, text, ha="center", va="center",
-                         fontsize=sizes["radial"], color="black", zorder=9)
+        if not companion:
+            for text, tx, ty in RADIAL_LABEL_C + RADIAL_LABEL_E:
+                overlay.text(tx, ty, text, ha="center", va="center",
+                             fontsize=sizes["radial"], color="black", zorder=9)
 
         buffer = io.StringIO()
         fig.savefig(buffer, format="svg",
