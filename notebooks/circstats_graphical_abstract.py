@@ -285,7 +285,9 @@ def _feedback_arrow(drawing):
          center_x + scale * (x1 - center_x), center_y + scale * (y1 - center_y))
         for kind, x0, y0, x1, y1 in drawing["items"]
     ]
-    return {**drawing, "width": drawing["width"] * scale, "items": items}
+    gray = to_rgb("#777777")
+    return {**drawing, "width": drawing["width"] * scale, "items": items,
+            "color": gray, "fill": gray if drawing["fill"] is not None else None}
 
 
 # -------------------------------------------------------------------
@@ -404,7 +406,6 @@ def draw_figure(asset, *, family=None):
                 dr = {**dr, "items": [("l", x, y0, x, y1)]}
             if i in _FEEDBACK_ARROW:
                 dr = _feedback_arrow(dr)
-                opacity *= 0.56
             round_join = i in _WORKFLOW_ARROWHEADS or i in _DIAGNOSTIC_ARROWHEADS
             draw_drawing(ax, dr, zorder=10 + i, opacity=opacity,
                          clip_box=box, clip_path=path,

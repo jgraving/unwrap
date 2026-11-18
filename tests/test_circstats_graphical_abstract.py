@@ -85,7 +85,7 @@ def test_svg_is_deterministic_vector_with_editable_text():
         original_paths = {patch.get_zorder() - 10: patch for patch in ax.patches}
         for index in ga._WORKFLOW_ARROWHEADS | ga._DIAGNOSTIC_ARROWHEADS:
             assert original_paths[index].get_joinstyle() == "round"
-        assert original_paths[8].get_edgecolor()[3] < original_paths[3].get_edgecolor()[3]
+        assert original_paths[8].get_edgecolor()[0] > original_paths[3].get_edgecolor()[0]
         assert original_paths[8].get_linewidth() < original_paths[3].get_linewidth()
         predictive_ring = fig.axes[1].spines["polar"]
         for index in ga._SUMMARY_POLAR_RINGS:

@@ -17,10 +17,10 @@
     "Menlo-Italic": "DejaVuSansMono-Oblique.ttf"
   },
   "counts": {
-    "reference_paths": 377,
+    "reference_paths": 369,
     "reference_paths_with_group_alpha": 19,
-    "reference_text_drawn": 108,
-    "reference_text_skipped": 85
+    "reference_text_drawn": 25,
+    "reference_text_skipped": 0
   },
   "illustrative_fit": {
     "observed_degrees": [
@@ -67,9 +67,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "99b0e2db5af2263af5f64f4e397d83c02ca9f35689e15fd2287ef6dd08a3327b",
-    "pdf_sha256": "f5d81b5c40d218a7d84cda98eab756ba6667489ef558e03c20d284bdf957f136",
-    "png_sha256": "d0708dfe5d4c3b8ada2a75747832c5ec0303aa4f9f437bbf10bd58fa2e4c2d89",
-    "html_sha256": "8496dbd1a894d0f9fc848e126bfb1750f96b853270a12cd3d773777c02975a7e"
+    "svg_sha256": "343498230a8e52338bc4e9511af69409604510d67bbbc2bfbf270b170a5fbc6c",
+    "pdf_sha256": "f166b1c1d76c90d0c87b23ab5c11822fb870b489ba6757c1c1e30de483f00d5d",
+    "png_sha256": "0c4385abcfa08af0e39d22504943bc2d720a0aa865d8620292b5a22a2007a029",
+    "html_sha256": "9ffe048aef144ea27c684b86d7575096315e0d798ec97cb00929932f3bf31bc5"
   }
 }
