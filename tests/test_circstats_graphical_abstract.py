@@ -90,6 +90,16 @@ def test_svg_is_deterministic_vector_with_editable_text():
             ring = original_paths[index]
             assert ring.get_edgecolor() == predictive_ring.get_edgecolor()
             assert ring.get_linewidth() == predictive_ring.get_linewidth()
+        for index, label in ga._SUMMARY_AXIS_LABELS.items():
+            _, x, _, _, _ = asset["drawings"][str(index)]["items"][0]
+            y0, y1 = ga._SUMMARY_AXIS_Y
+            np.testing.assert_allclose(original_paths[index].get_path().vertices,
+                                       [(x, ga.PAGE_H - y0), (x, ga.PAGE_H - y1)])
+            label_position = (x - 10.5, ga.PAGE_H - (y0 + y1) / 2)
+            caption, = [t for t in ax.texts if t.get_position() == label_position]
+            assert caption.get_text() == label
+            assert caption.get_rotation() == 90
+            assert caption.get_fontsize() == ga.model.LABEL_SIZE
         buf = io.BytesIO()
         fig.savefig(buf, format="svg",
                     metadata={"Date": None})

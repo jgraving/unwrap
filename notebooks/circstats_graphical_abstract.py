@@ -56,6 +56,11 @@ _SUMMARY_POLAR_SPOKES = {256: (0, -1), 257: (1, 0), 258: (0, 1), 259: (-1, 0)}
 # The measured center and radii of the two gray rings in panel D, in points.
 _SUMMARY_POLAR_CENTER = (167.492, 262.062)
 _SUMMARY_POLAR_RADII = (16.998, 33.996)
+# Model-comparison and hypothesis axes, and their superseded source spans.
+_SUMMARY_AXIS_LABELS = {107: "Predictive density difference",
+                        273: "Predictive density"}
+_SUMMARY_AXIS_LABEL_SPANS = {53, 54, 230}
+_SUMMARY_AXIS_Y = (218.0, 317.0)  # common span enclosing both sets of intervals
 
 # PDF font name -> family stack.  Liberation Sans is metric-compatible
 # with Arial (the CI default); Menlo falls back to a monospace.
@@ -286,8 +291,6 @@ def _label_size(span):
         return 18.0
     if size >= 10:
         return 11.0
-    if size >= 8.5:
-        return 9.0
     if size < 6.5:
         return model.LEGEND_SIZE
     return model.LABEL_SIZE
@@ -369,19 +372,30 @@ def draw_figure(asset, *, family=None):
         if i not in _REPLACED_PATHS:
             if i in _SUMMARY_POLAR_RINGS or i in _SUMMARY_POLAR_SPOKES:
                 dr = _summary_polar_guide(i, dr)
+            if i in _SUMMARY_AXIS_LABELS:
+                _, x, _, _, _ = dr["items"][0]
+                y0, y1 = _SUMMARY_AXIS_Y
+                dr = {**dr, "items": [("l", x, y0, x, y1)]}
             draw_drawing(ax, dr, zorder=10 + i, opacity=opacity,
                          clip_box=box, clip_path=path,
                          joinstyle="round" if i in _WORKFLOW_ARROWHEADS else "miter")
             translucent += opacity < 1.0
 
-    spans = [span for span in asset["text_spans"]
-             if not (span["x"] >= 250 and 23 <= span["y"] < 158
-                     and not (268 <= span["x"] <= 376 and span["y"] <= 81))]
+    spans = [span for i, span in enumerate(asset["text_spans"])
+             if i not in _SUMMARY_AXIS_LABEL_SPANS
+             and not (span["x"] >= 250 and 23 <= span["y"] < 158
+                      and not (268 <= span["x"] <= 376 and span["y"] <= 81))]
     drawn, skipped = draw_text(ax, spans, family_override=family)
     proportional = (family, *FONT_STACKS["ArialMT"]) if family else tuple(
         FONT_STACKS["ArialMT"])
-    model.draw_model_example(fig, (PAGE_W, PAGE_H),
-                             _font_name(proportional, False, False))
+    resolved_family = _font_name(proportional, False, False)
+    y0, y1 = _SUMMARY_AXIS_Y
+    for index, label in _SUMMARY_AXIS_LABELS.items():
+        _, x, _, _, _ = drawings[str(index)]["items"][0]
+        ax.text(x - 10.5, PAGE_H - (y0 + y1) / 2, label, rotation=90,
+                ha="center", va="center", fontfamily=resolved_family,
+                fontsize=model.LABEL_SIZE, color=model.INK, zorder=1000)
+    model.draw_model_example(fig, (PAGE_W, PAGE_H), resolved_family)
     stats = {
         "reference_paths": len(drawings) - len(_REPLACED_PATHS),
         "reference_paths_with_group_alpha": translucent,
