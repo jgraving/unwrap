@@ -1,0 +1,101 @@
+{
+  "figure": "circstats_graphical_abstract",
+  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, the faint polar curves are von Mises densities at individual prior and posterior draws of \u03bc and \u03ba. The blue curve is the posterior mean and the dashed curve marks the uniform reference. Zero density starts on the inner ring. The 16 illustrative observations use 70% of the angles\u2019 original offsets from their circular mean. Translucent dots inside the ring show jittered copies of these observations. Each lane shows 400 consecutive draws from three illustrative MCMC chains. Sample dots follow the chains through the links to the likelihood parameters. Direction traces use three equivalent turns and softplus maps concentration draws to positive values.",
+  "page_pt": [
+    599.0,
+    342.0
+  ],
+  "inputs": {
+    "artwork_sha256": "d2d6991cb522ac180dea76bf130511049a3562cded5b2b501cb822685a9fd612",
+    "reference_pdf_sha256": "5874a6da22930ff3b0e53f37c3ffd0074c2e88ddb25cdd4b909f7187a9e4e55c"
+  },
+  "fonts": {
+    "ArialMT": "arial.ttf",
+    "Arial-BoldMT": "arialbd.ttf",
+    "Helvetica": "arial.ttf",
+    "Menlo-Regular": "DejaVuSansMono.ttf",
+    "Menlo-Italic": "DejaVuSansMono-Oblique.ttf"
+  },
+  "counts": {
+    "reference_paths": 377,
+    "reference_paths_with_group_alpha": 19,
+    "reference_text_drawn": 108,
+    "reference_text_skipped": 85
+  },
+  "illustrative_fit": {
+    "reference_observed_degrees": [
+      -76,
+      -55,
+      -55,
+      -33,
+      -33,
+      -33,
+      -12,
+      -12,
+      10,
+      10,
+      10,
+      31,
+      31,
+      53,
+      53,
+      75
+    ],
+    "observed_offset_factor": 0.7,
+    "observed_degrees": [
+      -53.979345636346714,
+      -39.27934563634668,
+      -39.27934563634668,
+      -23.8793456363467,
+      -23.8793456363467,
+      -23.8793456363467,
+      -9.1793456363467,
+      -9.1793456363467,
+      6.220654363653311,
+      6.220654363653311,
+      6.220654363653311,
+      20.920654363653288,
+      20.920654363653288,
+      36.3206543636533,
+      36.3206543636533,
+      51.7206543636533
+    ],
+    "method": "random-walk Metropolis on the unconstrained scale",
+    "prior_mean": [
+      0.0,
+      1.5
+    ],
+    "prior_sd": [
+      3.5,
+      2.5
+    ],
+    "seed": 159,
+    "warmup": 600,
+    "posterior_draws_per_chain": 1000,
+    "displayed_draws_per_chain": 400,
+    "marked_draws_per_chain": 18,
+    "display_dots_per_observation": 4,
+    "displayed_prior_predictive_draws": 36,
+    "displayed_posterior_predictive_draws": 44,
+    "chains": 3,
+    "initial_direction_turns": [
+      -1,
+      0,
+      1
+    ],
+    "direction_proposal_sd": 0.42,
+    "concentration_updates_per_step": 2,
+    "concentration_proposal_sd": 1.6
+  },
+  "env": {
+    "python": "3.12.14",
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.5"
+  },
+  "exports": {
+    "svg_sha256": "91af1e5e65d8384ac8a706a7314831127cf95a64d906b14848a0d514066de850",
+    "pdf_sha256": "979469d5181280309d9df44aebdb6979efb776d8dd1ec62b43a967f78558141e",
+    "png_sha256": "b9b54839eed1dfe2f65e97d4b8ad0340a9ab3b020dbe41bfa694edfd74194199",
+    "html_sha256": "fb969c71c7967b004deafacfc3ec6afab426da754c488fc0f151b4c47e5e54af"
+  }
+}
