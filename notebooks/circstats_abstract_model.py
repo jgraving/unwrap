@@ -147,31 +147,29 @@ def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
         polar.plot(theta, 1 + sample.T / scale, color=color, alpha=opacity,
                    lw=0.40)
     uniform_radius = 1 + 1 / (2 * np.pi * scale)
-    uniform, = polar.plot(theta, np.full_like(theta, uniform_radius),
-                          color="#303030", alpha=0.68, lw=0.65,
-                          linestyle=(0, (2.4, 1.8)), label="Uniform", zorder=3)
-    mean, = polar.plot(theta, 1 + posterior.mean(axis=0) / scale,
-                       color=POSTERIOR_MEAN_COLOR, alpha=0.88, lw=0.85,
-                       label="Posterior mean", zorder=4)
+    polar.plot(theta, np.full_like(theta, uniform_radius),
+               color="#303030", alpha=0.68, lw=0.65,
+               linestyle=(0, (2.4, 1.8)), label="Uniform", zorder=3)
+    polar.plot(theta, 1 + posterior.mean(axis=0) / scale,
+               color=POSTERIOR_MEAN_COLOR, alpha=0.88, lw=0.85,
+               label="Posterior mean", zorder=4)
     angles, radii = _display_observations(observed)
     polar.scatter(angles, radii, s=2.75, color=BLUE, alpha=0.48,
                   edgecolors="none", zorder=5)
 
     handles = [
         Line2D([], [], color=GRAY, lw=0.8, alpha=0.65, label="Prior"),
-        uniform,
         Line2D([], [], color=BLUE, lw=0.8, label="Posterior"),
-        mean,
         Line2D([], [], color=BLUE, marker="o", ms=2.5, lw=0, alpha=0.72,
                label="Observed"),
     ]
-    key = _page_axes(fig, page, 335.5, 112, 48, 51)
+    key = _page_axes(fig, page, 338, 106, 43, 51)
     key.set_axis_off()
     legend = key.legend(handles=handles, loc="center left", frameon=True,
                         edgecolor="#c7c7c7", facecolor="white", framealpha=1,
-                        borderaxespad=0, borderpad=0.32,
-                        handlelength=0.85, handletextpad=0.38,
-                        labelspacing=0.40, prop={"family": family, "size": LEGEND_SIZE})
+                        borderaxespad=0, borderpad=0.46,
+                        handlelength=1.0, handletextpad=0.48,
+                        labelspacing=0.48, prop={"family": family, "size": LEGEND_SIZE})
     legend.get_frame().set_linewidth(0.65)
 
 

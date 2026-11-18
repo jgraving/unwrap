@@ -334,6 +334,12 @@ def draw_text(ax, spans, *, family_override=None, zorder=1000):
             stack = [family_override] + [
                 f for f in stack if f != family_override]
         editor = 268 <= s["x"] <= 376 and 23 <= s["y"] <= 81
+        if editor and s["x"] >= 280 and s["y"] >= 73:
+            # Replace the individually positioned PDF fragments on line 11.
+            if text != "idata":
+                skipped += 1
+                continue
+            text = "idata = model.fit(draws=1000)"
         size = s["size"] * _EDITOR_ZOOM if editor else _label_size(s)
         fp = _resolved_fp(stack, bold=bold, italic=italic, size=size)
         asc = float(s.get("ascender", 0.8))

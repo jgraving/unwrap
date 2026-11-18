@@ -98,7 +98,10 @@ def test_svg_is_deterministic_vector_with_editable_text():
         assert np.ptp(mean.get_ydata()) > 0
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
-        legend_bounds = fig.axes[2].get_legend().get_window_extent(renderer)
+        legend = fig.axes[2].get_legend()
+        assert [t.get_text() for t in legend.get_texts()] == [
+            "Prior", "Posterior", "Observed"]
+        legend_bounds = legend.get_window_extent(renderer)
         predictor, = [t for t in fig.axes[3].texts
                       if t.get_text() == "Concentration predictor"]
         assert not legend_bounds.overlaps(predictor.get_window_extent(renderer))
@@ -138,6 +141,7 @@ def test_svg_is_deterministic_vector_with_editable_text():
             "Circular modulo", "Softplus", "Predictive density",
             "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
     assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
+    assert "idata = model.fit(draws=1000)" in labels
     assert b"stroke-opacity: 0.28" in a
     assert b"fill-opacity: 0.48" in a
 
