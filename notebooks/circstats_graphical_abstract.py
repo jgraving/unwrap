@@ -25,6 +25,7 @@ from matplotlib.font_manager import (FontProperties, findSystemFonts, findfont,
                                      fontManager)  # noqa: E402
 from matplotlib.path import Path as MplPath  # noqa: E402
 from matplotlib.patches import PathPatch  # noqa: E402
+from matplotlib.textpath import TextToPath  # noqa: E402
 from matplotlib.transforms import Affine2D, Bbox, TransformedBbox  # noqa: E402
 
 import circstats_abstract_model as model  # noqa: E402
@@ -322,6 +323,7 @@ def draw_text(ax, spans, *, family_override=None, zorder=1000):
     """
     drawn = 0
     skipped = 0
+    fit_column = 0
     for s in spans:
         text = s["text"]
         if s["font"] in _SKIP_FONTS or not text.strip(" \xa0"):
@@ -334,12 +336,6 @@ def draw_text(ax, spans, *, family_override=None, zorder=1000):
             stack = [family_override] + [
                 f for f in stack if f != family_override]
         editor = 268 <= s["x"] <= 376 and 23 <= s["y"] <= 81
-        if editor and s["x"] >= 280 and s["y"] >= 73:
-            # Replace the individually positioned PDF fragments on line 11.
-            if text != "idata":
-                skipped += 1
-                continue
-            text = "idata = model.fit(draws=1000)"
         size = s["size"] * _EDITOR_ZOOM if editor else _label_size(s)
         fp = _resolved_fp(stack, bold=bold, italic=italic, size=size)
         asc = float(s.get("ascender", 0.8))
@@ -366,6 +362,20 @@ def draw_text(ax, spans, *, family_override=None, zorder=1000):
                 if s["dir"][0] else 0.0
             base_y = s["y"] + asc * s["size"]
             x, y = _editor_point(s["x"], base_y) if editor else (s["x"], base_y)
+            if editor and s["x"] >= 280 and s["y"] >= 73:
+                # Place the fit tokens on one monospace grid with their
+                # original colors and the original italic keyword argument.
+                if fit_column == 0:
+                    fit_x = x
+                    fit_advance = TextToPath().get_text_width_height_descent(
+                        "0", fp, ismath=False)[0]
+                text = text.replace("ﬁ", "fi")
+                columns = len(text)
+                if text == "=" and fit_column == len("idata"):
+                    fit_column += 1
+                    columns += 1
+                x = fit_x + fit_column * fit_advance
+                fit_column += columns
             ax.text(x, PAGE_H - y, text, fontproperties=fp,
                     color=color, ha="left", va="baseline", rotation=tilt,
                     zorder=zorder)

@@ -136,12 +136,27 @@ def test_svg_is_deterministic_vector_with_editable_text():
     assert root.get("viewBox") == "0 0 599 342"
     assert not root.findall(f".//{{{SVG_NS}}}image")
     assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 377
-    labels = {"".join(node.itertext()) for node in root.findall(f".//{{{SVG_NS}}}text")}
+    text_nodes = root.findall(f".//{{{SVG_NS}}}text")
+    labels = {"".join(node.itertext()) for node in text_nodes}
     assert {"MCMC draws", "Direction predictor", "Concentration predictor",
             "Circular modulo", "Softplus", "Predictive density",
             "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
     assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
-    assert "idata = model.fit(draws=1000)" in labels
+    fit_start, = [node for node in text_nodes if node.text == "idata"]
+    start_x = float(fit_start.get("x"))
+    fit_tokens = [node for node in text_nodes
+                  if node.get("y") == fit_start.get("y")
+                  and float(node.get("x")) >= start_x]
+    assert [node.text for node in fit_tokens] == [
+        "idata", "=", "model", ".", "fit", "(", "draws", "=", "1000", ")"]
+    offsets = np.array([float(node.get("x")) - start_x for node in fit_tokens])
+    np.testing.assert_allclose(offsets, offsets[-1] / 28 * np.array(
+        [0, 6, 8, 13, 14, 17, 18, 23, 24, 28]), atol=1e-6)
+    styles = {node.text: node.get("style") for node in fit_tokens}
+    assert "fill: #007197" in styles["fit"]
+    assert "fill: #0087a8" in styles["draws"]
+    assert "font-style: italic" in styles["draws"]
+    assert "fill: #b15c00" in styles["1000"]
     assert b"stroke-opacity: 0.28" in a
     assert b"fill-opacity: 0.48" in a
 
