@@ -61,6 +61,10 @@
       51.7206543636533
     ],
     "method": "random-walk Metropolis on the unconstrained scale",
+    "prior_mean": [
+      0.0,
+      1.5
+    ],
     "prior_sd": [
       3.5,
       2.5
@@ -79,6 +83,7 @@
       0,
       1
     ],
+    "direction_proposal_sd": 0.42,
     "concentration_updates_per_step": 2,
     "concentration_proposal_sd": 1.6
   },
@@ -88,9 +93,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "7f9ec5b0de7fbe1d7878b95a5316ce3b8ec98dd2f2cbf401af0f2dd1d81dc3da",
-    "pdf_sha256": "d1ed56cf2f81ce09983ad1b60aa447d0186d34ea48dcd500a8797e4a8d176ee2",
-    "png_sha256": "30ff9544f74f983ef517176f7b9acc49fc6c62740c2c2525bd3d976bbfac208f",
-    "html_sha256": "d2966c55229de617a87c9cbbe84216c0bcf77bc5011191224bf3c450c64b5430"
+    "svg_sha256": "b143cfb8e78e5d1e36bfb813596a0c10934f0fddea7d5488bcb807525e00e013",
+    "pdf_sha256": "d81338ea34373ed0b2f078c0b80bb8af4daae864dd1e1c6c31265529518afa4a",
+    "png_sha256": "a68d021c9341ae2c9091b2047cd8be92885d0277c92c8da11488d52f965a106f",
+    "html_sha256": "c96ec6e0f77c68f5e9325e55584c6c26cda29772ea79eacd98297a5392b545fc"
   }
 }
