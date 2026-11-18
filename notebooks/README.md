@@ -65,3 +65,6 @@ For the statistical framework and biological context, see the
 [mathematical guide](../docs/math/von-mises.md).
 The locust density–order manuscript figure has a saved-fit publication
 renderer with original source images: [reproduction instructions](LOCUST_DENSITY_FIGURE.md).
+The circstats paper's graphical abstract has a deterministic vector
+renderer that rebuilds the Inkscape-polished 599 × 342-point strip from
+the pinned artwork: [reproduction instructions](CIRCSTATS_GRAPHICAL_ABSTRACT.md).

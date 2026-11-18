@@ -1,0 +1,35 @@
+{
+  "figure": "circstats_graphical_abstract",
+  "caption": "Overview of a modern Bayesian workflow for circular GLMs.",
+  "page_pt": [
+    599.0,
+    342.0
+  ],
+  "inputs": {
+    "artwork_sha256": "d2d6991cb522ac180dea76bf130511049a3562cded5b2b501cb822685a9fd612",
+    "reference_pdf_sha256": "5874a6da22930ff3b0e53f37c3ffd0074c2e88ddb25cdd4b909f7187a9e4e55c"
+  },
+  "fonts": {
+    "ArialMT": "Arial.ttf",
+    "Arial-BoldMT": "Arial.ttf",
+    "Helvetica": "Arial.ttf",
+    "Menlo-Regular": "DejaVuSansMono.ttf",
+    "Menlo-Italic": "DejaVuSansMono.ttf"
+  },
+  "counts": {
+    "drawings": 526,
+    "text_drawn": 149,
+    "text_skipped": 87
+  },
+  "env": {
+    "python": "3.12.3",
+    "matplotlib": "3.10.9",
+    "numpy": "2.4.6"
+  },
+  "exports": {
+    "svg_sha256": "2170f4d5f1c46d7e19aa57f670969c7a16c6295107b2b42677b9a2570bbf271f",
+    "pdf_sha256": "6e0b3aaca93e81daa6ba5519995a9eff7b42398cc43a65181879f1e30c63197d",
+    "png_sha256": "8780190d2d1a60a2dad74c5aa36f26b91d98a6acb0953fdd08f4405f2cd838af",
+    "html_sha256": "bbb551d125caa43ddf4f0934b36a24aadf94690df6eca9805c84039183ccba97"
+  }
+}
