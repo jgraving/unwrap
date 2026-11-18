@@ -26,18 +26,21 @@ without running the notebook or sampling again. See the
 [reproduction instructions](BEETLE_FIGURE.md) and the
 [rendered preview](../assets/beetles-publication/beetles_publication.png).
 
-`locust_circ_stats_figure.py` likewise rebuilds the four-panel locust
-circular-statistics composite from the published fits and data in
-`unwrap-data` - panels b and d are the house `plot_loo_elpd` and
-`plot_hypothesis_density` panels, panel c is the house population check in
-the published style, and panel a replays the published artwork geometry kept
-in `assets/locust_circ_stats/`. Rendered preview:
+## Locust composite figure
+
+`locust_circ_stats_figure.py` rebuilds the four-panel locust
+circular-statistics composite from the pinned fits and data in `unwrap-data` -
+panels b and d are the house `plot_loo_elpd` and `plot_hypothesis_density`
+panels, panel c is the house population check drawn in the style of the
+reference figure, and panel a replays that figure's artwork geometry kept in
+`assets/locust_circ_stats/`. The composite being matched comes from the
+manuscript, so it is called the reference figure throughout. Rendered preview:
 [PDF](../assets/locust-circ-stats/locust_circ_stats_figure.pdf) ·
 [PNG](../assets/locust-circ-stats/locust_circ_stats_figure.png) ·
 [SVG](../assets/locust-circ-stats/locust_circ_stats_figure.svg) ·
 [provenance](../assets/locust-circ-stats/locust_circ_stats_figure.json),
-and a side-by-side against the published page
-[here](../assets/locust-circ-stats/comparison_vs_published.png).
+and a side-by-side against the reference page
+[here](../assets/locust-circ-stats/comparison_vs_reference.png).
 
 ## Setup
 

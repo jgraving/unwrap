@@ -2,10 +2,10 @@
 figure (panels a-d).
 
 Panels:
-  a. Virtual-swarm schematic, rebuilt from the published artwork geometry
+  a. Virtual-swarm schematic, rebuilt from the reference artwork geometry
      (``notebooks/assets/locust_circ_stats/``: the virtual-swarm sprite PNG
      plus the image placements, vector paths and text spans extracted from
-     the published PDF, replayed through matplotlib).
+     the reference PDF, replayed through matplotlib).
   b. LOO ELPD comparison - the house ``plot_loo_elpd`` panel, drawn onto the
      composite page by the house function itself (see ``_house_panel``).
   c. Population-level predictive check - the house
@@ -17,15 +17,17 @@ Panels:
 
 Data and fits: trajectories from ``unwrap-data`` through
 ``unwrap.datasets.load_directional`` + ``rediscretize_directional``; the
-bimodal and unimodal fits load from the published fit cache in the same
+bimodal and unimodal fits load from the pinned fit cache in the same
 repository (``fit_cache/locust_direction_{bimodal,unimodal}.nc``). The
 models are rebuilt only to attach the per-observation log-likelihood the
 LOO/ELPD post-hoc reads (PyMC 6 replacement for ``idata_kwargs=
 {"log_likelihood": True}``), mirroring notebook cells 10 and 14.
 
 The page is 900 x 600 pt (12.5 x 8.33 in), drawn in PDF points through a
-full-page stage axes; positions/colors/sizes reproduce the published
-layout. Saves to ``figures/locust/locust_circ_stats_figure.pdf``.
+full-page stage axes; positions/colors/sizes reproduce the reference layout.
+The composite being matched is the manuscript's figure, so it is called the
+reference figure - and its PDF the reference PDF - throughout. Saves to
+``figures/locust/locust_circ_stats_figure.pdf``.
 
 ``--snapshot-dir`` (default ``assets/locust-circ-stats``) additionally writes
 the review snapshots - PDF, PNG, SVG, a self-contained HTML review page and a
@@ -92,14 +94,14 @@ CAPTION = (
 )
 
 # ---------------------------------------------------------------------------
-# layout and type (measured from the published PDF, in pt)
+# layout and type (measured from the reference PDF, in pt)
 # ---------------------------------------------------------------------------
 PANEL_B = (146.2, 401.8, 284.8, 98.0)   # axes rectangle (x, y_top, w, h)
 PANEL_D = (577.2, 401.8, 296.0, 97.9)
 POLAR_CENTER = (615.1, 206.3)           # polar center
 POLAR_R_OUT = 118.7                     # outer grid circle radius (r = 1.0)
 
-#: The published page carries heavier type and lines than a standalone house
+#: The reference page carries heavier type and lines than a standalone house
 #: panel: tick caps measure 12.2 pt tall (Arial cap height 0.716 em -> ~17 pt),
 #: spines/ticks/error bars 2.09 pt, ticks 6.3 pt long. Scaling the house
 #: rcParams (8 pt / 1.0 pt) by those measured numbers is what makes the
@@ -108,14 +110,14 @@ TYPE_SZ = 17.0
 LEGEND_SZ = 15.0
 LINE_W = 2.09
 TICK_LEN = 6.3
-MARK_SCALE = 2.09   # marker/cap/elinewidth factor in the published dots
+MARK_SCALE = 2.09   # marker/cap/elinewidth factor in the reference figure's dots
 
-#: axis ticks as printed in the published figure. The pads reproduce the
-#: published margins from the plotted statistics: panel b's whisker extents
-#: sit 10 ELPD inside the axis (published left/right edges -3549.6/-3355.7
+#: axis ticks as printed in the reference figure. The pads reproduce that
+#: figure's margins from the plotted statistics: panel b's whisker extents
+#: sit 10 ELPD inside the axis (reference left/right edges -3549.6/-3355.7
 #: against whiskers at -3540.8/-3365.2), panel d's 0.0115 density units
 #: inside (0.0462/0.3152 against 0.0576/0.3034).
-#: The published page prints three ELPD ticks because its axis starts at
+#: The reference page prints three ELPD ticks because its axis starts at
 #: -3549.6; ours starts at -3581.7 (our unimodal whisker reaches -3571.7, see
 #: the PR note), so a fourth tick keeps the spacing even across the axis.
 PANEL_B_XTICKS = [-3550.0, -3500.0, -3450.0, -3400.0]
@@ -124,7 +126,7 @@ PANEL_D_XTICKS = [0.1, 0.2, 0.3]
 PANEL_D_PAD = 0.0115
 
 #: dash rhythm of panel d's dashed "Uniform" reference line, measured off the
-#: published PDF (7.74 pt on, 3.35 pt off at a 2.09 pt stroke)
+#: reference PDF (7.74 pt on, 3.35 pt off at a 2.09 pt stroke)
 UNIFORM_DASH = (7.74302, 3.3483332)
 
 
@@ -197,7 +199,7 @@ def build_models(df):
 
 
 def load_fits(model_bimodal, model_unimodal):
-    """Load the published bimodal/unimodal fit snapshots from unwrap-data
+    """Load the pinned bimodal/unimodal fit snapshots from unwrap-data
     and attach the per-observation log-likelihood."""
     data_root = pathlib.Path(os.environ.get("UNWRAP_DATA_ROOT",
                                             str(pathlib.Path.home() / ".cache" / "unwrap-data")))
@@ -216,7 +218,7 @@ def load_fits(model_bimodal, model_unimodal):
 
 
 # ---------------------------------------------------------------------------
-# panel a: replay the published artwork geometry
+# panel a: replay the reference artwork geometry
 # ---------------------------------------------------------------------------
 def _path_from_items(items):
     """Turn extracted PDF path items into a matplotlib Path.
@@ -270,7 +272,7 @@ def _path_from_items(items):
 PHOTO_OVERSAMPLE = 2.0
 
 
-#: the photo background is this bright in every channel; the published panel
+#: the photo background is this bright in every channel; the reference panel
 #: clips each locust to its silhouette, so these pixels are made transparent
 #: here (the arrows and rules behind the photos show through them).
 PHOTO_BG_FLOOR = 250
@@ -279,7 +281,7 @@ PHOTO_BG_FLOOR = 250
 def _photo_alpha(sprite, floor=PHOTO_BG_FLOOR):
     """Alpha for the sprite: 0 over the photographic background.
 
-    The published figure clips every placement to the locust's outline, so
+    The reference figure clips every placement to the locust's outline, so
     the grey flight arrows read through the gaps around the insect. Tracing
     that outline from the sprite itself is what the white background makes
     easy: the background is one bright connected region reaching the sprite
@@ -300,7 +302,7 @@ def _photo_alpha(sprite, floor=PHOTO_BG_FLOOR):
 def _photo_layer(spec, oversample=PHOTO_OVERSAMPLE):
     """Stitch the locust photos into one RGBA layer.
 
-    The published panel places twelve clipped windows of a single
+    The reference panel places twelve clipped windows of a single
     virtual-swarm sprite, each window further clipped to the locust inside
     it. Compositing them here (sub-pixel positioned, transparent outside the
     insect) gives one image to draw, which reproduces the print exactly:
@@ -344,7 +346,7 @@ def _photo_layer(spec, oversample=PHOTO_OVERSAMPLE):
 
 
 def draw_panel_a(ax, spec):
-    """Replay the published panel-a artwork: photo layer, vector paths, text."""
+    """Replay the reference panel-a artwork: photo layer, vector paths, text."""
     layer, (left, top, right, bottom) = _photo_layer(spec)
     ax.imshow(np.asarray(layer), extent=(left, right, top, bottom),
               origin="lower", zorder=50, interpolation="lanczos")
@@ -412,7 +414,7 @@ def draw_panel_a(ax, spec):
 # ---------------------------------------------------------------------------
 # panel c: population predictive check in the publication style
 # ---------------------------------------------------------------------------
-# strokes measured from the published PDF (pt): model line 2.9, data line 2.9
+# strokes measured from the reference PDF (pt): model line 2.9, data line 2.9
 # dashed 10.74/4.64, bands at alpha 0.25, grid circles 0.69 grey at 1.55, the
 # r = 0.5 reference circle black at 0.97 and the optic-flow / vectorial-
 # encoding arrows 4.0 long reaching r = 0.30.
@@ -424,7 +426,7 @@ DATA_DASHES = (10.736325 / DATA_LW, 4.6427357 / DATA_LW)   # matplotlib scales b
 BAND_ALPHA = 0.25
 EDGE_CIRCLE_LW = 0.97
 ARROW_LW = 4.0
-#: The page's arrow style, measured off the published PDF: a 4.0 pt shaft
+#: The page's arrow style, measured off the reference PDF: a 4.0 pt shaft
 #: closed by a triangular head whose base and length are both 16.8 pt (panel
 #: a's swarm arrows are the same shape at 3.0 pt shaft / 13.2 pt head).
 #: Panel c's tips sit 47.96 pt (forward) and 50.22 / 49.97 pt (the two
@@ -434,7 +436,7 @@ ARROW_LW = 4.0
 ARROW_HEAD = 16.8
 ARROW_TIP_R = {0.0: 47.96, np.pi / 2: 50.22, -np.pi / 2: 49.97}
 
-#: polar tick labels at their published page positions (measured: the nearest
+#: polar tick labels at their reference page positions (measured: the nearest
 #: edges clear the r = 1.0 grid circle by 3.8-8.2 pt).  matplotlib places
 #: polar tick labels on the circle, which would set "±180°" on top of the 180°
 #: grid line; the house polar gets the clearance by padding its label strings
@@ -446,7 +448,7 @@ POLAR_TICK_LABELS = (
     (492.56, 204.72, "right", "±180°"),
 )
 
-#: legend box measured from the published PDF: 97.9 x 48.5 pt, the handle band
+#: legend box measured from the reference PDF: 97.9 x 48.5 pt, the handle band
 #: 30.95 pt across (the house handler draws the line 10 % longer), rows 21.9 pt
 #: apart. matplotlib's legend bbox starts half a font size inside the anchor.
 LEGEND_BOX = (741.44, 63.42, 839.35, 111.89)
@@ -474,7 +476,7 @@ def draw_population_polar(fig, trace_bimodal, df):
     edge_radius = 0.5
     ylim_max = edge_radius + np.max(density_upper) * 1.2
 
-    # Square box centred on the published polar centre; the size is then
+    # Square box centred on the reference polar centre; the size is then
     # calibrated against the axes transform so the r = 1.0 grid circle lands
     # exactly on POLAR_R_OUT.
     ax = fig.add_axes([0, 0, 1, 1], projection="polar")
@@ -585,7 +587,7 @@ class _house_panel:
     - the module type size ``locust_direction_plots.FONT_SZ`` (used for the
       in-axes "Uniform" label) becomes the page's 17 pt;
     - dot / error-bar / reference-line strokes are scaled by ``mark_scale``
-      to the published weights.
+      to the reference weights.
 
     ``save=False`` in the call keeps the house function from writing its own
     file.
@@ -635,7 +637,7 @@ def _scaled(method, factor, keys):
 
 
 def _styled_vline(method, factor, dash):
-    """Wrap ``axvline``: scale the line width, and use the published dash
+    """Wrap ``axvline``: scale the line width, and use the reference dash
     rhythm (``dash`` is a period in points) for any dashed reference line."""
     def wrapper(*args, **kwargs):
         if kwargs.get("lw") is not None:
@@ -652,7 +654,7 @@ def build_figure():
     the statistics the figure draws, for the provenance snapshot."""
     plots.set_style()
     # the page is far larger than a standalone house panel, so the house
-    # 8 pt / 1.0 pt style moves to the published scale measured above
+    # 8 pt / 1.0 pt style moves to the reference figure's scale measured above
     mpl.rcParams.update({
         "font.size": TYPE_SZ,
         "axes.labelsize": TYPE_SZ,
@@ -677,7 +679,7 @@ def build_figure():
     stage.set_ylim(PAGE_H, 0)  # top-left origin
     stage.set_axis_off()
 
-    # panel a from the published artwork geometry
+    # panel a from the reference artwork geometry
     spec = json.loads((ASSETS / "panel_a.json").read_text())
     draw_panel_a(stage, spec)
 
@@ -766,11 +768,11 @@ def provenance(plotted):
         "python": platform.python_version(),
         "packages": {name: importlib.metadata.version(name) for name in packages},
         "panel_a_source": {
-            "kind": "extracted from the published figure PDF",
+            "kind": "extracted from the reference figure PDF",
             "assets": ["notebooks/assets/locust_circ_stats/panel_a.json",
                        "notebooks/assets/locust_circ_stats/virtual_swarm.png"],
             "note": "image placements, vector paths and text spans read from the "
-                    "published PDF and replayed; the sprite is the virtual-swarm "
+                    "reference PDF and replayed; the sprite is the virtual-swarm "
                     "photograph inside it",
         },
         "fits": {name: _fit_spec(name) for name in
@@ -783,17 +785,17 @@ def provenance(plotted):
             "panel c's arrows are drawn as a shaft plus a 16.8 pt triangular head "
             "in page points, i.e. panel a's arrow style; matplotlib's \"-|>\" head "
             "is blunter and shorter at the same nominal size.",
-            "panel c's polar tick labels are placed at their published page "
+            "panel c's polar tick labels are placed at their reference page "
             "positions: matplotlib puts polar tick labels on the grid circle, which "
             "lands \"±180°\" on top of the 180° grid line.",
-            "panel b prints four ELPD ticks where the published page prints three, "
+            "panel b prints four ELPD ticks where the reference page prints three, "
             "because our axis spans to -3581.7 rather than -3549.6.",
         ],
         "known_differences": [
-            "Text is set in Arial; the published page uses Helvetica Neue, whose "
+            "Text is set in Arial; the reference page uses Helvetica Neue, whose "
             "glyph widths differ by 1-4% at the same size and position.",
             "Panel b's cached unimodal fit gives ELPD -3533.40 +/- 38.34 where "
-            "the published page prints -3502.0 +/- 38.8; the bimodal fit matches "
+            "the reference page prints -3502.0 +/- 38.8; the bimodal fit matches "
             "(-3404.51 +/- 39.27 against -3403.8 +/- 39.2).",
         ],
     }

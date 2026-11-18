@@ -4,7 +4,7 @@
     900.0,
     600.0
   ],
-  "code_revision": "5eeb72fc718b88347816d61b25d2d6d35a648774",
+  "code_revision": "8a09c6126d3a40e423cf79975f77ed6177cc9999",
   "data_repository": "jgraving/unwrap-data",
   "data_revision": "7f62250a37701a5fce3cc256bbcbc11564b36600",
   "font_family": "Arial",
@@ -21,12 +21,12 @@
     "pillow": "13.0.0"
   },
   "panel_a_source": {
-    "kind": "extracted from the published figure PDF",
+    "kind": "extracted from the reference figure PDF",
     "assets": [
       "notebooks/assets/locust_circ_stats/panel_a.json",
       "notebooks/assets/locust_circ_stats/virtual_swarm.png"
     ],
-    "note": "image placements, vector paths and text spans read from the published PDF and replayed; the sprite is the virtual-swarm photograph inside it"
+    "note": "image placements, vector paths and text spans read from the reference PDF and replayed; the sprite is the virtual-swarm photograph inside it"
   },
   "fits": {
     "locust_direction_bimodal": {
@@ -88,12 +88,12 @@
   "corrections": [
     "panel a records 34 path primitives: the first extraction pass kept paths above y = 300 pt only and missed the two grey flight arrows of the bottom swarm's second row (y = 301-321 pt).",
     "panel c's arrows are drawn as a shaft plus a 16.8 pt triangular head in page points, i.e. panel a's arrow style; matplotlib's \"-|>\" head is blunter and shorter at the same nominal size.",
-    "panel c's polar tick labels are placed at their published page positions: matplotlib puts polar tick labels on the grid circle, which lands \"\u00b1180\u00b0\" on top of the 180\u00b0 grid line.",
-    "panel b prints four ELPD ticks where the published page prints three, because our axis spans to -3581.7 rather than -3549.6."
+    "panel c's polar tick labels are placed at their reference page positions: matplotlib puts polar tick labels on the grid circle, which lands \"\u00b1180\u00b0\" on top of the 180\u00b0 grid line.",
+    "panel b prints four ELPD ticks where the reference page prints three, because our axis spans to -3581.7 rather than -3549.6."
   ],
   "known_differences": [
-    "Text is set in Arial; the published page uses Helvetica Neue, whose glyph widths differ by 1-4% at the same size and position.",
-    "Panel b's cached unimodal fit gives ELPD -3533.40 +/- 38.34 where the published page prints -3502.0 +/- 38.8; the bimodal fit matches (-3404.51 +/- 39.27 against -3403.8 +/- 39.2)."
+    "Text is set in Arial; the reference page uses Helvetica Neue, whose glyph widths differ by 1-4% at the same size and position.",
+    "Panel b's cached unimodal fit gives ELPD -3533.40 +/- 38.34 where the reference page prints -3502.0 +/- 38.8; the bimodal fit matches (-3404.51 +/- 39.27 against -3403.8 +/- 39.2)."
   ],
   "outputs_sha256": {
     ".pdf": "76c83ce180d5174f42221830c71fdb51a64f802c3e32af90d73b1f497c0ea9c0",
