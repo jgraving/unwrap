@@ -9,6 +9,7 @@ from pathlib import Path
 
 import matplotlib
 import numpy as np
+import pytest
 from scipy.integrate import trapezoid
 
 matplotlib.use("Agg")
@@ -63,7 +64,7 @@ def test_pinned_split_is_a_partition_of_all_drawings():
 
 
 def test_reference_pdf_is_pure_vector_with_matching_counts():
-    import pymupdf
+    pymupdf = pytest.importorskip("pymupdf")
 
     doc = pymupdf.open(ga.REFERENCE_PDF)
     page = doc.load_page(0)
@@ -76,6 +77,7 @@ def test_reference_pdf_is_pure_vector_with_matching_counts():
 
 
 def test_svg_is_deterministic_vector_with_editable_text():
+    pytest.importorskip("pymupdf")
     asset = ga.load_asset()
 
     def svg_bytes():
@@ -123,6 +125,7 @@ def test_seeded_example_recomputes_normalized_predictive_densities():
 
 
 def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
+    pytest.importorskip("pymupdf")
     prov = ga.render(tmp_path)
     base = tmp_path / ga.FIGURE_NAME
     for ext in (".svg", ".pdf", ".png", ".html", ".json"):
@@ -148,8 +151,8 @@ def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
 
 
 def test_pdf_round_trip_stays_vector_and_keeps_text(tmp_path):
+    pymupdf = pytest.importorskip("pymupdf")
     prov = ga.render(tmp_path)
-    import pymupdf
 
     pdf = tmp_path / f"{ga.FIGURE_NAME}.pdf"
     doc = pymupdf.open(pdf)
