@@ -25,7 +25,7 @@ from matplotlib.font_manager import (FontProperties, findSystemFonts, findfont,
                                      fontManager)  # noqa: E402
 from matplotlib.path import Path as MplPath  # noqa: E402
 from matplotlib.patches import PathPatch  # noqa: E402
-from matplotlib.transforms import Bbox, TransformedBbox  # noqa: E402
+from matplotlib.transforms import Affine2D, Bbox, TransformedBbox  # noqa: E402
 
 import circstats_abstract_model as model  # noqa: E402
 
@@ -61,6 +61,11 @@ _SUMMARY_AXIS_LABELS = {107: "Predictive density difference",
                         273: "Predictive density"}
 _SUMMARY_AXIS_LABEL_SPANS = {53, 54, 230}
 _SUMMARY_AXIS_Y = (218.0, 317.0)  # common span enclosing both sets of intervals
+_EDITOR_SOURCE = (268.81, 24.07)
+_EDITOR_POSITION = (254.0, 20.5)
+_EDITOR_ZOOM = 1.19
+_EDITOR_WIDTH = 107.37
+_EDITOR_BAR_HEIGHT = 8.05
 
 # PDF font name -> family stack.  Liberation Sans is metric-compatible
 # with Arial (the CI default); Menlo falls back to a monospace.
@@ -215,8 +220,10 @@ def _reference_drawings():
         yield item["type"], opacity, clip_box, clip_path
 
 
-def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path, joinstyle="miter"):
+def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path,
+                 joinstyle="miter", transform=None):
     """Render one pinned/reference drawing (fill and/or stroke)."""
+    data_transform = ax.transData if transform is None else transform + ax.transData
     path = path_from_items(dr["items"])
     t = dr["type"]
     face = _color(dr["fill"], opacity * dr["fill_opacity"]) if "f" in t \
@@ -231,17 +238,17 @@ def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path, joinstyle="mit
         patch = PathPatch(path, facecolor=face, edgecolor=edge,
                           linewidth=lw, linestyle=ls,
                           capstyle="butt", joinstyle=joinstyle,
-                          zorder=zorder)
+                          transform=data_transform, zorder=zorder)
     else:
         patch = PathPatch(path, facecolor=face, edgecolor="none",
-                          zorder=zorder)
+                          transform=data_transform, zorder=zorder)
     ax.add_patch(patch)
     if clip_box is not None:
         x0, y0, x1, y1 = clip_box
         box = Bbox.from_extents(x0, PAGE_H - y1, x1, PAGE_H - y0)
-        patch.set_clip_box(TransformedBbox(box, ax.transData))
+        patch.set_clip_box(TransformedBbox(box, data_transform))
     if clip_path is not None:
-        patch.set_clip_path(clip_path, ax.transData)
+        patch.set_clip_path(clip_path, data_transform)
     return patch
 
 
@@ -284,9 +291,6 @@ def _resolved_fp(stack, *, bold, italic, size):
 
 def _label_size(span):
     size = span["size"]
-    # The editor mock retains the paper's original code-window typography.
-    if 268 <= span["x"] <= 376 and 23 <= span["y"] <= 81:
-        return size
     if size >= 17:
         return 18.0
     if size >= 10:
@@ -294,6 +298,12 @@ def _label_size(span):
     if size < 6.5:
         return model.LEGEND_SIZE
     return model.LABEL_SIZE
+
+
+def _editor_point(x, y):
+    left, top = _EDITOR_POSITION
+    return (left + (x - _EDITOR_SOURCE[0]) * _EDITOR_ZOOM,
+            top + (y - _EDITOR_SOURCE[1]) * _EDITOR_ZOOM)
 
 
 def draw_text(ax, spans, *, family_override=None, zorder=1000):
@@ -321,12 +331,21 @@ def draw_text(ax, spans, *, family_override=None, zorder=1000):
         if family_override and not s["font"].startswith("Menlo"):
             stack = [family_override] + [
                 f for f in stack if f != family_override]
-        fp = _resolved_fp(stack, bold=bold, italic=italic, size=_label_size(s))
+        editor = 268 <= s["x"] <= 376 and 23 <= s["y"] <= 81
+        size = s["size"] * _EDITOR_ZOOM if editor else _label_size(s)
+        fp = _resolved_fp(stack, bold=bold, italic=italic, size=size)
         asc = float(s.get("ascender", 0.8))
         color = s["color"]
         if color.startswith("#00") and len(color) == 9:
             color = "#" + color[3:]  # drop the leading zero byte
-        if s["dir"][1] < -0.5:  # vertical, bottom-to-top, tops facing left
+        if text == "model.py — Python":
+            left, top = _EDITOR_POSITION
+            fp.set_size(4.2)
+            ax.text(left + _EDITOR_WIDTH * _EDITOR_ZOOM / 2,
+                    PAGE_H - (top + _EDITOR_BAR_HEIGHT * _EDITOR_ZOOM / 2),
+                    "model.py", fontproperties=fp, ha="center", va="center",
+                    color=color, zorder=zorder)
+        elif s["dir"][1] < -0.5:  # vertical, bottom-to-top, tops facing left
             # rotation_mode="anchor" keeps ha/va in the unrotated frame,
             # so the anchor sits on the baseline at the string start.
             # The reference baseline is x0 + ascender*size (y down).
@@ -338,7 +357,8 @@ def draw_text(ax, spans, *, family_override=None, zorder=1000):
             tilt = 57.29578 * (s["dir"][1] / s["dir"][0]) \
                 if s["dir"][0] else 0.0
             base_y = s["y"] + asc * s["size"]
-            ax.text(s["x"], PAGE_H - base_y, text, fontproperties=fp,
+            x, y = _editor_point(s["x"], base_y) if editor else (s["x"], base_y)
+            ax.text(x, PAGE_H - y, text, fontproperties=fp,
                     color=color, ha="left", va="baseline", rotation=tilt,
                     zorder=zorder)
         drawn += 1
@@ -362,6 +382,11 @@ def draw_figure(asset, *, family=None):
     mpl.rcParams["svg.hashsalt"] = "unwrap-circstats-graphical-abstract-v1"
 
     drawings = asset["drawings"]
+    editor_shapes = set(asset["regions"]["code_window"])
+    editor_transform = (Affine2D()
+                        .translate(-_EDITOR_SOURCE[0], _EDITOR_SOURCE[1] - PAGE_H)
+                        .scale(_EDITOR_ZOOM)
+                        .translate(_EDITOR_POSITION[0], PAGE_H - _EDITOR_POSITION[1]))
     translucent = 0
     retained = (drawings[str(i)] for i in range(len(drawings)))
     for i, ((draw_type, opacity, box, path), dr) in enumerate(
@@ -376,9 +401,12 @@ def draw_figure(asset, *, family=None):
                 _, x, _, _, _ = dr["items"][0]
                 y0, y1 = _SUMMARY_AXIS_Y
                 dr = {**dr, "items": [("l", x, y0, x, y1)]}
+            if i in editor_shapes and dr["width"] is not None:
+                dr = {**dr, "width": dr["width"] * _EDITOR_ZOOM}
             draw_drawing(ax, dr, zorder=10 + i, opacity=opacity,
                          clip_box=box, clip_path=path,
-                         joinstyle="round" if i in _WORKFLOW_ARROWHEADS else "miter")
+                         joinstyle="round" if i in _WORKFLOW_ARROWHEADS else "miter",
+                         transform=editor_transform if i in editor_shapes else None)
             translucent += opacity < 1.0
 
     spans = [span for i, span in enumerate(asset["text_spans"])

@@ -2,8 +2,9 @@
 
 The renderer uses the 599 × 342 pt graphical abstract from
 [jgraving/circstats](https://github.com/jgraving/circstats/blob/main/figures/Graphical%20Abstract.pdf).
-It keeps the paper's four-panel layout, vector artwork, code window, and
-workflow arrows. Panel B uses a polar predictive plot and a compact
+It keeps the paper's four-panel layout and equally weighted workflow
+arrows. Panel B enlarges the original Mac-style editor window and centers
+`model.py` in its title bar. It also uses a polar predictive plot and a compact
 diagram showing how model draws are transformed.
 
 ## What the renderer computes

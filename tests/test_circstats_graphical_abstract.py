@@ -85,6 +85,11 @@ def test_svg_is_deterministic_vector_with_editable_text():
         original_paths = {patch.get_zorder() - 10: patch for patch in ax.patches}
         for index in ga._WORKFLOW_ARROWHEADS:
             assert original_paths[index].get_joinstyle() == "round"
+        title, = [t for t in ax.texts if t.get_text() == "model.py"]
+        assert title.get_ha() == "center"
+        assert title.get_position()[0] == (
+            ga._EDITOR_POSITION[0] + ga._EDITOR_WIDTH * ga._EDITOR_ZOOM / 2)
+        assert all(t.get_fontsize() > 3.02 for t in ax.texts if t.get_text() == "import")
         predictive_ring = fig.axes[1].spines["polar"]
         for index in ga._SUMMARY_POLAR_RINGS:
             ring = original_paths[index]
