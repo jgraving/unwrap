@@ -1,23 +1,15 @@
-"""Hermetic checks for the circstats graphical abstract generator.
-
-The generator replays the 526 vector drawings and 236 text spans of the
-Inkscape-polished reference PDF, so the tests pin the asset hashes,
-verify that the pinned/skeleton partition covers every drawing exactly
-once, re-check the reference PDF's geometry with PyMuPDF, and assert
-that two renders in the same environment are byte-identical.  No
-network access or licensed fonts are needed (DejaVu/Liberation resolve
-the stacks either way).
-"""
+"""Offline checks for the reference artwork and generated model panel."""
 import hashlib
 import io
 import json
-import re
 import struct
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import matplotlib
+import numpy as np
+from scipy.integrate import trapezoid
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -103,26 +95,31 @@ def test_svg_is_deterministic_vector_with_editable_text():
     assert root.get("height") == "342pt"
     assert root.get("viewBox") == "0 0 599 342"
     assert not root.findall(f".//{{{SVG_NS}}}image")
-    assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 526
-    # svg.fonttype = "none": the 149 non-placeholder spans stay <text>
-    assert len(root.findall(f".//{{{SVG_NS}}}text")) == 149
+    assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 378
+    labels = {"".join(node.itertext()) for node in root.findall(f".//{{{SVG_NS}}}text")}
+    assert {"MCMC draws", "Circular modulo", "Softplus", "Predictive density",
+            "Observed angles", "Prior", "Posterior"} <= labels
+    assert "Posterior draw" not in labels
+    assert b"fill-opacity: 0.22" in a
 
 
-def test_stabilize_pdf_pins_dates_and_id():
-    data = (b"%PDF-1.7\n/CreationDate (D:20261118030400Z)"
-            b"/ModDate (D:20261118030400Z) /ID [<AA> <BB>]")
-    out = ga._stabilize_pdf(data)
-    assert b"20261118030400" not in out
-    assert b"/CreationDate (D:20000101000000Z)" in out
-    assert b"/ModDate (D:20000101000000Z)" in out
-    # the /ID slots are the SHA-256 of the date-pinned document, so a
-    # second (or a writer-stamped) run hashes to the same content
-    m = re.search(rb"/ID \[<([0-9a-f]{64})> <([0-9a-f]{64})>\]", out)
-    assert m is not None
-    assert m.group(1) == m.group(2)
-    pinned = (b"%PDF-1.7\n/CreationDate (D:20000101000000Z)"
-              b"/ModDate (D:20000101000000Z) /ID [<AA> <BB>]")
-    assert m.group(1) == hashlib.sha256(pinned).hexdigest().encode()
+def test_seeded_example_recomputes_normalized_predictive_densities():
+    theta, observed, draws, prior, posterior = ga.model.example()
+    ga.model.example.cache_clear()
+    for previous, current in zip((theta, observed, draws, prior, posterior),
+                                 ga.model.example(), strict=True):
+        np.testing.assert_array_equal(previous, current)
+    assert observed.size == 16
+    assert draws.shape == (ga.model.N_DRAWS, 2)
+    assert (np.abs(draws[:, 0]) > np.pi).any()
+    mu, kappa = ga.model._parameters(draws)
+    assert ((-np.pi <= mu) & (mu < np.pi)).all()
+    assert (kappa > 0).all()
+    np.testing.assert_allclose(mu, ga.model._parameters(draws + [2 * np.pi, 0.0])[0],
+                               atol=1e-12)
+    for samples in (prior, posterior):
+        np.testing.assert_allclose(trapezoid(samples, x=theta), 1.0, atol=1e-10)
+    assert posterior.mean(axis=0).max() > prior.mean(axis=0).max()
 
 
 def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
@@ -133,8 +130,9 @@ def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
     assert prov["page_pt"] == [599.0, 342.0]
     assert prov["inputs"]["artwork_sha256"] == ARTWORK_SHA
     assert prov["inputs"]["reference_pdf_sha256"] == REFERENCE_SHA
-    assert prov["counts"] == {"drawings": 526, "text_drawn": 149,
-                              "text_skipped": 87}
+    assert prov["counts"]["reference_paths"] == 378
+    assert prov["counts"]["reference_paths_with_group_alpha"] > 0
+    assert prov["illustrative_fit"]["seed"] == ga.model.SEED
     assert len(prov["fonts"]) == len(ga.FONT_STACKS)
     assert all(prov["fonts"].values())
     for name, digest in prov["exports"].items():
@@ -158,9 +156,13 @@ def test_pdf_round_trip_stays_vector_and_keeps_text(tmp_path):
     page = doc.load_page(0)
     assert (page.rect.width, page.rect.height) == (599.0, 342.0)
     assert page.get_images(full=True) == []
-    # the 149 emitted text runs may merge or split on re-read, so check
-    # the floor and the actual content
-    assert len(_pdf_spans(page)) >= 149
+    assert doc.metadata["creationDate"] == "D:20000101000000Z"
+    # Both the reference bands and the new polar ribbons retain their alpha
+    # through the vector PDF exporter.
+    fills = [drawing["fill_opacity"] for drawing in page.get_drawings()
+             if drawing["type"] in {"f", "fs"}]
+    for target in (0.22, 0.25):
+        assert any(abs(alpha - target) < 1e-4 for alpha in fills)
     text = page.get_text()
     for needle in ("Experimental design", "Model summaries",
                    "Predictive density", "Softplus"):

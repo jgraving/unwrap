@@ -1,12 +1,17 @@
 name: Circstats graphical abstract fidelity
 on:
-  push:
-    branches: [feat/circstats-graphical-abstract]
+  pull_request:
     paths:
       - '.github/workflows/circstats-graphical-abstract.yml'
       - 'notebooks/circstats_graphical_abstract.py'
+      - 'notebooks/circstats_abstract_model.py'
       - 'notebooks/assets/circstats_graphical_abstract/**'
       - 'tests/test_circstats_graphical_abstract.py'
+      - 'unwrap/circular.py'
+      - 'unwrap/link/**'
+      - 'requirements.txt'
+      - 'setup.py'
+      - 'pyproject.toml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -59,13 +64,10 @@ jobs:
           uv run --no-project python notebooks/circstats_graphical_abstract.py \
             --font-family "Liberation Sans" \
             --output-dir /tmp/circstats-ga-ci-1
-          sha256sum /tmp/circstats-ga-ci-1/circstats_graphical_abstract.svg \
-            /tmp/circstats-ga-ci-1/circstats_graphical_abstract.pdf \
-            > /tmp/circstats-ga.sha256
           uv run --no-project python notebooks/circstats_graphical_abstract.py \
             --font-family "Liberation Sans" \
             --output-dir /tmp/circstats-ga-ci-2
-          sha256sum --check /tmp/circstats-ga.sha256
+          diff -qr /tmp/circstats-ga-ci-1 /tmp/circstats-ga-ci-2
       - uses: actions/upload-artifact@v4
         with:
           name: circstats-ga-exports

@@ -18,7 +18,17 @@ setup(
         # first line compatible with numpy 2, which the minimum-deps CI
         # job resolves
         "test": ["pytest>=8,<10", "pyarrow>=16"],
-        "figure": ["cairosvg>=2.7,<3", "xarray>=2024.1.0", "h5netcdf>=1.3", "h5py>=3.10", "pymupdf>=1.26.6,<2"],
+        # publication-figure generators (zebra/locust/beetles): SVG->PDF
+        # raster export, PDF image-object restore, and netcdf fit caches
+        "figure": [
+            "cairosvg>=2.7,<3",
+            "pyarrow>=16",
+            "seaborn>=0.13",
+            "xarray>=2024.1.0",
+            "h5netcdf>=1.3",
+            "h5py>=3.10",
+            "pymupdf>=1.26.6,<2",
+        ],
         "notebook": [
             "jupyterlab>=4,<5",
             "nbclient>=0.10,<1",

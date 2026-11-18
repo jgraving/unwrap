@@ -1,0 +1,26 @@
+{
+  "source_sha256": "d056e63a799530e9efb89f96db0b69a1c69eccce50984cd38908292d2104ce38",
+  "author_files_sha256": {
+    "zebra_circ_stats_figure(1).pdf": "0747eb1c18e1eecea18b9a77c2e0d0d94c2fa7cb1239495b591fd619e6e580ec",
+    "2009_Jul30_IMG_5242.JPG": "fd625f63d5070816442cea00b4a7fc65180c641b3818d525c60dd76e6961a342",
+    "WhatsApp Image 2026-02-03 at 09.32.58.jpeg": "3b3054bdeb47d6a194a84f00e429f362aa08c2e705aa454a7472a41de3ad9d16",
+    "WhatsApp Image 2026-02-03 at 09.35.58.jpeg": "a43e27e80d0b609fd8f68f56d8fdb7caa749d3ef04461af559ac19f985903f49"
+  },
+  "images": {
+    "drone_inset_post.jpg": {
+      "sha256": "a43e27e80d0b609fd8f68f56d8fdb7caa749d3ef04461af559ac19f985903f49",
+      "width": 160,
+      "height": 160
+    },
+    "drone_inset_pre.jpg": {
+      "sha256": "3b3054bdeb47d6a194a84f00e429f362aa08c2e705aa454a7472a41de3ad9d16",
+      "width": 160,
+      "height": 160
+    },
+    "zebra_photo.jpg": {
+      "sha256": "e67a183182474c4d008d0ed1dfc0ed8a4fd581ed28b2f6e6b84ea2eea8cf2119",
+      "width": 1600,
+      "height": 1066
+    }
+  }
+}

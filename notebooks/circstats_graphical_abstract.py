@@ -1,49 +1,18 @@
-"""Reproduce the circstats paper's graphical abstract (599 x 342 points).
+"""Rebuild the circstats graphical abstract with an executable model example.
 
-Rebuilds the Inkscape-polished ``Graphical Abstract.pdf`` published with the
-circstats elife paper (``notebooks/assets/circstats_graphical_abstract/
-reference.pdf``) in one deterministic render:
-
-* the 472 hand-made / stochastic vector paths of the published figure
-  (the twelve locust circle units, the foraging trajectory, the code
-  editor mock, the MCMC trace panels, the posterior predictive clusters,
-  the jagged posterior densities, the observed-angle dots, the panel
-  "d" predictive curves and ellipsoidal loop, and the four KDE summary
-  circles' interiors with arrow fans) are pinned verbatim from the
-  reference PDF and replayed through the vector renderer (SHA-256
-  verified);
-* the 54-piece deterministic skeleton (axis spines and ticks, the
-  circular-modulo and softplus link curves, the model / hypothesis
-  interval bars, the uniform reference lines, the flow arrows, the
-  legend frames and swatches, the four KDE circle outlines and the
-  eta_mu / eta_kappa glyph marks) is drawn from the same measured
-  geometry;
-* all 236 text spans (Arial labels, the Menlo syntax-highlighted code
-  window, the rotated axis captions) are typeset live at their measured
-  positions, so the exports stay editable (``svg.fonttype = "none"``).
-
-Nothing is randomized: every coordinate, colour, width, dash pattern and
-string literal comes from the hash-pinned asset, so two renders produce
-byte-identical exports.
-
-Exports (``assets/circstats-graphical-abstract/`` by default): SVG,
-byte-stabilised PDF (cairo CreationDate cleared, /ID pinned to the
-content hash), a 3x PNG preview rasterised from the PDF, a
-self-contained HTML page with the published caption, and a provenance
-JSON.
-
-Run from any directory: ``python notebooks/circstats_graphical_abstract.py
-[--output-dir DIR] [--font-family FAMILY]``.  See
-``CIRCSTATS_GRAPHICAL_ABSTRACT.md`` for provenance.
+The illustrations, surrounding panels, and code window use vector artwork
+and typography from the paper. Panel B's plots are regenerated from a
+seeded circular model and the package's parameter transforms.
 """
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+from functools import lru_cache
 import hashlib
 import importlib.metadata
 import io
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -54,6 +23,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.font_manager import FontProperties, findfont  # noqa: E402
 from matplotlib.path import Path as MplPath  # noqa: E402
 from matplotlib.patches import PathPatch  # noqa: E402
+from matplotlib.transforms import Bbox, TransformedBbox  # noqa: E402
+
+import circstats_abstract_model as model  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = Path(__file__).resolve().parent / "assets" / \
@@ -64,7 +36,15 @@ ARTWORK_PATH = ASSET_DIR / "artwork.json"
 PAGE_W = 599.0          # points
 PAGE_H = 342.0          # points
 FIGURE_NAME = "circstats_graphical_abstract"
-CAPTION = "Overview of a modern Bayesian workflow for circular GLMs."
+CAPTION = (
+    "Overview of a modern Bayesian workflow for circular GLMs. In panel B, "
+    "the polar plot shows mean prior and posterior predictive densities with "
+    "pointwise 10th–90th percentile bands. Dots show the observed angles. "
+    "The two lanes show how a seeded illustrative fit maps real-valued MCMC "
+    "draws to a circular direction and a positive concentration."
+)
+# The old Cartesian plots in B, leaving the code window and workflow arrows.
+_REPLACED_PATHS = set(range(11, 38)) | set(range(119, 240))
 
 # PDF font name -> family stack.  Liberation Sans is metric-compatible
 # with Arial (the CI default); Menlo falls back to a monospace.
@@ -190,14 +170,43 @@ def _color(c, opacity=None):
     return rgb + (float(opacity),)
 
 
-def draw_drawing(ax, dr, zorder):
+def _reference_drawings():
+    """Resolve the PDF graphics state in drawing order, including group alpha."""
+    import pymupdf
+
+    with pymupdf.open(REFERENCE_PDF) as doc:
+        sequence = doc[0].get_drawings(extended=True)
+
+    parents = []
+    for item in sequence:
+        parents = [parent for parent in parents if parent["level"] < item["level"]]
+        if item["type"] in {"group", "clip"}:
+            parents.append(item)
+            continue
+        opacity = 1.0
+        clip_box = None
+        clip_path = None
+        for parent in parents:
+            if parent["type"] == "group":
+                # The reference's translucent groups contain one path each.
+                opacity *= parent["opacity"]
+            else:
+                clip_box = parent["scissor"]
+                if any(segment[0] != "re" for segment in parent["items"]):
+                    items = [[segment[0], *(v for point in segment[1:] for v in point)]
+                             for segment in parent["items"]]
+                    clip_path = path_from_items(items)
+        yield item["type"], opacity, clip_box, clip_path
+
+
+def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path):
     """Render one pinned/reference drawing (fill and/or stroke)."""
     path = path_from_items(dr["items"])
     t = dr["type"]
-    face = _color(dr["fill"], dr.get("fill_opacity")) if "f" in t \
+    face = _color(dr["fill"], opacity * dr["fill_opacity"]) if "f" in t \
         else "none"
     if "s" in t:
-        edge = _color(dr["color"], dr.get("stroke_opacity"))
+        edge = _color(dr["color"], opacity * dr["stroke_opacity"])
         lw = dr.get("width") or 0.0
         ls = "solid"
         dash = dr.get("dashes")
@@ -211,14 +220,34 @@ def draw_drawing(ax, dr, zorder):
         patch = PathPatch(path, facecolor=face, edgecolor="none",
                           zorder=zorder)
     ax.add_patch(patch)
+    if clip_box is not None:
+        x0, y0, x1, y1 = clip_box
+        box = Bbox.from_extents(x0, PAGE_H - y1, x1, PAGE_H - y0)
+        patch.set_clip_box(TransformedBbox(box, ax.transData))
+    if clip_path is not None:
+        patch.set_clip_path(clip_path, ax.transData)
     return patch
 
 
 # -------------------------------------------------------------------
 # typography
 # -------------------------------------------------------------------
+@lru_cache(maxsize=None)
+def _font_name(stack, bold, italic):
+    for name in stack:
+        fp = FontProperties(family=[name], weight="bold" if bold else "normal",
+                            style="italic" if italic else "normal")
+        try:
+            findfont(fp, fallback_to_default=False)
+        except ValueError:
+            continue
+        return name
+    return FontProperties().get_name()
+
+
 def _resolved_fp(stack, *, bold, italic, size):
-    return FontProperties(family=list(stack), size=size,
+    family = _font_name(tuple(stack), bold, italic)
+    return FontProperties(family=[family], size=size,
                           weight="bold" if bold else "normal",
                           style="italic" if italic else "normal")
 
@@ -245,7 +274,7 @@ def draw_text(ax, spans, *, family_override=None, zorder=1000):
         bold = s["font"] == "Arial-BoldMT"
         italic = s["font"] == "Menlo-Italic"
         stack = list(FONT_STACKS.get(s["font"], FONT_STACKS["ArialMT"]))
-        if family_override:
+        if family_override and not s["font"].startswith("Menlo"):
             stack = [family_override] + [
                 f for f in stack if f != family_override]
         fp = _resolved_fp(stack, bold=bold, italic=italic,
@@ -290,30 +319,33 @@ def draw_figure(asset, *, family=None):
     mpl.rcParams["svg.hashsalt"] = "unwrap-circstats-graphical-abstract-v1"
 
     drawings = asset["drawings"]
-    order = sorted(int(k) for k in drawings)
-    for z, i in enumerate(order):
-        draw_drawing(ax, drawings[str(i)], zorder=10 + z)
+    translucent = 0
+    retained = (drawings[str(i)] for i in range(len(drawings)))
+    for i, ((draw_type, opacity, box, path), dr) in enumerate(
+        zip(_reference_drawings(), retained, strict=True)
+    ):
+        if draw_type != dr["type"]:
+            raise ValueError(f"Artwork and reference drawing {i} differ")
+        if i not in _REPLACED_PATHS:
+            draw_drawing(ax, dr, zorder=10 + i, opacity=opacity,
+                         clip_box=box, clip_path=path)
+            translucent += opacity < 1.0
 
-    drawn, skipped = draw_text(ax, asset["text_spans"],
-                               family_override=family)
+    spans = [span for span in asset["text_spans"]
+             if not (span["x"] >= 250 and 23 <= span["y"] < 158
+                     and not (268 <= span["x"] <= 376 and span["y"] <= 81))]
+    drawn, skipped = draw_text(ax, spans, family_override=family)
+    proportional = (family, *FONT_STACKS["ArialMT"]) if family else tuple(
+        FONT_STACKS["ArialMT"])
+    model.draw_model_example(fig, (PAGE_W, PAGE_H),
+                             _font_name(proportional, False, False))
     stats = {
-        "drawings": len(order),
-        "text_drawn": drawn,
-        "text_skipped": skipped,
+        "reference_paths": len(drawings) - len(_REPLACED_PATHS),
+        "reference_paths_with_group_alpha": translucent,
+        "reference_text_drawn": drawn,
+        "reference_text_skipped": skipped,
     }
     return fig, ax, stats
-
-
-def _stabilize_pdf(data: bytes) -> bytes:
-    """Clear cairo's wall-clock CreationDate and pin /ID to content."""
-    data = re.sub(rb"/CreationDate \(.*?\)",
-                  b"/CreationDate (D:20000101000000Z)", data)
-    data = re.sub(rb"/ModDate \(.*?\)", b"/ModDate (D:20000101000000Z)",
-                  data)
-    digest = hashlib.sha256(data).hexdigest().encode("ascii")
-    data = re.sub(rb"/ID \[[^\]]*\]",
-                  b"/ID [<" + digest + b"> <" + digest + b">]", data)
-    return data
 
 
 def _html_page(svg: str) -> str:
@@ -341,11 +373,12 @@ def _html_page(svg: str) -> str:
 def resolve_font_report(family):
     report = {}
     for name, stack in FONT_STACKS.items():
-        if family:
+        if family and not name.startswith("Menlo"):
             stack = ([family]
                      + [f for f in stack if f != family])
         try:
-            path = findfont(FontProperties(family=stack),
+            path = findfont(_resolved_fp(stack, bold=name == "Arial-BoldMT",
+                                         italic=name == "Menlo-Italic", size=10),
                             fallback_to_default=False)
         except ValueError:
             path = findfont(FontProperties(family=stack))
@@ -364,16 +397,13 @@ def render(output_dir: Path, *, family=None) -> dict:
     buf = io.BytesIO()
     fig.savefig(buf, format="svg", metadata={"Date": None})
     svg_path.write_bytes(buf.getvalue())
-    plt.close(fig)
     svg = svg_path.read_bytes()
 
     pdf_path = output_dir / f"{FIGURE_NAME}.pdf"
-    pdf_buf = io.BytesIO()
-    # re-open the figure for the PDF pass (savefig closes the canvas)
-    fig2, _ax2, _ = draw_figure(asset, family=family)
-    fig2.savefig(pdf_buf, format="pdf")
-    plt.close(fig2)
-    pdf_path.write_bytes(_stabilize_pdf(pdf_buf.getvalue()))
+    fig.savefig(pdf_path, metadata={
+        "CreationDate": datetime(2000, 1, 1, tzinfo=timezone.utc),
+    })
+    plt.close(fig)
 
     png_path = output_dir / f"{FIGURE_NAME}.png"
     import pymupdf
@@ -394,6 +424,14 @@ def render(output_dir: Path, *, family=None) -> dict:
         },
         "fonts": resolve_font_report(family),
         "counts": stats,
+        "illustrative_fit": {
+            "observed_degrees": model.OBSERVED_DEG,
+            "method": "random-walk Metropolis on the unconstrained scale",
+            "prior_sd": model.PRIOR_SD,
+            "seed": model.SEED,
+            "warmup": model.BURN_IN,
+            "posterior_draws": model.N_DRAWS,
+        },
         "env": {
             "python": sys.version.split()[0],
             "matplotlib": importlib.metadata.version("matplotlib"),
@@ -418,7 +456,7 @@ def main(argv=None):
                         default=ROOT / "assets"
                         / "circstats-graphical-abstract")
     parser.add_argument("--font-family", default=None,
-                        help="override the first family in every stack "
+                        help="override the first family in proportional text "
                              "(CI uses 'Liberation Sans')")
     args = parser.parse_args(argv)
     prov = render(args.output_dir, family=args.font_family)
