@@ -90,6 +90,18 @@ def test_svg_is_deterministic_vector_with_editable_text():
         assert title.get_position()[0] == (
             ga._EDITOR_POSITION[0] + ga._EDITOR_WIDTH * ga._EDITOR_ZOOM / 2)
         assert all(t.get_fontsize() > 3.02 for t in ax.texts if t.get_text() == "import")
+        polar = fig.axes[1]
+        uniform, = [line for line in polar.lines if line.get_label() == "Uniform"]
+        mean, = [line for line in polar.lines if line.get_label() == "Posterior mean"]
+        assert uniform.get_linestyle() == "--"
+        assert np.ptp(uniform.get_ydata()) == 0
+        assert np.ptp(mean.get_ydata()) > 0
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        legend_bounds = fig.axes[2].get_legend().get_window_extent(renderer)
+        predictor, = [t for t in fig.axes[3].texts
+                      if t.get_text() == "Concentration predictor"]
+        assert not legend_bounds.overlaps(predictor.get_window_extent(renderer))
         predictive_ring = fig.axes[1].spines["polar"]
         for index in ga._SUMMARY_POLAR_RINGS:
             ring = original_paths[index]
@@ -126,7 +138,7 @@ def test_svg_is_deterministic_vector_with_editable_text():
             "Circular modulo", "Softplus", "Predictive density",
             "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
     assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
-    assert b"stroke-opacity: 0.43" in a
+    assert b"stroke-opacity: 0.28" in a
     assert b"fill-opacity: 0.48" in a
 
 
@@ -199,7 +211,7 @@ def test_pdf_round_trip_stays_vector_and_keeps_text(tmp_path):
     assert doc.metadata["creationDate"] == "D:20000101000000Z"
     # The reference bands and individual polar traces retain their alpha.
     drawings = page.get_drawings()
-    for key, target in (("fill_opacity", 0.25), ("stroke_opacity", 0.43)):
+    for key, target in (("fill_opacity", 0.25), ("stroke_opacity", 0.28)):
         assert any(abs(drawing[key] - target) < 1e-4 for drawing in drawings
                    if drawing.get(key) is not None)
     text = page.get_text()

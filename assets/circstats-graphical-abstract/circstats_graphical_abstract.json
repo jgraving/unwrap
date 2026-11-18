@@ -1,6 +1,6 @@
 {
   "figure": "circstats_graphical_abstract",
-  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, each polar curve is a prior or posterior predictive draw. Zero density starts on the inner ring. Translucent dots just inside it show jittered copies of the 16 observed angles. Each lane shows 400 consecutive draws from three illustrative MCMC chains. Sample dots follow the chains through the links to the likelihood parameters. Direction traces use three equivalent turns and softplus maps concentration draws to positive values.",
+  "caption": "Overview of a modern Bayesian workflow for circular GLMs. In panel B, the faint polar curves are prior and posterior predictive draws. The blue curve is the posterior mean and the dashed curve marks the uniform reference. Zero density starts on the inner ring. Translucent dots just inside it show jittered copies of the 16 observed angles. Each lane shows 400 consecutive draws from three illustrative MCMC chains. Sample dots follow the chains through the links to the likelihood parameters. Direction traces use three equivalent turns and softplus maps concentration draws to positive values.",
   "page_pt": [
     599.0,
     342.0
@@ -52,6 +52,8 @@
     "displayed_draws_per_chain": 400,
     "marked_draws_per_chain": 18,
     "display_dots_per_observation": 4,
+    "displayed_prior_predictive_draws": 36,
+    "displayed_posterior_predictive_draws": 44,
     "chains": 3,
     "initial_direction_turns": [
       -1,
@@ -67,9 +69,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "99b0e2db5af2263af5f64f4e397d83c02ca9f35689e15fd2287ef6dd08a3327b",
-    "pdf_sha256": "f5d81b5c40d218a7d84cda98eab756ba6667489ef558e03c20d284bdf957f136",
-    "png_sha256": "d0708dfe5d4c3b8ada2a75747832c5ec0303aa4f9f437bbf10bd58fa2e4c2d89",
-    "html_sha256": "8496dbd1a894d0f9fc848e126bfb1750f96b853270a12cd3d773777c02975a7e"
+    "svg_sha256": "c30ab3e9c44744410fb8643454e21d0d8c59da93bb3a93f6f83009de9fe95bb4",
+    "pdf_sha256": "4d295b4f6db902461890dd89e427194fa25f845aae9f332b111cfbc1dfe6d840",
+    "png_sha256": "a71fb5d88e925c4d595382c44709c185103a88dd925a6dbcac7e5a3ca1b52fbd",
+    "html_sha256": "110cdf36cd601c5f9c54183af681d53d501078ded95da804404a95e2c6e1194d"
   }
 }

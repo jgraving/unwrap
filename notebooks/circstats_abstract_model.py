@@ -19,11 +19,14 @@ N_DRAWS = 1000
 TRACE_DRAWS = 400
 MARKED_DRAWS_PER_CHAIN = 18
 DISPLAY_DOTS_PER_ANGLE = 4
+PRIOR_LINES = 36
+POSTERIOR_LINES = 44
 # Two concentration-only moves improve tail mixing at a fixed draw count.
 KAPPA_UPDATES = 2
 KAPPA_STEP = 1.6
 
 BLUE = "#0072b2"
+POSTERIOR_MEAN_COLOR = "#075b91"
 GRAY = "#6b7280"
 INK = "#231f20"
 GRID = "#d4d7d9"
@@ -129,8 +132,9 @@ def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
 
     # An additive radius keeps zero density on an inner circle rather than
     # at the origin. Both sets of draws use one radial scale.
-    prior_lines = prior[np.linspace(0, len(prior) - 1, 20, dtype=int)]
-    posterior_lines = posterior[np.linspace(0, len(posterior) - 1, 24, dtype=int)]
+    prior_lines = prior[np.linspace(0, len(prior) - 1, PRIOR_LINES, dtype=int)]
+    posterior_lines = posterior[np.linspace(0, len(posterior) - 1, POSTERIOR_LINES,
+                                           dtype=int)]
     scale = max(prior_lines.max(), posterior_lines.max())
     polar.set_ylim(0, 2.17)
     polar.plot(theta, np.ones_like(theta), color=POLAR_GUIDE_COLOR,
@@ -138,27 +142,36 @@ def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
     for angle in np.arange(4) * np.pi / 2:
         polar.plot([angle, angle], [1, 2.17], color=POLAR_GUIDE_COLOR,
                    lw=POLAR_SPOKE_WIDTH)
-    for sample, color, opacity in ((prior_lines, GRAY, 0.32),
-                                    (posterior_lines, BLUE, 0.43)):
+    for sample, color, opacity in ((prior_lines, GRAY, 0.20),
+                                    (posterior_lines, BLUE, 0.28)):
         polar.plot(theta, 1 + sample.T / scale, color=color, alpha=opacity,
-                   lw=0.48)
+                   lw=0.40)
+    uniform_radius = 1 + 1 / (2 * np.pi * scale)
+    uniform, = polar.plot(theta, np.full_like(theta, uniform_radius),
+                          color="#303030", alpha=0.68, lw=0.65,
+                          linestyle=(0, (2.4, 1.8)), label="Uniform", zorder=3)
+    mean, = polar.plot(theta, 1 + posterior.mean(axis=0) / scale,
+                       color=POSTERIOR_MEAN_COLOR, alpha=0.88, lw=0.85,
+                       label="Posterior mean", zorder=4)
     angles, radii = _display_observations(observed)
     polar.scatter(angles, radii, s=2.75, color=BLUE, alpha=0.48,
                   edgecolors="none", zorder=5)
 
     handles = [
         Line2D([], [], color=GRAY, lw=0.8, alpha=0.65, label="Prior"),
+        uniform,
         Line2D([], [], color=BLUE, lw=0.8, label="Posterior"),
+        mean,
         Line2D([], [], color=BLUE, marker="o", ms=2.5, lw=0, alpha=0.72,
                label="Observed"),
     ]
-    key = _page_axes(fig, page, 338, 106, 43, 51)
+    key = _page_axes(fig, page, 335.5, 112, 48, 51)
     key.set_axis_off()
     legend = key.legend(handles=handles, loc="center left", frameon=True,
                         edgecolor="#c7c7c7", facecolor="white", framealpha=1,
-                        borderaxespad=0, borderpad=0.46,
-                        handlelength=1.0, handletextpad=0.48,
-                        labelspacing=0.48, prop={"family": family, "size": LEGEND_SIZE})
+                        borderaxespad=0, borderpad=0.32,
+                        handlelength=0.85, handletextpad=0.38,
+                        labelspacing=0.40, prop={"family": family, "size": LEGEND_SIZE})
     legend.get_frame().set_linewidth(0.65)
 
 

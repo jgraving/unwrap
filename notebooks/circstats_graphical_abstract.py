@@ -40,8 +40,10 @@ PAGE_H = 342.0          # points
 FIGURE_NAME = "circstats_graphical_abstract"
 CAPTION = (
     "Overview of a modern Bayesian workflow for circular GLMs. In panel B, "
-    "each polar curve is a prior or posterior predictive draw. Zero density "
-    "starts on the inner ring. Translucent dots just inside it show "
+    "the faint polar curves are prior and posterior predictive draws. The "
+    "blue curve is the posterior mean and the dashed curve marks the "
+    "uniform reference. Zero density starts on the inner ring. "
+    "Translucent dots just inside it show "
     "jittered copies of the 16 observed angles. Each lane shows 400 "
     "consecutive draws from three illustrative MCMC chains. Sample dots "
     "follow the chains through the links to the likelihood parameters. "
@@ -519,6 +521,8 @@ def render(output_dir: Path, *, family=None) -> dict:
             "displayed_draws_per_chain": model.TRACE_DRAWS,
             "marked_draws_per_chain": model.MARKED_DRAWS_PER_CHAIN,
             "display_dots_per_observation": model.DISPLAY_DOTS_PER_ANGLE,
+            "displayed_prior_predictive_draws": model.PRIOR_LINES,
+            "displayed_posterior_predictive_draws": model.POSTERIOR_LINES,
             "chains": len(model.WRAP_BRANCHES),
             "initial_direction_turns": model.WRAP_BRANCHES,
             "concentration_updates_per_step": model.KAPPA_UPDATES,

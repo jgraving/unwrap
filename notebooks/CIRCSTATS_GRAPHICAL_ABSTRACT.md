@@ -25,9 +25,10 @@ For display, each direction trace uses one equivalent turn, with
 within-turn variation expanded consistently across the three bands.
 Eighteen marked draws per chain carry through each link curve to the
 circle or positive axis, alongside the highlighted examples. The
-polar plot gives each of 20 prior and 24 posterior
-predictive draws its own line. Zero density is at radius 1, followed by
-a common linear density scale. The observed-angle display uses four
+polar plot gives each of 36 prior and 44 posterior predictive draws a
+faint line. A thin blue curve averages all posterior predictive draws,
+and a dashed circle marks the uniform reference. Zero density is at
+radius 1, followed by a common linear density scale. The observed-angle display uses four
 translucent, jittered copies of each of the 16 observed angles just inside
 the ring. The fit uses the original 16 values.
 
