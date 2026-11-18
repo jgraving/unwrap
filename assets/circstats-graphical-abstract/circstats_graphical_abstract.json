@@ -19,8 +19,8 @@
   "counts": {
     "reference_paths": 377,
     "reference_paths_with_group_alpha": 19,
-    "reference_text_drawn": 99,
-    "reference_text_skipped": 94
+    "reference_text_drawn": 108,
+    "reference_text_skipped": 85
   },
   "illustrative_fit": {
     "observed_degrees": [
@@ -69,9 +69,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "fc40b3588d70982456761855c78450bb7e6119e109fc6551e60684380623622d",
-    "pdf_sha256": "b18f5801c2fece223d616da94fbb0e72fb8fdddf596da5262a5cc440b6ac2882",
-    "png_sha256": "15f1cdd89abcf55c437b87e56bd70603cffa9b10d23a6115cd33efc21094c803",
-    "html_sha256": "cff57f9b92345c5770c16903562310da722ee3156677986de263a85897533588"
+    "svg_sha256": "347d14416693cf3b5101492be318b3a387229fe4ec2c7b9966cf5a4c44f427a3",
+    "pdf_sha256": "ac7e1a40b3837d51a5bb9c08438bdb113ba590c198f97ac1b97a1a43acf4aec6",
+    "png_sha256": "2aa5539f27bb40361c0619814702a198757767f41652967af9f17b7782481e86",
+    "html_sha256": "22539fbda7889a15420495d0579c7c9957405709af0c2387bacf20d8e39bf717"
   }
 }
