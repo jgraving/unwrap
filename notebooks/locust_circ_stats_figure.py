@@ -26,14 +26,24 @@ LOO/ELPD post-hoc reads (PyMC 6 replacement for ``idata_kwargs=
 The page is 900 x 600 pt (12.5 x 8.33 in), drawn in PDF points through a
 full-page stage axes; positions/colors/sizes reproduce the published
 layout. Saves to ``figures/locust/locust_circ_stats_figure.pdf``.
+
+``--snapshot-dir`` (default ``assets/locust-circ-stats``) additionally writes
+the review snapshots - PDF, PNG, SVG, a self-contained HTML review page and a
+provenance JSON - the same set the beetle publication figure ships, so the
+rendered figure can be reviewed straight from the pull request.
 """
 from __future__ import annotations
 
+import argparse
+import hashlib
+import importlib.metadata
 import json
 import math
 import os
 import pathlib
+import platform
 import re
+import subprocess
 import sys
 
 import matplotlib as mpl
@@ -53,6 +63,7 @@ import PIL.Image
 import PIL.ImageChops
 
 HERE = pathlib.Path(__file__).resolve().parent
+REPO = HERE.parent
 sys.path.insert(0, str(HERE))
 
 import unwrap  # noqa: E402
@@ -66,6 +77,19 @@ import locust_direction_plots as plots  # noqa: E402
 
 ASSETS = HERE / "assets" / "locust_circ_stats"
 PAGE_W, PAGE_H = 900.0, 600.0  # PDF points, origin top-left
+
+#: review snapshots, in the same shape as ``assets/beetles-publication``
+SNAPSHOT_DIR = REPO / "assets" / "locust-circ-stats"
+STEM = "locust_circ_stats_figure"
+CAPTION = (
+    "Locust circular statistics. (a) Virtual-swarm schematic of the free-flight "
+    "arena. (b) Leave-one-out cross-validated predictive density of the bimodal "
+    "and unimodal course models (+/- one standard error). (c) Population-level "
+    "predictive check: model posterior-predictive direction density against the "
+    "bootstrap KDE of the observed bearings, with the optic-flow (forward) and "
+    "vectorial-encoding (sideways) hypotheses. (d) Posterior predictive density "
+    "at the hypothesized directions against the uniform reference."
+)
 
 # ---------------------------------------------------------------------------
 # layout and type (measured from the published PDF, in pt)
@@ -489,7 +513,13 @@ def draw_population_polar(fig, trace_bimodal, df):
     )
     leg.get_frame().set_edgecolor(LEGEND_FRAME_COLOUR)
     leg.get_frame().set_linewidth(LEGEND_FRAME_LW)
-    return ax
+    peak = {
+        "model_density_max": float(np.max(density_median)),
+        "model_density_max_angle_deg": float(np.degrees(angles[int(np.argmax(density_median))])),
+        "data_kde_max": float(np.max(kde_median)),
+        "data_kde_max_angle_deg": float(np.degrees(kde_angles[int(np.argmax(kde_median))])),
+    }
+    return ax, peak
 
 
 # ---------------------------------------------------------------------------
@@ -577,7 +607,9 @@ def _styled_vline(method, factor, dash):
     return wrapper
 
 
-def main():
+def build_figure():
+    """Compose the page. Returns ``(fig, plotted)`` where ``plotted`` records
+    the statistics the figure draws, for the provenance snapshot."""
     plots.set_style()
     # the page is far larger than a standalone house panel, so the house
     # 8 pt / 1.0 pt style moves to the published scale measured above
@@ -628,15 +660,151 @@ def main():
     panel_d.ax.set_xticks(PANEL_D_XTICKS)
 
     # panel c
-    ax_c = draw_population_polar(fig, trace_bimodal, df)
+    ax_c, polar_plotted = draw_population_polar(fig, trace_bimodal, df)
     ax_c.set_zorder(5)
     stage.set_zorder(0)
 
-    out_dir = plots.FIG_DIR
-    out_dir.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_dir / "locust_circ_stats_figure.pdf")
-    fig.savefig(out_dir / "locust_circ_stats_figure.png", dpi=300)
-    print(f"saved {out_dir / 'locust_circ_stats_figure.pdf'}")
+    plotted = {
+        "loo_elpd": [
+            {"model": name, "elpd": value, "se": se} for name, value, se in rows
+        ],
+        "hypothesis_density": [
+            {"hypothesis": label, "density": float(center),
+             "hdi_low": float(center - err[0]), "hdi_high": float(center + err[1])}
+            for label, center, err in zip(("forward", "perpendicular"),
+                                          np.asarray(stats["centers"]),
+                                          np.asarray(stats["xerr"]))
+        ],
+        "uniform_density_reference": float(stats["p_uniform"]),
+        "population_polar": polar_plotted,
+        "observations": int(len(df)),
+        "individuals": int(pd.Series(df["animal_id"]).nunique()),
+    }
+    return fig, plotted
+
+
+# ---------------------------------------------------------------------------
+# output: generated figures + committed review snapshots
+# ---------------------------------------------------------------------------
+def _sha256(path):
+    return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+
+def _git_revision(*where):
+    for root in where:
+        try:
+            return subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=str(root), text=True,
+                stderr=subprocess.DEVNULL).strip() or None
+        except (OSError, subprocess.CalledProcessError):
+            continue
+    return None
+
+
+def _fit_spec(name):
+    """The sampling settings recorded alongside the cached snapshot."""
+    meta = fit_cache.cache_dir() / f"{name}.meta.json"
+    if not meta.exists():
+        return {"snapshot": None}
+    info = json.loads(meta.read_text())
+    return {"snapshot": str(fit_cache.cache_dir() / f"{name}.nc"),
+            "sha256": info.get("sha256"), **info.get("extra", {})}
+
+
+def provenance(plotted):
+    data_root = pathlib.Path(os.environ.get("UNWRAP_DATA_ROOT",
+                                            str(pathlib.Path.home() / ".cache" / "unwrap-data")))
+    packages = ("numpy", "scipy", "pandas", "matplotlib", "arviz", "pymc",
+                "pytensor", "xarray", "pillow")
+    return {
+        "figure": "locust circular-statistics composite (panels a-d)",
+        "page_points": [PAGE_W, PAGE_H],
+        "code_revision": _git_revision(REPO),
+        "data_repository": "jgraving/unwrap-data",
+        "data_revision": _git_revision(data_root / "unwrap-data"),
+        "font_family": mpl.rcParams["font.family"][0],
+        "python": platform.python_version(),
+        "packages": {name: importlib.metadata.version(name) for name in packages},
+        "panel_a_source": {
+            "kind": "extracted from the published figure PDF",
+            "assets": ["notebooks/assets/locust_circ_stats/panel_a.json",
+                       "notebooks/assets/locust_circ_stats/virtual_swarm.png"],
+            "note": "image placements, vector paths and text spans read from the "
+                    "published PDF and replayed; the sprite is the virtual-swarm "
+                    "photograph inside it",
+        },
+        "fits": {name: _fit_spec(name) for name in
+                 ("locust_direction_bimodal", "locust_direction_unimodal")},
+        "plotted_values": plotted,
+        "known_differences": [
+            "Text is set in Arial; the published page uses Helvetica Neue, whose "
+            "glyph widths differ by 1-4% at the same size and position.",
+            "Panel b's cached unimodal fit gives ELPD -3533.40 +/- 38.34 where "
+            "the published page prints -3502.0 +/- 38.8; the bimodal fit matches "
+            "(-3404.51 +/- 39.27 against -3403.8 +/- 39.2).",
+        ],
+    }
+
+
+def write_html(stem):
+    return f"""<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Locust circular-statistics figure</title>
+<style>body{{margin:0;background:#f5f5f4;color:#262626;font:15px/1.65 Arial,sans-serif}}
+main{{max-width:1100px;margin:40px auto;padding:0 24px}}figure{{margin:0}}
+.figure{{background:white;padding:20px;border:1px solid #e6e6e6}}img{{display:block;width:100%;height:auto}}
+figcaption{{max-width:94ch;margin:24px auto}}a{{color:#665017}}nav{{margin-bottom:18px}}</style>
+<main><nav><a href="{stem}.svg">SVG</a> · <a href="{stem}.pdf">PDF</a> · <a href="{stem}.json">provenance</a></nav>
+<figure><div class="figure"><img src="{stem}.png" alt="Locust circular-statistics figure"></div>
+<figcaption>{CAPTION}</figcaption></figure></main>
+"""
+
+
+def write_outputs(fig, plotted, output_dir, snapshot_dir=None):
+    """Save PDF/PNG/SVG to ``output_dir``; when ``snapshot_dir`` is given, also
+    write the committed review set (formats + provenance JSON) there."""
+    outputs = {}
+    targets = [pathlib.Path(output_dir)]
+    if snapshot_dir is not None:
+        targets.append(pathlib.Path(snapshot_dir))
+    for target in targets:
+        target.mkdir(parents=True, exist_ok=True)
+        stem = target / STEM
+        fig.savefig(stem.with_suffix(".pdf"),
+                    metadata={"Creator": "unwrap locust_circ_stats_figure.py",
+                              "CreationDate": None})
+        fig.savefig(stem.with_suffix(".png"), dpi=300)
+        with mpl.rc_context({"svg.fonttype": "path",
+                             "svg.hashsalt": "unwrap-locust-circ-stats-v1"}):
+            fig.savefig(stem.with_suffix(".svg"), format="svg",
+                        metadata={"Date": None,
+                                  "Creator": "unwrap locust_circ_stats_figure.py"})
+        outputs[target] = {suffix: _sha256(stem.with_suffix(suffix))
+                           for suffix in (".pdf", ".png", ".svg")}
+    if snapshot_dir is not None:
+        target = pathlib.Path(snapshot_dir)
+        info = provenance(plotted)
+        info["outputs_sha256"] = outputs[target]
+        (target / f"{STEM}.json").write_text(json.dumps(info, indent=2) + "\n")
+        (target / f"{STEM}.html").write_text(write_html(STEM), encoding="utf-8")
+    return outputs
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--output-dir", type=pathlib.Path, default=plots.FIG_DIR,
+                        help="where to write the generated figure (default: figures/locust)")
+    parser.add_argument("--snapshot-dir", type=pathlib.Path, default=SNAPSHOT_DIR,
+                        help="review snapshot directory, or '' to skip it "
+                             "(default: assets/locust-circ-stats)")
+    args = parser.parse_args(argv)
+
+    fig, plotted = build_figure()
+    outputs = write_outputs(fig, plotted, args.output_dir,
+                            args.snapshot_dir or None)
+    for target, hashes in outputs.items():
+        print(f"saved {target / (STEM + '.pdf')} "
+              f"(png {hashes['.png'][:8]}, pdf {hashes['.pdf'][:8]})")
     return fig
 
 
