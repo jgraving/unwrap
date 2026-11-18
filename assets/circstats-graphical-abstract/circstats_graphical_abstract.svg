@@ -18682,66 +18682,39 @@ z
     <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #5a5f77" x="267.9349" y="73.603798" transform="rotate(-0 267.9349 73.603798)">)</text>
    </g>
    <g id="text_90">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #2b2f3a" x="267.9349" y="82.778698" transform="rotate(-0 267.9349 82.778698)">idata</text>
+    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #2b2f3a" x="267.9349" y="82.778698" transform="rotate(-0 267.9349 82.778698)">idata = model.fit(draws=1000)</text>
    </g>
    <g id="text_91">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #5a5f77" x="280.9178" y="82.778698" transform="rotate(-0 280.9178 82.778698)">=</text>
-   </g>
-   <g id="text_92">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #2b2f3a" x="285.2375" y="82.778698" transform="rotate(-0 285.2375 82.778698)">model</text>
-   </g>
-   <g id="text_93">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #5a5f77" x="296.0546" y="82.778698" transform="rotate(-0 296.0546 82.778698)">.</text>
-   </g>
-   <g id="text_94">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #007197" x="298.2204" y="82.778698" transform="rotate(-0 298.2204 82.778698)">ﬁt</text>
-   </g>
-   <g id="text_95">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #5a5f77" x="304.7059" y="82.778698" transform="rotate(-0 304.7059 82.778698)">(</text>
-   </g>
-   <g id="text_96">
-    <text style="font-style: italic; font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #0087a8" x="306.8717" y="82.778698" transform="rotate(-0 306.8717 82.778698)">draws</text>
-   </g>
-   <g id="text_97">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #5a5f77" x="317.6888" y="82.778698" transform="rotate(-0 317.6888 82.778698)">=</text>
-   </g>
-   <g id="text_98">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #b15c00" x="319.8546" y="82.778698" transform="rotate(-0 319.8546 82.778698)">1000</text>
-   </g>
-   <g id="text_99">
-    <text style="font-size: 3.5938px; font-family: 'DejaVu Sans Mono'; text-anchor: start; fill: #5a5f77" x="328.5059" y="82.778698" transform="rotate(-0 328.5059 82.778698)">)</text>
-   </g>
-   <g id="text_100">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: start" x="68.37" y="295.2504" transform="rotate(-0 68.37 295.2504)">Predictor</text>
    </g>
-   <g id="text_101">
+   <g id="text_92">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="119.13" y="316.0564" transform="rotate(-0 119.13 316.0564)">Control</text>
    </g>
-   <g id="text_102">
+   <g id="text_93">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="119.13" y="324.7564" transform="rotate(-0 119.13 324.7564)">Treatment</text>
    </g>
-   <g id="text_103">
+   <g id="text_94">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="119.13" y="333.4664" transform="rotate(-0 119.13 333.4664)">Uniform</text>
    </g>
-   <g id="text_104">
+   <g id="text_95">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: start; fill: #de8f05" x="241.53" y="222.7304" transform="rotate(-0 241.53 222.7304)">Hypothesis 2</text>
    </g>
-   <g id="text_105">
+   <g id="text_96">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: start; fill: #56b4e9" x="244.45" y="322.1004" transform="rotate(-0 244.45 322.1004)">Hypothesis 1</text>
    </g>
-   <g id="text_106">
+   <g id="text_97">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: start" x="269.46" y="277.7704" transform="rotate(-0 269.46 277.7704)">Uniform</text>
    </g>
-   <g id="text_107">
+   <g id="text_98">
     <text style="font-size: 7px; font-family: 'Arial'; fill: #0173b2" transform="translate(102.639235 139.810402) rotate(-0.103826)">Control</text>
    </g>
-   <g id="text_108">
+   <g id="text_99">
     <text style="font-size: 7px; font-family: 'Arial'; fill: #029e73" transform="translate(161.019235 139.850402) rotate(-0.103826)">Treatment</text>
    </g>
-   <g id="text_109">
+   <g id="text_100">
     <text style="font-size: 7px; font-family: 'Arial'; fill: #231f20" transform="translate(380.421455 311.20625) rotate(-90)">Predictive density difference</text>
    </g>
-   <g id="text_110">
+   <g id="text_101">
     <text style="font-size: 7px; font-family: 'Arial'; fill: #231f20" transform="translate(225.161455 294.927969) rotate(-90)">Predictive density</text>
    </g>
   </g>
@@ -23744,7 +23717,7 @@ L 301.5 148.298236
 L 301.5 148.298236 
 " clip-path="url(#pbf9760f2d4)" style="fill: none; stroke-dasharray: 1.56,1.17; stroke-dashoffset: 0; stroke: #303030; stroke-opacity: 0.68; stroke-width: 0.65"/>
    </g>
-   <g id="text_111">
+   <g id="text_102">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="301.5" y="97.5" transform="rotate(-0 301.5 97.5)">Predictive density</text>
    </g>
    <g id="line2d_87">
@@ -24018,58 +23991,40 @@ z
   <g id="axes_3">
    <g id="legend_1">
     <g id="patch_381">
-     <path d="M 336.72 158.645495 
-L 387.046906 158.645495 
-Q 388.266906 158.645495 388.266906 157.425495 
-L 388.266906 117.574505 
-Q 388.266906 116.354505 387.046906 116.354505 
-L 336.72 116.354505 
-Q 335.5 116.354505 335.5 117.574505 
-L 335.5 157.425495 
-Q 335.5 158.645495 336.72 158.645495 
+     <path d="M 339.22 145.822788 
+L 377.864453 145.822788 
+Q 379.084453 145.822788 379.084453 144.602788 
+L 379.084453 118.397212 
+Q 379.084453 117.177212 377.864453 117.177212 
+L 339.22 117.177212 
+Q 338 117.177212 338 118.397212 
+L 338 144.602788 
+Q 338 145.822788 339.22 145.822788 
 z
 " style="fill: #ffffff; stroke: #c7c7c7; stroke-width: 0.65; stroke-linejoin: miter"/>
     </g>
     <g id="line2d_88">
-     <path d="M 337.452 120.612472 
-L 340.0445 120.612472 
-L 342.637 120.612472 
+     <path d="M 340.806 122.289179 
+L 343.856 122.289179 
+L 346.906 122.289179 
 " style="fill: none; stroke: #6b7280; stroke-opacity: 0.65; stroke-width: 0.8; stroke-linecap: square"/>
     </g>
-    <g id="text_112">
-     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="344.955" y="122.747472" transform="rotate(-0 344.955 122.747472)">Prior</text>
+    <g id="text_103">
+     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="349.834" y="124.424179" transform="rotate(-0 349.834 124.424179)">Prior</text>
     </g>
     <g id="line2d_89">
-     <path d="M 337.452 128.777179 
-L 340.0445 128.777179 
-L 342.637 128.777179 
-" style="fill: none; stroke-dasharray: 1.56,1.17; stroke-dashoffset: 0; stroke: #303030; stroke-opacity: 0.68; stroke-width: 0.65"/>
-    </g>
-    <g id="text_113">
-     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="344.955" y="130.912179" transform="rotate(-0 344.955 130.912179)">Uniform</text>
-    </g>
-    <g id="line2d_90">
-     <path d="M 337.452 136.941886 
-L 340.0445 136.941886 
-L 342.637 136.941886 
+     <path d="M 340.806 130.941886 
+L 343.856 130.941886 
+L 346.906 130.941886 
 " style="fill: none; stroke: #0072b2; stroke-width: 0.8; stroke-linecap: square"/>
     </g>
-    <g id="text_114">
-     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="344.955" y="139.076886" transform="rotate(-0 344.955 139.076886)">Posterior</text>
+    <g id="text_104">
+     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="349.834" y="133.076886" transform="rotate(-0 349.834 133.076886)">Posterior</text>
     </g>
-    <g id="line2d_91">
-     <path d="M 337.452 145.106593 
-L 340.0445 145.106593 
-L 342.637 145.106593 
-" style="fill: none; stroke: #075b91; stroke-opacity: 0.88; stroke-width: 0.85; stroke-linecap: square"/>
-    </g>
-    <g id="text_115">
-     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="344.955" y="147.241593" transform="rotate(-0 344.955 147.241593)">Posterior mean</text>
-    </g>
-    <g id="line2d_92">
-     <path d="M 337.452 153.274755 
-L 340.0445 153.274755 
-L 342.637 153.274755 
+    <g id="line2d_90">
+     <path d="M 340.806 139.598048 
+L 343.856 139.598048 
+L 346.906 139.598048 
 " style="fill: none"/>
      <defs>
       <path id="m941bbdec72" d="M 0 1.25 
@@ -24085,26 +24040,26 @@ z
 " style="stroke: #0072b2; stroke-opacity: 0.72"/>
      </defs>
      <g>
-      <use xlink:href="#m941bbdec72" x="340.0445" y="153.274755" style="fill: #0072b2; fill-opacity: 0.72; stroke: #0072b2; stroke-opacity: 0.72"/>
+      <use xlink:href="#m941bbdec72" x="343.856" y="139.598048" style="fill: #0072b2; fill-opacity: 0.72; stroke: #0072b2; stroke-opacity: 0.72"/>
      </g>
     </g>
-    <g id="text_116">
-     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="344.955" y="155.409755" transform="rotate(-0 344.955 155.409755)">Observed</text>
+    <g id="text_105">
+     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start" x="349.834" y="141.733048" transform="rotate(-0 349.834 141.733048)">Observed</text>
     </g>
    </g>
   </g>
   <g id="axes_4">
-   <g id="line2d_93">
+   <g id="line2d_91">
     <path d="M 464 68 
 L 514 68 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #d4d7d9; stroke-width: 0.5; stroke-linecap: square"/>
    </g>
-   <g id="line2d_94">
+   <g id="line2d_92">
     <path d="M 391 89 
 L 593 89 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #d4d7d9; stroke-width: 0.55; stroke-linecap: square"/>
    </g>
-   <g id="line2d_95">
+   <g id="line2d_93">
     <path d="M 394 80.416626 
 L 394.130326 79.989533 
 L 394.260652 78.347246 
@@ -24307,7 +24262,7 @@ L 446 77.639939
 L 446 77.639939 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #973e08; stroke-opacity: 0.5; stroke-width: 0.5; stroke-linecap: square"/>
    </g>
-   <g id="line2d_96">
+   <g id="line2d_94">
     <path d="M 394 67.626725 
 L 394.651629 67.670621 
 L 394.781955 68.217027 
@@ -24512,7 +24467,7 @@ L 446 71.240292
 L 446 71.240292 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #d55e00; stroke-opacity: 0.5; stroke-width: 0.5; stroke-linecap: square"/>
    </g>
-   <g id="line2d_97">
+   <g id="line2d_95">
     <path d="M 394 58.754578 
 L 394.260652 58.754578 
 L 394.390977 58.973507 
@@ -24713,7 +24668,7 @@ L 446 58.578646
 L 446 58.578646 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #e98b43; stroke-opacity: 0.5; stroke-width: 0.5; stroke-linecap: square"/>
    </g>
-   <g id="line2d_98">
+   <g id="line2d_96">
     <path d="M 464 80 
 L 464.166667 79.76 
 L 464.333333 79.52 
@@ -24816,7 +24771,7 @@ L 480.333333 56.48
 L 480.5 56.24 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #bb6a3a; stroke-width: 0.8; stroke-linecap: square"/>
    </g>
-   <g id="line2d_99">
+   <g id="line2d_97">
     <path d="M 480.666667 80 
 L 480.833333 79.76 
 L 481 79.52 
@@ -24919,7 +24874,7 @@ L 497 56.48
 L 497.166667 56.24 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #bb6a3a; stroke-width: 0.8; stroke-linecap: square"/>
    </g>
-   <g id="line2d_100">
+   <g id="line2d_98">
     <path d="M 497.333333 80 
 L 497.5 79.76 
 L 497.666667 79.52 
@@ -25022,7 +24977,7 @@ L 513.666667 56.48
 L 513.833333 56.24 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #bb6a3a; stroke-width: 0.8; stroke-linecap: square"/>
    </g>
-   <g id="line2d_101">
+   <g id="line2d_99">
     <path d="M 558 77 
 L 556.608269 76.902681 
 L 555.243626 76.612617 
@@ -25072,7 +25027,7 @@ L 558 77
 L 558 77 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #d4d7d9; stroke-width: 0.7; stroke-linecap: square"/>
    </g>
-   <g id="line2d_102">
+   <g id="line2d_100">
     <path d="M 394 136.752734 
 L 394.260652 131.206309 
 L 394.390977 131.385061 
@@ -25401,7 +25356,7 @@ L 446 132.584163
 L 446 132.584163 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #804181; stroke-opacity: 0.5; stroke-width: 0.5; stroke-linecap: square"/>
    </g>
-   <g id="line2d_103">
+   <g id="line2d_101">
     <path d="M 394 128.680023 
 L 394.130326 128.815184 
 L 394.260652 129.810321 
@@ -25736,7 +25691,7 @@ L 446 135.838166
 L 446 135.838166 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #b65fa0; stroke-opacity: 0.5; stroke-width: 0.5; stroke-linecap: square"/>
    </g>
-   <g id="line2d_104">
+   <g id="line2d_102">
     <path d="M 394 134.352112 
 L 394.130326 134.352112 
 L 394.390977 127.969527 
@@ -26059,12 +26014,12 @@ L 446 136.82214
 L 446 136.82214 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #d486bc; stroke-opacity: 0.5; stroke-width: 0.5; stroke-linecap: square"/>
    </g>
-   <g id="line2d_105">
+   <g id="line2d_103">
     <path d="M 464 143 
 L 514 143 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #d4d7d9; stroke-width: 0.5; stroke-linecap: square"/>
    </g>
-   <g id="line2d_106">
+   <g id="line2d_104">
     <path d="M 464 142.93778 
 L 470.603774 142.741559 
 L 474.377358 142.433736 
@@ -26080,33 +26035,33 @@ L 514 119
 L 514 119 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #ad5b9a; stroke-width: 0.8; stroke-linecap: square"/>
    </g>
-   <g id="line2d_107">
+   <g id="line2d_105">
     <path d="M 537 130 
 L 537 136 
 " clip-path="url(#p439dde8c9f)" style="fill: none; stroke: #848484; stroke-width: 0.6; stroke-linecap: square"/>
    </g>
-   <g id="text_117">
+   <g id="text_106">
     <text style="font-weight: 700; font-size: 7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="420" y="34" transform="rotate(-0 420 34)">MCMC draws</text>
    </g>
-   <g id="text_118">
+   <g id="text_107">
     <text style="font-weight: 700; font-size: 7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="489" y="34" transform="rotate(-0 489 34)">Link</text>
    </g>
-   <g id="text_119">
+   <g id="text_108">
     <text style="font-weight: 700; font-size: 7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="556" y="34" transform="rotate(-0 556 34)">Likelihood parameters</text>
    </g>
-   <g id="text_120">
+   <g id="text_109">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="394.25" y="49" transform="rotate(-0 394.25 49)">Direction predictor</text>
    </g>
-   <g id="text_121">
+   <g id="text_110">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="445.75" y="49" transform="rotate(-0 445.75 49)">η</text>
    </g>
-   <g id="text_122">
+   <g id="text_111">
     <text style="font-size: 4.6px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="449.15" y="50.4" transform="rotate(-0 449.15 50.4)">μ</text>
    </g>
-   <g id="text_123">
+   <g id="text_112">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="489" y="49" transform="rotate(-0 489 49)">Circular modulo</text>
    </g>
-   <g id="text_124">
+   <g id="text_113">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="49" transform="rotate(-0 558 49)">Mean direction μ</text>
    </g>
    <g id="patch_382">
@@ -26127,22 +26082,22 @@ L 526.220501 68
 L 523.820501 69.2 
 " style="fill: none; stroke: #848484; stroke-width: 0.7; stroke-linecap: round"/>
    </g>
-   <g id="text_125">
+   <g id="text_114">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="85" transform="rotate(-0 558 85)">[−π, π)</text>
    </g>
-   <g id="text_126">
+   <g id="text_115">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="387.3" y="112" transform="rotate(-0 387.3 112)">Concentration predictor</text>
    </g>
-   <g id="text_127">
+   <g id="text_116">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="452.7" y="112" transform="rotate(-0 452.7 112)">η</text>
    </g>
-   <g id="text_128">
+   <g id="text_117">
     <text style="font-size: 4.6px; font-family: 'Arial'; text-anchor: start; fill: #231f20" x="456.1" y="113.4" transform="rotate(-0 456.1 113.4)">κ</text>
    </g>
-   <g id="text_129">
+   <g id="text_118">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="489" y="112" transform="rotate(-0 489 112)">Softplus</text>
    </g>
-   <g id="text_130">
+   <g id="text_119">
     <text style="font-size: 7px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="112" transform="rotate(-0 558 112)">Concentration κ</text>
    </g>
    <g id="patch_384">
@@ -26172,7 +26127,7 @@ L 578.214979 133
 L 575.814979 134.2 
 " style="fill: none; stroke: #d4d7d9; stroke-width: 0.7; stroke-linecap: round"/>
    </g>
-   <g id="text_131">
+   <g id="text_120">
     <text style="font-size: 6.1px; font-family: 'Arial'; text-anchor: middle; fill: #231f20" x="558" y="147" transform="rotate(-0 558 147)">κ &gt; 0</text>
    </g>
    <g id="PathCollection_2">

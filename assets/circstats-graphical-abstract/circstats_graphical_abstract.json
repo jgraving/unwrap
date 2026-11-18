@@ -19,8 +19,8 @@
   "counts": {
     "reference_paths": 377,
     "reference_paths_with_group_alpha": 19,
-    "reference_text_drawn": 108,
-    "reference_text_skipped": 85
+    "reference_text_drawn": 99,
+    "reference_text_skipped": 94
   },
   "illustrative_fit": {
     "observed_degrees": [
@@ -69,9 +69,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "c30ab3e9c44744410fb8643454e21d0d8c59da93bb3a93f6f83009de9fe95bb4",
-    "pdf_sha256": "4d295b4f6db902461890dd89e427194fa25f845aae9f332b111cfbc1dfe6d840",
-    "png_sha256": "a71fb5d88e925c4d595382c44709c185103a88dd925a6dbcac7e5a3ca1b52fbd",
-    "html_sha256": "110cdf36cd601c5f9c54183af681d53d501078ded95da804404a95e2c6e1194d"
+    "svg_sha256": "fc40b3588d70982456761855c78450bb7e6119e109fc6551e60684380623622d",
+    "pdf_sha256": "b18f5801c2fece223d616da94fbb0e72fb8fdddf596da5262a5cc440b6ac2882",
+    "png_sha256": "15f1cdd89abcf55c437b87e56bd70603cffa9b10d23a6115cd33efc21094c803",
+    "html_sha256": "cff57f9b92345c5770c16903562310da722ee3156677986de263a85897533588"
   }
 }
