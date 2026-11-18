@@ -11,8 +11,10 @@ from unwrap.link.numpy import softplus
 
 SEED = 159
 # Dot centres measured on the original panel's −180° to 180° axis.
-OBSERVED_DEG = (-76, -55, -55, -33, -33, -33, -12, -12,
-                10, 10, 10, 31, 31, 53, 53, 75)
+REFERENCE_OBSERVED_DEG = (-76, -55, -55, -33, -33, -33, -12, -12,
+                           10, 10, 10, 31, 31, 53, 53, 75)
+# Bring the illustrative angles closer to their mean before fitting.
+OBSERVED_SPREAD = 0.70
 PRIOR_SD = (3.5, 2.5)
 BURN_IN = 600
 N_DRAWS = 1000
@@ -57,7 +59,9 @@ def example():
     prior_seed, *chain_seeds = np.random.SeedSequence(SEED).spawn(
         1 + len(WRAP_BRANCHES))
     rng = np.random.default_rng(prior_seed)
-    observed = np.deg2rad(OBSERVED_DEG)
+    observed = np.deg2rad(REFERENCE_OBSERVED_DEG)
+    center = np.angle(np.exp(1j * observed).mean())
+    observed = circ_mod(center + OBSERVED_SPREAD * circ_mod(observed - center))
     prior = rng.normal(scale=PRIOR_SD, size=(N_DRAWS, 2))
     resultant = np.exp(1j * observed).sum()
 
@@ -115,7 +119,7 @@ def _display_observations(observed):
     rng = np.random.default_rng(SEED + 1)
     angles = np.repeat(observed, DISPLAY_DOTS_PER_ANGLE)
     offsets = np.clip(rng.normal(0, 6.5, angles.size), -14, 14)
-    radii = rng.uniform(0.865, 0.965, angles.size)
+    radii = rng.uniform(0.82, 0.91, angles.size)
     return angles + np.deg2rad(offsets), radii
 
 

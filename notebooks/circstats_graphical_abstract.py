@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 import matplotlib as mpl
+import numpy as np
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -44,8 +45,10 @@ CAPTION = (
     "the faint polar curves are prior and posterior predictive draws. The "
     "blue curve is the posterior mean and the dashed curve marks the "
     "uniform reference. Zero density starts on the inner ring. "
-    "Translucent dots just inside it show "
-    "jittered copies of the 16 observed angles. Each lane shows 400 "
+    f"The 16 illustrative observations use {model.OBSERVED_SPREAD:.0%} "
+    "of the angles’ original "
+    "offsets from their circular mean. Translucent dots inside the ring "
+    "show jittered copies of these observations. Each lane shows 400 "
     "consecutive draws from three illustrative MCMC chains. Sample dots "
     "follow the chains through the links to the likelihood parameters. "
     "Direction traces use three equivalent turns and softplus maps "
@@ -528,7 +531,9 @@ def render(output_dir: Path, *, family=None) -> dict:
         "fonts": resolve_font_report(family),
         "counts": stats,
         "illustrative_fit": {
-            "observed_degrees": model.OBSERVED_DEG,
+            "reference_observed_degrees": model.REFERENCE_OBSERVED_DEG,
+            "observed_offset_factor": model.OBSERVED_SPREAD,
+            "observed_degrees": np.rad2deg(model.example()[1]).tolist(),
             "method": "random-walk Metropolis on the unconstrained scale",
             "prior_sd": model.PRIOR_SD,
             "seed": model.SEED,

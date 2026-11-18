@@ -170,7 +170,7 @@ def test_seeded_example_recomputes_normalized_predictive_densities():
     assert observed.size == 16
     display_angles, display_radii = ga.model._display_observations(observed)
     assert len(display_angles) == len(display_radii) == 64
-    assert np.all(display_radii < 1)
+    assert np.all(display_radii <= 0.91)
     assert draws.shape == (3, ga.model.N_DRAWS, 2)
     traces = ga.model._display_traces(draws)
     assert traces.shape == (3, ga.model.TRACE_DRAWS, 2)
@@ -188,7 +188,13 @@ def test_seeded_example_recomputes_normalized_predictive_densities():
                                atol=1e-12)
     for samples in (prior, posterior):
         np.testing.assert_allclose(trapezoid(samples, x=theta), 1.0, atol=1e-10)
-    assert posterior.mean(axis=0).max() > prior.mean(axis=0).max()
+    center = np.angle(np.exp(1j * observed).mean())
+    near_center = np.abs(ga.model.circ_mod(theta - center)) <= np.pi / 4
+    prior_mass = trapezoid(prior[:, near_center].mean(axis=0), x=theta[near_center])
+    posterior_mass = trapezoid(
+        posterior[:, near_center].mean(axis=0), x=theta[near_center])
+    assert prior_mass < 0.30
+    assert posterior_mass > 0.75
 
 
 def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
@@ -204,6 +210,8 @@ def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
     assert prov["counts"]["reference_paths_with_group_alpha"] > 0
     assert prov["illustrative_fit"]["seed"] == ga.model.SEED
     assert prov["illustrative_fit"]["chains"] == 3
+    np.testing.assert_allclose(
+        prov["illustrative_fit"]["observed_degrees"], np.rad2deg(ga.model.example()[1]))
     assert len(prov["fonts"]) == len(ga.FONT_STACKS)
     assert all(prov["fonts"].values())
     for name, digest in prov["exports"].items():
