@@ -4,7 +4,7 @@
     900.0,
     600.0
   ],
-  "code_revision": "4a464b204c8c083f5be5ea6b4f8f96b46850fdf1",
+  "code_revision": "5eeb72fc718b88347816d61b25d2d6d35a648774",
   "data_repository": "jgraving/unwrap-data",
   "data_revision": "7f62250a37701a5fce3cc256bbcbc11564b36600",
   "font_family": "Arial",
@@ -85,13 +85,19 @@
     "observations": 2435,
     "individuals": 52
   },
+  "corrections": [
+    "panel a records 34 path primitives: the first extraction pass kept paths above y = 300 pt only and missed the two grey flight arrows of the bottom swarm's second row (y = 301-321 pt).",
+    "panel c's arrows are drawn as a shaft plus a 16.8 pt triangular head in page points, i.e. panel a's arrow style; matplotlib's \"-|>\" head is blunter and shorter at the same nominal size.",
+    "panel c's polar tick labels are placed at their published page positions: matplotlib puts polar tick labels on the grid circle, which lands \"\u00b1180\u00b0\" on top of the 180\u00b0 grid line.",
+    "panel b prints four ELPD ticks where the published page prints three, because our axis spans to -3581.7 rather than -3549.6."
+  ],
   "known_differences": [
     "Text is set in Arial; the published page uses Helvetica Neue, whose glyph widths differ by 1-4% at the same size and position.",
     "Panel b's cached unimodal fit gives ELPD -3533.40 +/- 38.34 where the published page prints -3502.0 +/- 38.8; the bimodal fit matches (-3404.51 +/- 39.27 against -3403.8 +/- 39.2)."
   ],
   "outputs_sha256": {
-    ".pdf": "2af594a4cdf82d2ba7ba5ec67324f24828f50a48c439cb6caa02f59c3c48570d",
-    ".png": "ec288c84b20bc0dd688d48ace1be03f6047af64c01d614f7b5c3c15c957000d7",
-    ".svg": "20352959372047ce968c068036e80147b9f2dc8c92b033855d9365271ffe4552"
+    ".pdf": "76c83ce180d5174f42221830c71fdb51a64f802c3e32af90d73b1f497c0ea9c0",
+    ".png": "e13811b05bcc2aba8d13b98f52db55d2e2706b040c14eee1ec1f768aea6c5e2c",
+    ".svg": "6cfc7f3197946eadce7c24e2499674a54ff27cb686bedf102f58bdf8653a40cb"
   }
 }

@@ -25,11 +25,15 @@ It is a schematic icon, not a measurement of the lamp's angular extent.
 
 `locust_circ_stats/panel_a.json` holds the geometry of panel a of the published
 locust circular-statistics figure, read from the figure PDF: the twelve
-virtual-swarm image placements (CTM plus clip window each), the thirty vector
-paths in the upper-left quadrant, and the fourteen text spans.
+virtual-swarm image placements (CTM plus clip window each), the thirty-four
+vector paths in the panel's region, and the fourteen text spans.
 `locust_circ_stats/virtual_swarm.png` is the sprite those placements stamp,
 cropped from the same page. `../locust_circ_stats_figure.py` replays them onto
 a 900 x 600 pt stage.
+
+The path list spans y = 0-321 pt: panel a's bottom swarm has two rows, and a
+first extraction pass that stopped at y = 300 pt left the second row's two grey
+flight arrows out.
 
 The published PDF is not committed; only this panel's artwork and geometry are.
 No fitted plot data from the published panels is taken from the PDF - panels b,

@@ -51,7 +51,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from matplotlib.patches import FancyArrowPatch, PathPatch
+from matplotlib.patches import PathPatch, Polygon
 from matplotlib.path import Path
 
 import numpy as np
@@ -115,7 +115,10 @@ MARK_SCALE = 2.09   # marker/cap/elinewidth factor in the published dots
 #: sit 10 ELPD inside the axis (published left/right edges -3549.6/-3355.7
 #: against whiskers at -3540.8/-3365.2), panel d's 0.0115 density units
 #: inside (0.0462/0.3152 against 0.0576/0.3034).
-PANEL_B_XTICKS = [-3500.0, -3450.0, -3400.0]
+#: The published page prints three ELPD ticks because its axis starts at
+#: -3549.6; ours starts at -3581.7 (our unimodal whisker reaches -3571.7, see
+#: the PR note), so a fourth tick keeps the spacing even across the axis.
+PANEL_B_XTICKS = [-3550.0, -3500.0, -3450.0, -3400.0]
 PANEL_B_PAD = 10.0
 PANEL_D_XTICKS = [0.1, 0.2, 0.3]
 PANEL_D_PAD = 0.0115
@@ -421,9 +424,27 @@ DATA_DASHES = (10.736325 / DATA_LW, 4.6427357 / DATA_LW)   # matplotlib scales b
 BAND_ALPHA = 0.25
 EDGE_CIRCLE_LW = 0.97
 ARROW_LW = 4.0
-ARROW_R = 0.469         # FancyArrowPatch trims the shaft by the head, so the
-ARROW_HEAD = 42.0       # path end sits beyond the published tip at r = 0.423;
-                        # 42 gives the measured 16.8 pt head at lw 4.0
+#: The page's arrow style, measured off the published PDF: a 4.0 pt shaft
+#: closed by a triangular head whose base and length are both 16.8 pt (panel
+#: a's swarm arrows are the same shape at 3.0 pt shaft / 13.2 pt head).
+#: Panel c's tips sit 47.96 pt (forward) and 50.22 / 49.97 pt (the two
+#: sideways heads) out from the polar centre.  These arrows are drawn as
+#: explicit paths so panel c uses panel a's arrow rather than matplotlib's
+#: "-|>" head, which is blunter and shorter at the same nominal size.
+ARROW_HEAD = 16.8
+ARROW_TIP_R = {0.0: 47.96, np.pi / 2: 50.22, -np.pi / 2: 49.97}
+
+#: polar tick labels at their published page positions (measured: the nearest
+#: edges clear the r = 1.0 grid circle by 3.8-8.2 pt).  matplotlib places
+#: polar tick labels on the circle, which would set "±180°" on top of the 180°
+#: grid line; the house polar gets the clearance by padding its label strings
+#: with spaces, too blunt a tool at this type size.
+POLAR_TICK_LABELS = (
+    (617.00, 73.56, "center", "90°"),
+    (739.28, 204.72, "left", "0°"),
+    (615.02, 335.00, "center", "−90°"),
+    (492.56, 204.72, "right", "±180°"),
+)
 
 #: legend box measured from the published PDF: 97.9 x 48.5 pt, the handle band
 #: 30.95 pt across (the house handler draws the line 10 % longer), rows 21.9 pt
@@ -486,17 +507,36 @@ def draw_population_polar(fig, trace_bimodal, df):
     ax.set_yticks([edge_radius, edge_radius + 0.5])
     ax.set_yticklabels(["", ""])
     ax.set_xticks([-np.pi / 2, 0, np.pi / 2, np.pi])
-    ax.set_xticklabels(["−90°", "0°", "90°", "±180°"], fontsize=TYPE_SZ)
+    ax.set_xticklabels(["", "", "", ""])
     ax.tick_params(axis="x", pad=-4)
+    for x, y, ha, label in POLAR_TICK_LABELS:
+        fig.text(x / PAGE_W, (PAGE_H - y) / PAGE_H, label, ha=ha, va="center",
+                 fontsize=TYPE_SZ, zorder=8)
 
-    # optic-flow (forward, +x) and vectorial-encoding (sideways, ±y) arrows
-    for theta in (0.0, np.pi / 2, -np.pi / 2):
+    # optic-flow (forward, +x) and vectorial-encoding (sideways, ±y) arrows,
+    # drawn in the page's own arrow style (see ARROW_HEAD) so panel c reads
+    # like panel a.  They go on a page-point overlay rather than on the polar
+    # axes: the measured triangle heads come out exact in page coordinates,
+    # and nothing needs to survive a polar transform.
+    overlay = fig.add_axes([0, 0, 1, 1], zorder=7)
+    overlay.set_xlim(0, PAGE_W)
+    overlay.set_ylim(PAGE_H, 0)  # top-left origin, like the panel-a stage
+    overlay.set_axis_off()
+    overlay.patch.set_visible(False)
+    cx, cy = POLAR_CENTER
+    for theta, tip_r in ARROW_TIP_R.items():
         color = plots.UNIMODAL if theta == 0.0 else plots.BIMODAL
-        ax.add_patch(FancyArrowPatch((theta, 0.0), (theta, ARROW_R),
-                                     transform=ax.transData,
-                                     arrowstyle="-|>", mutation_scale=ARROW_HEAD,
-                                     color=color, linewidth=ARROW_LW,
-                                     zorder=6, shrinkA=0, shrinkB=0))
+        ux, uy = math.cos(theta), -math.sin(theta)   # page y grows downward
+        nx, ny = -uy, ux                             # along the head's base
+        base_r = tip_r - ARROW_HEAD
+        overlay.plot([cx, cx + ux * base_r], [cy, cy + uy * base_r], color=color,
+                     linewidth=ARROW_LW, solid_capstyle="butt", zorder=6)
+        head = [(cx + ux * tip_r, cy + uy * tip_r)]
+        for side in (1.0, -1.0):
+            head.append((cx + ux * base_r + side * nx * ARROW_HEAD / 2,
+                         cy + uy * base_r + side * ny * ARROW_HEAD / 2))
+        overlay.add_patch(Polygon(head, closed=True, facecolor=color,
+                                  edgecolor="none", zorder=6))
 
     leg = ax.legend(
         [line_model, line_data], ["Model", "Data"],
@@ -736,6 +776,19 @@ def provenance(plotted):
         "fits": {name: _fit_spec(name) for name in
                  ("locust_direction_bimodal", "locust_direction_unimodal")},
         "plotted_values": plotted,
+        "corrections": [
+            "panel a records 34 path primitives: the first extraction pass kept "
+            "paths above y = 300 pt only and missed the two grey flight arrows of "
+            "the bottom swarm's second row (y = 301-321 pt).",
+            "panel c's arrows are drawn as a shaft plus a 16.8 pt triangular head "
+            "in page points, i.e. panel a's arrow style; matplotlib's \"-|>\" head "
+            "is blunter and shorter at the same nominal size.",
+            "panel c's polar tick labels are placed at their published page "
+            "positions: matplotlib puts polar tick labels on the grid circle, which "
+            "lands \"±180°\" on top of the 180° grid line.",
+            "panel b prints four ELPD ticks where the published page prints three, "
+            "because our axis spans to -3581.7 rather than -3549.6.",
+        ],
         "known_differences": [
             "Text is set in Arial; the published page uses Helvetica Neue, whose "
             "glyph widths differ by 1-4% at the same size and position.",
