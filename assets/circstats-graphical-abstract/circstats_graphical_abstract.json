@@ -19,7 +19,7 @@
   "counts": {
     "reference_paths": 377,
     "reference_paths_with_group_alpha": 19,
-    "reference_text_drawn": 111,
+    "reference_text_drawn": 108,
     "reference_text_skipped": 85
   },
   "illustrative_fit": {
@@ -67,9 +67,9 @@
     "numpy": "2.5.5"
   },
   "exports": {
-    "svg_sha256": "3b1fe61969b2b2dd54dde9da19c4a600bd4d4084f5d5fe7f34bd2a0ff17d5e6f",
-    "pdf_sha256": "96dc4234f1f080df6ff2dbb2cd1d30e4d4a3dbbf6fc27aa67060b9eb0fa465ca",
-    "png_sha256": "c56bee1a844298d151366ecdab3b14d41ee1b379cb5746bd6d17b396f6d03d76",
-    "html_sha256": "ab7a3073590840db18edc32f781c98bf63256ee4461eeeacd02fd3a9ffff730a"
+    "svg_sha256": "99b0e2db5af2263af5f64f4e397d83c02ca9f35689e15fd2287ef6dd08a3327b",
+    "pdf_sha256": "f5d81b5c40d218a7d84cda98eab756ba6667489ef558e03c20d284bdf957f136",
+    "png_sha256": "d0708dfe5d4c3b8ada2a75747832c5ec0303aa4f9f437bbf10bd58fa2e4c2d89",
+    "html_sha256": "8496dbd1a894d0f9fc848e126bfb1750f96b853270a12cd3d773777c02975a7e"
   }
 }
