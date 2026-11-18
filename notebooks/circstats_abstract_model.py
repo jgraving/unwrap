@@ -16,6 +16,7 @@ OBSERVED_DEG = (-76, -55, -55, -33, -33, -33, -12, -12,
 PRIOR_SD = (3.5, 2.5)
 BURN_IN = 600
 N_DRAWS = 1000
+TRACE_DRAWS = 160
 # Two concentration-only moves improve tail mixing at a fixed draw count.
 KAPPA_UPDATES = 2
 KAPPA_STEP = 1.6
@@ -91,17 +92,12 @@ def _page_axes(fig, page, x, y, w, h, **kwargs):
                          w / width, h / height], **kwargs)
 
 
-def _trace_windows(draws):
-    """Choose contiguous trace excerpts in three different periodic modes."""
-    windows = []
-    for chain, branch in zip(draws, WRAP_BRANCHES):
-        wraps = np.floor((chain[:, 0] + np.pi) / (2 * np.pi))
-        runs = np.split(chain, np.flatnonzero(np.diff(wraps)) + 1)
-        candidates = [run for run in runs
-                      if np.floor((run[0, 0] + np.pi) / (2 * np.pi)) == branch]
-        windows.append(max(candidates, key=len))
-    count = min(60, *(len(window) for window in windows))
-    return np.stack([window[:count] for window in windows])
+def _display_traces(draws):
+    """Keep draw order and show each direction chain on one equivalent turn."""
+    traces = draws[:, :TRACE_DRAWS].copy()
+    turns = 2 * np.pi * np.asarray(WRAP_BRANCHES)[:, None]
+    traces[:, :, 0] = circ_mod(traces[:, :, 0]) + turns
+    return traces
 
 
 def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
@@ -128,18 +124,17 @@ def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
                                     (posterior_lines, BLUE, 0.43)):
         polar.plot(theta, 1 + sample.T / scale, color=color, alpha=opacity,
                    lw=0.48)
-    middle = np.median(posterior_lines, axis=0)
-    radii = 1 + np.interp(observed, theta, middle) / scale
-    for angle in np.unique(observed):
-        indices = np.flatnonzero(observed == angle)
-        radii[indices] += 0.09 * (np.arange(len(indices)) - (len(indices) - 1) / 2)
-    polar.scatter(observed, radii, s=5.8, color=BLUE, edgecolors="white",
-                  linewidths=0.33, zorder=5)
+    # Overlapping observation strokes form a circular rug just inside r = 1.
+    # Repeated angles darken the rug without stacking marks radially.
+    arc = np.deg2rad(np.linspace(-11.5, 11.5, 36))
+    for angle in observed:
+        polar.plot(angle + arc, np.full_like(arc, 0.95), color=BLUE,
+                   lw=1.45, alpha=0.44, solid_capstyle="round", zorder=5)
 
     handles = [
         Line2D([], [], color=GRAY, lw=0.8, alpha=0.65, label="Prior"),
         Line2D([], [], color=BLUE, lw=0.8, label="Posterior"),
-        Line2D([], [], color=BLUE, marker="o", ms=2.4, lw=0, label="Observed"),
+        Line2D([], [], color=BLUE, lw=1.45, alpha=0.8, label="Observed"),
     ]
     key = _page_axes(fig, page, 338, 100, 43, 51)
     key.set_axis_off()
@@ -160,7 +155,7 @@ def _sampling_diagram(fig, page, family, draws):
         flow.text(x, 8, title, weight="bold", **text_style)
     flow.plot([2, 204], [63, 63], color=GRID, lw=0.55)
 
-    traces = _trace_windows(draws)
+    traces = _display_traces(draws)
     mu_draws, _ = _parameters(traces)
     mu_center = np.angle(np.exp(1j * circ_mod(draws[:, :, 0])).mean())
     mean_points = np.argmin(np.abs(circ_mod(mu_draws - mu_center)), axis=1)
@@ -191,11 +186,18 @@ def _sampling_diagram(fig, page, family, draws):
         arrow(128, 140, top + 42)
 
         trace = traces[:, :, i]
-        low, high = trace.min(), trace.max()
-        y_trace = top + 55 - 24 * (trace - low) / (high - low)
+        if i == 0:
+            # Give the within-turn fluctuations the same vertical scale in
+            # each band, making them visible beside the full-turn offsets.
+            residual = circ_mod(trace - mu_center)
+            scaled = (residual - residual.min()) / np.ptp(residual) - 0.5
+            y_trace = 43 - 10 * np.asarray(WRAP_BRANCHES)[:, None] - 8 * scaled
+        else:
+            scaled = (trace - trace.min()) / np.ptp(trace)
+            y_trace = top + 55 - 24 * scaled
         values = trace[np.arange(len(points)), points]
         for color, y, point in zip(CHAIN_COLORS[i], y_trace, points):
-            flow.plot(x_trace, y, color=color, alpha=0.72, lw=0.6)
+            flow.plot(x_trace, y, color=color, alpha=0.62, lw=0.62)
             mark(x_trace[point], y[point], color)
 
         left, width, baseline, height = 75, 50, top + 54, 24
@@ -219,7 +221,7 @@ def _sampling_diagram(fig, page, family, draws):
                 mark(169 + radius * np.sin(mu), 41 - radius * np.cos(mu), color)
             flow.text(169, 59, "[−π, π)", **text_style)
         else:
-            eta = np.linspace(-4, max(7, high), 160)
+            eta = np.linspace(min(-4, trace.min()), max(7, trace.max()), 160)
             support_limit = softplus(eta[-1])
             x_range = (left, left + width)
             y_range = (baseline, baseline - height)

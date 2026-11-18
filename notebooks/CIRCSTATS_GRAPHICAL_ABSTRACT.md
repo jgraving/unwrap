@@ -18,13 +18,15 @@ parameter scale:
 - **Direction μ** wraps into `[−π, π)` with circular modulo.
 - **Concentration κ** becomes positive with softplus.
 
-Three independent chains start one turn apart. Each trace shows a
-contiguous excerpt from a different wrap branch. The same highlighted
-samples appear on each link curve and on the circle or positive axis.
-The polar plot gives each of 20 prior and 24 posterior predictive draws
-its own line. Zero density is at radius 1, followed by a common linear
-density scale. Observed dots sit among the posterior lines at their
-observed angles, with repeated observations staggered along the radius.
+Three independent chains start one turn apart. The trace plots show 160
+consecutive draws per chain in translucent, chain-specific colors.
+For display, each direction trace uses one equivalent turn, with
+within-turn variation expanded consistently across the three bands. The
+same highlighted samples appear on each link curve and on the circle or
+positive axis. The polar plot gives each of 20 prior and 24 posterior
+predictive draws its own line. Zero density is at radius 1, followed by
+a common linear density scale. The observed-angle rug follows the inside
+edge of that ring, with repeated angles giving darker overlapping marks.
 
 The illustrative fit uses seed 159, 600 warmup iterations, and 1,000
 retained draws per chain. Each iteration includes two extra

@@ -103,6 +103,7 @@ def test_svg_is_deterministic_vector_with_editable_text():
             "Observed", "Prior", "Posterior", "Likelihood parameters"} <= labels
     assert labels.isdisjoint({"Posterior draw", "Unconstrained", "Illustrative fit"})
     assert b"stroke-opacity: 0.43" in a
+    assert b"stroke-opacity: 0.44" in a
 
 
 def test_seeded_example_recomputes_normalized_predictive_densities():
@@ -113,9 +114,13 @@ def test_seeded_example_recomputes_normalized_predictive_densities():
         np.testing.assert_array_equal(previous, current)
     assert observed.size == 16
     assert draws.shape == (3, ga.model.N_DRAWS, 2)
-    windows = ga.model._trace_windows(draws)
-    assert windows.shape[1] > 20
-    wraps = np.floor((windows[:, :, 0] + np.pi) / (2 * np.pi))
+    traces = ga.model._display_traces(draws)
+    assert traces.shape == (3, ga.model.TRACE_DRAWS, 2)
+    original = draws[:, :ga.model.TRACE_DRAWS]
+    np.testing.assert_array_equal(traces[:, :, 1], original[:, :, 1])
+    np.testing.assert_allclose(ga.model.circ_mod(traces[:, :, 0]),
+                               ga.model.circ_mod(original[:, :, 0]), atol=1e-12)
+    wraps = np.floor((traces[:, :, 0] + np.pi) / (2 * np.pi))
     np.testing.assert_array_equal(wraps, np.broadcast_to(
         np.array(ga.model.WRAP_BRANCHES)[:, None], wraps.shape))
     mu, kappa = ga.model._parameters(draws)
