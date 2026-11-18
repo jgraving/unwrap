@@ -65,3 +65,7 @@ For the statistical framework and biological context, see the
 [mathematical guide](../docs/math/von-mises.md).
 The locust density–order manuscript figure has a saved-fit publication
 renderer with original source images: [reproduction instructions](LOCUST_DENSITY_FIGURE.md).
+
+The zebra escape-response paper figure has a saved-fit publication
+renderer that rebuilds the published 900 × 1080-point composite from the
+pinned data and cached fit: [reproduction instructions](ZEBRA_FIGURE.md).
