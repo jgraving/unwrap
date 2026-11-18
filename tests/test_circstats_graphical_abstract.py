@@ -81,7 +81,15 @@ def test_svg_is_deterministic_vector_with_editable_text():
     asset = ga.load_asset()
 
     def svg_bytes():
-        fig, _ax, _stats = ga.draw_figure(asset)
+        fig, ax, _stats = ga.draw_figure(asset)
+        original_paths = {patch.get_zorder() - 10: patch for patch in ax.patches}
+        for index in ga._WORKFLOW_ARROWHEADS:
+            assert original_paths[index].get_joinstyle() == "round"
+        predictive_ring = fig.axes[1].spines["polar"]
+        for index in ga._SUMMARY_POLAR_RINGS:
+            ring = original_paths[index]
+            assert ring.get_edgecolor() == predictive_ring.get_edgecolor()
+            assert ring.get_linewidth() == predictive_ring.get_linewidth()
         buf = io.BytesIO()
         fig.savefig(buf, format="svg",
                     metadata={"Date": None})
@@ -97,7 +105,7 @@ def test_svg_is_deterministic_vector_with_editable_text():
     assert root.get("height") == "342pt"
     assert root.get("viewBox") == "0 0 599 342"
     assert not root.findall(f".//{{{SVG_NS}}}image")
-    assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 378
+    assert len(root.findall(f".//{{{SVG_NS}}}path")) >= 377
     labels = {"".join(node.itertext()) for node in root.findall(f".//{{{SVG_NS}}}text")}
     assert {"MCMC draws", "Direction predictor", "Concentration predictor",
             "Circular modulo", "Softplus", "Predictive density",
@@ -146,7 +154,7 @@ def test_render_writes_all_exports_with_consistent_provenance(tmp_path):
     assert prov["page_pt"] == [599.0, 342.0]
     assert prov["inputs"]["artwork_sha256"] == ARTWORK_SHA
     assert prov["inputs"]["reference_pdf_sha256"] == REFERENCE_SHA
-    assert prov["counts"]["reference_paths"] == 378
+    assert prov["counts"]["reference_paths"] == 377
     assert prov["counts"]["reference_paths_with_group_alpha"] > 0
     assert prov["illustrative_fit"]["seed"] == ga.model.SEED
     assert prov["illustrative_fit"]["chains"] == 3

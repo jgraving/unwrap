@@ -53,8 +53,10 @@ the paper's measured vector artwork from `artwork.json`. These elements
 are schematic reference drawings. The renderer reads the reference
 PDF's nested graphics state with PyMuPDF to preserve the opacity and clip
 of each retained path. The retained text is typeset from the measured
-reference spans. The 148 original plot paths in panel B are omitted from
-the export.
+reference baselines using shared sizes for panel titles, labels, and
+legends. Workflow arrowheads use the paper PDF's round joins. The polar
+graphs in B and D share a guide style, with spokes between the two gray
+rings. The 148 original plot paths in panel B are omitted from the export.
 
 ## Generate the exports
 

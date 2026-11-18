@@ -20,6 +20,7 @@ import matplotlib as mpl
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.colors import to_rgb  # noqa: E402
 from matplotlib.font_manager import (FontProperties, findSystemFonts, findfont,
                                      fontManager)  # noqa: E402
 from matplotlib.path import Path as MplPath  # noqa: E402
@@ -47,8 +48,14 @@ CAPTION = (
     "Direction traces use three equivalent turns and softplus maps "
     "concentration draws to positive values."
 )
-# The old Cartesian plots in B, leaving the code window and workflow arrows.
-_REPLACED_PATHS = set(range(11, 38)) | set(range(119, 240))
+# The old Cartesian plots in B and an overlapping copy of D's inner ring.
+_REPLACED_PATHS = set(range(11, 38)) | set(range(119, 240)) | {255}
+_WORKFLOW_ARROWHEADS = {1, 3, 6, 8, 10}
+_SUMMARY_POLAR_RINGS = {260, 261}
+_SUMMARY_POLAR_SPOKES = {256: (0, -1), 257: (1, 0), 258: (0, 1), 259: (-1, 0)}
+# The measured center and radii of the two gray rings in panel D, in points.
+_SUMMARY_POLAR_CENTER = (167.492, 262.062)
+_SUMMARY_POLAR_RADII = (16.998, 33.996)
 
 # PDF font name -> family stack.  Liberation Sans is metric-compatible
 # with Arial (the CI default); Menlo falls back to a monospace.
@@ -203,7 +210,7 @@ def _reference_drawings():
         yield item["type"], opacity, clip_box, clip_path
 
 
-def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path):
+def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path, joinstyle="miter"):
     """Render one pinned/reference drawing (fill and/or stroke)."""
     path = path_from_items(dr["items"])
     t = dr["type"]
@@ -218,7 +225,7 @@ def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path):
             ls = (0, (dash["on"] / lw, dash["off"] / lw))
         patch = PathPatch(path, facecolor=face, edgecolor=edge,
                           linewidth=lw, linestyle=ls,
-                          capstyle="butt", joinstyle="miter",
+                          capstyle="butt", joinstyle=joinstyle,
                           zorder=zorder)
     else:
         patch = PathPatch(path, facecolor=face, edgecolor="none",
@@ -231,6 +238,20 @@ def draw_drawing(ax, dr, zorder, *, opacity, clip_box, clip_path):
     if clip_path is not None:
         patch.set_clip_path(clip_path, ax.transData)
     return patch
+
+
+def _summary_polar_guide(index, drawing):
+    """Use the shared polar guide style between the two measured rings."""
+    if index in _SUMMARY_POLAR_RINGS:
+        return {**drawing, "color": to_rgb(model.POLAR_GUIDE_COLOR),
+                "width": model.POLAR_RING_WIDTH}
+    dx, dy = _SUMMARY_POLAR_SPOKES[index]
+    x, y = _SUMMARY_POLAR_CENTER
+    inner, outer = _SUMMARY_POLAR_RADII
+    items = [("l", x + dx * inner, y + dy * inner,
+              x + dx * outer, y + dy * outer)]
+    return {**drawing, "color": to_rgb(model.POLAR_GUIDE_COLOR),
+            "width": model.POLAR_SPOKE_WIDTH, "items": items}
 
 
 # -------------------------------------------------------------------
@@ -254,6 +275,22 @@ def _resolved_fp(stack, *, bold, italic, size):
     return FontProperties(family=[family], size=size,
                           weight="bold" if bold else "normal",
                           style="italic" if italic else "normal")
+
+
+def _label_size(span):
+    size = span["size"]
+    # The editor mock retains the paper's original code-window typography.
+    if 268 <= span["x"] <= 376 and 23 <= span["y"] <= 81:
+        return size
+    if size >= 17:
+        return 18.0
+    if size >= 10:
+        return 11.0
+    if size >= 8.5:
+        return 9.0
+    if size < 6.5:
+        return model.LEGEND_SIZE
+    return model.LABEL_SIZE
 
 
 def draw_text(ax, spans, *, family_override=None, zorder=1000):
@@ -281,8 +318,7 @@ def draw_text(ax, spans, *, family_override=None, zorder=1000):
         if family_override and not s["font"].startswith("Menlo"):
             stack = [family_override] + [
                 f for f in stack if f != family_override]
-        fp = _resolved_fp(stack, bold=bold, italic=italic,
-                          size=s["size"])
+        fp = _resolved_fp(stack, bold=bold, italic=italic, size=_label_size(s))
         asc = float(s.get("ascender", 0.8))
         color = s["color"]
         if color.startswith("#00") and len(color) == 9:
@@ -331,8 +367,11 @@ def draw_figure(asset, *, family=None):
         if draw_type != dr["type"]:
             raise ValueError(f"Artwork and reference drawing {i} differ")
         if i not in _REPLACED_PATHS:
+            if i in _SUMMARY_POLAR_RINGS or i in _SUMMARY_POLAR_SPOKES:
+                dr = _summary_polar_guide(i, dr)
             draw_drawing(ax, dr, zorder=10 + i, opacity=opacity,
-                         clip_box=box, clip_path=path)
+                         clip_box=box, clip_path=path,
+                         joinstyle="round" if i in _WORKFLOW_ARROWHEADS else "miter")
             translucent += opacity < 1.0
 
     spans = [span for span in asset["text_spans"]

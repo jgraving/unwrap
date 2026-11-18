@@ -27,6 +27,11 @@ BLUE = "#0072b2"
 GRAY = "#6b7280"
 INK = "#231f20"
 GRID = "#d4d7d9"
+POLAR_GUIDE_COLOR = "#b9bdc0"
+POLAR_RING_WIDTH = 0.60
+POLAR_SPOKE_WIDTH = 0.50
+LABEL_SIZE = 7.0
+LEGEND_SIZE = 6.1
 CHAIN_COLORS = (("#973e08", "#d55e00", "#e98b43"),
                 ("#804181", "#b65fa0", "#d486bc"))
 WRAP_BRANCHES = (-1, 0, 1)
@@ -112,14 +117,14 @@ def _display_observations(observed):
 
 
 def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
-    polar = _page_axes(fig, page, 270, 94, 63, 63, projection="polar")
+    polar = _page_axes(fig, page, 270, 100, 63, 63, projection="polar")
     polar.set_theta_zero_location("N")
     polar.set_theta_direction(-1)
     polar.set_xticks([])
     polar.set_yticks([])
-    polar.spines["polar"].set_color(GRID)
-    polar.spines["polar"].set_linewidth(0.6)
-    polar.set_title("Predictive density", fontfamily=family, fontsize=7,
+    polar.spines["polar"].set_color(POLAR_GUIDE_COLOR)
+    polar.spines["polar"].set_linewidth(POLAR_RING_WIDTH)
+    polar.set_title("Predictive density", fontfamily=family, fontsize=LABEL_SIZE,
                     color=INK, pad=2.5)
 
     # An additive radius keeps zero density on an inner circle rather than
@@ -128,9 +133,11 @@ def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
     posterior_lines = posterior[np.linspace(0, len(posterior) - 1, 24, dtype=int)]
     scale = max(prior_lines.max(), posterior_lines.max())
     polar.set_ylim(0, 2.17)
-    polar.plot(theta, np.ones_like(theta), color=GRID, lw=0.55)
+    polar.plot(theta, np.ones_like(theta), color=POLAR_GUIDE_COLOR,
+               lw=POLAR_RING_WIDTH)
     for angle in np.arange(4) * np.pi / 2:
-        polar.plot([angle, angle], [1, 2.17], color=GRID, lw=0.45)
+        polar.plot([angle, angle], [1, 2.17], color=POLAR_GUIDE_COLOR,
+                   lw=POLAR_SPOKE_WIDTH)
     for sample, color, opacity in ((prior_lines, GRAY, 0.32),
                                     (posterior_lines, BLUE, 0.43)):
         polar.plot(theta, 1 + sample.T / scale, color=color, alpha=opacity,
@@ -145,13 +152,13 @@ def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
         Line2D([], [], color=BLUE, marker="o", ms=2.5, lw=0, alpha=0.72,
                label="Observed"),
     ]
-    key = _page_axes(fig, page, 338, 100, 43, 51)
+    key = _page_axes(fig, page, 338, 106, 43, 51)
     key.set_axis_off()
     legend = key.legend(handles=handles, loc="center left", frameon=True,
                         edgecolor="#c7c7c7", facecolor="white", framealpha=1,
                         borderaxespad=0, borderpad=0.46,
                         handlelength=1.0, handletextpad=0.48,
-                        labelspacing=0.48, prop={"family": family, "size": 6.2})
+                        labelspacing=0.48, prop={"family": family, "size": LEGEND_SIZE})
     legend.get_frame().set_linewidth(0.65)
 
 
@@ -159,8 +166,9 @@ def _sampling_diagram(fig, page, family, draws):
     flow = _page_axes(fig, page, 389, 26, 207, 126)
     flow.set(xlim=(0, 207), ylim=(126, 0))
     flow.set_axis_off()
-    text_style = dict(fontfamily=family, color=INK, fontsize=6.7, ha="center")
-    for x, title in ((31, "MCMC draws"), (100, "Link"), (169, "Likelihood parameters")):
+    text_style = dict(fontfamily=family, color=INK, fontsize=LABEL_SIZE, ha="center")
+    support_style = {**text_style, "fontsize": LEGEND_SIZE}
+    for x, title in ((31, "MCMC draws"), (100, "Link"), (167, "Likelihood parameters")):
         flow.text(x, 8, title, weight="bold", **text_style)
     flow.plot([2, 204], [63, 63], color=GRID, lw=0.55)
 
@@ -196,8 +204,8 @@ def _sampling_diagram(fig, page, family, draws):
         left = 35 - (name_width + 10) / 2
         eta_x = left + name_width + 2
         predictor_style = dict(fontfamily=family, color=INK, ha="left")
-        flow.text(left, top + 23, predictor, fontsize=6.1, **predictor_style)
-        flow.text(eta_x, top + 23, "η", fontsize=6.1, **predictor_style)
+        flow.text(left, top + 23, predictor, fontsize=LEGEND_SIZE, **predictor_style)
+        flow.text(eta_x, top + 23, "η", fontsize=LEGEND_SIZE, **predictor_style)
         flow.text(eta_x + 3.4, top + 24.4, subscript, fontsize=4.6,
                   **predictor_style)
         flow.text(100, top + 23, link, **text_style)
@@ -246,7 +254,7 @@ def _sampling_diagram(fig, page, family, draws):
                 cloud(169 + radius * np.sin(samples), 41 - radius * np.cos(samples),
                       color)
                 mark(169 + radius * np.sin(mu), 41 - radius * np.cos(mu), color)
-            flow.text(169, 59, "[−π, π)", **text_style)
+            flow.text(169, 59, "[−π, π)", **support_style)
         else:
             eta = np.linspace(min(-4, trace.min()), max(7, trace.max()), 160)
             support_limit = softplus(eta[-1])
@@ -271,7 +279,7 @@ def _sampling_diagram(fig, page, family, draws):
                      np.interp(kappa, support_limits, y_range), color)
                 cloud(148 + 41 * samples / support_limit, y, color)
                 mark(148 + 41 * kappa / support_limit, y, color)
-            flow.text(169, 121, "κ > 0", **text_style)
+            flow.text(169, 121, "κ > 0", **support_style)
 
 
 def draw_model_example(fig, page, family):
