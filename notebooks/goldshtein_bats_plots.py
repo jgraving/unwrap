@@ -2160,7 +2160,10 @@ def plot_delta_total_and_by_treatment(
     vline_at_zero=True,
     y_step=1.35,
     y_margins=0.10,
+    ax=None,
+    treatment_colors=None,
 ):
+    """Plot paired ELPD differences on a new or supplied axis."""
     import numpy as np
     import pandas as pd
     import matplotlib.pyplot as plt
@@ -2184,14 +2187,18 @@ def plot_delta_total_and_by_treatment(
 
     out = pd.concat([total_row, treat_rows], ignore_index=True)
 
-    cmap = mpl.colormaps.get_cmap("tab10")
-    treat_to_color = {t: cmap(i % 10) for i, t in enumerate(treatment_order)}
+    if treatment_colors is None:
+        cmap = mpl.colormaps.get_cmap("tab10")
+        treatment_colors = {t: cmap(i % 10) for i, t in enumerate(treatment_order)}
 
     y = np.arange(len(out), dtype=float) * float(y_step)
 
-    fig_h = max(1.35, (0.20 * y_step) * len(out) + 0.20)
-    fig = plt.figure(figsize=(3.0, fig_h), dpi=dpi)
-    ax = plt.gca()
+    standalone = ax is None
+    if standalone:
+        fig_h = max(1.35, (0.20 * y_step) * len(out) + 0.20)
+        fig, ax = plt.subplots(figsize=(3.0, fig_h), dpi=dpi)
+    else:
+        fig = ax.figure
 
     if vline_at_zero:
         ax.axvline(0.0, linestyle="--", linewidth=1.0, color="k", zorder=0)
@@ -2205,7 +2212,7 @@ def plot_delta_total_and_by_treatment(
             ecolor = "black"
         else:
             t = r["treatment"]
-            color = treat_to_color.get(t, "black")
+            color = treatment_colors.get(t, "black")
             ecolor = color
 
         if np.isfinite(se):
@@ -2242,7 +2249,8 @@ def plot_delta_total_and_by_treatment(
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    plt.tight_layout()
+    if standalone:
+        fig.tight_layout()
     _save(fig, save, save_path)
     return fig, ax
 

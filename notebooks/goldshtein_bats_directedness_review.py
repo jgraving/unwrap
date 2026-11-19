@@ -19,26 +19,16 @@ from goldshtein_bats_layout_data import _read_context, assemble_layout_data
 from locust_density_figure import add_compact_unit_label
 
 
-PAGE_W, PAGE_H = composite.PAGE_W, 608
+PAGE_W, PAGE_H = composite.PAGE_W, 758
 OUTPUT_DIR = source.ROOT / "assets" / "goldshtein-bats-figure-ideas"
 STEM = "bat_composite_directedness"
 ONSET_GOLD = "#FFC850"
 ONSET_EDGE = "#664512"
-
-
-def cumulative_heading_gain(ctx):
-    """Sum paired step-level gains within each absolute error threshold."""
-    error = np.abs(np.rad2deg(ctx["df_track"]["HeadingRadians"].to_numpy()))
-    pointwise = ctx["pointwise_elpd"]
-    gain = np.asarray(pointwise["von Mises-Uniform"]) - pointwise["von Mises"]
-    if gain.shape != error.shape or not np.isfinite(gain).all():
-        raise ValueError("Pointwise ELPD must align with the modeled headings")
-    if not np.isfinite(error).all() or np.any(error > 180):
-        raise ValueError("Modeled heading errors must lie between 0° and 180°")
-    order = np.argsort(error, kind="stable")
-    thresholds = np.linspace(0, 180, 91)
-    counts = np.searchsorted(error[order], thresholds, side="right")
-    return thresholds, np.r_[0, np.cumsum(gain[order])][counts]
+ONSET_MARKERS = {
+    "within_segment": ("o", ONSET_GOLD, 2.5, "Directed bout onset and 90% interval"),
+    "flight_start": ("o", "white", 2.6, "Directed at first usable step of flight"),
+    "data_resume": ("^", "white", 3.1, "Directed when data resume"),
+}
 
 
 def first_directed_bout(scores, eligible, *, run=5):
@@ -50,6 +40,15 @@ def first_directed_bout(scores, eligible, *, run=5):
         first = (starts < 0) & (lengths == run)
         starts[first] = i - run + 1
     return starts
+
+
+def onset_kind(start, usable, gaps):
+    """Distinguish flight starts, resumption boundaries, and observed onsets."""
+    if start == np.argmax(usable) and not np.any(gaps[:start]):
+        return "flight_start"
+    if not usable[start - 1]:
+        return "data_resume"
+    return "within_segment"
 
 
 def flight_directedness(ctx, posthoc, levels):
@@ -96,28 +95,37 @@ def flight_directedness(ctx, posthoc, levels):
             indices = np.quantile(qualifying, (.05, .5, .95), method="inverted_cdf")
             positions = np.flatnonzero(valid)
             early, median, late = (len(positions) - 1 - np.searchsorted(positions, indices)) * step_km
-            start = int(indices[1])
-            boundary = start == 0 or not usable[start - 1]
-            onsets[level].append((row, early, median, late, boundary))
+            kind = onset_kind(int(indices[1]), usable, gaps)
+            onsets[level].append((row, early, median, late, kind))
     return route_scores, heatmaps, onsets
 
 
-def draw_heading_gain(ax, thresholds, gain):
-    """Plot the signed cumulative difference in predictive accuracy."""
-    ax.axhline(0, color="#888888", lw=.65, linestyle=(0, (2, 2)), zorder=0)
-    ax.plot(thresholds, gain, color=composite.INK, lw=1.3)
-    ax.plot(thresholds[-1], gain[-1], "o", color=composite.INK, ms=3.0, clip_on=False)
-    ax.annotate(f"{gain[-1]:+.1f}", (thresholds[-1], gain[-1]), xytext=(-6, 8),
-                textcoords="offset points", ha="right", va="bottom", fontsize=8.5)
-    ax.set(xlim=(0, 180), xticks=(0, 45, 90, 135, 180),
-           xlabel="Absolute error from goal bearing (°)", ylabel="Cumulative ΔELPD")
-    ax.yaxis.set_major_locator(MultipleLocator(50))
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.tick_params(length=2.8, width=.65, labelsize=8.5, pad=3)
+def draw_elpd_comparison(plots, total, delta, total_ax, delta_ax, colors):
+    """Use the notebook's total and paired ELPD plots inside the composite."""
+    model_names = total["model"].replace({"von Mises-Uniform": "von Mises\n–Uniform Mixture"})
+    plots._ax_total_elpd_black(total.assign(model=model_names), total_ax)
+    for tick in total_ax.get_yticklabels():
+        tick.set_multialignment("right")
+
+    labels = dict(zip(colors, composite.LABELS, strict=True))
+    delta_labels = delta["treatment"].map(labels).fillna("Total")
+    plots.plot_delta_total_and_by_treatment(
+        delta.assign(label=delta_labels), treatment_order=list(colors),
+        xlabel="ELPD difference (mixture − von Mises)", save=False,
+        ax=delta_ax, treatment_colors=colors,
+    )
+    for tick, color in zip(delta_ax.get_yticklabels()[1:], colors.values(), strict=True):
+        tick.set_color(color)
+    for ax, spacing in ((total_ax, 100), (delta_ax, 50)):
+        ax.xaxis.set_major_locator(MultipleLocator(spacing))
+        ax.xaxis.set_major_formatter(StrMethodFormatter("{x:.0f}"))
+        ax.spines["left"].set_visible(False)
+        ax.tick_params(axis="y", length=0, pad=5)
+        ax.tick_params(axis="x", length=3, width=.65, labelsize=8.5, pad=2)
 
 
-def draw_directedness_map(ax, data, tracks, scores, color, xlim, ylim, *, show_scale=False):
-    """Use the heatmap's directedness scale on the original track segments."""
+def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_scale=False):
+    """Show routes in individual treatment shades or on the directedness scale."""
     ax.set(xlim=xlim, ylim=ylim, xticks=[], yticks=[], facecolor=composite.MAP_FACE, aspect="equal")
     for spine in ax.spines.values():
         spine.set_color(color)
@@ -127,25 +135,36 @@ def draw_directedness_map(ax, data, tracks, scores, color, xlim, ylim, *, show_s
     for polygon in polygons:
         ax.fill(*polygon.exterior.xy, fc="#d9e9ed", ec="#a3bcc3", lw=.45, zorder=2)
 
-    missing, gaps, route, values = [], [], [], []
-    for _, flight in tracks.groupby("tag", sort=False, observed=True):
+    missing, gaps, route, values, route_colors = [], [], [], [], []
+    flights = tracks.groupby("tag", sort=False, observed=True)
+    shades = (composite._route_shades(color, flights.ngroups) if scores is None
+              else [None] * flights.ngroups)
+    for (_, flight), shade in zip(flights, shades, strict=True):
         xy = flight[["x_m", "y_m"]].to_numpy()
         segments = np.stack((xy[:-1], xy[1:]), axis=1)
+        crossed = flight["gap_before"].to_numpy()[1:] == 1
+        gaps.extend(segments[crossed])
+        if shade is not None:
+            connected = segments[~crossed]
+            route.extend(connected)
+            route_colors.extend([shade] * len(connected))
+            continue
         # The heading at each sample describes the segment that ends there.
         means = scores.loc[flight.index].to_numpy()[1:]
-        crossed = flight["gap_before"].to_numpy()[1:] == 1
         has_score = np.isfinite(means) & ~crossed
         missing.extend(segments[~has_score & ~crossed])
-        gaps.extend(segments[crossed])
         route.extend(segments[has_score])
         values.extend(means[has_score])
 
     ax.add_collection(LineCollection(missing, colors="#a7aeae", lw=.47, zorder=3))
     ax.add_collection(LineCollection(gaps, colors="#959b9c", lw=.45,
                                      linestyles=(0, (2, 2)), zorder=3))
-    colored = LineCollection(route, cmap=composite.HEATMAP_CMAP, norm=composite.HEATMAP_NORM,
-                             lw=.61, capstyle="round", zorder=4)
-    colored.set_array(np.asarray(values))
+    if scores is None:
+        colored = LineCollection(route, colors=route_colors, lw=.67, capstyle="round", zorder=4)
+    else:
+        colored = LineCollection(route, cmap=composite.HEATMAP_CMAP, norm=composite.HEATMAP_NORM,
+                                 lw=.61, capstyle="round", zorder=4)
+        colored.set_array(np.asarray(values))
     ax.add_collection(colored)
     for site in data["sites"]:
         ax.plot(*site, marker="X", ms=3.8, mec="white", mew=.65, mfc=composite.INK, zorder=5)
@@ -165,19 +184,26 @@ def draw_directedness_map(ax, data, tracks, scores, color, xlim, ylim, *, show_s
 
 def draw_onsets(ax, onsets):
     """Mark each bout start's median and conditional 90% interval."""
-    for row, early, median, late, boundary in onsets:
+    for row, early, median, late, kind in onsets:
         y = row + .5
         ax.hlines(y, late, early, colors=ONSET_EDGE, linewidth=1.05, zorder=4)
         ax.hlines(y, late, early, colors=ONSET_GOLD, linewidth=.58, zorder=5)
-        ax.plot(median, y, "o", ms=2.5, mfc="white" if boundary else ONSET_GOLD,
-                mec=ONSET_EDGE, mew=.45, zorder=6)
+        marker, fill, size, _ = ONSET_MARKERS[kind]
+        ax.plot(median, y, marker=marker, ms=size, mfc=fill, mec=ONSET_EDGE, mew=.45, zorder=6)
 
 
-def draw_composite(data, gain, flights, *, photo_path=None):
+def draw_composite(data, comparison, flights, plots, *, photo_path=None):
     """Place model comparison and predictive densities above paired flight views."""
     route_scores, heatmaps, onsets = flights
     levels = data["levels"]
     colors = dict(zip(levels, composite.PALETTE, strict=True))
+    tracks = data["tracks"]
+    treatments = {level: tracks.loc[tracks["treatment"].eq(level)] for level in levels}
+    features = np.vstack([tracks[["x_m", "y_m"]].to_numpy(), data["sites"], data["roost"],
+                          np.reshape(data["lake"].bounds, (2, 2))])
+    xlim = features[:, 0].min() - 225, features[:, 0].max() + 225
+    ylim = features[:, 1].min() - 300, features[:, 1].max() + 300
+    map_ratio = np.ptp(xlim) / np.ptp(ylim)
     fig = plt.figure(figsize=(PAGE_W / 72, PAGE_H / 72), facecolor="white")
 
     def axes_at(x, y, width, height, **kwargs):
@@ -211,26 +237,37 @@ def draw_composite(data, gain, flights, *, photo_path=None):
     for level, label, y in zip(levels, composite.LABELS, icon_rows, strict=True):
         page_text(218, icon_top + (y - iy0) * icon_scale, label, color=colors[level], fontsize=9.2)
 
-    letter(316, 25, "b")
-    gain_axis = axes_at(370, 49, 248, 73)
-    page_text(494, 24, "Predictive gain by heading", ha="center", weight="bold", fontsize=11)
-    page_text(494, 38, "von Mises–Uniform Mixture − von Mises", ha="center", fontsize=8.6)
-    draw_heading_gain(gain_axis, *gain)
+    page_text(456, 26, "Homing routes", ha="center", weight="bold", fontsize=10.7)
+    route_h = 86
+    route_w = route_h * map_ratio
+    for center, level, label in zip((324, 412, 500, 588), levels, composite.LABELS, strict=True):
+        color = colors[level]
+        page_text(center, 43, label, ha="center", color=color, fontsize=8.7)
+        map_ax = axes_at(center - route_w / 2, 51, route_w, route_h)
+        draw_track_map(map_ax, data, treatments[level], color, xlim, ylim)
 
-    letter(22, 157, "c")
-    page_text(46, 157, "Predictive heading density", weight="bold", fontsize=11)
+    letter(22, 157, "b")
+    page_text(46, 157, "Model comparison", weight="bold", fontsize=11)
+    page_text(230, 175, "Total by model", ha="center", fontsize=9.3)
+    page_text(507, 175, "Total and by treatment", ha="center", fontsize=9.3)
+    total_ax = axes_at(155, 185, 150, 71)
+    delta_ax = axes_at(425, 185, 164, 71)
+    draw_elpd_comparison(plots, *comparison, total_ax, delta_ax, colors)
+
+    letter(22, 293, "c")
+    page_text(46, 293, "Predictive heading density", weight="bold", fontsize=11)
     bearings = data["density_bearings"]
     profiles = data["density_profiles"]
     radius_max = 1 + 1.08 * max(profile["hi"].max() for profile in profiles.values())
     polar_size = 68
-    slots = ((100, 173), (240, 173), (100, 249), (240, 249))
+    slots = ((100, 309), (240, 309), (100, 385), (240, 385))
     for (center, y), level, label in zip(slots, levels, composite.LABELS, strict=True):
         polar = axes_at(center - polar_size / 2, y, polar_size, polar_size, projection="polar")
         composite.draw_polar_density(polar, bearings, profiles[level], colors[level], radius_max)
         page_text(center, y - 3, "0°", ha="center", fontsize=8)
         page_text(center + 35, y + polar_size / 2, label, color=colors[level], fontsize=8.7)
 
-    x, y, width, height = 416, 202, 142, 75
+    x, y, width, height = 416, 338, 142, 75
     contrast = axes_at(x, y, width, height)
     composite.draw_density_contrast(contrast, data, colors)
     prop = contrast.xaxis.label.get_fontproperties()
@@ -238,27 +275,22 @@ def draw_composite(data, gain, flights, *, photo_path=None):
                            "Density change vs. control", "radian", -1,
                            fontsize=prop.get_size_in_points(), prop=prop)
 
-    letter(22, 330, "d")
-    page_text(334, 330, "Directedness by individual", ha="center", weight="bold", fontsize=11)
-    tracks = data["tracks"]
-    features = np.vstack([tracks[["x_m", "y_m"]].to_numpy(), data["sites"], data["roost"],
-                          np.reshape(data["lake"].bounds, (2, 2))])
-    xlim = features[:, 0].min() - 225, features[:, 0].max() + 225
-    ylim = features[:, 1].min() - 300, features[:, 1].max() + 300
+    letter(22, 466, "d")
+    page_text(334, 466, "Directedness by individual", ha="center", weight="bold", fontsize=11)
     map_h = 96
-    map_w = map_h * np.ptp(xlim) / np.ptp(ylim)
+    map_w = map_h * map_ratio
     n_rows = max(data["counts"].values())
     centers = (112, 260, 408, 556)
     for center, level, label in zip(centers, levels, composite.LABELS, strict=True):
         color = colors[level]
         n_bats = data["counts"][level]
-        page_text(center, 346, f"{label} (n = {n_bats})", ha="center", color=color,
+        page_text(center, 482, f"{label} (n = {n_bats})", ha="center", color=color,
                   fontsize=9.3, weight="bold")
-        map_ax = axes_at(center - map_w / 2, 355, map_w, map_h)
-        draw_directedness_map(map_ax, data, tracks.loc[tracks["treatment"].eq(level)],
-                              route_scores, color, xlim, ylim, show_scale=level == levels[-1])
+        map_ax = axes_at(center - map_w / 2, 491, map_w, map_h)
+        draw_track_map(map_ax, data, treatments[level], color, xlim, ylim,
+                       scores=route_scores, show_scale=level == levels[-1])
 
-        tile = axes_at(center - 69, 459, 138, 78)
+        tile = axes_at(center - 69, 595, 138, 90)
         composite.draw_flight_heatmap(tile, heatmaps[level])
         draw_onsets(tile, onsets[level])
         tile.set(ylim=(n_rows, 0), yticks=[], xticks=(6, 3, 0))
@@ -266,15 +298,15 @@ def draw_composite(data, gain, flights, *, photo_path=None):
         tile.tick_params(axis="x", labelsize=8, width=.6, length=2, pad=2)
         if level == levels[0]:
             tile.set_ylabel("Individual", labelpad=4)
-    page_text(334, 557, "Path distance remaining (km)", ha="center", fontsize=9.5)
-    composite.draw_flight_colorbar(fig, axes_at(185, 576, 132, 5.5))
-    onset_key = Line2D([], [], color=ONSET_GOLD, linewidth=1.1, marker="o", markersize=3.3,
-                       markeredgecolor=ONSET_EDGE, markeredgewidth=.5)
-    boundary_key = Line2D([], [], linestyle="none", marker="o", markersize=3.3,
-                          markerfacecolor="white", markeredgecolor=ONSET_EDGE, markeredgewidth=.5)
-    fig.legend([onset_key, boundary_key], ["Directed bout onset and 90% interval",
-                                          "Onset at start of recorded segment"], frameon=False,
-               loc="center left", bbox_to_anchor=(392 / PAGE_W, 1 - 580 / PAGE_H),
+    page_text(334, 705, "Path distance remaining (km)", ha="center", fontsize=9.5)
+    composite.draw_flight_colorbar(fig, axes_at(185, 724, 132, 5.5))
+    onset_key = [Line2D([], [], color=ONSET_GOLD, linewidth=1.1,
+                        linestyle="-" if fill == ONSET_GOLD else "none",
+                        marker=marker, markersize=size + .8, markerfacecolor=fill,
+                        markeredgecolor=ONSET_EDGE, markeredgewidth=.5, label=label)
+                 for marker, fill, size, label in ONSET_MARKERS.values()]
+    fig.legend(handles=onset_key, frameon=False,
+               loc="center left", bbox_to_anchor=(392 / PAGE_W, 1 - 727 / PAGE_H),
                fontsize=8.6, handletextpad=.65, handlelength=2.25, borderaxespad=0)
     return fig
 
@@ -293,14 +325,14 @@ def main(argv=None):
     source.resolve_fonts(args.font_dir, args.font_family)
     ctx, posthoc, plots, lake_path = _read_context(root)
     data = assemble_layout_data(ctx, posthoc, plots, lake_path)
-    gain = cumulative_heading_gain(ctx)
+    comparison = ctx["res_total"], ctx["delta_df"]
     flights = flight_directedness(ctx, posthoc, data["levels"])
     args.output_dir.mkdir(parents=True, exist_ok=True)
     style = {"font.family": args.font_family, "font.size": 9, "pdf.fonttype": 42,
              "text.color": composite.INK, "axes.labelcolor": composite.INK,
              "axes.edgecolor": composite.INK, "axes.linewidth": .65}
     with mpl.rc_context(style):
-        fig = draw_composite(data, gain, flights, photo_path=args.photo)
+        fig = draw_composite(data, comparison, flights, plots, photo_path=args.photo)
         composite.save_figure(fig, args.output_dir, STEM)
 
 
