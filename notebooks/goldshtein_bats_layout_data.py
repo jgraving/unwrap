@@ -71,7 +71,6 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     goal_index = bearings.size // 2
     uniform_density = posthoc.vonmises_pdf_scalar(bearings, 0.0, kappa_uniform)
     density_at_goal = np.empty_like(weight)
-    directed_at_goal = np.empty_like(weight)
     density_profiles = {}
     for i, level in enumerate(levels):
         directed_density = posthoc.vonmises_pdf_scalar(
@@ -80,7 +79,6 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
         p = weight[:, i, None]
         density = p * directed_density + (1 - p) * uniform_density
         density_at_goal[:, i] = density[:, goal_index]
-        directed_at_goal[:, i] = directed_density[:, goal_index]
         lo, hi = posthoc.hdi_along_samples(density, prob=0.95)
         density_profiles[level] = {"mean": density.mean(axis=0), "lo": lo, "hi": hi}
 
@@ -99,10 +97,6 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
         },
         "full_contrasts": {
             level: summary(density_at_goal[:, i] - density_at_goal[:, 0])
-            for i, level in enumerate(levels[1:], 1)
-        },
-        "directed_contrasts": {
-            level: summary(directed_at_goal[:, i] - directed_at_goal[:, 0])
             for i, level in enumerate(levels[1:], 1)
         },
         "goal_window_half_width_degrees": half_width,
