@@ -29,17 +29,22 @@ without running the notebook or sampling again. See the
 ## Locust composite figure
 
 `locust_circ_stats_figure.py` rebuilds the locust circular-statistics composite
-from the pinned fits and data in `unwrap-data`, and adds a row of its own below
-the reference figure's four. Panels b and d are the house `plot_loo_elpd` and
-`plot_hypothesis_density` panels, panel a replays the reference figure's artwork
-geometry kept in `assets/locust_circ_stats/`, panel c draws its population
-hypothesis test in polar form (the two hypothesis densities at their directions,
-against the uniform reference), and panels e and f widen those two comparisons -
-the house `plot_predictive_both_models_polar` (both models' predictive densities
-against the observed KDE) and `plot_hypothesis_elpd_swarm` (one dot per animal).
-The composite being matched comes from the manuscript, so it is called the
-reference figure throughout; its page is 900 x 600 pt and this one is
-900 x 945, the extra 345 pt being the new row. Rendered preview:
+from the pinned fits and data in `unwrap-data`, extends it with a third row, and
+relays the panels so the letters follow the figure's flow of information: setup
+(a), model selection (b) and predictive check (c), then the hypothesis test at
+three levels - predictive density (d), population level (e), individual level
+(f). The reference page drew its four panels as a, b, c, d; its panels c and d
+are d and e here, with their measured geometry kept exactly. Panel b is the
+house `plot_loo_elpd` panel, panel e the house `plot_hypothesis_density` panel,
+panel a replays the reference figure's artwork geometry kept in
+`assets/locust_circ_stats/`, panel d draws the hypothesis test in polar form
+(the two hypothesis densities at their directions, against the uniform
+reference), and the new panels take their house twins:
+`plot_predictive_models_polar` (a pair of polar plots, one per model, each
+against the observed KDE drawn solid) and `plot_hypothesis_elpd_swarm` (one dot
+per animal). The composite being matched comes from the manuscript, so it is
+called the reference figure throughout; its page is 900 x 600 pt and this one
+is 900 x 900, the extra 300 pt being the new row. Rendered preview:
 [PDF](../assets/locust-circ-stats/locust_circ_stats_figure.pdf) ·
 [PNG](../assets/locust-circ-stats/locust_circ_stats_figure.png) ·
 [SVG](../assets/locust-circ-stats/locust_circ_stats_figure.svg) ·

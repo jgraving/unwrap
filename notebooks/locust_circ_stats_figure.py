@@ -1,5 +1,10 @@
 """Programmatic reconstruction of the locust circular-statistics composite
-figure (panels a-d), extended with a third row of our own (panels e-f).
+figure, extended with a third row and with the panel letters following the
+figure's own flow of information: setup (a), model selection (b) and
+predictive check (c), then the hypothesis test at three levels (d, e, f).
+The reference page drew its four panels as a, b, c (bottom left, empty
+here), d; the panels it drew as c and d are d and e here, with their
+measured geometry kept exactly.
 
 Panels:
   a. Virtual-swarm schematic, rebuilt from the reference artwork geometry
@@ -8,19 +13,20 @@ Panels:
      the reference PDF, replayed through matplotlib).
   b. LOO ELPD comparison - the house ``plot_loo_elpd`` panel, drawn onto the
      composite page by the house function itself (see ``_house_panel``).
-  c. Predictive density at the hypotheses - the bimodal fit's
+  c. Predictive check as a pair of polar plots, one per model: each model's
+     replicated posterior-predictive direction density against the observed
+     bootstrap KDE (drawn solid; dashed is the uniform reference on this
+     page), on d's polar axes and radius convention, KDE estimate only. The
+     house twin is ``plot_predictive_models_polar``.
+  d. Hypothesis testing, predictive density - the bimodal fit's
      posterior-predictive direction density (``locust_posthoc
      .population_validation_stats``, faint, for context) with the two
-     hypothesis densities of panel d marked at their directions against the
+     hypothesis densities of panel e marked at their directions against the
      uniform reference (the dashed circle), plus the optic-flow and
      vectorial-encoding arrows.
-  d. Population-level hypothesis testing - the house
-     ``plot_hypothesis_density`` panel, drawn onto the composite page.
-  e. Predictive check, both models at once: each model's replicated
-     posterior-predictive direction density against the observed
-     bootstrap KDE, on c's polar axes and radius convention, KDE estimate
-     only. The house twin is ``plot_predictive_both_models_polar``.
-  f. The same hypothesis test as d, per animal: each animal's ELPD at the
+  e. Hypothesis testing, population level - the house ``plot_hypothesis_density``
+     panel, drawn onto the composite page.
+  f. The same hypothesis test as e, per animal: each animal's ELPD at the
      two hypotheses as a swarm, one dot per animal. The house twin is
      ``plot_hypothesis_elpd_swarm``.
 
@@ -32,12 +38,13 @@ models are rebuilt only to attach the per-observation log-likelihood the
 LOO/ELPD post-hoc reads (PyMC 6 replacement for ``idata_kwargs=
 {"log_likelihood": True}``), mirroring notebook cells 10 and 14.
 
-The page is 900 x 945 pt, drawn in PDF points through a full-page stage axes;
-positions/colors/sizes reproduce the reference layout for panels a-d, which fill
-the reference page's 900 x 600 pt, and panels e-f add a row of the reference's
-own row height (345 pt) below it. The composite being matched is the
-manuscript's figure, so it is called the reference figure - and its PDF the
-reference PDF - throughout. Saves to
+The page is 900 x 900 pt, drawn in PDF points through a full-page stage axes;
+positions/colors/sizes reproduce the reference layout for the panels the
+reference page has (a, b and the two hypothesis panels, here d and e), which
+fill its 900 x 600 pt, and the predictive-check pair (c) and the individual
+hypothesis panel (f) fill a third row of 300 pt below it. The composite being
+matched is the manuscript's figure, so it is called the reference figure -
+and its PDF the reference PDF - throughout. Saves to
 ``figures/locust/locust_circ_stats_figure.pdf``.
 
 ``--snapshot-dir`` (default ``assets/locust-circ-stats``) additionally writes
@@ -89,8 +96,8 @@ import locust_posthoc as posthoc  # noqa: E402
 import locust_direction_plots as plots  # noqa: E402
 
 ASSETS = HERE / "assets" / "locust_circ_stats"
-PAGE_W, PAGE_H = 900.0, 945.0  # PDF points, origin top-left (600 pt of
-# reference page plus a 345 pt third row; see ROW_3_TOP below)
+PAGE_W, PAGE_H = 900.0, 900.0  # PDF points, origin top-left (the reference's
+# 900 x 600 plus a 300 pt third row; see ROW_3_TOP below)
 #: The reference PDF's own height. Panel a's photo placements are recorded in
 #: that page's bottom-left space, so they are flipped against it rather than
 #: against this (taller) page.
@@ -102,18 +109,19 @@ STEM = "locust_circ_stats_figure"
 CAPTION = (
     "Locust circular statistics. (a) Virtual-swarm schematic of the free-flight "
     "arena. (b) Leave-one-out cross-validated predictive density of the bimodal "
-    "and unimodal course models (+/- one standard error). (c) Predictive density "
-    "at the hypotheses: the bimodal model's posterior-predictive direction "
-    "density (faint, for context) with the optic-flow (forward) and "
+    "and unimodal course models (+/- one standard error). (c) Predictive check, "
+    "one polar plot per model: each model's replicated posterior-predictive "
+    "direction density (von Mises KDE, median and 2.5/97.5 band) against the "
+    "observed bootstrap KDE (solid line). (d) The hypothesis test on the "
+    "predictive-density scale: the bimodal model's posterior-predictive "
+    "direction density (faint, for context) and the optic-flow (forward) and "
     "vectorial-encoding (sideways) hypothesis densities marked at their "
-    "directions against the uniform reference, as the dashed circle. (d) The "
+    "directions against the uniform reference, as the dashed circle. (e) The "
     "same test in numbers: population posterior-predictive density at the "
-    "hypothesized directions against the uniform reference. (e) Predictive "
-    "check for both models at once: each model's replicated "
-    "posterior-predictive direction density (von Mises KDE) against the "
-    "observed bootstrap KDE. (f) The hypothesis test of d taken down to the "
-    "individual: each animal's ELPD at the hypothesized directions, one dot per "
-    "animal, against the uniform reference (open markers: the pooled values)."
+    "hypothesized directions against the uniform reference. (f) The test of e "
+    "taken down to the individual: each animal's ELPD at the hypothesized "
+    "directions, one dot per animal, against the uniform reference (open "
+    "markers: the pooled values)."
 )
 
 # ---------------------------------------------------------------------------
@@ -124,52 +132,80 @@ PANEL_D = (577.2, 401.8, 296.0, 97.9)
 POLAR_CENTER = (615.1, 206.3)           # polar center
 POLAR_R_OUT = 118.7                     # outer grid circle radius (r = 1.0)
 
-#: The reference page is 900 x 600 pt and carries panels a-d.  Panels e and f
-#: are additions below it, so the page grows by a third row 345 pt tall - what
-#: panel c's polar, tick labels and title occupy: panel e is panel c exactly as
-#: large, and its tick labels need the same 261 pt c's do, with the row's title
-#: above them.  Panel f is panel d's inset with a taller axes, because the
-#: swarm needs the height for its stacks.
+#: The reference page is 900 x 600 pt and carries the reference figure's four
+#: panels. This figure tells a longer story, so the page grows by a third row
+#: and the letters follow the flow of information rather than the reference
+#: page's order:
+#:
+#:   left column   a setup, b model selection, c predictive check (a pair of
+#:                 polar plots, one per model)
+#:   right column  d, e, f: the same hypothesis test at three levels -
+#:                 predictive density at the hypotheses (polar), the two
+#:                 hypotheses compared at population level, then at individual
+#:                 level
+#:
+#: So the panels the reference page drew as c and d are letters d and e here,
+#: and keep their measured geometry exactly. Panels a and b keep theirs. Only c
+#: (a pair of polars, where the reference page had nothing) and f (panel e's
+#: inset, taller, because the swarm needs the height for its stacks) are new.
 ROW_3_TOP = 600.0
-ROW_3_H = 345.0
-#: The swarm's dots.  ``SWARM_DOT_PT`` is the drawn diameter in points and
-#: ``SWARM_PACK_GAP`` the packing clearance as a multiple of it: at gap 1.0 the
-#: dots only just touch, and the densely-populated vectorial-encoding row
-#: merges into a solid block of squares, so they are packed 20 % further apart
-#: than they are drawn.  PANEL_F's height is the height that packing asks for
-#: (4 * the stack reach + 4 * the clearance = 216 pt at this panel width),
-#: because the house function sets its y limits in points: at any other height
-#: the packing it computes is not the packing that gets drawn.
-SWARM_DOT_PT = 5.0
-SWARM_PACK_GAP = 1.2
-#: where the reference page's second row starts (the y of its b. and d. letters);
-#: panel d sits 43.1 pt below it, and panel f the same below row three
+ROW_3_H = PAGE_H - ROW_3_TOP
+#: where the reference page's second row starts (the y of its b. and d.
+#: letters); panel e sits 43.1 pt below it, and panel f the same below row three
 ROW_2_TOP = 358.743
 PANEL_F_INSET_Y = PANEL_D[1] - ROW_2_TOP
-PANEL_F = (577.2, ROW_3_TOP + PANEL_F_INSET_Y, 296.0, 216.0)
-POLAR_E_CENTER = (245.0, ROW_3_TOP + POLAR_CENTER[1])   # c's offset within its row
-POLAR_E_R_OUT = POLAR_R_OUT
-#: Panel e's legend, at the reference legend's offset above the polar circle
-#: (LEGEND_BOX sits 142.9 pt above panel c's centre), mirrored to the left of
-#: the polar because panel e owns the page's left half, and brought to the
-#: page's left margin.  Its band (663-712 pt) clears the letter e. (to 649.5)
-#: and the r = 1.0 circle (whose leftmost point at that height is x = 173).
-PANEL_E_LEGEND = (31.82, ROW_3_TOP + 63.42)
 
-#: Titles and panel letters.  ``assets/locust_circ_stats/panel_a.json`` keeps
-#: the reference page's wording; panel c's title is renamed at draw time
-#: because the panel now shows the model's predictive density and the two
-#: hypothesis densities, not the model-versus-data check (that is panel e).
-#: The row below the reference page needs letters and titles of its own, in
-#: the same style as a-d: 32 pt bold letters and 17 pt titles at the same
-#: offsets from the row top (13.74 and 21.465 pt).
-SPAN_TITLE_RENAMES = {"Population-level predictive check": "Predictive density"}
+#: The swarm's dots. ``SWARM_DOT_PT`` is the drawn diameter in points and
+#: ``SWARM_PACK_GAP`` the packing clearance as a multiple of it: at gap 1.0 the
+#: dots only just touch, and the densely-populated vectorial-encoding row - all
+#: 52 animals within 1.2 ELPD - merges into a solid block of squares.
+#: PANEL_F's height is set from the packing itself at draw time (see build):
+#: the house function works in points, so any other height draws a packing it
+#: did not compute.
+SWARM_DOT_PT = 4.5
+SWARM_PACK_GAP = 1.25
+PANEL_F = (577.2, ROW_3_TOP + PANEL_F_INSET_Y, 296.0, 1.0)
+
+#: The predictive-check pair: one polar per model, each showing that model's
+#: replicated posterior-predictive heading density against the observed KDE, so
+#: the reading is "does each model reproduce the data's shape", one model at a
+#: time.  They are much smaller than panel d's polar (68 pt against 118.7)
+#: because the two have to share the page's left half with their horizontal
+#: tick labels: the left "±180°" label (43 pt wide at this type size) has to
+#: start at the same 30-odd pt margin as the panel letters, the right "0°"
+#: label has to stop short of panel f's row labels (x ~ 472), and the left
+#: polar's "0°" has to clear the right polar's "±180°" in the middle.
+POLAR_PAIR_R_OUT = 68.0
+POLAR_PAIR_CENTRES = ((152.0, 759.0), (373.0, 759.0))
+POLAR_PAIR_DATA_KEY = (262.5, 873.0)      # "Data" key, centred under the pair
+
+#: Titles and panel letters.  The reference page's letters and titles come out
+#: of ``panel_a.json`` in Helvetica Neue at the reference's weight; they are
+#: filtered at draw time and redrawn here, because the flow (and so three of
+#: the six titles) is ours.  Style as the reference: 32 pt bold letters and
+#: 17 pt titles at 13.74 and 21.465 pt from the row top - but bold, matching
+#: the bat composite's panel titles.
 PANEL_TITLES = (
-    ("Predictive check", POLAR_E_CENTER[0] + 42.8, ROW_3_TOP + 21.465),
-    ("Individual hypothesis testing", 716.3, ROW_3_TOP + 21.465),
+    ("Model selection", 292.8, 366.465),
+    ("Predictive check", 0.5 * (POLAR_PAIR_CENTRES[0][0] + POLAR_PAIR_CENTRES[1][0]),
+     ROW_3_TOP + 21.465),
+    ("Hypothesis testing: predictive density", 657.9, 21.465),
+    ("Hypothesis testing: population level", 716.3, 366.465),
+    ("Hypothesis testing: individual level", 716.3, ROW_3_TOP + 21.465),
 )
-PANEL_LETTERS = (("e.", 31.82, ROW_3_TOP + 13.74),
-                 ("f.", 459.05, ROW_3_TOP + 13.74))
+PANEL_LETTERS = (
+    ("a.", 31.823, 13.743),
+    ("b.", 30.948, ROW_2_TOP + 13.74),
+    ("c.", 31.823, ROW_3_TOP + 13.74),
+    ("d.", 459.922, 12.639),
+    ("e.", 459.047, ROW_2_TOP + 13.74),
+    ("f.", 459.047, ROW_3_TOP + 13.74),
+)
+#: the reference page's own letters and titles, filtered out of the panel-a
+#: spans so only the labels inside its artwork ("Virtual swarm", "Optic flow",
+#: ...) are replayed as drawn
+SPAN_DROP_TEXTS = {"a.", "b.", "c.", "d.", "Model selection",
+                   "Population-level predictive check", "Hypothesis testing"}
 TITLE_SZ, LETTER_SZ = 17.0, 32.0
 EDGE_RADIUS = 0.5                       # density zero, on the reference circle
 
@@ -188,6 +224,7 @@ PANEL_F_XTICKS = [-6.0, -5.0, -4.0, -3.0, -2.0, -1.0]
 #: house panels sit on the same visual scale as panel a.
 TYPE_SZ = 17.0
 LEGEND_SZ = 15.0
+KEY_SZ = 13.0   # the predictive-check pair's centre labels and "Data" key
 LINE_W = 2.09
 TICK_LEN = 6.3
 MARK_SCALE = 2.09   # marker/cap/elinewidth factor in the reference figure's dots
@@ -488,7 +525,9 @@ def draw_panel_a(ax, spec):
 
     for s in spec["spans"]:
         color = f"#{s['color']:06x}"
-        text = SPAN_TITLE_RENAMES.get(s["text"], s["text"]).replace("\u2028", "\n")
+        if s["text"] in SPAN_DROP_TEXTS:      # letters and titles are redrawn
+            continue                          # by draw_panel_titles, in our flow
+        text = s["text"].replace("\u2028", "\n")
         ax.text(s["bbox"][0], s["bbox"][1], text,
                 fontsize=s["size"], color=color, va="top", ha="left",
                 family="Arial",
@@ -497,11 +536,18 @@ def draw_panel_a(ax, spec):
 
 
 def draw_panel_titles(stage):
-    """Titles and panel letters for the row below the reference page, in the
-    same styles a-d are replayed in."""
+    """Panel letters and titles for the six-panel page.
+
+    The reference page draws its own letters and titles, and its geometry is
+    replayed for panels a, b and the two hypothesis panels; the texts are
+    filtered out of that replay and redrawn here, because the flow of the
+    figure (and so the wording of three of the titles) is ours.  Sizes and
+    offsets are the reference page's - 32 pt bold letters, 17 pt titles at
+    13.74 / 21.465 pt from the row top - but the titles are bold, as the bat
+    composite's are."""
     for text, x, y in PANEL_TITLES:
         stage.text(x, y, text, fontsize=TITLE_SZ, family="Arial", ha="center",
-                   va="top", zorder=100)
+                   va="top", fontweight="bold", zorder=100)
     for text, x, y in PANEL_LETTERS:
         stage.text(x, y, text, fontsize=LETTER_SZ, family="Arial",
                    fontweight="bold", ha="left", va="top", zorder=100)
@@ -520,17 +566,17 @@ MODEL_LW = 2.9
 DATA_LW = 2.9
 DATA_DASHES = (10.736325 / DATA_LW, 4.6427357 / DATA_LW)   # matplotlib scales by lw
 BAND_ALPHA = 0.25
-DATA_BAND_ALPHA = 0.12   # panel e: the observed band lies over two model bands
-#: panel c's model band is context behind the hypothesis markers, so it sits
-#: lighter than panel e's, where the bands are the subject.  Its dashed
-#: uniform circle carries panel d's line weight (house 1.0 pt at MARK_SCALE).
+DATA_BAND_ALPHA = 0.12   # panels c and d: the observed band lies under its line
+#: panel d's model band is context behind the hypothesis markers, so it sits
+#: lighter than panel c's, where the bands are the subject.  Its dashed
+#: uniform circle carries panel e's line weight (house 1.0 pt at MARK_SCALE).
 MODEL_BAND_ALPHA = 0.15
 MODEL_LINE_LW = 1.6
 MODEL_LINE_ALPHA = 0.45
 UNIFORM_LW = MARK_SCALE
-#: panel c's hypothesis markers, which draw panel d's two estimates.  Panel d
+#: panel d's hypothesis markers, which draw panel e's two estimates.  Panel e
 #: draws them 12.5 pt across, but there one density unit is 118.7 pt against
-#: panel d's 1096: at 12.5 pt the optic-flow marker's edge would come within
+#: panel e's 1096: at 12.5 pt the optic-flow marker's edge would come within
 #: 3.5 pt of the dashed uniform circle (centre 9.8 pt away), so it would read as
 #: sitting on the reference.  10 pt keeps a 4.8 pt gap there and 4.0 pt from
 #: the r = 0.5 circle.
@@ -540,9 +586,9 @@ ARROW_LW = 4.0
 #: The page's arrow style, measured off the reference PDF: a 4.0 pt shaft
 #: closed by a triangular head whose base and length are both 16.8 pt (panel
 #: a's swarm arrows are the same shape at 3.0 pt shaft / 13.2 pt head).
-#: Panel c's tips sit 47.96 pt (forward) and 50.22 / 49.97 pt (the two
+#: Panel d's tips sit 47.96 pt (forward) and 50.22 / 49.97 pt (the two
 #: sideways heads) out from the polar centre.  These arrows are drawn as
-#: explicit paths so panel c uses panel a's arrow rather than matplotlib's
+#: explicit paths so panel d uses panel a's arrow rather than matplotlib's
 #: "-|>" head, which is blunter and shorter at the same nominal size.
 ARROW_HEAD = 16.8
 ARROW_TIP_R = {0.0: 47.96, np.pi / 2: 50.22, -np.pi / 2: 49.97}
@@ -563,20 +609,8 @@ POLAR_TICK_LABELS = (
     (-122.54, -1.58, "right", "±180°"),
 )
 
-#: legend box measured from the reference PDF: 97.9 x 48.5 pt, the handle band
-#: 30.95 pt across (the house handler draws the line 10 % longer), rows 21.9 pt
-#: apart. matplotlib's legend bbox starts half a font size inside the anchor.
-LEGEND_BOX = (741.44, 63.42, 839.35, 111.89)
-LEGEND_HANDLE_LEN = 30.95 / LEGEND_SZ
-LEGEND_TEXT_PAD = 0.902          # 13.5 pt gap between handle and label
-LEGEND_BORDERPAD = 0.31          # 4.65 pt inside the frame
-LEGEND_LABELSPACING = 0.52
-LEGEND_ANCHOR_PAD = 0.5 * LEGEND_SZ
-LEGEND_FRAME_LW = 1.93
-LEGEND_FRAME_COLOUR = "0.8"
 
-
-def _page_polar_axes(fig, centre, r_out, ylim_max):
+def _page_polar_axes(fig, centre, r_out, ylim_max, tick_labels=None):
     """A polar axes on the page's grid, calibrated so that the r = 1.0 grid
     circle is a circle of ``r_out`` points about ``centre``.
 
@@ -584,9 +618,12 @@ def _page_polar_axes(fig, centre, r_out, ylim_max):
     the axes transform: the polar projection fits its radius to the box and
     the y limit together, so the first placement is only an estimate. The
     reference's black r = 0.5 circle (density zero), grid and tick labels come
-    with it; the labels are figure text at ``POLAR_TICK_LABELS`` offsets from
-    the centre, scaled with the radius, so they clear the grid the way they do
-    on the reference page."""
+    with it; the labels are figure text, so they clear the grid the way they do
+    on the reference page.  ``tick_labels`` is a (dx, dy, ha, text) sequence in
+    points from the centre; it defaults to ``POLAR_TICK_LABELS`` (measured at
+    the reference radius) scaled with the radius, which suits a polar of a
+    similar size - a smaller panel sharing its column should pass labels
+    hugging its own circle instead."""
     ax = fig.add_axes([0, 0, 1, 1], projection="polar")
     ax.set_ylim(0, ylim_max)
     ax.set_xlim(-np.pi, np.pi)
@@ -609,24 +646,27 @@ def _page_polar_axes(fig, centre, r_out, ylim_max):
     ax.set_xticklabels(["", "", "", ""])
     ax.tick_params(axis="x", pad=-4)
 
-    scale = r_out / POLAR_R_OUT
-    for dx, dy, ha, label in POLAR_TICK_LABELS:
-        fig.text((centre[0] + dx * scale) / PAGE_W,
-                 (PAGE_H - (centre[1] + dy * scale)) / PAGE_H, label,
+    if tick_labels is None:
+        scale = r_out / POLAR_R_OUT
+        tick_labels = [(dx * scale, dy * scale, ha, text)
+                       for dx, dy, ha, text in POLAR_TICK_LABELS]
+    for dx, dy, ha, label in tick_labels:
+        fig.text((centre[0] + dx) / PAGE_W,
+                 (PAGE_H - (centre[1] + dy)) / PAGE_H, label,
                  ha=ha, va="center", fontsize=TYPE_SZ, zorder=8)
     return ax
 
 
-def draw_population_polar(fig, trace_bimodal, df):
-    """Population-level hypothesis test on the polar axes: the bimodal fit's
+def draw_hypothesis_polar(fig, trace_bimodal, df):
+    """Panel d: the hypothesis test on the polar axes - the bimodal fit's
     posterior-predictive direction density (``locust_posthoc
     .population_validation_stats``, faint, for context) with the two
-    hypothesis densities of panel d marked at the directions they describe -
+    hypothesis densities of panel e marked at the directions they describe -
     optic flow (forward) as a blue circle at 0 degrees, vectorial encoding
     (sideways) as orange squares at both +/-90 degrees - against the uniform
     reference, which here is the dashed circle at 1/(2*pi). The markers,
-    colours and shapes are panel d's, so c reads as d's polar twin; the
-    intervals stay in panel d, where the scale can show them."""
+    colours and shapes are panel e's, so d reads as e's polar twin; the
+    intervals stay in panel e, where the scale can show them."""
     stats = posthoc.population_validation_stats(trace_bimodal, df)
     hyp = posthoc.hypothesis_density_stats(trace_bimodal)
     angles = stats["angles"]
@@ -637,26 +677,26 @@ def draw_population_polar(fig, trace_bimodal, df):
     ax = _page_polar_axes(fig, POLAR_CENTER, POLAR_R_OUT, ylim_max)
 
     # the model's predictive density behind the hypotheses. The observed-data
-    # band this panel used to carry is gone: with panel e checking both
-    # models' predictive densities against the data, it was panel e's band
-    # again, and c's job is where the two hypotheses sit.
+    # band this panel used to carry is gone: panel c checks each model's
+    # predictive density against the data, and this panel's job is where the
+    # two hypotheses sit.
     ax.fill_between(angles, EDGE_RADIUS + density_lower,
                     EDGE_RADIUS + density_upper, color=plots.BIMODAL,
                     alpha=MODEL_BAND_ALPHA, edgecolor="none", zorder=2)
     ax.plot(angles, EDGE_RADIUS + density_median, color=plots.BIMODAL,
             linewidth=MODEL_LINE_LW, alpha=MODEL_LINE_ALPHA, zorder=3)
 
-    # the uniform reference: panel d's dashed line, as the polar twin
+    # the uniform reference: panel e's dashed line, as the polar twin
     ax.add_artist(PathPatch(
         Path.circle((0, 0), EDGE_RADIUS + float(hyp["p_uniform"])),
         transform=ax.transData._b, fill=False, edgecolor="black",
         linewidth=UNIFORM_LW, linestyle=(0, UNIFORM_DASH), zorder=4))
 
-    # the hypothesis densities of panel d at their directions; the
+    # the hypothesis densities of panel e at their directions; the
     # perpendicular hypothesis is symmetric, so it marks both sideways axes.
     # Point estimates only: one density unit is 118.7 pt here against panel
-    # d's 1096, so the +/-0.03 HDIs would be 3.6 pt long - shorter than the
-    # marker - and panel d is where the intervals are read.
+    # e's 1096, so the +/-0.03 HDIs would be 3.6 pt long - shorter than the
+    # marker - and panel e is where the intervals are read.
     centers = np.asarray(hyp["centers"], dtype=float)
     for thetas, i, color, marker in (((0.0,), 0, plots.UNIMODAL, "o"),
                                      ((-np.pi / 2, np.pi / 2), 1, plots.BIMODAL, "s")):
@@ -665,7 +705,7 @@ def draw_population_polar(fig, trace_bimodal, df):
                 markeredgecolor=color, markeredgewidth=MARK_SCALE, zorder=6)
 
     # optic-flow (forward, +x) and vectorial-encoding (sideways, ±y) arrows,
-    # drawn in the page's own arrow style (see ARROW_HEAD) so panel c reads
+    # drawn in the page's own arrow style (see ARROW_HEAD) so panel d reads
     # like panel a.  They go on a page-point overlay rather than on the polar
     # axes: the measured triangle heads come out exact in page coordinates,
     # and nothing needs to survive a polar transform.
@@ -689,9 +729,9 @@ def draw_population_polar(fig, trace_bimodal, df):
         overlay.add_patch(Polygon(head, closed=True, facecolor=color,
                                   edgecolor="none", zorder=6))
 
-    # no legend: the marker colours and shapes are panel d's row labels
+    # no legend: the marker colours and shapes are panel e's row labels
     # ("Optic flow" / "Vec. encoding"), directly below, and the dashed circle
-    # is the same reference panel d labels.
+    # is the same reference panel e labels.
     plotted = {
         "model_density_max": float(np.max(density_median)),
         "model_density_max_angle_deg": float(
@@ -706,87 +746,96 @@ def draw_population_polar(fig, trace_bimodal, df):
                  np.asarray(hyp["centers"])[1], np.asarray(hyp["xerr"])[1]))
         ],
         "uniform_density_reference": float(hyp["p_uniform"]),
-        "note": "observed-data band omitted; panel e draws it for both models",
+        "note": "observed-data band omitted; panel c draws it for each model",
     }
     return ax, plotted
 
 
-def draw_population_predictive_polar(fig, trace_bimodal, trace_unimodal, df,
-                                     centre, r_out):
-    """Population predictive check for both models at once, on panel c's
-    polar axes and radius convention: each model's replicated
-    posterior-predictive direction density (von Mises KDE median + 2.5/97.5
-    band across the shared replicates, ``locust_posthoc
-    .both_models_ppc_stats``) in the model's colour, against the observed
-    bootstrap KDE in black dashed. The histogram estimate of the notebook's
-    cartesian comparison is left out - on a polar axis the reading is the
-    shape of the two bands against the data, not their bin-by-bin error bars.
+def _pair_tick_labels(r_out):
+    """The predictive-check pair's polar tick labels, a fixed distance outside
+    their own r = 1.0 grid circle.  The reference page's offsets
+    (``POLAR_TICK_LABELS``) are measured at its radius; scaled down by the
+    pair's smaller radius they would run the left "±180°" label off the page
+    and slide the right "0°" label under panel f's row labels.  The clearances
+    here are the reference page's own: its labels sit 3.8-5.5 pt beyond the
+    circle horizontally and 9.5-14 pt beyond it vertically."""
+    return ((0.0, -(r_out + 14.0), "center", "90°"),
+            (r_out + 5.5, 0.0, "left", "0°"),
+            (0.0, r_out + 9.5, "center", "−90°"),
+            (-(r_out + 3.8), 0.0, "right", "±180°"))
 
-    Drawn here rather than by the house ``plot_predictive_both_models_polar``
-    for the same reason as panel c: the page's grid weights, band alphas and
+
+def draw_predictive_pair(fig, stage, trace_bimodal, trace_unimodal, df):
+    """Panel c: the predictive check as a pair of polar plots, one per model.
+
+    Each polar carries one model's replicated posterior-predictive direction
+    density (von Mises KDE median + 2.5/97.5 band across the shared
+    replicates, ``locust_posthoc.both_models_ppc_stats``) against the observed
+    bootstrap KDE, on panel d's radius convention - density zero on the
+    r = 0.5 circle.  Splitting the models is the point: on a single axis the
+    two bands lie so close together that the only reading is which is nearer
+    the data, and the shape each model reproduces is lost.
+
+    The observed KDE is drawn as a *solid* line, where the reference page and
+    the house panels draw data dashed.  On this page dashed is the uniform
+    reference - panel d's circle, panels e and f's vertical lines - and a
+    dashed data line reads as a second uniform sitting next to the one it is
+    being compared to.
+
+    Drawn here rather than by the house ``plot_predictive_models_polar`` for
+    the same reason as panel d: the page's grid weights, band alphas and
     tick-label positions are measured, and the house polar puts its labels on
     the grid circle."""
     stats = posthoc.both_models_ppc_stats(trace_bimodal, trace_unimodal, df)
     obs = posthoc.bootstrap_von_mises_kde_stats(df)
     angles = stats["population_angles"]
-    bimodal, unimodal = stats["Bimodal"], stats["Unimodal"]
 
-    ylim_max = EDGE_RADIUS + 1.2 * max(np.max(bimodal["kde_upper"]),
-                                       np.max(unimodal["kde_upper"]),
+    ylim_max = EDGE_RADIUS + 1.2 * max(np.max(stats["Bimodal"]["kde_upper"]),
+                                       np.max(stats["Unimodal"]["kde_upper"]),
                                        np.max(obs["kde_upper_bounds"]))
-    ax = _page_polar_axes(fig, centre, r_out, ylim_max)
-
-    line_bimodal, = ax.plot(angles, EDGE_RADIUS + bimodal["kde_median"],
-                            color=plots.BIMODAL, linewidth=MODEL_LW, zorder=5)
-    ax.fill_between(angles, EDGE_RADIUS + bimodal["kde_lower"],
-                    EDGE_RADIUS + bimodal["kde_upper"], color=plots.BIMODAL,
-                    alpha=BAND_ALPHA, edgecolor="none", zorder=2)
-    line_unimodal, = ax.plot(angles, EDGE_RADIUS + unimodal["kde_median"],
-                             color=plots.UNIMODAL, linewidth=MODEL_LW, zorder=4)
-    ax.fill_between(angles, EDGE_RADIUS + unimodal["kde_lower"],
-                    EDGE_RADIUS + unimodal["kde_upper"], color=plots.UNIMODAL,
-                    alpha=BAND_ALPHA, edgecolor="none", zorder=1)
-    line_data, = ax.plot(obs["kde_angles"], EDGE_RADIUS + obs["kde_median"],
-                         color="black", linestyle="--", linewidth=DATA_LW,
-                         dashes=DATA_DASHES, zorder=6)
-    # the observed band sits over both model bands, so it is lighter than
-    # panel c's, where it shares the axis with one band only
-    ax.fill_between(obs["kde_angles"], EDGE_RADIUS + obs["kde_lower_bounds"],
-                    EDGE_RADIUS + obs["kde_upper_bounds"], color="black",
-                    alpha=DATA_BAND_ALPHA, edgecolor="none", zorder=3)
-
-    leg = ax.legend(
-        [line_bimodal, line_unimodal, line_data],
-        ["Bimodal", "Unimodal", "Data"],
-        handler_map={
-            line_bimodal: plots._density_legend_handler(plots.BIMODAL, "-",
-                                                        BAND_ALPHA, MODEL_LW),
-            line_unimodal: plots._density_legend_handler(plots.UNIMODAL, "-",
-                                                         BAND_ALPHA, MODEL_LW),
-            line_data: plots._density_legend_handler("black", "--",
-                                                     DATA_BAND_ALPHA, DATA_LW),
-        },
-        loc="upper left", frameon=True, fontsize=LEGEND_SZ,
-        handlelength=LEGEND_HANDLE_LEN, borderpad=LEGEND_BORDERPAD,
-        handletextpad=LEGEND_TEXT_PAD, labelspacing=LEGEND_LABELSPACING,
-        bbox_to_anchor=((PANEL_E_LEGEND[0] - LEGEND_ANCHOR_PAD) / PAGE_W,
-                        (PAGE_H - PANEL_E_LEGEND[1] + LEGEND_ANCHOR_PAD) / PAGE_H),
-        bbox_transform=fig.transFigure,
-    )
-    leg.get_frame().set_edgecolor(LEGEND_FRAME_COLOUR)
-    leg.get_frame().set_linewidth(LEGEND_FRAME_LW)
 
     def _peak(median, grid):
         return {"max": float(np.max(median)),
                 "max_angle_deg": float(np.degrees(grid[int(np.argmax(median))]))}
 
-    plotted = {
-        "bimodal": _peak(bimodal["kde_median"], angles),
-        "unimodal": _peak(unimodal["kde_median"], angles),
-        "data": _peak(obs["kde_median"], obs["kde_angles"]),
-        "estimate": "von Mises KDE, histogram estimate omitted",
-    }
-    return ax, plotted
+    plotted = {}
+    for (name, colour), centre in zip((("Bimodal", plots.BIMODAL),
+                                       ("Unimodal", plots.UNIMODAL)),
+                                      POLAR_PAIR_CENTRES):
+        model = stats[name]
+        ax = _page_polar_axes(fig, centre, POLAR_PAIR_R_OUT, ylim_max,
+                              tick_labels=_pair_tick_labels(POLAR_PAIR_R_OUT))
+        ax.set_zorder(5)
+        ax.fill_between(angles, EDGE_RADIUS + model["kde_lower"],
+                        EDGE_RADIUS + model["kde_upper"], color=colour,
+                        alpha=BAND_ALPHA, edgecolor="none", zorder=2)
+        ax.plot(angles, EDGE_RADIUS + model["kde_median"], color=colour,
+                linewidth=MODEL_LW, zorder=5)
+        # the data over the model band, solid: see the docstring
+        ax.fill_between(obs["kde_angles"], EDGE_RADIUS + obs["kde_lower_bounds"],
+                        EDGE_RADIUS + obs["kde_upper_bounds"], color="black",
+                        alpha=DATA_BAND_ALPHA, edgecolor="none", zorder=3)
+        ax.plot(obs["kde_angles"], EDGE_RADIUS + obs["kde_median"],
+                color="black", linewidth=DATA_LW, zorder=6)
+        # r = 0 sits below the axis limit (density zero is r = 0.5), so the
+        # label is explicitly unclipped
+        ax.text(0.0, 0.0, name, color=colour, fontsize=KEY_SZ, ha="center",
+                va="center", zorder=7, clip_on=False,
+                bbox=dict(facecolor="white", edgecolor="none", pad=1.2))
+        plotted[name.lower()] = _peak(model["kde_median"], angles)
+
+    # one key for the pair: what the solid black line is
+    key_x, key_y = POLAR_PAIR_DATA_KEY
+    stage.plot([key_x - 15.5, key_x + 15.5], [key_y, key_y], color="black",
+               linewidth=DATA_LW, solid_capstyle="butt", zorder=6,
+               clip_on=False)
+    stage.text(key_x + 21.0, key_y, "Data", fontsize=KEY_SZ, family="Arial",
+               ha="left", va="center", zorder=6)
+
+    plotted["data"] = _peak(obs["kde_median"], obs["kde_angles"])
+    plotted["estimate"] = "von Mises KDE, histogram estimate omitted"
+    plotted["data_line"] = "solid (dashed is the uniform reference on this page)"
+    return plotted
 
 
 # ---------------------------------------------------------------------------
@@ -927,24 +976,34 @@ def build_figure():
     panel_d.ax.set_xlim(lo_d - PANEL_D_PAD, hi_d + PANEL_D_PAD)
     panel_d.ax.set_xticks(PANEL_D_XTICKS)
 
-    # panel c
-    ax_c, polar_plotted = draw_population_polar(fig, trace_bimodal, df)
-    ax_c.set_zorder(5)
+    # panel d (the reference page's c): the hypothesis test on the
+    # predictive-density scale, polar, with the two hypothesis densities
+    # marked at their angles
+    ax_d, polar_plotted = draw_hypothesis_polar(fig, trace_bimodal, df)
+    ax_d.set_zorder(5)
 
-    # panel e: the same population check for both models, polar, KDE only
-    ax_e, predictive_plotted = draw_population_predictive_polar(
-        fig, trace_bimodal, trace_unimodal, df, POLAR_E_CENTER, POLAR_E_R_OUT)
-    ax_e.set_zorder(5)
+    # panel c: the predictive check, one polar per model against the data;
+    # sets its own axes zorder
+    predictive_plotted = draw_predictive_pair(fig, stage, trace_bimodal,
+                                              trace_unimodal, df)
     stage.set_zorder(0)
 
-    # panel f: the hypothesis test of panel d, one dot per animal.  The
-    # uniform reference is drawn but not labelled here - panel d labels the
-    # same line (on the density scale) directly above.
+    # panel f: the hypothesis test of panel e, one dot per animal.  The
+    # uniform reference is drawn but not labelled here - panel e labels the
+    # same line (on the density scale) directly above.  The axes starts 1 pt
+    # tall: the house swarm sets its y limits in points from its own packing,
+    # and a polar/axes in points only draws 1 unit per point when the box
+    # height equals the limit span, so the panel height is read back from the
+    # limits and the axes re-placed.  (The height cannot be predicted from
+    # the dot size alone: the greedy packer's stack reach is not monotonic in
+    # the packing distance.)
     with _house_panel(fig, PANEL_F, dash=UNIFORM_DASH) as panel_f:
         plots.plot_hypothesis_elpd_swarm(
             trace_bimodal, save=False, dot_pt=SWARM_DOT_PT,
             pack_gap=SWARM_PACK_GAP, xlim=PANEL_F_XLIM, xticks=PANEL_F_XTICKS,
             uniform_label=False)
+    f_x, f_y, f_w, _ = PANEL_F
+    _place(panel_f.ax, (f_x, f_y, f_w, abs(panel_f.ax.get_ylim()[0]) * 2))
 
     hip = posthoc.hypothesis_elpd_individual_stats(trace_bimodal)
     n_ind = int(hip["n_ind"])
@@ -984,8 +1043,8 @@ def build_figure():
                                           np.asarray(stats["xerr"]))
         ],
         "uniform_density_reference": float(stats["p_uniform"]),
-        "population_polar": polar_plotted,
-        "population_predictive_polar": predictive_plotted,
+        "hypothesis_polar": polar_plotted,
+        "predictive_pair": predictive_plotted,
         "hypothesis_elpd_individual": individual_hypothesis,
         "observations": int(len(df)),
         "individuals": int(pd.Series(df["animal_id"]).nunique()),
@@ -1027,8 +1086,10 @@ def provenance(plotted):
     packages = ("numpy", "scipy", "pandas", "matplotlib", "arviz", "pymc",
                 "pytensor", "xarray", "pillow")
     return {
-        "figure": "locust circular-statistics composite (panels a-d, plus e-f "
-                  "below the reference page)",
+        "figure": "locust circular-statistics composite (the reference page's "
+                  "panels with the letters following this figure's information "
+                  "flow: a setup, b model selection, c predictive check, d-f "
+                  "hypothesis testing)",
         "page_points": [PAGE_W, PAGE_H],
         "code_revision": _git_revision(REPO),
         "data_repository": "jgraving/unwrap-data",
@@ -1051,49 +1112,71 @@ def provenance(plotted):
             "panel a records 34 path primitives: the first extraction pass kept "
             "paths above y = 300 pt only and missed the two grey flight arrows of "
             "the bottom swarm's second row (y = 301-321 pt).",
-            "panel c's arrows are drawn as a shaft plus a 16.8 pt triangular head "
+            "the panel letters and titles are not replayed from panel_a.json: "
+            "the reference page's four letters and three titles are filtered out "
+            "of the span replay and redrawn, because the flow (and so the "
+            "wording of three of the titles) is ours.  Sizes and offsets are the "
+            "reference's - 32 pt bold letters and 17 pt titles at 13.74 and "
+            "21.465 pt from the row top - but the titles are bold, matching the "
+            "bat composite's panel titles.",
+            "panel d's arrows are drawn as a shaft plus a 16.8 pt triangular head "
             "in page points, i.e. panel a's arrow style; matplotlib's \"-|>\" head "
             "is blunter and shorter at the same nominal size.",
-            "panel c's polar tick labels are placed at their reference page "
+            "panel d's polar tick labels are placed at their reference page "
             "positions: matplotlib puts polar tick labels on the grid circle, which "
             "lands \"±180°\" on top of the 180° grid line.",
             "panel b prints four ELPD ticks where the reference page prints three, "
             "because our axis spans to -3581.7 rather than -3549.6.",
-            "panel c is not the reference page's panel any more: the observed-data "
-            "band is gone (that comparison is panel e's, where both models' "
-            "predictive densities meet the data), the bimodal predictive density "
-            "stays as faint context, and the two hypothesis densities of panel d "
-            "are marked at their directions - optic flow at 0 degrees, vectorial "
-            "encoding at both +/-90 - against the uniform reference, drawn as a "
-            "dashed circle.  The markers are point estimates only: their +/-HDIs "
-            "would be 3.6 pt long at the polar's scale (shorter than a marker), "
-            "so panel d remains the place the intervals are read.  Its title is "
-            "renamed from the reference page's \"Population-level predictive "
-            "check\" to \"Predictive density\" accordingly; panel_a.json keeps "
-            "the reference wording.",
-            "panel e repeats panel c's polar geometry exactly (r = 1.0 circle 118.7 "
-            "pt, centre 206.3 pt below its row's top), which is why the third row "
-            "is the reference's own row height of 345 pt: like panel c, the polar's "
-            "tick labels need 261 pt of height, and the row title sits above them.  "
-            "Its legend takes the reference legend's clearance of 142.9 pt above the "
-            "polar circle, mirrored onto the page's left half.",
-            "panel f's axes is 216 pt tall against panel d's 97.9: the house swarm "
-            "sets its y limits in points (4 * the stack reach + 4 * the packing "
-            "clearance), and the axes height has to equal that number, or the "
-            "packing the function computes is not the packing that gets drawn.  "
-            "Dots are drawn 5.0 pt and packed 6.0 pt apart: packed at their own "
-            "size they only touch, and the vectorial-encoding row, where all 52 "
-            "animals fall within 1.2 ELPD, then reads as one solid block.",
+            "panel d (the reference page's c) is not the reference page's panel "
+            "any more: the observed-data band is gone (that comparison is panel "
+            "c's, where each model's predictive density meets the data), the "
+            "bimodal predictive density stays as faint context, and the two "
+            "hypothesis densities of panel e are marked at their directions - "
+            "optic flow at 0 degrees, vectorial encoding at both +/-90 - against "
+            "the uniform reference, drawn as a dashed circle.  The markers are "
+            "point estimates only: their +/-HDIs would be 3.6 pt long at the "
+            "polar's scale (shorter than a marker), so panel e remains the place "
+            "the intervals are read.",
+            "panel c is a pair of polar plots, one per model, each against the "
+            "observed bootstrap KDE - the reference page had nothing there.  The "
+            "observed KDE is drawn solid rather than the dashed line of the "
+            "reference and the house panels: on this page dashed is the uniform "
+            "reference (panel d's circle, panels e and f's vertical lines), and "
+            "a dashed data line reads as a second uniform.  Splitting the models "
+            "is the point: on a shared axis the two bands lie so close together "
+            "that the only reading is which is nearer the data.",
+            "panel c's polars are 68 pt radius against panel d's 118.7, so the "
+            "two can share the page's left half with their horizontal tick "
+            "labels; their labels sit at the reference page's own clearances "
+            "(3.8-5.5 pt beyond the circle horizontally, 9.5-14 pt vertically) "
+            "rather than its offsets scaled down, which would run the left "
+            "\"±180°\" label off the page.",
+            "panel c's polars are 85 pt radius against panel d's 118.7, so the "
+            "two can share the page's left half with their horizontal tick "
+            "labels; their labels sit at the reference page's own clearances "
+            "(3.8-5.5 pt beyond the circle horizontally, 9.5-14 pt vertically) "
+            "rather than its offsets scaled down, which would run the left "
+            "\"±180°\" label off the page.",
+            "panel f's axes height is read from the house swarm's own y limits "
+            "after it draws (4 * the stack reach + 4 * the packing clearance = "
+            "202.5 pt at dot 4.5 pt and gap 1.25) and the axes re-placed to it: "
+            "the swarm sets its limits in points, so the axes height has to "
+            "equal that number or the packing the function computes is not the "
+            "packing that gets drawn - and the height is not predictable from "
+            "the dot size alone, because the greedy packer's stack reach is not "
+            "monotonic in the packing distance.  Dots are packed 1.25 times "
+            "their own diameter apart: packed at their own size they only touch, "
+            "and the vectorial-encoding row, where all 52 animals fall within "
+            "1.2 ELPD, then reads as one solid block.",
         ],
         "known_differences": [
-            "The page is 900 x 945 pt against the reference's 900 x 600: panels "
-            "e and f are a row added below the reference figure's four, not a "
-            "redrawing of anything on its page, and they take letters, titles and "
-            "row height (345 pt, the reference's tallest row) in the reference's "
-            "own measures so panel e sits at panel c's size exactly.  Panels a, b "
-            "and d are unchanged and still fill the reference's 900 x 600 (their "
-            "text and drawing positions match the previous build; see "
-            "\"verification\"); c is redrawn (see corrections).",
+            "The page is 900 x 900 pt against the reference's 900 x 600: panels "
+            "c and f are new in a third row of 300 pt, and the letters follow "
+            "this figure's flow of information (setup, model selection, "
+            "predictive check, then hypothesis testing at three levels), so the "
+            "reference page's c and d are d and e here.  Their measured geometry "
+            "is kept exactly, as are panels a and b; all six sit within the "
+            "reference's 900 x 600 plus the new row.",
             "Text is set in Arial; the reference page uses Helvetica Neue, whose "
             "glyph widths differ by 1-4% at the same size and position.",
             "Panel b's cached unimodal fit gives ELPD -3533.40 +/- 38.34 where "
@@ -1101,17 +1184,17 @@ def provenance(plotted):
             "(-3404.51 +/- 39.27 against -3403.8 +/- 39.2).",
         ],
         "verification": {
-            "panels_a_b_d_against_the_previous_build": {
+            "reference_region_against_the_previous_build": {
                 "method": "text spans and drawing primitives within the reference "
-                          "page's own 900 x 600 (panel c excluded), compared "
-                          "between the previously committed PDF and this one",
-                "text_spans": "28 of 28 within 0.6 pt",
-                "drawing_primitives": "66 of 68 identical to 0.05 pt; the two that "
-                                      "move are the page background rectangle "
-                                      "(600 -> 945 pt) and one photo-layer fill, by "
-                                      "0.01 pt",
-                "png_note": "over the same region the committed PNG does differ "
-                            "(mean |difference| 8.5 of 255 over 4.3% of pixels): "
+                          "page's own 900 x 600, compared between the previously "
+                          "committed PDF and this one; the panel letters and "
+                          "titles are excluded, they are redrawn to this figure's "
+                          "flow",
+                "text_spans": "26 of 26 identical to 0.000 pt",
+                "drawing_primitives": "88 of 89 identical to 0.05 pt; the one that "
+                                      "moves is the page background rectangle "
+                                      "(945 -> 900 pt)",
+                "png_note": "over the same region the committed PNG does differ: "
                             "matplotlib places every axes from the bottom of the "
                             "page, so changing the page height re-lays the raster "
                             "phase of the whole figure.  900 pt is exactly 3750 px "
@@ -1120,11 +1203,14 @@ def provenance(plotted):
                             "recoverable.",
             },
             "mean_abs_pixel_difference_against_reference_pdf": {
-                "panel_a": 15.9, "panel_b": 28.5, "panel_c": 34.5, "panel_d": 25.3,
-                "method": "300 dpi, over each panel's own page region, with the "
-                          "best shift within +/-4 px taken up; panel c is the one "
-                          "panel here drawn to a different brief than the "
-                          "reference's, so its number is not comparable.",
+                "panel_a": 5.2, "panel_b": 12.7, "panel_d": 12.9, "panel_e": 12.3,
+                "regions": "panel a: x 28-448, y 5-350; panel b: 28-448, 360-520; "
+                           "panel d: 455-880, 5-350; panel e: 455-880, 360-520 "
+                           "(pt, top-left origin); the regions include the redrawn "
+                           "bold titles, whose wording differs from the reference "
+                           "page's in d and e",
+                "method": "300 dpi, with the best shift within +/-4 px taken up.  "
+                          "Panels c and f are new and have no reference panel.",
             },
         },
     }

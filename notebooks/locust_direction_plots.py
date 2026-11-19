@@ -987,18 +987,24 @@ def plot_predictive_both_models_population(trace_bimodal, trace_unimodal, df,
     _save(fig, save, save_path)
 
 
-def plot_predictive_both_models_polar(trace_bimodal, trace_unimodal, df, *,
-                                      save=True,
-                                      save_path="figures/locust/population_predictive_both_models_polar.pdf"):
-    """Polar view of the population row of
-    ``plot_predictive_both_models_population``, KDE estimate only: both
-    models' replicated population heading densities (median + 2.5/97.5 band
-    across the shared replicates, in the model colours) with the observed
-    bootstrap von Mises KDE over them in black dashed, on the radius
+def plot_predictive_models_polar(trace_bimodal, trace_unimodal, df, *,
+                                 save=True,
+                                 save_path="figures/locust/population_predictive_models_polar_pair.pdf"):
+    """Population predictive check as a pair of polar plots, one per model:
+    each polar carries one model's replicated population heading density
+    (median + 2.5/97.5 band across the shared replicates, in the model
+    colour) against the observed bootstrap von Mises KDE, on the radius
     convention of ``plot_directional_validation_polar`` - density zero sits
-    on the reference circle at ``r = 0.5``. The histogram row of the
-    cartesian figure is left out: the point of the polar view is the shape
-    of the two model bands against the data."""
+    on the reference circle at ``r = 0.5``.
+
+    One model per polar because on a shared axis the two bands lie so close
+    together that the only reading is which is nearer the data; split, each
+    polar answers "does this model reproduce the shape of the data".  The
+    observed KDE is drawn *solid* rather than the dashed line of the other
+    house polars: on the publication page (panel c of
+    ``locust_circ_stats_figure``) dashed is the uniform reference, and the
+    figure and the notebook should read the same.  The histogram estimate of
+    ``plot_predictive_both_models_population`` is left out, as before."""
     stats = posthoc.both_models_ppc_stats(trace_bimodal, trace_unimodal, df)
     obs = posthoc.bootstrap_von_mises_kde_stats(df)
     angles = stats["population_angles"]
@@ -1008,49 +1014,44 @@ def plot_predictive_both_models_polar(trace_bimodal, trace_unimodal, df, *,
                np.nanmax(stats["Unimodal"]["kde_upper"]),
                np.nanmax(obs["kde_upper_bounds"]))
 
-    fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
-                           figsize=(3, 3), dpi=_plots.DEFAULT_DISPLAY_DPI)
+    fig, axes = plt.subplots(1, 2, subplot_kw={"projection": "polar"},
+                             figsize=(3, 3), dpi=_plots.DEFAULT_DISPLAY_DPI)
 
-    line_bimodal, = ax.plot(angles, edge_radius + stats["Bimodal"]["kde_median"],
-                            color=BIMODAL, linewidth=1.5, zorder=5)
-    ax.fill_between(angles, edge_radius + stats["Bimodal"]["kde_lower"],
-                    edge_radius + stats["Bimodal"]["kde_upper"],
-                    color=BIMODAL, alpha=0.2, edgecolor="none", zorder=2)
-    line_unimodal, = ax.plot(angles, edge_radius + stats["Unimodal"]["kde_median"],
-                             color=UNIMODAL, linewidth=1.5, zorder=4)
-    ax.fill_between(angles, edge_radius + stats["Unimodal"]["kde_lower"],
-                    edge_radius + stats["Unimodal"]["kde_upper"],
-                    color=UNIMODAL, alpha=0.2, edgecolor="none", zorder=1)
+    for ax, (model, color) in zip(axes, (("Bimodal", BIMODAL),
+                                         ("Unimodal", UNIMODAL))):
+        s = stats[model]
+        ax.plot(angles, edge_radius + s["kde_median"], color=color,
+                linewidth=1.5, zorder=5)
+        ax.fill_between(angles, edge_radius + s["kde_lower"],
+                        edge_radius + s["kde_upper"], color=color, alpha=0.2,
+                        edgecolor="none", zorder=2)
+        ax.plot(obs["kde_angles"], edge_radius + obs["kde_median"],
+                color="black", linewidth=1.5, zorder=6)
+        ax.fill_between(obs["kde_angles"], edge_radius + obs["kde_lower_bounds"],
+                        edge_radius + obs["kde_upper_bounds"], color="black",
+                        alpha=0.12, edgecolor="none", zorder=3)
 
-    line_data, = ax.plot(obs["kde_angles"], edge_radius + obs["kde_median"],
-                         color="black", linestyle="--", linewidth=1.5, zorder=6)
-    ax.fill_between(obs["kde_angles"], edge_radius + obs["kde_lower_bounds"],
-                    edge_radius + obs["kde_upper_bounds"], color="black",
-                    alpha=0.12, edgecolor="none", zorder=3)
+        ax.add_artist(Circle((0, 0), edge_radius, transform=ax.transData._b,
+                             color="black", fill=False, linewidth=0.5))
+        ax.spines["polar"].set_visible(False)
+        ax.set_ylim(0, edge_radius + ymax * 1.2)
+        ax.set_xlim(-np.pi, np.pi)
+        ax.set_yticks([edge_radius, edge_radius + 0.5])
+        ax.set_yticklabels(["", ""])
+        ax.set_xticks([-np.pi / 2, 0, np.pi / 2, np.pi])
+        ax.set_xticklabels(["−90°", "0°", " 90°", "±180°     "])
+        ax.tick_params(axis="x", pad=-4)
 
-    ax.add_artist(Circle((0, 0), edge_radius, transform=ax.transData._b,
-                         color="black", fill=False, linewidth=0.5))
-    ax.spines["polar"].set_visible(False)
-    ax.set_ylim(0, edge_radius + ymax * 1.2)
-    ax.set_xlim(-np.pi, np.pi)
-    ax.set_yticks([edge_radius, edge_radius + 0.5])
-    ax.set_yticklabels(["", ""])
-    ax.set_xticks([-np.pi / 2, 0, np.pi / 2, np.pi])
-    ax.set_xticklabels(["−90°", "0°", " 90°", "±180°     "])
-    ax.tick_params(axis="x", pad=-4)
+        # the model name sits where the density is zero, i.e. the middle;
+        # r = 0 is below the axis limit, hence clip_on=False
+        ax.text(0.0, 0.0, model, color=color, fontsize=8, ha="center",
+                va="center", zorder=7, clip_on=False,
+                bbox=dict(facecolor="white", edgecolor="none", pad=1.0))
 
-    ax.legend(
-        [line_bimodal, line_unimodal, line_data],
-        ["Bimodal", "Unimodal", "Data"],
-        handler_map={
-            line_bimodal: _density_legend_handler(BIMODAL, "-", 0.2, 1.5),
-            line_unimodal: _density_legend_handler(UNIMODAL, "-", 0.2, 1.5),
-            line_data: _density_legend_handler("black", "--", 0.12, 1.5),
-        },
-        bbox_to_anchor=(1, 1), loc="center left", frameon=True,
-    )
-
-    plt.tight_layout()
+    fig.text(0.5, 0.01,
+             "Black: observed bootstrap (solid). Colour: one model's "
+             "replicates, median + 2.5/97.5 band.", ha="center", fontsize=6)
+    plt.tight_layout(rect=(0, 0.03, 1, 1))
     _save(fig, save, save_path)
 
 
