@@ -4,13 +4,13 @@
 
 [Composite PDF](bat_composite_directedness.pdf) · [PNG preview](bat_composite_directedness.png)
 
-**a.** The photo and treatment key sit beside the model comparison. Faded
-icons identify the senses manipulated in each group.
+**a.** The photo and treatment key sit beside four matched homing route
+maps. Shades of each treatment color distinguish individual trajectories.
+Faded icons identify the senses manipulated in each group.
 
-**b.** Predictive gain by heading sums the paired step-level difference in
-PSIS-LOO ELPD (von Mises–Uniform Mixture minus von Mises) over steps at or
-below each absolute error threshold. The curve is evaluated every 2°. At
-180°, it includes all 4,942 modeled steps and ends at +118.7 ΔELPD.
+**b.** The notebook's left plot compares total PSIS-LOO ELPD across models.
+The right plot shows the paired ELPD difference (von Mises–Uniform Mixture
+minus von Mises) overall and for each treatment. Bars show one standard error.
 
 **c.** The four polar plots show the full population-level mixture predictive
 densities on a common scale. The dots identify density at the goal bearing
@@ -28,10 +28,13 @@ Gold dots mark the estimated start of the first sustained goalward bout,
 defined as the first of five consecutive usable goalward steps with
 smoothed directedness above 0.5 within a joint posterior draw. The trailing
 smoother weights the most recent ten steps and resets at gaps and missing
-headings. Dots and bars show the median and central 90% interval among
-draws with a qualifying bout. An open dot marks a median at the first usable
-step of a recorded segment. Four median onsets precede the plotted window.
-[Bat model card](https://jakegraving.com/goldshtein-bats/)
+headings. Symbols and bars show the median and central 90% interval among
+draws with a qualifying bout. Open circles indicate a median at the
+flight's first usable step. Open triangles indicate that the first usable
+step after a tracking gap or missing heading is already directed. Six
+flights have this second kind of onset, including the second Eye cover row.
+Four median onsets precede the plotted window.
+[Bat model card](https://jakegraving.com/goldshtein-bats)
 
 ```bash
 python notebooks/goldshtein_bats_directedness_review.py --download \
