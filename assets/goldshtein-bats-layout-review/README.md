@@ -5,9 +5,10 @@ all 67 flight trajectories. The bottom row shows absolute step-level PSIS-LOO
 ELPD with one SE per model, posterior directedness over remaining path distance,
 and full vMU density at 0° relative to control.
 
-The goal-window figure shows the full vMU predictive probability within ±45°
-of the goal for each of the four arms. Points and whiskers show posterior
-means and 95% HDIs. The separate eye-cover sensitivity plot compares the
+The goal-window figure integrates the full vMU predictive heading density
+from −45° to +45° relative to the goal for each posterior draw. Points and
+whiskers show posterior means and 95% HDIs for that probability by treatment.
+The separate eye-cover sensitivity plot compares the
 eye-cover-only arm with control across angular windows. The figures evaluate
 the fitted group parameters with individual offsets set to zero. The JSON
 records draw-wise contrasts and the pooled contrast across the three groups

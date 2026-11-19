@@ -11,7 +11,7 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.patches import Circle, Wedge
-from matplotlib.ticker import MultipleLocator, PercentFormatter
+from matplotlib.ticker import MultipleLocator, StrMethodFormatter
 import numpy as np
 from PIL import Image
 import pymupdf
@@ -215,7 +215,7 @@ def draw_composite(data, *, photo_path=None):
 
 
 def draw_goal_window(data):
-    """Define the sector visually and compare the four treatment groups."""
+    """Compare posterior predictive probability for bearings within the sector."""
     fig = plt.figure(figsize=(5.9, 2.75), facecolor='white')
     diagram = fig.add_axes([.022, .14, .30, .76], aspect='equal')
     diagram.set(xlim=(-1.25, 1.25), ylim=(-1.06, 1.20))
@@ -241,13 +241,13 @@ def draw_goal_window(data):
         axis.errorbar(mean, row, xerr=[[mean-lo], [hi-mean]], color=PALETTE[row],
                       fmt='o', ms=5, elinewidth=1.1, capsize=2.4, capthick=1.0)
     axis.set(xlim=(.55, .95), ylim=(3.57, -.57), yticks=range(4),
-             yticklabels=LABELS, xlabel='Steps within the shaded sector')
+             yticklabels=LABELS, xlabel='Posterior predictive probability')
     axis.spines[['left', 'top', 'right']].set_visible(False)
     axis.xaxis.set_major_locator(MultipleLocator(.10))
-    axis.xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+    axis.xaxis.set_major_formatter(StrMethodFormatter('{x:.1f}'))
     axis.tick_params(axis='y', length=0, pad=6)
     axis.tick_params(axis='x', length=3, width=.65, pad=3)
-    axis.set_title('Goal-aligned steps', weight='bold', fontsize=11, pad=8)
+    axis.set_title('Goal-aligned headings', weight='bold', fontsize=11, pad=8)
     return fig
 
 
