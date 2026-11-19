@@ -44,3 +44,24 @@ uv pip install -e '.[figure,notebook]'
 python notebooks/goldshtein_bats_figure_ideas.py --download \
     --font-family Arial --font-dir /path/to/arial-fonts
 ```
+
+## Panel b alternative
+
+[Panel PDF](bat_model_panel.pdf) · [PNG preview](bat_model_panel.png)
+
+The map puts all 67 routes on the same geographic scale, colored by
+treatment. Crosses mark release sites and the star marks the roost.
+The plots compare the fitted von Mises and von Mises–Uniform heading
+distributions with the observed distribution of absolute heading error.
+Each posterior draw averages 15° bin probabilities over the 4,942 modeled
+steps, using the fitted effects for each bat. Bands are pointwise 95%
+highest-density intervals for the fitted bin probabilities. The lower
+plot subtracts the observed proportion in each bin.
+
+Within 30° of the goal bearing, the observed share is 0.413. The fitted
+shares are 0.381 for von Mises and 0.412 for von Mises–Uniform.
+
+```bash
+python notebooks/goldshtein_bats_model_panel.py --download \
+    --font-family Arial --font-dir /path/to/arial-fonts
+```
