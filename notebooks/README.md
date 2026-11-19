@@ -28,19 +28,25 @@ without running the notebook or sampling again. See the
 
 ## Locust composite figure
 
-`locust_circ_stats_figure.py` rebuilds the four-panel locust
-circular-statistics composite from the pinned fits and data in `unwrap-data` -
-panels b and d are the house `plot_loo_elpd` and `plot_hypothesis_density`
-panels, panel c is the house population check drawn in the style of the
-reference figure, and panel a replays that figure's artwork geometry kept in
-`assets/locust_circ_stats/`. The composite being matched comes from the
-manuscript, so it is called the reference figure throughout. Rendered preview:
+`locust_circ_stats_figure.py` rebuilds the locust circular-statistics composite
+from the pinned fits and data in `unwrap-data`, and adds a row of its own below
+the reference figure's four. Panels b and d are the house `plot_loo_elpd` and
+`plot_hypothesis_density` panels, panel a replays the reference figure's artwork
+geometry kept in `assets/locust_circ_stats/`, panel c draws its population
+hypothesis test in polar form (the two hypothesis densities at their directions,
+against the uniform reference), and panels e and f widen those two comparisons -
+the house `plot_predictive_both_models_polar` (both models' predictive densities
+against the observed KDE) and `plot_hypothesis_elpd_swarm` (one dot per animal).
+The composite being matched comes from the manuscript, so it is called the
+reference figure throughout; its page is 900 x 600 pt and this one is
+900 x 945, the extra 345 pt being the new row. Rendered preview:
 [PDF](../assets/locust-circ-stats/locust_circ_stats_figure.pdf) ·
 [PNG](../assets/locust-circ-stats/locust_circ_stats_figure.png) ·
 [SVG](../assets/locust-circ-stats/locust_circ_stats_figure.svg) ·
 [provenance](../assets/locust-circ-stats/locust_circ_stats_figure.json),
-and a side-by-side against the reference page
-[here](../assets/locust-circ-stats/comparison_vs_reference.png).
+and side-by-side against the reference page
+[whole page](../assets/locust-circ-stats/comparison_vs_reference.png) and
+[panel by panel](../assets/locust-circ-stats/panel_comparison.png).
 
 ## Setup
 

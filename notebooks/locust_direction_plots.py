@@ -741,6 +741,142 @@ def plot_hypothesis_elpd_individual(trace_bimodal, *, save=True,
     _save(fig, save, save_path)
 
 
+# ---------------------------------------------------------------------------
+# Individual-level hypothesis test as a swarm.
+# ---------------------------------------------------------------------------
+def _swarm_offsets(values, dot_pt, pt_per_unit):
+    """Vertical offsets in points that pack dots of ``dot_pt`` diameter along
+    the value axis without overlap - the arrangement seaborn's ``swarmplot``
+    draws, computed here so the packing radius is the radius the dots are
+    actually drawn at (a library layout packs against its own nominal marker
+    size, which is a different size once the dots are scaled up).
+
+    ``values`` sit on the value axis; ``pt_per_unit`` turns a unit of them
+    into points on the page, so the collision test happens in points. Values
+    are visited in ascending order and each dot takes the first free slot
+    ``0, +d, -d, +2d, -2d, ...`` (``d`` the dot diameter), where free means no
+    placed dot lies within ``d`` in both x and y."""
+    values = np.asarray(values, dtype=float) * float(pt_per_unit)
+    order = np.argsort(values, kind="stable")
+    offsets = np.zeros(values.size, dtype=float)
+    placed = []
+    d = float(dot_pt)
+    for idx in order:
+        x = float(values[idx])
+        step = 0
+        while True:
+            for y in ([0.0] if step == 0 else [step * d, -step * d]):
+                if all(abs(x - px) >= d or abs(y - py) >= d for px, py in placed):
+                    offsets[idx] = y
+                    placed.append((x, y))
+                    break
+            else:
+                step += 1
+                continue
+            break
+    return offsets
+
+
+def plot_hypothesis_elpd_swarm(trace_bimodal, *, save=True,
+                               save_path="figures/locust/locust_directional_hypothesis_elpd_swarm.pdf",
+                               dot_pt=3.5, pack_gap=1.2, xlim=None, xticks=None,
+                               uniform_label=True, uniform_text_off=0.05):
+    """Individual-level version of ``plot_hypothesis_elpd``: the ELPD of each
+    animal at the two hypothesised directions (``locust_posthoc
+    .hypothesis_elpd_individual_stats``) as a swarm - one dot per animal -
+    on the rows, labels, colours and markers of the population panel (Optic
+    flow, blue circle, above Vec. encoding, orange square) and the same
+    log-uniform reference. The pooled ELPD from the same stats sits on each
+    row as an open marker.
+
+    ``dot_pt`` is the drawn dot diameter in points; ``pack_gap`` is that
+    packing distance as a multiple of it, so the dots are separated rather
+    than merely touching (touching squares merge into a solid block, which is
+    what the densely-populated hypothesis rows do at publication size).
+
+    The packing is done in points, which is why the vertical axis is measured
+    in points (the row spacing and the stack depths are the only things on it,
+    and both are set here): a library layout packs against its own nominal
+    marker size, which is a different size once the dots are scaled up.
+    ``xlim`` / ``xticks`` fix the value axis; the packing needs the limit, so
+    pass them rather than setting them afterwards.  ``uniform_label`` turns
+    the rotated "Uniform" text off - the composite page leaves it to the
+    population panel, which labels the same reference on the density scale."""
+    stats = posthoc.hypothesis_elpd_individual_stats(trace_bimodal)
+    n_ind = int(stats["n_ind"])
+    uniform = float(stats["logp_uniform"])
+    rows = [
+        ("Optic flow", UNIMODAL, "o", np.asarray(stats["elpd_f_all"])[:n_ind],
+         float(stats["elpd_f_all"][n_ind])),
+        ("Vec. encoding", BIMODAL, "s", np.asarray(stats["elpd_p_all"])[:n_ind],
+         float(stats["elpd_p_all"][n_ind])),
+    ]
+
+    fig, ax = plt.subplots(figsize=(3.0, 1.6), dpi=_plots.DEFAULT_DISPLAY_DPI)
+
+    if xlim is None:
+        lo = min(float(np.min(r[3])) for r in rows)
+        hi = max(float(np.max(r[3])) for r in rows)
+        lo, hi = min(lo, uniform), max(hi, uniform)
+        pad = 0.04 * (hi - lo)
+        xlim = (lo - pad, hi + pad)
+    ax.set_xlim(*xlim)
+
+    # Row 0 = Optic flow, row 1 = Vec. encoding, top to bottom as in the
+    # population panel (the vertical axis is inverted to do that). The ticks
+    # are put at 0 / 1 here only so tight_layout sizes the label column; they
+    # move to their row positions below, where the same two strings keep the
+    # layout that was just measured.
+    ax.set_yticks(np.arange(len(rows), dtype=float))
+    ax.set_yticklabels([label for label, *_ in rows])
+    for label, row in zip(ax.get_yticklabels(), rows):
+        label.set_color(row[1])
+    if xticks is not None:
+        ax.set_xticks(xticks)
+    ax.set_ylabel("")
+    ax.set_title("")
+    ax.set_xlabel("ELPD")
+    _despine(ax)
+
+    # The packing needs the axes box, and the box is only settled once
+    # tight_layout has sized the labels - which it can do now, because the
+    # ticks and labels that consume the margins are already in place.
+    plt.tight_layout()
+    size_pt = fig.get_size_inches() * 72.0
+    width_pt = ax.get_position().width * size_pt[0]
+    pack_pt = dot_pt * pack_gap           # the centre-to-centre clearance to keep
+    offsets = [_swarm_offsets(vals, pack_pt, width_pt / (xlim[1] - xlim[0]))
+               for _, _, _, vals, _ in rows]
+
+    reach = float(max(np.max(np.abs(off)) if off.size else 0.0 for off in offsets))
+    spacing = 2 * reach + 2.5 * pack_pt              # row centre to centre, points
+    half = 0.5 * spacing + reach + 0.75 * pack_pt    # band edge, points
+    ax.set_ylim(half, -half)                         # inverted: Optic flow on top
+
+    #: the vertical axis is in points, so the stack offsets go on straight
+    y_rows = [(i - 0.5 * (len(rows) - 1)) * spacing for i in range(len(rows))]
+    for (label, color, marker, vals, pooled), off, y0 in zip(rows, offsets, y_rows):
+        ax.plot(vals, y0 + off, marker=marker, linestyle="", color=color,
+                markersize=dot_pt, markeredgecolor=color, markeredgewidth=0.3,
+                alpha=0.95, zorder=3)
+        ax.plot([pooled], [y0], marker=marker, linestyle="", color=color,
+                markersize=1.9 * dot_pt, markerfacecolor="white",
+                markeredgecolor=color, markeredgewidth=0.6, zorder=4)
+
+    ax.set_yticks(y_rows)
+    ax.set_yticklabels([label for label, *_ in rows])
+    for label, row in zip(ax.get_yticklabels(), rows):
+        label.set_color(row[1])
+
+    ax.axvline(uniform, ls="--", c="k", lw=1, zorder=1)
+    if uniform_label:
+        ax.text(uniform + uniform_text_off, 0.8, "Uniform", rotation=90,
+                va="top", ha="center", fontsize=FONT_SZ, color="k",
+                transform=ax.get_xaxis_transform(), clip_on=False)
+
+    _save(fig, save, save_path)
+
+
 def plot_alignment_individual(trace_bimodal, *, save=True,
                               save_path="figures/locust/locust_directional_alignment_individual_ab.pdf"):
     """Panel a: per-individual posterior mean alignment HDI (blue circle =
@@ -848,6 +984,73 @@ def plot_predictive_both_models_population(trace_bimodal, trace_unimodal, df,
     # No legend: the R twin carries none either (the black overlays are
     # named in the caption).
     plt.tight_layout(rect=(0.03, 0.03, 1.0, 0.97))
+    _save(fig, save, save_path)
+
+
+def plot_predictive_both_models_polar(trace_bimodal, trace_unimodal, df, *,
+                                      save=True,
+                                      save_path="figures/locust/population_predictive_both_models_polar.pdf"):
+    """Polar view of the population row of
+    ``plot_predictive_both_models_population``, KDE estimate only: both
+    models' replicated population heading densities (median + 2.5/97.5 band
+    across the shared replicates, in the model colours) with the observed
+    bootstrap von Mises KDE over them in black dashed, on the radius
+    convention of ``plot_directional_validation_polar`` - density zero sits
+    on the reference circle at ``r = 0.5``. The histogram row of the
+    cartesian figure is left out: the point of the polar view is the shape
+    of the two model bands against the data."""
+    stats = posthoc.both_models_ppc_stats(trace_bimodal, trace_unimodal, df)
+    obs = posthoc.bootstrap_von_mises_kde_stats(df)
+    angles = stats["population_angles"]
+
+    edge_radius = 0.5
+    ymax = max(np.nanmax(stats["Bimodal"]["kde_upper"]),
+               np.nanmax(stats["Unimodal"]["kde_upper"]),
+               np.nanmax(obs["kde_upper_bounds"]))
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
+                           figsize=(3, 3), dpi=_plots.DEFAULT_DISPLAY_DPI)
+
+    line_bimodal, = ax.plot(angles, edge_radius + stats["Bimodal"]["kde_median"],
+                            color=BIMODAL, linewidth=1.5, zorder=5)
+    ax.fill_between(angles, edge_radius + stats["Bimodal"]["kde_lower"],
+                    edge_radius + stats["Bimodal"]["kde_upper"],
+                    color=BIMODAL, alpha=0.2, edgecolor="none", zorder=2)
+    line_unimodal, = ax.plot(angles, edge_radius + stats["Unimodal"]["kde_median"],
+                             color=UNIMODAL, linewidth=1.5, zorder=4)
+    ax.fill_between(angles, edge_radius + stats["Unimodal"]["kde_lower"],
+                    edge_radius + stats["Unimodal"]["kde_upper"],
+                    color=UNIMODAL, alpha=0.2, edgecolor="none", zorder=1)
+
+    line_data, = ax.plot(obs["kde_angles"], edge_radius + obs["kde_median"],
+                         color="black", linestyle="--", linewidth=1.5, zorder=6)
+    ax.fill_between(obs["kde_angles"], edge_radius + obs["kde_lower_bounds"],
+                    edge_radius + obs["kde_upper_bounds"], color="black",
+                    alpha=0.12, edgecolor="none", zorder=3)
+
+    ax.add_artist(Circle((0, 0), edge_radius, transform=ax.transData._b,
+                         color="black", fill=False, linewidth=0.5))
+    ax.spines["polar"].set_visible(False)
+    ax.set_ylim(0, edge_radius + ymax * 1.2)
+    ax.set_xlim(-np.pi, np.pi)
+    ax.set_yticks([edge_radius, edge_radius + 0.5])
+    ax.set_yticklabels(["", ""])
+    ax.set_xticks([-np.pi / 2, 0, np.pi / 2, np.pi])
+    ax.set_xticklabels(["−90°", "0°", " 90°", "±180°     "])
+    ax.tick_params(axis="x", pad=-4)
+
+    ax.legend(
+        [line_bimodal, line_unimodal, line_data],
+        ["Bimodal", "Unimodal", "Data"],
+        handler_map={
+            line_bimodal: _density_legend_handler(BIMODAL, "-", 0.2, 1.5),
+            line_unimodal: _density_legend_handler(UNIMODAL, "-", 0.2, 1.5),
+            line_data: _density_legend_handler("black", "--", 0.12, 1.5),
+        },
+        bbox_to_anchor=(1, 1), loc="center left", frameon=True,
+    )
+
+    plt.tight_layout()
     _save(fig, save, save_path)
 
 
