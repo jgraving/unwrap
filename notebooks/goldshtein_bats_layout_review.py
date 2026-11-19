@@ -10,7 +10,9 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
+from matplotlib.patches import Circle
 from matplotlib.ticker import MultipleLocator, StrMethodFormatter
+from matplotlib.transforms import Affine2D
 import numpy as np
 from PIL import Image
 import pymupdf
@@ -90,6 +92,24 @@ def draw_flight_colorbar(fig, cax):
     cb.ax.set_title('Posterior directedness', fontsize=9, pad=3)
 
 
+def _draw_treatment_icons(ax, drawings, row_ys, colors):
+    """Repeat the original control glyphs and fade the manipulated senses."""
+    # Control-row paths for vision, magnetoreception, olfaction and echolocation.
+    glyphs = [drawings[index] for index in (60, 65, 51, 56)]
+    faded_columns = ((), (0,), (0, 1), (0, 1, 2))
+    for row_y, color, faded in zip(row_ys, colors, faded_columns, strict=True):
+        transform = Affine2D().translate(0, row_ys[0] - row_y) + ax.transData
+        for column, glyph in enumerate(glyphs):
+            x0, _, x1, _ = glyph['rect']
+            center = ((x0 + x1) / 2, source.PAGE_H - row_y)
+            muted = column in faded
+            ax.add_patch(Circle(center, 10.5, facecolor=color, edgecolor='none',
+                                alpha=.08 if muted else .27, zorder=10))
+            patch = source.draw_drawing(ax, glyph, zorder=11)
+            patch.set_transform(transform)
+            patch.set_alpha(.30 if muted else 1)
+
+
 def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     """Compose the photo, matched maps, and three fitted summaries."""
     flight_view = flight_heatmaps is not None
@@ -148,10 +168,14 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     icon_ax = axes_at(23, icon_top, (ix1-ix0)*icon_scale, (iy1-iy0)*icon_scale)
     icon_ax.set(xlim=(ix0,ix1), ylim=(source.PAGE_H-iy1,source.PAGE_H-iy0))
     icon_ax.axis('off')
-    for index, drawing in sorted(icons.items()):
-        patch = source.draw_drawing(icon_ax, drawing, zorder=index+10)
-        patch.set_linewidth(patch.get_linewidth()*icon_scale)
-    for y, level, label in zip((126.58,158.73,190.90,223.05), levels, LABELS, strict=True):
+    icon_rows = (126.58, 158.73, 190.90, 223.05)
+    if flight_view:
+        _draw_treatment_icons(icon_ax, icons, icon_rows, [colors[level] for level in levels])
+    else:
+        for index, drawing in sorted(icons.items()):
+            patch = source.draw_drawing(icon_ax, drawing, zorder=index+10)
+            patch.set_linewidth(patch.get_linewidth()*icon_scale)
+    for y, level, label in zip(icon_rows, levels, LABELS, strict=True):
         page_text(108, icon_top+(y-iy0)*icon_scale, label, fontsize=9.3,
                   color=colors[level] if flight_view else INK)
 
@@ -249,19 +273,25 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     comparison_y, comparison_top = (309, 330) if flight_view else (title_y, plot_top)
     letter(22, comparison_y, 'c')
     page_text(103, comparison_y, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
-    comparison = axes_at(51, comparison_top, 114, plot_bottom-comparison_top)
+    comparison_x, comparison_width = (100, 78) if flight_view else (51, 114)
+    comparison = axes_at(comparison_x, comparison_top, comparison_width, plot_bottom-comparison_top)
     for y, key in enumerate(('vm','vmu')):
         score = data['scores'][key]
         comparison.errorbar(score['elpd'], y, xerr=score['se'], color=INK, fmt='o',
                             ms=4.1, elinewidth=1, capsize=2.2, capthick=1, zorder=3)
     lo = min(s['elpd']-s['se'] for s in data['scores'].values())-16
     hi = max(s['elpd']+s['se'] for s in data['scores'].values())+16
+    model_names = ('von Mises', 'von Mises–Uniform\nMixture') if flight_view else ('vM', 'vMU')
     comparison.set(xlim=(lo,hi), ylim=(1.63,-.63), yticks=(0,1),
-                   yticklabels=('vM','vMU'), xlabel='ELPD')
+                   yticklabels=model_names, xlabel='ELPD')
     comparison.xaxis.set_major_locator(MultipleLocator(100))
     setup_axes(comparison)
     comparison.spines['left'].set_visible(False)
     comparison.tick_params(axis='y', length=0, pad=4)
+    if flight_view:
+        comparison.tick_params(axis='y', labelsize=8.5)
+        for label in comparison.get_yticklabels():
+            label.set_multialignment('left')
 
     # d. Flight-level or group-level homing progression.
     if flight_view:

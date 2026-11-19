@@ -26,6 +26,8 @@ Smoothing resets at tracking gaps.
 
 [Composite PDF](bat_composite_heatmaps.pdf) · [PNG preview](bat_composite_heatmaps.png)
 
+In panel a, faded icons identify the senses manipulated in each group.
+
 Panel b shows the geography of the 67 routes, including release sites, the
 roost, the lake and tracking gaps. Shades of each treatment color distinguish
 individual routes. Panel d aligns the corresponding treatment
