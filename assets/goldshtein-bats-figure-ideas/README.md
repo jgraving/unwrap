@@ -13,7 +13,8 @@ zero.
 directedness measure and trailing smoother as the main composite. Rows are
 sorted by modeled path length within treatment. Zero is the last modeled step
 of each flight. The horizontal scale uses 60 m per modeled step. Gray cells
-precede the first modeled step. Smoothing resets at tracking gaps.
+mark distance beyond each flight's modeled path. Smoothing resets at tracking
+gaps.
 
 Render from the same verified tracks and model fits as the main composite.
 

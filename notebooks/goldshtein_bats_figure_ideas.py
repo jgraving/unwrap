@@ -110,7 +110,7 @@ def draw_ideas(cones, heatmaps, levels, reference_angle):
     delta.set(xlabel="Cone half-angle from the goal bearing (°)",
               ylabel="Change vs. control\n(percentage points)")
 
-    page_text(356, 43, "One row per bat. Gray shows the period before its first modeled step.",
+    page_text(356, 43, "One row per bat. Gray marks distance beyond its modeled path.",
               fontsize=8.5, color="#555555")
     cmap = mpl.colormaps["viridis"].with_extremes(bad=ABSENT)
     norm = mpl.colors.Normalize(0, 1)
