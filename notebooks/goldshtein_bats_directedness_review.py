@@ -351,8 +351,6 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                          bottom=row == 1, labelbottom=row == 1)
 
     evidence_center = tile_lefts[1] + tile_w / 2
-    page_text(evidence_center, 427, "Control evidence by heading", ha="center",
-              color=colors[levels[0]], fontsize=8.5, weight="bold")
     evidence_polar = axes_at(evidence_center - 29, 434, 58, 58, projection="polar")
     draw_heading_evidence(evidence_polar, bearings, data["control_heading_evidence"])
     page_text(180, 470, "Individual", rotation=90, ha="center", fontsize=9.2)
