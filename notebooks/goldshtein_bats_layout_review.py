@@ -103,8 +103,8 @@ def _draw_treatment_icons(ax, drawings, row_ys, colors):
             x0, _, x1, _ = glyph['rect']
             center = ((x0 + x1) / 2, source.PAGE_H - row_y)
             muted = column in faded
-            ax.add_patch(Circle(center, 10.5, facecolor=color, edgecolor='none',
-                                alpha=.12 if muted else .42, zorder=10))
+            ax.add_patch(Circle(center, 12, facecolor=color, edgecolor='none',
+                                alpha=.15 if muted else .54, clip_on=False, zorder=10))
             patch = source.draw_drawing(ax, glyph, zorder=11)
             patch.set_transform(transform)
             patch.set_alpha(.30 if muted else 1)
