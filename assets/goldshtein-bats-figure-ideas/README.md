@@ -6,7 +6,9 @@
 
 **a.** The photo and treatment key sit beside four matched homing route
 maps. Shades of each treatment color distinguish individual trajectories.
-Faded icons identify the senses manipulated in each group.
+The star marks the roost, crosses mark translocation sites, and dashed
+segments mark signal dropout. The north arrow and 1 km scale apply to all
+four maps. Faded icons identify the senses manipulated in each group.
 
 **b.** The polar likelihood diagrams show the von Mises (vM) and von
 Mises–Uniform Mixture (vMU) models. Both use the same illustrative directed
@@ -22,16 +24,15 @@ at the goal bearing (0°). The contrast plot shows within-draw density
 differences at 0° against control with 95% highest-density intervals.
 
 **d.** The 2×2 map and heatmap grids use matching treatment order and one
-posterior directedness scale. Matched Oklab ramps run from rose for undirected
-evidence through charcoal at 0.5 to aqua for directed evidence. Map segments
-and heatmap cells use the mean of the same draw-wise smoothed values. Gray
-dashed map segments cross tracking
-gaps. White heatmap cells mark missing data, including gap-crossing steps
-and distances beyond each individual's modeled path. Each row represents
-one bat and has the same height across treatments. The treatments include
-29 control, 14 eye cover, 15 eye cover plus
-magnet, and 9 eye cover plus magnet and anosmia bats. Each heatmap shows the
-last 6.6 km at 60 m per modeled step.
+posterior directedness scale. Matched Oklab ramps run from lavender for
+undirected evidence through charcoal at 0.5 to sea green for directed
+evidence. Map segments and heatmap cells use the mean of the same draw-wise
+smoothed values. Gray dashed map segments cross tracking gaps. White heatmap
+cells mark missing data, including gap-crossing steps and distances beyond
+each individual's modeled path. Each row represents one bat and has the
+same height across treatments. The treatments include 29 control, 14 eye
+cover, 15 eye cover plus magnet, and 9 eye cover plus magnet and anosmia
+bats. Each heatmap shows the last 6.6 km at 60 m per modeled step.
 
 The polar ring shows the same directedness score by heading relative to the
 goal bearing (0°). Its colors average the baseline-adjusted evidence across
