@@ -50,6 +50,13 @@ zero in each plot.
 Entries are posterior means and 95% highest-density intervals in inverse
 radians. Differences are calculated within each draw before summarizing.
 
+Within each draw, multiplying the directed-density contrast by the two
+groups' mean mixture weight gives its contribution to the full contrast.
+Multiplying the weight contrast by the two groups' mean directed density
+above the undirected baseline gives the remaining contribution. The
+posterior means of the weight contribution are −0.022, −0.022, and 0.010
+inverse radians in table order. Each 95% interval spans zero.
+
 Render from the same verified tracks and model fits as the main composite.
 
 ```bash

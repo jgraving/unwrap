@@ -306,12 +306,12 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     if flight_view:
         letter_x, density_y = 22, 450
         polar_positions = ((71, 483), (200, 483), (71, 576), (200, 576))
-        polar_size = 76
+        polar_size, polar_label_offset = 76, -4
         page_text(135.5, 469, 'Full mixture densities', ha='center', weight='bold', fontsize=9.5)
     else:
         letter_x, density_y = 420, 314
         polar_positions = ((444, 341), (497, 341), (550, 341), (603, 341))
-        polar_size = 47
+        polar_size, polar_label_offset = 47, 7
     letter(letter_x, density_y, 'e')
     page_text(letter_x+23, density_y, 'Predictive heading density', weight='bold', fontsize=11)
     bearings = data['density_bearings']
@@ -334,7 +334,8 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
         mean_at_goal = profile['mean'][bearings.size // 2]
         polar.plot(0, zero_radius + mean_at_goal, 'o', color=color, ms=2.8)
         page_text(center, polar_top-3, '0°', ha='center', fontsize=8)
-        page_text(center, polar_top+polar_size+7, label, ha='center', color=color, fontsize=8.5)
+        page_text(center, polar_top+polar_size+polar_label_offset, label,
+                  ha='center', color=color, fontsize=8.5)
 
     def draw_density_contrasts(box, contrasts, limits):
         ax = axes_at(*box)
