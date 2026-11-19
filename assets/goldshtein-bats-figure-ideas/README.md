@@ -1,5 +1,45 @@
 # Candidate bat figure panels
 
+## Composite with directedness maps and bout onsets
+
+[Composite PDF](bat_composite_directedness.pdf) · [PNG preview](bat_composite_directedness.png)
+
+**a.** The photo and treatment key sit beside the model comparison. Faded
+icons identify the senses manipulated in each group.
+
+**b.** Predictive gain by heading sums the paired step-level difference in
+PSIS-LOO ELPD (von Mises–Uniform Mixture minus von Mises) over steps at or
+below each absolute error threshold. The curve is evaluated every 2°. At
+180°, it includes all 4,942 modeled steps and ends at +118.7 ΔELPD.
+
+**c.** The four polar plots show the full population-level mixture predictive
+densities on a common scale. The dots identify density at the goal bearing
+(0°). The contrast plot shows within-draw density differences at 0° against
+control with 95% highest-density intervals.
+
+**d.** The small maps and heatmaps share one posterior directedness scale.
+Map segments and heatmap cells use the mean of the same draw-wise smoothed
+values. Gray dashed map segments cross tracking gaps. White heatmap cells
+mark missing data, including gap-crossing steps and distances beyond each
+individual's modeled path. One row represents one bat, and all four heatmaps
+show the last 6.6 km at 60 m per modeled step.
+
+Gold dots mark the estimated start of the first sustained goalward bout,
+defined as the first of five consecutive usable goalward steps with
+smoothed directedness above 0.5 within a joint posterior draw. The trailing
+smoother weights the most recent ten steps and resets at gaps and missing
+headings. Dots and bars show the median and central 90% interval among
+draws with a qualifying bout. An open dot marks a median at the first usable
+step of a recorded segment. Four median onsets precede the plotted window.
+[Bat model card](https://jakegraving.com/goldshtein-bats/)
+
+```bash
+python notebooks/goldshtein_bats_directedness_review.py --download \
+    --font-family Arial --font-dir /path/to/arial-fonts
+```
+
+## Goal-cone and individual heatmaps
+
 [Goal-cone and flight panels PDF](bat_figure_ideas.pdf) · [PNG preview](bat_figure_ideas.png)
 
 **A. Heading within the goal cone.** The upper plot shows the probability of
