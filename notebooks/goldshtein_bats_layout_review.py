@@ -10,7 +10,6 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
-from matplotlib.patches import Circle, Wedge
 from matplotlib.ticker import MultipleLocator, StrMethodFormatter
 import numpy as np
 from PIL import Image
@@ -194,31 +193,32 @@ def draw_composite(data, *, photo_path=None):
           yticklabels=('0','0.5','1'))
     setup_axes(c)
 
-    # e. Changes from control in full-mixture probability within the goal sector.
+    # e. Full-mixture predictive density at the goal bearing, relative to control.
     letter(420, 314, 'e')
-    page_text(443, 314, 'Goal-aligned headings', weight='bold', fontsize=11)
-    diagram = axes_at(563, 299, 51, 31)
-    diagram.set(xlim=(-.8, 1.05), ylim=(-.1, 1.11), aspect='equal')
+    page_text(443, 314, 'Predictive density at 0°', weight='bold', fontsize=11)
+    diagram = axes_at(571, 299, 48, 31)
+    diagram.set(xlim=(-1.12, 1.12), ylim=(-.33, .95))
     diagram.axis('off')
-    half_width = data['goal_window_half_width_degrees']
-    diagram.add_patch(Wedge((0, 0), 1, 90-half_width, 90+half_width,
-                            fc='#dce8ed', ec='#98a7ac', lw=.65))
-    diagram.annotate('', (0, .85), (0, .04),
-                     arrowprops={'arrowstyle': '-|>', 'color': INK, 'lw': .8})
-    diagram.plot(0, 0, 'o', color=INK, ms=2.1)
-    diagram.add_patch(Circle((0, .98), .10, fc='white', ec=INK, lw=.65))
-    diagram.plot(0, .98, 'o', color=INK, ms=1.8)
-    page_text(625, 314, f'±{half_width:g}°', ha='right', fontsize=9)
+    # An offset peak emphasizes the height at one bearing.
+    angle = np.linspace(-1, 1, 101)
+    profile = .12 + .69 * np.exp(-.5 * ((angle - .22) / .40)**2)
+    height = np.interp(0, angle, profile)
+    diagram.plot([-1, 1], [0, 0], color='#a6a6a6', lw=.65)
+    diagram.plot(angle, profile, color='#7b8c94', lw=.9)
+    diagram.plot([0, 0], [0, height], color=INK, lw=.7)
+    diagram.plot(0, height, 'o', color=INK, ms=2.6)
+    diagram.annotate('0°', (0, 0), xytext=(0, -1.5), textcoords='offset points',
+                     ha='center', va='top', fontsize=8)
 
     d = axes_at(486, 337, 134, 85)
     d.axvline(0, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
     for y, level in enumerate(levels[1:]):
-        mean, lo, hi = data['goal_window_contrasts'][level]
+        mean, lo, hi = data['full_contrasts'][level]
         d.errorbar(mean, y, xerr=[[mean-lo],[hi-mean]], color=colors[level],
                    fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
-    d.set(xlim=(-.23,.04), ylim=(2.57,-.57), xticks=(-.2,-.1,0),
+    d.set(xlim=(-.34,.04), ylim=(2.57,-.57), xticks=(-.3,-.2,-.1,0),
           yticks=range(3), yticklabels=LABELS[1:],
-          xlabel='Change in probability vs. control')
+          xlabel='Change vs. control (per radian)')
     d.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
     setup_axes(d)
     d.spines['left'].set_visible(False)

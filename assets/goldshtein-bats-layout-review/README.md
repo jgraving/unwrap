@@ -4,15 +4,15 @@ The main-text composite pairs the tagged-bat photo placeholder and treatment
 icons (a) with all 67 flight trajectories colored by posterior directedness
 (b). The bottom row shows absolute step-level PSIS-LOO ELPD with one SE per
 model (c), posterior directedness over remaining path distance (d), and
-changes in goal alignment from control (e).
+changes in predictive density at the goal bearing from control (e).
 
-Panel e integrates the full von Mises–Uniform (vMU) predictive heading density
-within ±45° of the goal, using fitted group parameters with individual offsets
-set to zero. It subtracts the control probability from each treatment
-probability within the same posterior draw. Points and whiskers show posterior
+Panel e evaluates the full von Mises–Uniform (vMU) predictive heading density
+at 0° relative to the local goal bearing, using fitted group parameters with
+individual offsets set to zero. The diagram marks the height of an illustrative
+density at 0°. The plot subtracts the control density from each treatment
+density within the same posterior draw. Points and whiskers show posterior
 means and 95% highest-density intervals. The dashed line at zero marks the
-control reference. The JSON also records the pooled contrast across the three
-groups with eye cover, weighted by their modeled bat counts (14, 15, and 9).
+control reference.
 
 From the repository root, install the figure dependencies and render from the
 pinned fit and data snapshots:
