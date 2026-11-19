@@ -22,7 +22,7 @@ from goldshtein_bats_layout_data import _population_parameters, _read_context, a
 from locust_density_figure import add_compact_unit_label
 
 
-PAGE_W, PAGE_H = 532, 663
+PAGE_W, PAGE_H = 532, 678
 OUTPUT_DIR = source.ROOT / "assets" / "goldshtein-bats-figure-ideas"
 STEM = "bat_composite_directedness"
 ONSET_GOLD = "#FFC850"
@@ -30,8 +30,10 @@ ONSET_EDGE = "#664512"
 DIRECTED_FILL = "#87a1af"
 UNDIRECTED_FILL = "#d4d5d5"
 DIRECTEDNESS_CMAP = composite._directedness_colormap(
-    (335, 204), lightness=.82, chroma=.135, neutral_lightness=.29
+    (310, 169), lightness=.79, chroma=.10, neutral_lightness=.30
 )
+MAP_DROPOUT_COLOR = "#959b9c"
+MAP_DROPOUT_STYLE = (0, (2, 2))
 ONSET_MARKERS = {
     "bout_onset": ("o", ONSET_GOLD, 2.5, "Directed bout onset and 90% interval"),
     "flight_start": ("o", "white", 2.6, "Directed at first usable step of flight"),
@@ -209,18 +211,20 @@ def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_sca
         values.extend(means[has_score])
 
     ax.add_collection(LineCollection(missing, colors="#a7aeae", lw=.47, zorder=3))
-    ax.add_collection(LineCollection(gaps, colors="#959b9c", lw=.45,
-                                     linestyles=(0, (2, 2)), zorder=3))
+    ax.add_collection(LineCollection(gaps, colors=MAP_DROPOUT_COLOR, lw=.45,
+                                     linestyles=MAP_DROPOUT_STYLE, zorder=3))
     if scores is None:
         colored = LineCollection(route, colors=route_colors, lw=.67, capstyle="round", zorder=4)
+        marker_style = {"mec": "black", "mfc": "white"}
     else:
         colored = LineCollection(route, cmap=DIRECTEDNESS_CMAP, norm=composite.HEATMAP_NORM,
                                  lw=.88, capstyle="round", zorder=4)
         colored.set_array(np.asarray(values))
+        marker_style = {"mec": "white", "mfc": composite.INK}
     ax.add_collection(colored)
     for site in data["sites"]:
-        ax.plot(*site, marker="X", ms=3.8, mec="white", mew=.65, mfc=composite.INK, zorder=5)
-    ax.plot(*data["roost"], marker="*", ms=5.2, mec="white", mew=.65, mfc=composite.INK, zorder=5)
+        ax.plot(*site, marker="X", ms=3.8, mew=.65, zorder=5, **marker_style)
+    ax.plot(*data["roost"], marker="*", ms=5.2, mew=.65, zorder=5, **marker_style)
     if show_scale:
         x, y = xlim[1] - 460, ylim[0] + 590
         ax.plot([x - 1000, x], [y, y], color=composite.INK, lw=1.1, zorder=6)
@@ -285,7 +289,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     icons.axis("off")
     icon_rows = (126.58, 158.73, 190.90, 223.05)
     drawings = source.panel_b_drawings(source.load_artwork())
-    composite._draw_treatment_icons(icons, drawings, icon_rows, list(colors.values()))
+    composite._draw_treatment_icons(icons, drawings, icon_rows, list(colors.values()), active_alpha=.76)
     for level, label, y in zip(levels, composite.LABELS, icon_rows, strict=True):
         page_text(220, icon_top + (y - iy0) * icon_scale, label, color=colors[level], fontsize=9.2)
 
@@ -295,34 +299,43 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         color = colors[level]
         page_text(center, 22, label, ha="center", color=color, fontsize=8.7)
         map_ax = axes_at(center - route_w / 2, 31, route_w, route_h)
-        draw_track_map(map_ax, data, treatments[level], color, xlim, ylim)
+        draw_track_map(map_ax, data, treatments[level], color, xlim, ylim, show_scale=level == levels[-1])
+    map_key = plots._compact_destination_legend(
+        show_dropout=tracks["gap_before"].eq(1).any(), gap_linestyle=MAP_DROPOUT_STYLE,
+        gap_color=MAP_DROPOUT_COLOR,
+    )
+    fig.legend(handles=map_key, frameon=False, loc="center", ncols=len(map_key),
+               bbox_to_anchor=(389 / PAGE_W, 1 - 150 / PAGE_H), fontsize=8,
+               handlelength=1.45, handletextpad=.45, columnspacing=1.25, markerscale=.85)
 
-    letter(18, 151, "b")
-    page_text(39, 151, "Model comparison", weight="bold", fontsize=11)
-    page_text(63, 166, "von Mises (vM)", fontsize=8.5, ha="center")
-    page_text(151, 166, "von Mises–Uniform\nMixture (vMU)", fontsize=8.3, ha="center")
-    draw_likelihood_diagrams(axes_at(36, 177, 54, 54, projection="polar"),
-                             axes_at(124, 177, 54, 54, projection="polar"))
+    body_top = 166
+    letter(18, body_top, "b")
+    page_text(39, body_top, "Model comparison", weight="bold", fontsize=11)
+    page_text(63, body_top + 15, "von Mises (vM)", fontsize=8.5, ha="center")
+    page_text(151, body_top + 15, "von Mises–Uniform\nMixture (vMU)", fontsize=8.3, ha="center")
+    draw_likelihood_diagrams(axes_at(36, body_top + 26, 54, 54, projection="polar"),
+                             axes_at(124, body_top + 26, 54, 54, projection="polar"))
     fig.legend(handles=[Patch(facecolor=DIRECTED_FILL, label="Directed"),
                         Patch(facecolor=UNDIRECTED_FILL, label="Undirected")],
-               frameon=False, loc="center", bbox_to_anchor=(107 / PAGE_W, 1 - 233 / PAGE_H),
+               frameon=False, loc="center", bbox_to_anchor=(107 / PAGE_W, 1 - (body_top + 71) / PAGE_H),
                ncols=2, fontsize=7.8, handlelength=1.3, handletextpad=.45, columnspacing=1.2)
-    delta_ax = axes_at(69, 242, 122, 54)
+    delta_ax = axes_at(69, body_top + 91, 122, 54)
     draw_elpd_difference(plots, delta, delta_ax, colors)
 
-    letter(211, 151, "c")
-    page_text(232, 151, "Predictive heading density", weight="bold", fontsize=11)
+    letter(211, body_top, "c")
+    page_text(232, body_top, "Predictive heading density", weight="bold", fontsize=11)
     bearings = data["density_bearings"]
     profiles = data["density_profiles"]
     radius_max = 1 + 1.08 * max(profile["hi"].max() for profile in profiles.values())
     polar_size = 66
-    slots = ((250, 172), (318, 172), (250, 246), (318, 246))
-    for (center, y), level in zip(slots, levels, strict=True):
+    slots = ((414, 21), (482, 21), (414, 95), (482, 95))
+    for (center, offset), level in zip(slots, levels, strict=True):
+        y = body_top + offset
         polar = axes_at(center - polar_size / 2, y, polar_size, polar_size, projection="polar")
         composite.draw_polar_density(polar, bearings, profiles[level], colors[level], radius_max)
         center_zero_digit(page_text(center, y - 3, "0°", ha="center", fontsize=8))
 
-    x, y, width, height = 390, 200, 102, 73
+    x, y, width, height = 259, body_top + 49, 102, 73
     contrast = axes_at(x, y, width, height)
     composite.draw_density_contrast(contrast, data, colors)
     prop = contrast.xaxis.label.get_fontproperties()
@@ -330,13 +343,14 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                            "Density difference vs. control", "radian", -1,
                            fontsize=prop.get_size_in_points(), prop=prop)
 
-    letter(18, 329, "d")
-    page_text(39, 329, "Directedness by individual", weight="bold", fontsize=11)
+    flight_top = body_top + 178
+    letter(18, flight_top, "d")
+    page_text(39, flight_top, "Directedness along homing routes", weight="bold", fontsize=11)
     map_h = 132
     map_w = map_h * map_ratio
     map_centers = (52, 127)
     tile_lefts = (194, 363)
-    tops = (357, 507)
+    tops = (flight_top + 28, flight_top + 178)
     row_height = 4
     lower_rows = max(data["counts"][level] for level in levels[2:])
     tile_w = 151
@@ -366,18 +380,18 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                          bottom=row == 1, labelbottom=row == 1)
 
     evidence_center = tile_lefts[1] + tile_w / 2
-    evidence_polar = axes_at(evidence_center - 29, 421, 58, 58, projection="polar")
+    evidence_polar = axes_at(evidence_center - 29, flight_top + 92, 58, 58, projection="polar")
     draw_heading_evidence(evidence_polar, bearings, data["control_heading_evidence"])
-    page_text(180, 470, "Individual", rotation=90, ha="center", fontsize=9.2)
-    page_text(354, 588, "Path distance remaining (km)", ha="center", fontsize=9.5)
-    composite.draw_flight_colorbar(fig, axes_at(201, 613, 122, 5.5), cmap=DIRECTEDNESS_CMAP)
+    page_text(180, flight_top + 141, "Individual", rotation=90, ha="center", fontsize=9.2)
+    page_text(354, flight_top + 259, "Path distance remaining (km)", ha="center", fontsize=9.5)
+    composite.draw_flight_colorbar(fig, axes_at(201, flight_top + 284, 122, 5.5), cmap=DIRECTEDNESS_CMAP)
     onset_key = [Line2D([], [], color=ONSET_GOLD, linewidth=1.1,
                         linestyle="-" if fill == ONSET_GOLD else "none",
                         marker=marker, markersize=size + .8, markerfacecolor=fill,
                         markeredgecolor=ONSET_EDGE, markeredgewidth=.5, label=label)
                  for marker, fill, size, label in ONSET_MARKERS.values()]
     fig.legend(handles=onset_key, frameon=False,
-               loc="center left", bbox_to_anchor=(344 / PAGE_W, 1 - 619 / PAGE_H),
+               loc="center left", bbox_to_anchor=(344 / PAGE_W, 1 - (flight_top + 290) / PAGE_H),
                fontsize=8.3, handletextpad=.55, handlelength=1.8, borderaxespad=0)
     return fig
 

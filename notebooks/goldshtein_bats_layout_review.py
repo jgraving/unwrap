@@ -93,7 +93,7 @@ def draw_flight_colorbar(fig, cax, *, cmap=HEATMAP_CMAP):
     cb.ax.set_title('Posterior directedness', fontsize=9, pad=3)
 
 
-def _draw_treatment_icons(ax, drawings, row_ys, colors):
+def _draw_treatment_icons(ax, drawings, row_ys, colors, *, active_alpha=.54):
     """Repeat the original control glyphs and fade the manipulated senses."""
     # Control-row paths for vision, magnetoreception, olfaction and echolocation.
     glyphs = [drawings[index] for index in (60, 65, 51, 56)]
@@ -105,7 +105,7 @@ def _draw_treatment_icons(ax, drawings, row_ys, colors):
             center = ((x0 + x1) / 2, source.PAGE_H - row_y)
             muted = column in faded
             ax.add_patch(Circle(center, 12, facecolor=color, edgecolor='none',
-                                alpha=.15 if muted else .54, clip_on=False, zorder=10))
+                                alpha=.15 if muted else active_alpha, clip_on=False, zorder=10))
             patch = source.draw_drawing(ax, glyph, zorder=11)
             patch.set_transform(transform)
             patch.set_alpha(.30 if muted else 1)

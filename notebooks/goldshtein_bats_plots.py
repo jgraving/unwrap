@@ -862,6 +862,23 @@ def plot_destination_panels(
         _save(fig, save, save_path)
         return fig
 
+
+def _compact_destination_legend(*, show_dropout, gap_linestyle="--", gap_color="black"):
+    """Return the notebook's map key for the roost, releases, and signal gaps."""
+    handles = [
+        Line2D([0], [0], marker="*", color="none",
+               markerfacecolor="white", markeredgecolor="black",
+               markeredgewidth=0.8, markersize=7.2, label="Roost"),
+        Line2D([0], [0], marker="X", color="none",
+               markerfacecolor="white", markeredgecolor="black",
+               markeredgewidth=0.8, markersize=6.2, label="Translocation"),
+    ]
+    if show_dropout:
+        handles.append(Line2D([0, 1], [0, 0], color=gap_color, lw=1.0,
+                              linestyle=gap_linestyle, alpha=0.95, label="Signal dropout"))
+    return handles
+
+
 def plot_destination_panels_compact(
     resampled_df,
     meta_df,
@@ -1058,22 +1075,9 @@ def plot_destination_panels_compact(
         ax.add_patch(rect)
 
     # --- Legend: top-right INSIDE right plot, compact and properly fitting ---
-    other_handles = [
-        Line2D([0], [0], marker="*", color="none",
-               markerfacecolor="white", markeredgecolor="black",
-               markeredgewidth=0.8, markersize=7.2, label="Roost"),
-        Line2D([0], [0], marker="X", color="none",
-               markerfacecolor="white", markeredgecolor="black",
-               markeredgewidth=0.8, markersize=6.2, label="Translocation"),
-    ]
-    if len(res_gaps_gdf):
-        other_handles.append(
-            Line2D([0, 1], [0, 0], color="black", lw=1.0,
-                   linestyle=gap_linestyle, alpha=0.95, label="Signal dropout")
-        )
-
     axes[1].legend(
-        handles=other_handles,
+        handles=_compact_destination_legend(show_dropout=not res_gaps_gdf.empty,
+                                            gap_linestyle=gap_linestyle),
         loc="upper right",
         bbox_to_anchor=(0.985, 0.985),
         borderaxespad=0.2,
