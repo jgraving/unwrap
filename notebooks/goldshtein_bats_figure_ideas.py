@@ -9,8 +9,8 @@ import goldshtein_bats_publication_figure as source
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.patches import Wedge
-from matplotlib.ticker import MultipleLocator
+from matplotlib.patches import Arc, Wedge
+from matplotlib.ticker import MultipleLocator, StrMethodFormatter
 import numpy as np
 
 from goldshtein_bats_layout_data import _goal_window_mass, _population_parameters, _read_context
@@ -59,7 +59,7 @@ def flight_directedness(tracks, levels, posthoc):
     return heatmaps
 
 
-def draw_ideas(cones, heatmaps, levels, reference_angle):
+def draw_ideas(cones, heatmaps, levels):
     """Draw the goal-cone and flight-by-flight views at composite width."""
     fig = plt.figure(figsize=(PAGE_W / 72, PAGE_H / 72), facecolor="white")
     colors = dict(zip(levels, composite.PALETTE, strict=True))
@@ -75,14 +75,19 @@ def draw_ideas(cones, heatmaps, levels, reference_angle):
     page_text(336, 24, "B", fontsize=15, weight="bold")
     page_text(356, 24, "Homing, flight by flight", fontsize=12, weight="bold")
 
-    cone = axes_at(56, 38, 70, 45)
-    cone.set(xlim=(-0.07, 1.7), ylim=(-0.82, 0.81), aspect="equal")
+    cone = axes_at(51, 38, 87, 45)
+    cone.set(xlim=(-0.07, 2.35), ylim=(-0.69, 0.71), aspect="equal")
     cone.axis("off")
-    cone.add_patch(Wedge((0, 0), 1, -reference_angle, reference_angle,
+    example_angle = 36
+    cone.add_patch(Wedge((0, 0), 1, -example_angle, example_angle,
                          facecolor="#e3edf2", edgecolor="#7894a3", linewidth=.65))
-    cone.annotate("", (1.04, 0), (0, 0), arrowprops={"arrowstyle": "->", "lw": .85})
-    cone.text(1.13, 0, "Goal", va="center", fontsize=8)
-    cone.text(.51, -.71, f"±{reference_angle:g}°", ha="center", va="top", fontsize=8)
+    cone.annotate("", (1.09, 0), (0, 0), arrowprops={"arrowstyle": "->", "lw": .85})
+    cone.add_patch(Arc((0, 0), 1.06, 1.06, theta1=0, theta2=example_angle,
+                       color=composite.INK, linewidth=.9))
+    angle_mid = np.deg2rad(example_angle / 2)
+    cone.text(.72 * np.cos(angle_mid), .72 * np.sin(angle_mid), "α",
+              ha="center", va="center", fontsize=10)
+    cone.text(1.17, 0, "Goal bearing", va="center", fontsize=8)
 
     fig.legend([Line2D([], [], color=colors[level], lw=1.5) for level in levels],
                composite.LABELS, loc="center", bbox_to_anchor=(216 / PAGE_W, 1 - 57 / PAGE_H),
@@ -93,22 +98,22 @@ def draw_ideas(cones, heatmaps, levels, reference_angle):
     delta = axes_at(58, 197, 248, 82)
     for ax in (share, delta):
         ax.spines[["top", "right"]].set_visible(False)
-        ax.axvline(reference_angle, color="#a2a2a2", lw=.65, ls=(0, (3, 2)), zorder=0)
         ax.set(xlim=(0, 180), xticks=(0, 45, 90, 135, 180))
         ax.tick_params(length=3, width=.65)
 
     for level, curve in means.items():
-        share.plot(angles, 100 * curve, color=colors[level], lw=1.35)
-    share.set(ylim=(0, 102), yticks=(0, 25, 50, 75, 100), ylabel="Predicted share (%)")
+        share.plot(angles, curve, color=colors[level], lw=1.35)
+    share.set(ylim=(0, 1.02), yticks=(0, .25, .5, .75, 1), ylabel="Predictive probability")
+    share.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     share.tick_params(axis="x", labelbottom=False)
 
     delta.axhline(0, color="#666666", lw=.65, ls=(0, (3, 2)), zorder=2)
     for level, (mean, lo, hi) in contrasts.items():
-        delta.fill_between(angles, 100 * lo, 100 * hi, color=colors[level], alpha=.16, lw=0)
-        delta.plot(angles, 100 * mean, color=colors[level], lw=1.35, zorder=3)
-    delta.yaxis.set_major_locator(MultipleLocator(5))
-    delta.set(xlabel="Cone half-angle from the goal bearing (°)",
-              ylabel="Change vs. control\n(percentage points)")
+        delta.fill_between(angles, lo, hi, color=colors[level], alpha=.16, lw=0)
+        delta.plot(angles, mean, color=colors[level], lw=1.35, zorder=3)
+    delta.yaxis.set_major_locator(MultipleLocator(.05))
+    delta.set(xlabel="Half-angle α from the goal bearing (°)",
+              ylabel="Difference in probability\nvs. control")
 
     page_text(356, 43, "One row per bat. Gray marks distance beyond its modeled path.",
               fontsize=8.5, color="#555555")
@@ -166,7 +171,7 @@ def main(argv=None):
              "text.color": composite.INK, "axes.labelcolor": composite.INK,
              "axes.edgecolor": composite.INK, "axes.linewidth": .65}
     with mpl.rc_context(style):
-        fig = draw_ideas(cones, heatmaps, levels, posthoc.MASS_HALF_WIDTH_DEG)
+        fig = draw_ideas(cones, heatmaps, levels)
         composite.save_figure(fig, args.output_dir, "bat_figure_ideas")
 
 
