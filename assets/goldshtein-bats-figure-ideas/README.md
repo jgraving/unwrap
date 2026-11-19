@@ -1,5 +1,7 @@
 # Candidate bat figure panels
 
+[Goal-cone and flight panels PDF](bat_figure_ideas.pdf) · [PNG preview](bat_figure_ideas.png)
+
 **A. Heading within the goal cone.** The upper plot shows the probability of
 a heading falling within ±α of the local goal bearing. The inset marks α
 from the goal bearing to one edge of the cone. The lower plot shows paired
@@ -17,6 +19,8 @@ mark distance beyond each flight's modeled path. Smoothing resets at tracking
 gaps.
 
 ## Composite with flight heatmaps
+
+[Composite PDF](bat_composite_heatmaps.pdf) · [PNG preview](bat_composite_heatmaps.png)
 
 Panel b shows the geography of the 67 routes, including release sites, the
 roost, the lake and tracking gaps. Panel d aligns the corresponding treatment
