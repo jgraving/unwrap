@@ -120,7 +120,7 @@ def draw_ideas(cones, heatmaps, levels):
     delta.set(xlabel="Half-angle α from the goal bearing (°)",
               ylabel="Difference in probability\nvs. control")
 
-    page_text(356, 43, "Gray marks distance beyond each flight.",
+    page_text(356, 43, "Blank cells lie beyond each flight.",
               fontsize=8.5, color="#555555")
     top = 57
     for level, label in zip(levels, composite.LABELS, strict=True):

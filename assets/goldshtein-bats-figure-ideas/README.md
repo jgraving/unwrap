@@ -14,11 +14,12 @@ individual offsets set to zero.
 **B. Directedness by individual.** The 67 rows show the same posterior
 directedness measure and trailing smoother as the main composite. Rows are
 sorted by modeled path length within treatment. Zero is the last modeled step
-of each flight. The horizontal scale uses 60 m per modeled step. Gray cells
+of each flight. The horizontal scale uses 60 m per modeled step. White cells
 mark distance beyond each flight's modeled path, and white separators mark
-individual rows. The diverging color scale centers on 0.5, where the directed
-and undirected components have equal support. Values toward 0 favor the
-undirected component and values toward 1 favor the directed component.
+individual rows. The purple and orange ramps use even Oklab steps from black
+at 0.5, with matched lightness and chroma across the midpoint. At 0.5 the
+directed and undirected components have equal support. Values toward 0 favor
+the undirected component and values toward 1 favor the directed component.
 Smoothing resets at tracking gaps.
 
 ## Composite with flight heatmaps
@@ -30,8 +31,9 @@ roost, the lake and tracking gaps. Shades of each treatment color distinguish
 individual routes. Panel d aligns the corresponding treatment
 heatmaps below the maps. Each row is one bat, and all four tiles show the
 last 6.6 km of modeled path on the same distance and directedness scales.
-Gray cells mark distance beyond an individual's modeled path. The
+White cells mark distance beyond an individual's modeled path. The
 group-average curves and their uncertainty are candidates for a supplement.
+The blue Control point in panel e marks the zero difference from control.
 
 Render from the same verified tracks and model fits as the main composite.
 

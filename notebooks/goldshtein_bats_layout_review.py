@@ -20,14 +20,40 @@ import goldshtein_bats_publication_figure as source
 
 INK = "#222222"
 MAP_FACE = "#f5f6f5"
-HEATMAP_CMAP = mpl.colors.LinearSegmentedColormap.from_list(
-    "directedness", ("#86255f", "#f7f5ef", "#456e23"), N=257
-).with_extremes(bad="#d8dcdf")
 HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
 PAGE_W, PAGE_H = 646, 489
 OUTPUT_DIR = source.ROOT / 'assets' / 'goldshtein-bats-layout-review'
+
+
+def _directedness_colormap():
+    """Use matched purple and orange Oklab ramps from black."""
+    hue = np.deg2rad([286, 43])
+    lightness, chroma = .71, .15
+    endpoints = np.column_stack(([lightness] * 2, chroma * np.cos(hue), chroma * np.sin(hue)))
+    position = np.linspace(-1, 1, 257)
+    lab = endpoints[(position >= 0).astype(int)] * np.abs(position[:, None])
+
+    # Inverse Oklab transform (https://bottosson.github.io/posts/oklab/).
+    lab_to_lms = np.array([
+        [1, .3963377774, .2158037573],
+        [1, -.1055613458, -.0638541728],
+        [1, -.0894841775, -1.2914855480],
+    ])
+    lms_to_rgb = np.array([
+        [4.0767416621, -3.3077115913, .2309699292],
+        [-1.2684380046, 2.6097574011, -.3413193965],
+        [-.0041960863, -.7034186147, 1.7076147010],
+    ])
+    linear = (lab @ lab_to_lms.T) ** 3 @ lms_to_rgb.T
+    if np.any((linear < 0) | (linear > 1)):
+        raise ValueError("Directedness colors lie outside the sRGB gamut")
+    rgb = np.where(linear <= .0031308, 12.92 * linear, 1.055 * linear ** (1 / 2.4) - .055)
+    return mpl.colors.ListedColormap(rgb, name="directedness").with_extremes(bad="white")
+
+
+HEATMAP_CMAP = _directedness_colormap()
 
 
 def _route_shades(color, n_routes):
@@ -279,7 +305,7 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     # e. Full-mixture polar densities and their 0° contrasts against control.
     if flight_view:
         letter_x, density_y = 22, 450
-        polar_centers, polar_top, polar_size = (55, 129, 203, 277), 474, 55
+        polar_centers, polar_top, polar_size = (59, 141, 223, 305), 473, 72
         contrast_box = (424, 471, 196, 64)
     else:
         letter_x, density_y = 420, 314
@@ -311,25 +337,29 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
 
     d = axes_at(*contrast_box)
     d.axvline(0, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
-    for y, level in enumerate(levels[1:]):
+    contrast_labels = LABELS if flight_view else LABELS[1:]
+    contrast_levels = levels if flight_view else levels[1:]
+    if flight_view:
+        d.plot(0, 0, 'o', color=colors[levels[0]], ms=4.1, zorder=3)
+    for y, level in enumerate(levels[1:], start=1 if flight_view else 0):
         mean, lo, hi = data['full_contrasts'][level]
         d.errorbar(mean, y, xerr=[[mean-lo],[hi-mean]], color=colors[level],
                    fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
-    d.set(xlim=(-.34,.04), ylim=(2.57,-.57), xticks=(-.3,-.2,-.1,0),
-          yticks=range(3), yticklabels=LABELS[1:])
+    d.set(xlim=(-.34,.04), ylim=(len(contrast_labels)-1+.57,-.57), xticks=(-.3,-.2,-.1,0),
+          yticks=range(len(contrast_labels)), yticklabels=contrast_labels)
     d.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
     setup_axes(d)
     d.spines['left'].set_visible(False)
     d.tick_params(axis='y', length=0, pad=5)
-    for text_artist, color in zip(d.get_yticklabels(), PALETTE[1:], strict=True):
-        text_artist.set_color(color)
+    for text_artist, level in zip(d.get_yticklabels(), contrast_levels, strict=True):
+        text_artist.set_color(colors[level])
     if flight_view:
         from locust_density_figure import add_compact_unit_label
 
         x, y, width, height = contrast_box
         prop = d.xaxis.label.get_fontproperties()
         add_compact_unit_label(fig, x+width/2, page_h-(y+height+24),
-                               'Change vs. control', 'radian', -1,
+                               'Density change vs. control', 'radian', -1,
                                fontsize=prop.get_size_in_points(), prop=prop)
     else:
         d.set_xlabel('Change vs. control (per radian)')
