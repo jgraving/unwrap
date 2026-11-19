@@ -1,4 +1,4 @@
-"""Render two candidate homing panels from the pinned bat model and tracks."""
+"""Render candidate homing panels and a flight-by-flight bat composite."""
 from __future__ import annotations
 
 import argparse
@@ -13,11 +13,15 @@ from matplotlib.patches import Arc, Wedge
 from matplotlib.ticker import MultipleLocator, StrMethodFormatter
 import numpy as np
 
-from goldshtein_bats_layout_data import _goal_window_mass, _population_parameters, _read_context
+from goldshtein_bats_layout_data import (
+    _goal_window_mass,
+    _population_parameters,
+    _read_context,
+    assemble_layout_data,
+)
 
 
 PAGE_W, PAGE_H = composite.PAGE_W, 317
-ABSENT = "#eeeeee"
 OUTPUT_DIR = source.ROOT / "assets" / "goldshtein-bats-figure-ideas"
 
 
@@ -117,7 +121,7 @@ def draw_ideas(cones, heatmaps, levels):
 
     page_text(356, 43, "One row per bat. Gray marks distance beyond its modeled path.",
               fontsize=8.5, color="#555555")
-    cmap = mpl.colormaps["viridis"].with_extremes(bad=ABSENT)
+    cmap = mpl.colormaps["viridis"].with_extremes(bad=composite.HEATMAP_ABSENT)
     norm = mpl.colors.Normalize(0, 1)
     step_km = source.STEP_LENGTH_M / 1000
     far, end = (heatmaps[levels[0]].shape[1] - .5) * step_km, -.5 * step_km
@@ -162,7 +166,7 @@ def main(argv=None):
 
     source.resolve_fonts(args.font_dir, args.font_family)
     root = source.prepare_inputs(args.data_root, download=args.download)
-    ctx, posthoc, _, _ = _read_context(root)
+    ctx, posthoc, plots, lake_path = _read_context(root)
     levels = [int(level) for level in ctx["treatment_order"]]
     cones = goal_cone_curves(ctx["idata_vmu"].posterior, levels, posthoc)
     heatmaps = flight_directedness(ctx["df_track"], levels, posthoc)
@@ -173,6 +177,9 @@ def main(argv=None):
     with mpl.rc_context(style):
         fig = draw_ideas(cones, heatmaps, levels)
         composite.save_figure(fig, args.output_dir, "bat_figure_ideas")
+        layout = assemble_layout_data(ctx, posthoc, plots, lake_path)
+        fig = composite.draw_composite(layout, flight_heatmaps=heatmaps)
+        composite.save_figure(fig, args.output_dir, "bat_composite_heatmaps")
 
 
 if __name__ == "__main__":

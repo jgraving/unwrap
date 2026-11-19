@@ -109,7 +109,11 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
 def load_layout_data(data_root):
     """Validate the input pins and assemble the map, model, and heading panels."""
     root = publication.prepare_inputs(data_root)
-    ctx, posthoc, plots, lake_path = _read_context(root)
+    return assemble_layout_data(*_read_context(root))
+
+
+def assemble_layout_data(ctx, posthoc, plots, lake_path):
+    """Build the composite's panel data from the restored notebook context."""
     observed = ctx["df_track"]
     tracks = ctx["track_w_treat"]
     if not (observed.index.is_unique and tracks.index.is_unique and observed.index.isin(tracks.index).all()):

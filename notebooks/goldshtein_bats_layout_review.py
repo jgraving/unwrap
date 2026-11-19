@@ -20,26 +20,29 @@ import goldshtein_bats_publication_figure as source
 
 INK = "#222222"
 MAP_FACE = "#f5f6f5"
+HEATMAP_ABSENT = "#eeeeee"
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
 PAGE_W, PAGE_H = 646, 489
 OUTPUT_DIR = source.ROOT / 'assets' / 'goldshtein-bats-layout-review'
 
 
-def draw_composite(data, *, photo_path=None):
+def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     """Compose the photo, matched maps, and three fitted summaries."""
+    flight_view = flight_heatmaps is not None
+    page_h = 565 if flight_view else PAGE_H
     levels = data["levels"]
     colors = dict(zip(levels, PALETTE, strict=True))
     norm = mpl.colors.Normalize(0, 1)
     cmap = mpl.colormaps["viridis"]
-    fig = plt.figure(figsize=(PAGE_W / 72, PAGE_H / 72), facecolor="white")
+    fig = plt.figure(figsize=(PAGE_W / 72, page_h / 72), facecolor="white")
 
     def axes_at(x, y, w, h, **kwargs):
-        return fig.add_axes([x/PAGE_W, 1-(y+h)/PAGE_H, w/PAGE_W, h/PAGE_H], **kwargs)
+        return fig.add_axes([x/PAGE_W, 1-(y+h)/page_h, w/PAGE_W, h/page_h], **kwargs)
 
 
     def page_text(x, y, text, **kwargs):
-        return fig.text(x/PAGE_W, 1-y/PAGE_H, text, va='center', **kwargs)
+        return fig.text(x/PAGE_W, 1-y/page_h, text, va='center', **kwargs)
 
 
     def letter(x, y, value, **kwargs):
@@ -49,6 +52,16 @@ def draw_composite(data, *, photo_path=None):
     def setup_axes(ax):
         ax.spines[['top', 'right']].set_visible(False)
         ax.tick_params(length=3, width=.65, pad=3)
+
+    def directedness_scale(x, y, width):
+        cb = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
+                          cax=axes_at(x, y, width, 5.5),
+                          orientation='horizontal', ticks=[0,.5,1], format='%g')
+        cb.solids.set_rasterized(False)
+        cb.solids.set_edgecolor('face')
+        cb.outline.set_linewidth(.5)
+        cb.ax.tick_params(labelsize=8, length=2.25, pad=2)
+        page_text(x+width+11, y+2.6, 'Posterior directedness', fontsize=9.5)
 
 
     # a. Use the original placeholder and retain all four icon rows as vector art.
@@ -78,9 +91,10 @@ def draw_composite(data, *, photo_path=None):
     for y, label in zip((126.58,158.73,190.90,223.05), LABELS, strict=True):
         page_text(108, icon_top+(y-iy0)*icon_scale, label, fontsize=9.3)
 
-    # b. Four map panels share metric bounds and a single directedness scale.
+    # b. Four map panels share metric bounds.
     letter(190, 24, 'b')
-    page_text(410, 24, 'Homing trajectories', weight='bold', fontsize=11.2, ha='center')
+    map_title = 'Homing routes' if flight_view else 'Homing trajectories'
+    page_text(410, 24, map_title, weight='bold', fontsize=11.2, ha='center')
     tracks = data['tracks'].copy()
     tracks['directedness'] = tracks.index.map(data['evidence'])
     track_groups = tracks.groupby('tag', sort=False, observed=True)
@@ -124,13 +138,18 @@ def draw_composite(data, *, photo_path=None):
             segments.extend(indexed_segments[valid])
             means.extend(score[valid])
 
-        ax.add_collection(LineCollection(unscored, colors='#a7aeae', lw=.53, alpha=.64, zorder=3))
+        if flight_view:
+            ax.add_collection(LineCollection(segments + unscored, colors='#40545d', lw=.65,
+                                             alpha=.70, capstyle='round', zorder=3))
+        else:
+            ax.add_collection(LineCollection(unscored, colors='#a7aeae', lw=.53, alpha=.64, zorder=3))
         ax.add_collection(LineCollection(gaps, colors='#959b9c', lw=.5, alpha=.65,
                                          linestyles=(0,(2.3,2)), zorder=3))
-        colored = LineCollection(segments, cmap=cmap, norm=norm, lw=.76, alpha=.88,
-                                 capstyle='round', zorder=4)
-        colored.set_array(np.asarray(means))
-        ax.add_collection(colored)
+        if not flight_view:
+            colored = LineCollection(segments, cmap=cmap, norm=norm, lw=.76, alpha=.88,
+                                     capstyle='round', zorder=4)
+            colored.set_array(np.asarray(means))
+            ax.add_collection(colored)
         for site in data['sites']:
             ax.plot(*site, marker='X', ms=5.4, mec='white', mew=.8, mfc=INK, zorder=5)
         ax.plot(*data['roost'], marker='*', ms=7.6, mec='white', mew=.8, mfc=INK, zorder=5)
@@ -148,20 +167,14 @@ def draw_composite(data, *, photo_path=None):
                         ha='center', fontsize=8)
     assert counts == data['counts'] == dict(zip(levels, (29,14,15,9), strict=True))
 
-    cax = axes_at(318, 279, 173, 5.5)
-    cb = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax,
-                      orientation='horizontal', ticks=[0,.5,1], format='%g')
-    cb.solids.set_rasterized(False)
-    cb.solids.set_edgecolor('face')
-    cb.outline.set_linewidth(.5)
-    cb.ax.tick_params(labelsize=8, length=2.25, pad=2)
-    page_text(502, 281.6, 'Posterior directedness', fontsize=9.5)
+    if not flight_view:
+        directedness_scale(318, 279, 173)
 
     # c. Step-level PSIS-LOO ELPD and one standard error per model.
-    plot_bottom = 456
-    letter(22, 314, 'c')
-    page_text(103, 314, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
-    comparison = axes_at(51, 337, 114, plot_bottom-337)
+    title_y, plot_top, plot_bottom = (289, 320, 391) if flight_view else (314, 337, 456)
+    letter(22, title_y, 'c')
+    page_text(103, title_y, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
+    comparison = axes_at(51, plot_top, 114, plot_bottom-plot_top)
     for y, key in enumerate(('vm','vmu')):
         score = data['scores'][key]
         comparison.errorbar(score['elpd'], y, xerr=score['se'], color=INK, fmt='o',
@@ -175,34 +188,65 @@ def draw_composite(data, *, photo_path=None):
     comparison.spines['left'].set_visible(False)
     comparison.tick_params(axis='y', length=0, pad=4)
 
-    # d. Progression plot. Low-support tails are subdued and defined in the caption.
-    letter(182, 314, 'd')
-    page_text(309, 314, 'Homing progression', ha='center', weight='bold', fontsize=11)
-    c = axes_at(224, 337, 178, plot_bottom-337)
-    for level, color in colors.items():
-        curve = data['curves'][level]
-        x = np.abs(np.asarray(curve['x_mid']))/1000
-        mean = np.asarray(curve['mean'])
-        support = np.asarray(curve['n_tags_by_x']) >= 5
-        c.fill_between(x, curve['lo'], curve['hi'], where=support, color=color,
-                       alpha=.14, linewidth=0)
-        c.plot(x, np.where(support, mean, np.nan), color=color, lw=1.13, zorder=3)
-        c.plot(x, np.where(~support, mean, np.nan), color=color, lw=.85, alpha=.27, zorder=2)
-    c.axhline(.5, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
-    c.set(xlim=(6.6,0), ylim=(0,1), xticks=(6,4,2,0), yticks=(0,.5,1),
-          xlabel='Path distance remaining (km)', ylabel='Posterior directedness',
-          yticklabels=('0','0.5','1'))
-    setup_axes(c)
+    # d. Flight-level or group-level homing progression.
+    if flight_view:
+        letter(190, title_y, 'd')
+        page_text(410, title_y, 'Directedness by flight', ha='center', weight='bold', fontsize=11)
+        page_text(410, 303, 'One row per bat', ha='center', fontsize=8.5)
+        step_km = source.STEP_LENGTH_M / 1000
+        n_steps = source.LAST_N_STEPS + 1
+        far, end = (n_steps - .5) * step_km, -.5 * step_km
+        row_count = max(counts.values())
+        heat_cmap = cmap.with_extremes(bad=HEATMAP_ABSENT)
+        for center, level in zip(centers, levels, strict=True):
+            scores = flight_heatmaps[level][:, -n_steps:]
+            n_bats = counts[level]
+            assert scores.shape == (n_bats, n_steps)
+            page_text(center, 313, f'n = {n_bats}', color=colors[level], ha='center', fontsize=8.5)
+            ax = axes_at(center-map_w/2, plot_top, map_w, plot_bottom-plot_top)
+            ax.imshow(scores, extent=(far, end, n_bats, 0), aspect='auto',
+                      interpolation='nearest', cmap=heat_cmap, norm=norm)
+            ax.set(ylim=(row_count, 0), yticks=[], xticks=(6, 3, 0))
+            ax.spines[['left', 'top', 'right']].set_visible(False)
+            ax.tick_params(axis='x', labelsize=8, width=.6, length=2, pad=2)
+        page_text(410, 410, 'Modeled path distance remaining (km)', ha='center', fontsize=9.5)
+        directedness_scale(309, 423, 132)
+    else:
+        letter(182, title_y, 'd')
+        page_text(309, title_y, 'Homing progression', ha='center', weight='bold', fontsize=11)
+        c = axes_at(224, plot_top, 178, plot_bottom-plot_top)
+        for level, color in colors.items():
+            curve = data['curves'][level]
+            x = np.abs(np.asarray(curve['x_mid']))/1000
+            mean = np.asarray(curve['mean'])
+            support = np.asarray(curve['n_tags_by_x']) >= 5
+            c.fill_between(x, curve['lo'], curve['hi'], where=support, color=color,
+                           alpha=.14, linewidth=0)
+            c.plot(x, np.where(support, mean, np.nan), color=color, lw=1.13, zorder=3)
+            c.plot(x, np.where(~support, mean, np.nan), color=color, lw=.85, alpha=.27, zorder=2)
+        c.axhline(.5, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
+        c.set(xlim=(6.6,0), ylim=(0,1), xticks=(6,4,2,0), yticks=(0,.5,1),
+              xlabel='Path distance remaining (km)', ylabel='Posterior directedness',
+              yticklabels=('0','0.5','1'))
+        setup_axes(c)
 
     # e. Full-mixture polar densities and their 0° contrasts against control.
-    letter(420, 314, 'e')
-    page_text(443, 314, 'Predictive heading density', weight='bold', fontsize=11)
+    if flight_view:
+        letter_x, density_y = 22, 450
+        polar_centers, polar_top, polar_size = (55, 129, 203, 277), 474, 55
+        contrast_box = (424, 471, 196, 64)
+    else:
+        letter_x, density_y = 420, 314
+        polar_centers, polar_top, polar_size = (444, 497, 550, 603), 341, 47
+        contrast_box = (486, 407, 134, plot_bottom-407)
+    letter(letter_x, density_y, 'e')
+    page_text(letter_x+23, density_y, 'Predictive heading density', weight='bold', fontsize=11)
     bearings = data['density_bearings']
     profiles = data['density_profiles']
     zero_radius = 1.0
     radius_max = zero_radius + 1.08 * max(profile['hi'].max() for profile in profiles.values())
-    for center, level, label in zip((444, 497, 550, 603), levels, LABELS, strict=True):
-        polar = axes_at(center-23.5, 341, 47, 47, projection='polar')
+    for center, level, label in zip(polar_centers, levels, LABELS, strict=True):
+        polar = axes_at(center-polar_size/2, polar_top, polar_size, polar_size, projection='polar')
         polar.set_theta_zero_location('N')
         polar.set_theta_direction(-1)
         polar.set(ylim=(0, radius_max), xticks=[], yticks=[])
@@ -216,10 +260,10 @@ def draw_composite(data, *, photo_path=None):
         polar.plot(bearings, zero_radius + profile['mean'], color=color, lw=1.05)
         mean_at_goal = profile['mean'][bearings.size // 2]
         polar.plot(0, zero_radius + mean_at_goal, 'o', color=color, ms=2.8)
-        page_text(center, 338, '0°', ha='center', fontsize=8)
-        page_text(center, 395, label, ha='center', color=color, fontsize=8.5)
+        page_text(center, polar_top-3, '0°', ha='center', fontsize=8)
+        page_text(center, polar_top+polar_size+7, label, ha='center', color=color, fontsize=8.5)
 
-    d = axes_at(486, 407, 134, plot_bottom-407)
+    d = axes_at(*contrast_box)
     d.axvline(0, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
     for y, level in enumerate(levels[1:]):
         mean, lo, hi = data['full_contrasts'][level]

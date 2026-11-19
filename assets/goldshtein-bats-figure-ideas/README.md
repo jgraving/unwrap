@@ -16,6 +16,15 @@ of each flight. The horizontal scale uses 60 m per modeled step. Gray cells
 mark distance beyond each flight's modeled path. Smoothing resets at tracking
 gaps.
 
+## Composite with flight heatmaps
+
+Panel b shows the geography of the 67 routes, including release sites, the
+roost, the lake and tracking gaps. Panel d aligns the corresponding treatment
+heatmaps below the maps. Each row is one bat, and all four tiles show the
+last 6.6 km of modeled path on the same distance and directedness scales.
+Gray cells mark distance beyond an individual's modeled path. The
+group-average curves and their uncertainty are candidates for a supplement.
+
 Render from the same verified tracks and model fits as the main composite.
 
 ```bash
