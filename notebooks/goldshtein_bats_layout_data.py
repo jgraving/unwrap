@@ -31,8 +31,8 @@ def _read_context(data_root):
     return ctx, posthoc, plots, lake_path
 
 
-def _mixture_predictions(posterior, levels, counts, posthoc):
-    """Evaluate the pinned vMU with individual offsets set to zero."""
+def _population_parameters(posterior, levels, posthoc):
+    """Return the pinned vMU draws with individual offsets set to zero."""
     if levels != [1, 2, 3, 4]:
         raise ValueError(f"Unexpected treatment order for the bat fit: {levels}")
 
@@ -46,6 +46,20 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     mu = circular_modulo(population_draws("mu0", "mu_treat"))
     kappa = softplus(population_draws("eta_kappa0", "kappa_treat"))
     weight = expit(population_draws("logit_p0", "beta_treat"))
+    return mu, kappa, weight
+
+
+def _goal_window_mass(tolerance, mu, kappa, weight, kappa_uniform):
+    """Integrate the predictive mixture from -tolerance to +tolerance."""
+    directed_mass = (vonmises.cdf(tolerance, kappa, loc=mu)
+                     - vonmises.cdf(-tolerance, kappa, loc=mu))
+    uniform_mass = vonmises.cdf(tolerance, kappa_uniform) - vonmises.cdf(-tolerance, kappa_uniform)
+    return np.clip(weight * directed_mass + (1 - weight) * uniform_mass, 0, 1)
+
+
+def _mixture_predictions(posterior, levels, counts, posthoc):
+    """Summarize the pinned population-level vMU predictive densities."""
+    mu, kappa, weight = _population_parameters(posterior, levels, posthoc)
 
     def summary(draws):
         return (float(np.mean(draws)), *map(float, posthoc.hdi_1d(draws, prob=0.95)))
@@ -69,11 +83,7 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
         density_profiles[level] = {"mean": density.mean(axis=0), "lo": lo, "hi": hi}
 
     half_width = posthoc.MASS_HALF_WIDTH_DEG
-    tolerance = np.deg2rad(half_width)
-    directed_mass = (vonmises.cdf(tolerance, kappa, loc=mu)
-                     - vonmises.cdf(-tolerance, kappa, loc=mu))
-    uniform_mass = vonmises.cdf(tolerance, kappa_uniform) - vonmises.cdf(-tolerance, kappa_uniform)
-    mass = np.clip(weight * directed_mass + (1 - weight) * uniform_mass, 0, 1)
+    mass = _goal_window_mass(np.deg2rad(half_width), mu, kappa, weight, kappa_uniform)
     by_treatment = mass - mass[:, :1]
     pooled = np.average(by_treatment[:, 1:], axis=1,
                         weights=[counts[level] for level in levels[1:]])
