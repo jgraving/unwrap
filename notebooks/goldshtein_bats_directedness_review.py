@@ -11,7 +11,9 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from matplotlib.textpath import TextToPath
 from matplotlib.ticker import MultipleLocator, StrMethodFormatter
+from matplotlib.transforms import ScaledTranslation
 import numpy as np
 from PIL import Image
 from scipy.special import expit
@@ -27,6 +29,9 @@ ONSET_GOLD = "#FFC850"
 ONSET_EDGE = "#664512"
 DIRECTED_FILL = "#87a1af"
 UNDIRECTED_FILL = "#d4d5d5"
+DIRECTEDNESS_CMAP = composite._directedness_colormap(
+    (335, 204), lightness=.82, chroma=.135, neutral_lightness=.29
+)
 ONSET_MARKERS = {
     "bout_onset": ("o", ONSET_GOLD, 2.5, "Directed bout onset and 90% interval"),
     "flight_start": ("o", "white", 2.6, "Directed at first usable step of flight"),
@@ -128,6 +133,15 @@ def draw_likelihood_diagrams(ax_vm, ax_vmu):
         ax.plot(bearings, np.full_like(bearings, reference), color="#a0a0a0", lw=.45)
 
 
+def center_zero_digit(label):
+    """Align the zero in a centered degree label to its bearing tick."""
+    measure = TextToPath().get_text_width_height_descent
+    font = label.get_fontproperties()
+    extra_width = measure("0°", font, ismath=False)[0] - measure("0", font, ismath=False)[0]
+    shift = ScaledTranslation(extra_width / (2 * 72), 0, label.figure.dpi_scale_trans)
+    label.set_transform(label.get_transform() + shift)
+
+
 def draw_heading_evidence(ax, bearings, scores):
     """Use a fixed-width colored ring to map evidence around the circle."""
     ax.set_theta_zero_location("N")
@@ -135,11 +149,13 @@ def draw_heading_evidence(ax, bearings, scores):
     ax.set_ylim(0, 1)
     ax.set_axis_off()
     ring = ax.pcolormesh(bearings, (.66, .96), scores[None, :], shading="flat",
-                         cmap=composite.HEATMAP_CMAP, norm=composite.HEATMAP_NORM,
+                         cmap=DIRECTEDNESS_CMAP, norm=composite.HEATMAP_NORM,
                          antialiased=False, linewidth=.18)
     ring.set_edgecolor("face")
     for angle, label in ((0, "0°"), (90, "90°"), (180, "180°"), (-90, "−90°")):
-        ax.text(np.deg2rad(angle), .45, label, ha="center", va="center", fontsize=6.7)
+        tick = ax.text(np.deg2rad(angle), .45, label, ha="center", va="center", fontsize=6.7)
+        if angle == 0:
+            center_zero_digit(tick)
 
 
 def draw_elpd_difference(plots, delta, ax, colors):
@@ -198,7 +214,7 @@ def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_sca
     if scores is None:
         colored = LineCollection(route, colors=route_colors, lw=.67, capstyle="round", zorder=4)
     else:
-        colored = LineCollection(route, cmap=composite.HEATMAP_CMAP, norm=composite.HEATMAP_NORM,
+        colored = LineCollection(route, cmap=DIRECTEDNESS_CMAP, norm=composite.HEATMAP_NORM,
                                  lw=.88, capstyle="round", zorder=4)
         colored.set_array(np.asarray(values))
     ax.add_collection(colored)
@@ -299,20 +315,19 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     bearings = data["density_bearings"]
     profiles = data["density_profiles"]
     radius_max = 1 + 1.08 * max(profile["hi"].max() for profile in profiles.values())
-    polar_size = 60
+    polar_size = 66
     slots = ((250, 172), (318, 172), (250, 246), (318, 246))
-    for (center, y), level, label in zip(slots, levels, composite.LABELS, strict=True):
+    for (center, y), level in zip(slots, levels, strict=True):
         polar = axes_at(center - polar_size / 2, y, polar_size, polar_size, projection="polar")
         composite.draw_polar_density(polar, bearings, profiles[level], colors[level], radius_max)
-        page_text(center, y - 3, "0°", ha="center", fontsize=8)
-        page_text(center, y + polar_size + 2, label, color=colors[level], fontsize=8.7, ha="center")
+        center_zero_digit(page_text(center, y - 3, "0°", ha="center", fontsize=8))
 
-    x, y, width, height = 394, 200, 102, 73
+    x, y, width, height = 390, 200, 102, 73
     contrast = axes_at(x, y, width, height)
     composite.draw_density_contrast(contrast, data, colors)
     prop = contrast.xaxis.label.get_fontproperties()
     add_compact_unit_label(fig, x + width / 2, PAGE_H - (y + height + 23),
-                           "Density change vs. control", "radian", -1,
+                           "Density difference vs. control", "radian", -1,
                            fontsize=prop.get_size_in_points(), prop=prop)
 
     letter(18, 329, "d")
@@ -340,7 +355,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         page_text(tile_left + tile_w / 2, top - 8, label, ha="center", color=color,
                   fontsize=9.3, weight="bold")
         tile = axes_at(tile_left, top, tile_w, n_bats * row_height)
-        composite.draw_flight_heatmap(tile, heatmaps[level])
+        composite.draw_flight_heatmap(tile, heatmaps[level], cmap=DIRECTEDNESS_CMAP)
         draw_onsets(tile, onsets[level])
         tile.set(ylim=(n_bats, 0), yticks=[], xticks=(6, 3, 0))
         tile.spines[["left", "top", "right"]].set_visible(False)
@@ -351,11 +366,11 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                          bottom=row == 1, labelbottom=row == 1)
 
     evidence_center = tile_lefts[1] + tile_w / 2
-    evidence_polar = axes_at(evidence_center - 29, 434, 58, 58, projection="polar")
+    evidence_polar = axes_at(evidence_center - 29, 421, 58, 58, projection="polar")
     draw_heading_evidence(evidence_polar, bearings, data["control_heading_evidence"])
     page_text(180, 470, "Individual", rotation=90, ha="center", fontsize=9.2)
     page_text(354, 588, "Path distance remaining (km)", ha="center", fontsize=9.5)
-    composite.draw_flight_colorbar(fig, axes_at(201, 613, 122, 5.5))
+    composite.draw_flight_colorbar(fig, axes_at(201, 613, 122, 5.5), cmap=DIRECTEDNESS_CMAP)
     onset_key = [Line2D([], [], color=ONSET_GOLD, linewidth=1.1,
                         linestyle="-" if fill == ONSET_GOLD else "none",
                         marker=marker, markersize=size + .8, markerfacecolor=fill,

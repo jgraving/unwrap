@@ -29,13 +29,13 @@ PAGE_W, PAGE_H = 646, 489
 OUTPUT_DIR = source.ROOT / 'assets' / 'goldshtein-bats-layout-review'
 
 
-def _directedness_colormap():
-    """Use matched purple and olive-green Oklab ramps from black."""
-    hue = np.deg2rad([286, 129])
-    lightness, chroma = .71, .15
+def _directedness_colormap(hues=(286, 129), *, lightness=.71, chroma=.15, neutral_lightness=0):
+    """Build two matched, equal-step Oklab ramps from a neutral midpoint."""
+    hue = np.deg2rad(hues)
     endpoints = np.column_stack(([lightness] * 2, chroma * np.cos(hue), chroma * np.sin(hue)))
     position = np.linspace(-1, 1, 257)
-    lab = endpoints[(position >= 0).astype(int)] * np.abs(position[:, None])
+    neutral = np.array([neutral_lightness, 0, 0])
+    lab = neutral + (endpoints[(position >= 0).astype(int)] - neutral) * np.abs(position[:, None])
 
     # Inverse Oklab transform (https://bottosson.github.io/posts/oklab/).
     lab_to_lms = np.array([
@@ -70,20 +70,20 @@ def _route_shades(color, n_routes):
     return ramp(np.linspace(0, 1, n_routes)[order])
 
 
-def draw_flight_heatmap(ax, scores):
+def draw_flight_heatmap(ax, scores, *, cmap=HEATMAP_CMAP):
     """Plot one row per individual with fine white row separators."""
     n_bats, n_steps = scores.shape
     step_km = source.STEP_LENGTH_M / 1000
     far, end = (n_steps - .5) * step_km, -.5 * step_km
     ax.imshow(scores, extent=(far, end, n_bats, 0), aspect='auto',
-              interpolation='nearest', cmap=HEATMAP_CMAP, norm=HEATMAP_NORM)
+              interpolation='nearest', cmap=cmap, norm=HEATMAP_NORM)
     ax.hlines(np.arange(1, n_bats), end, far, colors='white', linewidth=.42)
     ax.set_xlim(far, end)
 
 
-def draw_flight_colorbar(fig, cax):
+def draw_flight_colorbar(fig, cax, *, cmap=HEATMAP_CMAP):
     """Label the direction of evidence on either side of the neutral midpoint."""
-    cb = fig.colorbar(mpl.cm.ScalarMappable(norm=HEATMAP_NORM, cmap=HEATMAP_CMAP),
+    cb = fig.colorbar(mpl.cm.ScalarMappable(norm=HEATMAP_NORM, cmap=cmap),
                       cax=cax, orientation='horizontal')
     cb.solids.set_rasterized(False)
     cb.solids.set_edgecolor('face')
