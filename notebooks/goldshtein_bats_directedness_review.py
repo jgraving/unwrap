@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image
 from scipy.special import expit
 
-from goldshtein_bats_layout_data import _read_context, assemble_layout_data
+from goldshtein_bats_layout_data import _population_parameters, _read_context, assemble_layout_data
 from locust_density_figure import add_compact_unit_label
 
 
@@ -28,9 +28,8 @@ ONSET_EDGE = "#664512"
 DIRECTED_FILL = "#87a1af"
 UNDIRECTED_FILL = "#d4d5d5"
 ONSET_MARKERS = {
-    "within_segment": ("o", ONSET_GOLD, 2.5, "Directed bout onset and 90% interval"),
+    "bout_onset": ("o", ONSET_GOLD, 2.5, "Directed bout onset and 90% interval"),
     "flight_start": ("o", "white", 2.6, "Directed at first usable step of flight"),
-    "data_resume": ("^", "white", 3.1, "Directed when data resume"),
 }
 
 
@@ -46,12 +45,18 @@ def first_directed_bout(scores, eligible, *, run=5):
 
 
 def onset_kind(start, usable, gaps):
-    """Distinguish flight starts, resumption boundaries, and observed onsets."""
+    """Flag bouts detected at the flight's first usable step."""
     if start == np.argmax(usable) and not np.any(gaps[:start]):
         return "flight_start"
-    if not usable[start - 1]:
-        return "data_resume"
-    return "within_segment"
+    return "bout_onset"
+
+
+def control_heading_evidence(posterior, levels, posthoc, bearing_edges):
+    """Average control's baseline-adjusted evidence over posterior draws."""
+    mu, kappa, _ = _population_parameters(posterior, levels, posthoc)
+    centers = (bearing_edges[:-1] + bearing_edges[1:]) / 2
+    log_ratio = posthoc.evidence_log_ratio(centers[:, None], mu[:, 0], kappa[:, 0])
+    return expit(log_ratio).mean(axis=1)
 
 
 def flight_directedness(ctx, posthoc, levels):
@@ -105,21 +110,36 @@ def flight_directedness(ctx, posthoc, levels):
 
 def draw_likelihood_diagrams(ax_vm, ax_vmu):
     """Illustrate two normalized likelihoods with a shared directed component."""
-    degrees = np.linspace(-180, 180, 361)
+    bearings = np.linspace(-np.pi, np.pi, 361)
     kappa = 2.0
-    vm = np.exp(kappa * np.cos(np.deg2rad(degrees))) / (2 * np.pi * np.i0(kappa))
+    vm = np.exp(kappa * np.cos(bearings)) / (2 * np.pi * np.i0(kappa))
+    reference = .24
     for ax, directed_weight in ((ax_vm, 1.0), (ax_vmu, .55)):
         flat = (1 - directed_weight) / (2 * np.pi)
-        top = directed_weight * vm + flat
-        ax.fill_between(degrees, 0, flat, color=UNDIRECTED_FILL, linewidth=0)
-        ax.fill_between(degrees, flat, top, color=DIRECTED_FILL, linewidth=0)
-        ax.plot(degrees, top, color=composite.INK, lw=.75)
-        ax.set(xlim=(-180, 180), ylim=(0, 1.06 * vm.max()), yticks=[],
-               xticks=(-180, 0, 180), xticklabels=("", "0°", ""))
-        ax.spines[["left", "right", "top"]].set_visible(False)
-        ax.spines["bottom"].set_linewidth(.45)
-        ax.tick_params(axis="x", length=2, width=.45, pad=1, labelsize=7.3)
-    ax_vm.set_ylabel("Density", labelpad=2, fontsize=7.4)
+        baseline = reference + flat
+        top = baseline + directed_weight * vm
+        ax.set_theta_zero_location("N")
+        ax.set_theta_direction(-1)
+        ax.set(ylim=(0, reference + 1.06 * vm.max()), xticks=[], yticks=[])
+        ax.spines["polar"].set_visible(False)
+        ax.fill_between(bearings, reference, baseline, color=UNDIRECTED_FILL, linewidth=0)
+        ax.fill_between(bearings, baseline, top, color=DIRECTED_FILL, linewidth=0)
+        ax.plot(bearings, top, color=composite.INK, lw=.75)
+        ax.plot(bearings, np.full_like(bearings, reference), color="#a0a0a0", lw=.45)
+
+
+def draw_heading_evidence(ax, bearings, scores):
+    """Use a fixed-width colored ring to map evidence around the circle."""
+    ax.set_theta_zero_location("N")
+    ax.set_theta_direction(-1)
+    ax.set_ylim(0, 1)
+    ax.set_axis_off()
+    ring = ax.pcolormesh(bearings, (.66, .96), scores[None, :], shading="flat",
+                         cmap=composite.HEATMAP_CMAP, norm=composite.HEATMAP_NORM,
+                         antialiased=False, linewidth=.18)
+    ring.set_edgecolor("face")
+    for angle, label in ((0, "0°"), (90, "90°"), (180, "180°"), (-90, "−90°")):
+        ax.text(np.deg2rad(angle), .45, label, ha="center", va="center", fontsize=6.7)
 
 
 def draw_elpd_difference(plots, delta, ax, colors):
@@ -128,7 +148,7 @@ def draw_elpd_difference(plots, delta, ax, colors):
     delta_labels = delta["treatment"].map(labels).fillna("Total")
     plots.plot_delta_total_and_by_treatment(
         delta.assign(label=delta_labels), treatment_order=list(colors),
-        xlabel="ELPD difference (vMU − von Mises)",
+        xlabel="ELPD difference (vMU − vM)",
         save=False, ax=ax, treatment_colors=colors,
     )
     for tick, color in zip(ax.get_yticklabels()[1:], colors.values(), strict=True):
@@ -179,7 +199,7 @@ def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_sca
         colored = LineCollection(route, colors=route_colors, lw=.67, capstyle="round", zorder=4)
     else:
         colored = LineCollection(route, cmap=composite.HEATMAP_CMAP, norm=composite.HEATMAP_NORM,
-                                 lw=.61, capstyle="round", zorder=4)
+                                 lw=.88, capstyle="round", zorder=4)
         colored.set_array(np.asarray(values))
     ax.add_collection(colored)
     for site in data["sites"]:
@@ -243,7 +263,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     letter(26, 32, "a", color="white")
     page_text(139, 22, "Treatment groups", fontsize=10.7, weight="bold")
     ix0, iy0, ix1, iy1 = 202.9, 114.76, 304.79, 234.88
-    icon_top, icon_scale = 33, .57
+    icon_top, icon_scale = 32, .74
     icons = axes_at(139, icon_top, (ix1 - ix0) * icon_scale, (iy1 - iy0) * icon_scale)
     icons.set(xlim=(ix0, ix1), ylim=(source.PAGE_H - iy1, source.PAGE_H - iy0))
     icons.axis("off")
@@ -251,26 +271,25 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     drawings = source.panel_b_drawings(source.load_artwork())
     composite._draw_treatment_icons(icons, drawings, icon_rows, list(colors.values()))
     for level, label, y in zip(levels, composite.LABELS, icon_rows, strict=True):
-        page_text(205, icon_top + (y - iy0) * icon_scale, label, color=colors[level], fontsize=9.2)
+        page_text(220, icon_top + (y - iy0) * icon_scale, label, color=colors[level], fontsize=9.2)
 
-    page_text(389, 22, "Homing routes", ha="center", weight="bold", fontsize=10.7)
-    route_h = 87
+    route_h = 109
     route_w = route_h * map_ratio
     for center, level, label in zip((296, 358, 420, 482), levels, composite.LABELS, strict=True):
         color = colors[level]
-        page_text(center, 37, label, ha="center", color=color, fontsize=8.7)
-        map_ax = axes_at(center - route_w / 2, 45, route_w, route_h)
+        page_text(center, 22, label, ha="center", color=color, fontsize=8.7)
+        map_ax = axes_at(center - route_w / 2, 31, route_w, route_h)
         draw_track_map(map_ax, data, treatments[level], color, xlim, ylim)
 
     letter(18, 151, "b")
     page_text(39, 151, "Model comparison", weight="bold", fontsize=11)
-    page_text(63, 169, "von Mises", fontsize=8.5, ha="center")
-    page_text(151, 169, "von Mises\n–Uniform Mixture (vMU)", fontsize=8.3, ha="center")
-    draw_likelihood_diagrams(axes_at(25, 182, 76, 32), axes_at(113, 182, 76, 32))
-    page_text(107, 220, "Heading error", fontsize=7.4, ha="center")
+    page_text(63, 166, "von Mises (vM)", fontsize=8.5, ha="center")
+    page_text(151, 166, "von Mises–Uniform\nMixture (vMU)", fontsize=8.3, ha="center")
+    draw_likelihood_diagrams(axes_at(36, 177, 54, 54, projection="polar"),
+                             axes_at(124, 177, 54, 54, projection="polar"))
     fig.legend(handles=[Patch(facecolor=DIRECTED_FILL, label="Directed"),
                         Patch(facecolor=UNDIRECTED_FILL, label="Undirected")],
-               frameon=False, loc="center", bbox_to_anchor=(107 / PAGE_W, 1 - 232 / PAGE_H),
+               frameon=False, loc="center", bbox_to_anchor=(107 / PAGE_W, 1 - 233 / PAGE_H),
                ncols=2, fontsize=7.8, handlelength=1.3, handletextpad=.45, columnspacing=1.2)
     delta_ax = axes_at(69, 242, 122, 54)
     draw_elpd_difference(plots, delta, delta_ax, colors)
@@ -303,7 +322,8 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     map_centers = (52, 127)
     tile_lefts = (194, 363)
     tops = (357, 507)
-    tile_heights = (117, 77)
+    row_height = 4
+    lower_rows = max(data["counts"][level] for level in levels[2:])
     tile_w = 151
     for i, (level, label) in enumerate(zip(levels, composite.LABELS, strict=True)):
         row, col = divmod(i, 2)
@@ -319,22 +339,32 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
 
         page_text(tile_left + tile_w / 2, top - 8, label, ha="center", color=color,
                   fontsize=9.3, weight="bold")
-        tile = axes_at(tile_left, top, tile_w, tile_heights[row])
+        tile = axes_at(tile_left, top, tile_w, n_bats * row_height)
         composite.draw_flight_heatmap(tile, heatmaps[level])
         draw_onsets(tile, onsets[level])
         tile.set(ylim=(n_bats, 0), yticks=[], xticks=(6, 3, 0))
         tile.spines[["left", "top", "right"]].set_visible(False)
-        tile.tick_params(axis="x", labelsize=8, width=.6, length=2, pad=2, labelbottom=row == 1)
+        tile.spines["bottom"].set_visible(row == 1)
+        if row == 1:
+            tile.spines["bottom"].set_position(("outward", (lower_rows - n_bats) * row_height))
+        tile.tick_params(axis="x", labelsize=8, width=.6, length=2, pad=2,
+                         bottom=row == 1, labelbottom=row == 1)
+
+    evidence_center = tile_lefts[1] + tile_w / 2
+    page_text(evidence_center, 427, "Control evidence by heading", ha="center",
+              color=colors[levels[0]], fontsize=8.5, weight="bold")
+    evidence_polar = axes_at(evidence_center - 29, 434, 58, 58, projection="polar")
+    draw_heading_evidence(evidence_polar, bearings, data["control_heading_evidence"])
     page_text(180, 470, "Individual", rotation=90, ha="center", fontsize=9.2)
-    page_text(354, 604, "Path distance remaining (km)", ha="center", fontsize=9.5)
-    composite.draw_flight_colorbar(fig, axes_at(201, 627, 122, 5.5))
+    page_text(354, 588, "Path distance remaining (km)", ha="center", fontsize=9.5)
+    composite.draw_flight_colorbar(fig, axes_at(201, 613, 122, 5.5))
     onset_key = [Line2D([], [], color=ONSET_GOLD, linewidth=1.1,
                         linestyle="-" if fill == ONSET_GOLD else "none",
                         marker=marker, markersize=size + .8, markerfacecolor=fill,
                         markeredgecolor=ONSET_EDGE, markeredgewidth=.5, label=label)
                  for marker, fill, size, label in ONSET_MARKERS.values()]
     fig.legend(handles=onset_key, frameon=False,
-               loc="center left", bbox_to_anchor=(344 / PAGE_W, 1 - 630 / PAGE_H),
+               loc="center left", bbox_to_anchor=(344 / PAGE_W, 1 - 619 / PAGE_H),
                fontsize=8.3, handletextpad=.55, handlelength=1.8, borderaxespad=0)
     return fig
 
@@ -353,6 +383,9 @@ def main(argv=None):
     source.resolve_fonts(args.font_dir, args.font_family)
     ctx, posthoc, plots, lake_path = _read_context(root)
     data = assemble_layout_data(ctx, posthoc, plots, lake_path)
+    data["control_heading_evidence"] = control_heading_evidence(
+        ctx["idata_vmu"].posterior, data["levels"], posthoc, data["density_bearings"]
+    )
     flights = flight_directedness(ctx, posthoc, data["levels"])
     args.output_dir.mkdir(parents=True, exist_ok=True)
     style = {"font.family": args.font_family, "font.size": 9, "pdf.fonttype": 42,
