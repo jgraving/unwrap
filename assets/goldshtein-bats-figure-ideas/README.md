@@ -65,3 +65,26 @@ shares are 0.381 for von Mises and 0.412 for von Mises–Uniform.
 python notebooks/goldshtein_bats_model_panel.py --download \
     --font-family Arial --font-dir /path/to/arial-fonts
 ```
+
+## Compact-map composite and model diagnostics
+
+[Composite PDF](bat_composite_methods.pdf) · [PNG preview](bat_composite_methods.png) ·
+[Mixture parameter plot](bat_mixture_parameters.pdf)
+
+The four maps use the same geographic bounds and show each treatment on a
+smaller scale. Panel c pairs absolute PSIS-LOO ELPD with the mean paired
+change in ELPD per step (von Mises–Uniform minus von Mises) in six 30° bins
+of observed absolute heading error. Positive values favor the mixture. The
+largest total gain comes from steps within 30° of the goal bearing. The
+largest gain per step comes from the 150°–180° bin. Panel d gives the
+individual heatmaps the full width of the composite.
+
+The parameter plot shows one pair of posterior means per bat. The
+horizontal axis is the fitted directed-component weight. The vertical
+axis is the fitted probability of a heading falling within ±30° of the
+directed component’s own mean, conditional on that component.
+
+```bash
+python notebooks/goldshtein_bats_methods_review.py --download \
+    --font-family Arial --font-dir /path/to/arial-fonts
+```

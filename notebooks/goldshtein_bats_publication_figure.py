@@ -587,7 +587,7 @@ def build_context(data_root):
 
     # ---- panel tables (the notebook figure cells' statistics) ---------
     # c (cell 57/58): PSIS-LOO ELPD of both models, best first
-    res_total, best_model, _loo_cache = \
+    res_total, best_model, loo_cache = \
         posthoc.compute_psisloo_elpd_summary(
             models={"von Mises-Uniform": idata_mix,
                     "von Mises": idata_treatment},
@@ -663,6 +663,7 @@ def build_context(data_root):
         "idata_vmu": idata_mix,
         "treatment_order": list(treatment_order),
         "res_total": res_total,
+        "pointwise_elpd": loo_cache["loo_i_map"],
         "best_model": best_model,
         "delta_df": delta_df,
         "res_full": res_full,

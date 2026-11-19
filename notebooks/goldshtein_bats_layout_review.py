@@ -110,10 +110,15 @@ def _draw_treatment_icons(ax, drawings, row_ys, colors):
             patch.set_alpha(.30 if muted else 1)
 
 
-def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
+def draw_composite(data, *, photo_path=None, flight_heatmaps=None, heading_scores=None):
     """Compose the photo, matched maps, and three fitted summaries."""
     flight_view = flight_heatmaps is not None
+    methods_view = heading_scores is not None
+    if methods_view and not flight_view:
+        raise ValueError("The methods layout requires flight heatmaps")
     page_h = 565 if flight_view else PAGE_H
+    if methods_view:
+        page_h = 608
     levels = data["levels"]
     colors = dict(zip(levels, PALETTE, strict=True))
     norm = mpl.colors.Normalize(0, 1)
@@ -195,7 +200,7 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     features = np.vstack([xy_all, data['sites'], data['roost'], np.reshape(lake.bounds, (2,2))])
     xlim = features[:,0].min()-225, features[:,0].max()+225
     ylim = features[:,1].min()-300, features[:,1].max()+300
-    map_h = 216
+    map_h = 128 if methods_view else 216
     map_w = map_h*np.ptp(xlim)/np.ptp(ylim)
     centers = (244, 352, 460, 568)
     counts = {}
@@ -248,16 +253,17 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
                                      capstyle='round', zorder=4)
             colored.set_array(np.asarray(means))
             ax.add_collection(colored)
+        release_size, roost_size = (4.2, 5.8) if methods_view else (5.4, 7.6)
         for site in data['sites']:
-            ax.plot(*site, marker='X', ms=5.4, mec='white', mew=.8, mfc=INK, zorder=5)
-        ax.plot(*data['roost'], marker='*', ms=7.6, mec='white', mew=.8, mfc=INK, zorder=5)
+            ax.plot(*site, marker='X', ms=release_size, mec='white', mew=.8, mfc=INK, zorder=5)
+        ax.plot(*data['roost'], marker='*', ms=roost_size, mec='white', mew=.8, mfc=INK, zorder=5)
         if level == levels[-1]:
             x = xlim[1]-430
             y = ylim[0]+470
             ax.plot([x-1000,x],[y,y], color=INK, lw=1.45, zorder=6)
             ax.annotate('1 km', (x-500,y), textcoords='offset points', xytext=(0,4),
                         ha='center', fontsize=8)
-            arrow_y = ylim[1]-1470
+            arrow_y = ylim[1] - (1910 if methods_view else 1470)
             ax.annotate('', (x,arrow_y+700), (x,arrow_y),
                         arrowprops=dict(arrowstyle='-|>', lw=1.05, color=INK,
                                         shrinkA=0, shrinkB=0), zorder=6)
@@ -270,11 +276,17 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
 
     # c. Step-level PSIS-LOO ELPD and one standard error per model.
     title_y, plot_top, plot_bottom = (289, 314, 391) if flight_view else (314, 337, 456)
-    comparison_y, comparison_top = (309, 330) if flight_view else (title_y, plot_top)
-    letter(22, comparison_y, 'c')
-    page_text(103, comparison_y, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
-    comparison_x, comparison_width = (100, 78) if flight_view else (51, 114)
-    comparison = axes_at(comparison_x, comparison_top, comparison_width, plot_bottom-comparison_top)
+    if methods_view:
+        letter(190, 202, 'c')
+        page_text(410, 202, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
+        page_text(330, 218, 'Absolute ELPD', ha='center', weight='bold', fontsize=9.3)
+        comparison = axes_at(270, 232, 120, 50)
+    else:
+        comparison_y, comparison_top = (309, 330) if flight_view else (title_y, plot_top)
+        letter(22, comparison_y, 'c')
+        page_text(103, comparison_y, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
+        comparison_x, comparison_width = (100, 78) if flight_view else (51, 114)
+        comparison = axes_at(comparison_x, comparison_top, comparison_width, plot_bottom-comparison_top)
     for y, key in enumerate(('vm','vmu')):
         score = data['scores'][key]
         comparison.errorbar(score['elpd'], y, xerr=score['se'], color=INK, fmt='o',
@@ -293,17 +305,41 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
         for label in comparison.get_yticklabels():
             label.set_multialignment('right')
 
+    if methods_view:
+        page_text(549, 218, 'Predictive gain by heading error', ha='center',
+                  weight='bold', fontsize=9.3)
+        gain = axes_at(478, 232, 142, 50)
+        gain.axhline(0, color='#888888', linestyle=(0, (2, 2)), lw=.65)
+        gain.plot(heading_scores['centers'], heading_scores['means'], 'o', color=INK, ms=3.8)
+        gain.set(xlim=(0, 180), xticks=(0, 60, 120, 180),
+                 xlabel='Absolute heading error (°)', ylabel='ΔELPD per step')
+        gain.yaxis.set_major_locator(MultipleLocator(.1))
+        gain.yaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
+        setup_axes(gain)
+        gain.tick_params(labelsize=8)
+        gain.yaxis.label.set_fontsize(8.5)
+
     # d. Flight-level or group-level homing progression.
     if flight_view:
-        letter(190, title_y, 'd')
-        page_text(410, title_y, 'Directedness by individual', ha='center', weight='bold', fontsize=11)
+        if methods_view:
+            title_y, plot_top, plot_bottom = 320, 350, 433
+            centers, map_w = (112, 260, 408, 556), 138
+            panel_x, panel_center = 22, 334
+            x_label_y, colorbar_y = 450, 472
+        else:
+            panel_x, panel_center = 190, 410
+            x_label_y, colorbar_y = 410, 433
+        letter(panel_x, title_y, 'd')
+        page_text(panel_center, title_y, 'Directedness by individual',
+                  ha='center', weight='bold', fontsize=11)
         n_steps = source.LAST_N_STEPS + 1
         row_count = max(counts.values())
-        for center, level in zip(centers, levels, strict=True):
+        for center, level, treatment in zip(centers, levels, LABELS, strict=True):
             scores = flight_heatmaps[level][:, -n_steps:]
             n_bats = counts[level]
             assert scores.shape == (n_bats, n_steps)
-            page_text(center, 307, f'n = {n_bats}', color=colors[level], ha='center', fontsize=8.5)
+            label = f'{treatment} (n = {n_bats})' if methods_view else f'n = {n_bats}'
+            page_text(center, plot_top-7, label, color=colors[level], ha='center', fontsize=8.5)
             ax = axes_at(center-map_w/2, plot_top, map_w, plot_bottom-plot_top)
             draw_flight_heatmap(ax, scores)
             ax.set(ylim=(row_count, 0), yticks=[], xticks=(6, 3, 0))
@@ -311,8 +347,8 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
             ax.tick_params(axis='x', labelsize=8, width=.6, length=2, pad=2)
             if level == levels[0]:
                 ax.set_ylabel('Individual', fontsize=9.5, labelpad=4)
-        page_text(410, 410, 'Path distance remaining (km)', ha='center', fontsize=9.5)
-        draw_flight_colorbar(fig, axes_at(344, 433, 132, 5.5))
+        page_text(panel_center, x_label_y, 'Path distance remaining (km)', ha='center', fontsize=9.5)
+        draw_flight_colorbar(fig, axes_at(panel_center-66, colorbar_y, 132, 5.5))
     else:
         letter(182, title_y, 'd')
         page_text(309, title_y, 'Homing progression', ha='center', weight='bold', fontsize=11)
@@ -334,9 +370,10 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
 
     # e. Full-mixture polar densities and their 0° contrasts against control.
     if flight_view:
-        letter_x, density_y = 22, 450
-        polar_centers, polar_top, polar_size = (59, 141, 223, 305), 473, 72
-        contrast_box = (444, 471, 156, 64)
+        offset = 43 if methods_view else 0
+        letter_x, density_y = 22, 450 + offset
+        polar_centers, polar_top, polar_size = (59, 141, 223, 305), 473 + offset, 72
+        contrast_box = (444, 471 + offset, 156, 64)
     else:
         letter_x, density_y = 420, 314
         polar_centers, polar_top, polar_size = (444, 497, 550, 603), 341, 47
