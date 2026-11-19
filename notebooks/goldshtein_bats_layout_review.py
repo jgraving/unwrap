@@ -172,9 +172,10 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
 
     # c. Step-level PSIS-LOO ELPD and one standard error per model.
     title_y, plot_top, plot_bottom = (289, 320, 391) if flight_view else (314, 337, 456)
-    letter(22, title_y, 'c')
-    page_text(103, title_y, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
-    comparison = axes_at(51, plot_top, 114, plot_bottom-plot_top)
+    comparison_y, comparison_top = (309, 330) if flight_view else (title_y, plot_top)
+    letter(22, comparison_y, 'c')
+    page_text(103, comparison_y, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
+    comparison = axes_at(51, comparison_top, 114, plot_bottom-comparison_top)
     for y, key in enumerate(('vm','vmu')):
         score = data['scores'][key]
         comparison.errorbar(score['elpd'], y, xerr=score['se'], color=INK, fmt='o',
