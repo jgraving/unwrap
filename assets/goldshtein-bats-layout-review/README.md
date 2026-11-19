@@ -1,18 +1,18 @@
-# Bat composite layout review
+# Bat homing composite
 
-The landscape composite pairs the tagged-bat photo and treatment icons with
-all 67 flight trajectories. The bottom row shows absolute step-level PSIS-LOO
-ELPD with one SE per model, posterior directedness over remaining path distance,
-and full vMU density at 0° relative to control.
+The main-text composite pairs the tagged-bat photo placeholder and treatment
+icons (a) with all 67 flight trajectories colored by posterior directedness
+(b). The bottom row shows absolute step-level PSIS-LOO ELPD with one SE per
+model (c), posterior directedness over remaining path distance (d), and
+changes in goal alignment from control (e).
 
-The goal-window figure integrates the full vMU predictive heading density
-from −45° to +45° relative to the goal for each posterior draw. Points and
-whiskers show posterior means and 95% HDIs for that probability by treatment.
-The separate eye-cover sensitivity plot compares the
-eye-cover-only arm with control across angular windows. The figures evaluate
-the fitted group parameters with individual offsets set to zero. The JSON
-records draw-wise contrasts and the pooled contrast across the three groups
-with eye cover, weighted by their modeled bat counts (14, 15, and 9).
+Panel e integrates the full von Mises–Uniform (vMU) predictive heading density
+within ±45° of the goal, using fitted group parameters with individual offsets
+set to zero. It subtracts the control probability from each treatment
+probability within the same posterior draw. Points and whiskers show posterior
+means and 95% highest-density intervals. The dashed line at zero marks the
+control reference. The JSON also records the pooled contrast across the three
+groups with eye cover, weighted by their modeled bat counts (14, 15, and 9).
 
 From the repository root, install the figure dependencies and render from the
 pinned fit and data snapshots:
@@ -24,6 +24,6 @@ python notebooks/goldshtein_bats_layout_review.py --download \
 ```
 
 Pass `--data-root` to use verified local inputs without downloading. The
-renderer writes PDF and PNG previews and a JSON record to this directory by
+renderer writes one composite as PDF and PNG and a JSON record to this directory by
 default. Pass `--output-dir` for a separate destination, or `--photo` to use
 the final tagged-bat photograph when it is available.

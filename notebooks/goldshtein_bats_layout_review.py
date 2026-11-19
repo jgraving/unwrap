@@ -1,4 +1,4 @@
-"""Render the bat composite layout review and goal-window plots."""
+"""Render the bat composite from the pinned tracks and model fits."""
 from __future__ import annotations
 
 import argparse
@@ -23,7 +23,7 @@ INK = "#222222"
 MAP_FACE = "#f5f6f5"
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
-PAGE_W, PAGE_H = 646, 445
+PAGE_W, PAGE_H = 646, 456
 OUTPUT_DIR = source.ROOT / 'assets' / 'goldshtein-bats-layout-review'
 
 
@@ -161,7 +161,7 @@ def draw_composite(data, *, photo_path=None):
     # c. Step-level PSIS-LOO ELPD and one standard error per model.
     letter(22, 314, 'c')
     page_text(103, 314, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
-    comparison = axes_at(51, 329, 114, 82)
+    comparison = axes_at(51, 337, 114, 85)
     for y, key in enumerate(('vm','vmu')):
         score = data['scores'][key]
         comparison.errorbar(score['elpd'], y, xerr=score['se'], color=INK, fmt='o',
@@ -178,7 +178,7 @@ def draw_composite(data, *, photo_path=None):
     # d. Progression plot. Low-support tails are subdued and defined in the caption.
     letter(182, 314, 'd')
     page_text(309, 314, 'Homing progression', ha='center', weight='bold', fontsize=11)
-    c = axes_at(224, 329, 188, 82)
+    c = axes_at(224, 337, 178, 85)
     for level, color in colors.items():
         curve = data['curves'][level]
         x = np.abs(np.asarray(curve['x_mid']))/1000
@@ -194,77 +194,37 @@ def draw_composite(data, *, photo_path=None):
           yticklabels=('0','0.5','1'))
     setup_axes(c)
 
-    # e. Full-mixture treatment contrasts use the same colors and a single zero reference.
-    letter(433, 314, 'e')
-    page_text(541, 314, 'Treatment effects', ha='center', weight='bold', fontsize=11)
-    d = axes_at(501, 329, 119, 82)
+    # e. Changes from control in full-mixture probability within the goal sector.
+    letter(420, 314, 'e')
+    page_text(443, 314, 'Goal-aligned headings', weight='bold', fontsize=11)
+    diagram = axes_at(563, 299, 51, 31)
+    diagram.set(xlim=(-.8, 1.05), ylim=(-.1, 1.11), aspect='equal')
+    diagram.axis('off')
+    half_width = data['goal_window_half_width_degrees']
+    diagram.add_patch(Wedge((0, 0), 1, 90-half_width, 90+half_width,
+                            fc='#dce8ed', ec='#98a7ac', lw=.65))
+    diagram.annotate('', (0, .85), (0, .04),
+                     arrowprops={'arrowstyle': '-|>', 'color': INK, 'lw': .8})
+    diagram.plot(0, 0, 'o', color=INK, ms=2.1)
+    diagram.add_patch(Circle((0, .98), .10, fc='white', ec=INK, lw=.65))
+    diagram.plot(0, .98, 'o', color=INK, ms=1.8)
+    page_text(625, 314, f'±{half_width:g}°', ha='right', fontsize=9)
+
+    d = axes_at(486, 337, 134, 85)
     d.axvline(0, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
     for y, level in enumerate(levels[1:]):
-        mean, lo, hi = data['full_contrasts'][level]
+        mean, lo, hi = data['goal_window_contrasts'][level]
         d.errorbar(mean, y, xerr=[[mean-lo],[hi-mean]], color=colors[level],
                    fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
-    d.set(xlim=(-.38,.07), ylim=(2.57,-.57), xticks=(-.3,-.2,-.1,0),
+    d.set(xlim=(-.23,.04), ylim=(2.57,-.57), xticks=(-.2,-.1,0),
           yticks=range(3), yticklabels=LABELS[1:],
-          xlabel='Mixture density at 0° vs. control')
+          xlabel='Change in probability vs. control')
+    d.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
     setup_axes(d)
     d.spines['left'].set_visible(False)
     d.tick_params(axis='y', length=0, pad=5)
     for text_artist, color in zip(d.get_yticklabels(), PALETTE[1:], strict=True):
         text_artist.set_color(color)
-    return fig
-
-
-def draw_goal_window(data):
-    """Compare posterior predictive probability for bearings within the sector."""
-    fig = plt.figure(figsize=(5.9, 2.75), facecolor='white')
-    diagram = fig.add_axes([.022, .14, .30, .76], aspect='equal')
-    diagram.set(xlim=(-1.25, 1.25), ylim=(-1.06, 1.20))
-    diagram.axis('off')
-    diagram.add_patch(Circle((0, 0), 1, fill=False, ec='#c6cbce', lw=.7))
-    diagram.add_patch(Wedge((0, 0), 1, 45, 135, fc='#dce8ed', ec='none'))
-    for side in (-1, 1):
-        edge = 1 / np.sqrt(2)
-        diagram.plot([0, side*edge], [0, edge], color='#98a7ac', lw=.65)
-        diagram.annotate(f'{"−" if side < 0 else "+"}45°',
-                         (side*edge, edge), xytext=(side*3, 2),
-                         textcoords='offset points', fontsize=9,
-                         ha='right' if side < 0 else 'left', va='bottom')
-    diagram.annotate('', (0, .80), (0, .04),
-                     arrowprops={'arrowstyle': '-|>', 'color': INK, 'lw': 1.25})
-    diagram.plot(0, 0, 'o', color=INK, ms=3.4)
-    for radius, color in ((.10, 'white'), (.065, '#dce8ed'), (.025, INK)):
-        diagram.add_patch(Circle((0, .99), radius, fc=color, ec=INK, lw=.55))
-
-    axis = fig.add_axes([.49, .25, .46, .62])
-    for row, level in enumerate(data['levels']):
-        mean, lo, hi = data['goal_window_groups'][level]
-        axis.errorbar(mean, row, xerr=[[mean-lo], [hi-mean]], color=PALETTE[row],
-                      fmt='o', ms=5, elinewidth=1.1, capsize=2.4, capthick=1.0)
-    axis.set(xlim=(.55, .95), ylim=(3.57, -.57), yticks=range(4),
-             yticklabels=LABELS, xlabel='Posterior predictive probability')
-    axis.spines[['left', 'top', 'right']].set_visible(False)
-    axis.xaxis.set_major_locator(MultipleLocator(.10))
-    axis.xaxis.set_major_formatter(StrMethodFormatter('{x:.1f}'))
-    axis.tick_params(axis='y', length=0, pad=6)
-    axis.tick_params(axis='x', length=3, width=.65, pad=3)
-    axis.set_title('Goal-aligned headings', weight='bold', fontsize=11, pad=8)
-    return fig
-
-
-def draw_eye_cover_sensitivity(data):
-    """Show the eye-cover-only contrast over goal window widths."""
-    fig, axis = plt.subplots(figsize=(5.2, 3), layout='constrained')
-    angle, mean, lo, hi = np.asarray(data['vision_windows']).T
-    axis.fill_between(angle, lo*100, hi*100, color='#007b75', alpha=.20, lw=0)
-    axis.plot(angle, mean*100, color='#007b75', lw=1.5)
-    axis.axhline(0, color='#777777', ls=(0,(2,2)), lw=.7)
-    axis.axvline(45, color='#a0a5a6', ls=(0,(2,2)), lw=.7, zorder=0)
-    axis.set(xlim=(0, 90), xlabel='Goal window half-width (degrees)',
-             ylabel='Eye cover only − control\n(percentage points)')
-    axis.set_title('Eye cover and goal alignment', weight='bold', pad=8)
-    axis.xaxis.set_major_locator(MultipleLocator(15))
-    axis.yaxis.set_major_locator(MultipleLocator(5))
-    axis.spines[['top', 'right']].set_visible(False)
     return fig
 
 
@@ -302,8 +262,6 @@ def main(argv=None):
              'xtick.color': INK, 'ytick.color': INK, 'pdf.fonttype': 42}
     with mpl.rc_context(style):
         save_figure(draw_composite(data, photo_path=args.photo), args.output_dir, 'bat_composite')
-        save_figure(draw_goal_window(data), args.output_dir, 'bat_goal_window')
-        save_figure(draw_eye_cover_sensitivity(data), args.output_dir, 'bat_eye_cover_sensitivity')
     summary = {
         'inputs_sha256': source.INPUT_HASHES,
         'data_revision': source.DATA_REVISION,
@@ -312,7 +270,7 @@ def main(argv=None):
         'n_model_steps': len(data['evidence']),
         'elpd': data['scores'],
         'density_at_zero_treatment_contrasts': data['full_contrasts'],
-        'goal_window_half_width_degrees': 45,
+        'goal_window_half_width_degrees': data['goal_window_half_width_degrees'],
         'goal_window_rates': data['goal_window_groups'],
         'goal_window_treatment_contrasts': data['goal_window_contrasts'],
         'goal_window_pooled_contrast': data['pooled_goal_window_contrast'],

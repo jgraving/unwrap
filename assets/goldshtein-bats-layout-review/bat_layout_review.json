@@ -28,12 +28,12 @@
   "n_model_steps": 4942,
   "elpd": {
     "vmu": {
-      "elpd": -6710.059294421191,
-      "se": 60.29029359517193
+      "elpd": -6710.059294421164,
+      "se": 60.290293595171676
     },
     "vm": {
-      "elpd": -6828.780696350347,
-      "se": 59.31393335972166
+      "elpd": -6828.780696350324,
+      "se": 59.31393335972136
     }
   },
   "density_at_zero_treatment_contrasts": {
@@ -53,7 +53,7 @@
       -0.01385771373050304
     ]
   },
-  "goal_window_half_width_degrees": 45,
+  "goal_window_half_width_degrees": 45.0,
   "goal_window_rates": {
     "1": [
       0.8264013144739383,
