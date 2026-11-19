@@ -11,19 +11,23 @@ At α = 45°, the fitted probabilities are 0.83 for control and 0.72–0.74
 for the eye-cover groups. Predictions use the full vMU mixture with
 individual offsets set to zero.
 
-**B. Homing, flight by flight.** The 67 rows show the same posterior
+**B. Directedness by individual.** The 67 rows show the same posterior
 directedness measure and trailing smoother as the main composite. Rows are
 sorted by modeled path length within treatment. Zero is the last modeled step
 of each flight. The horizontal scale uses 60 m per modeled step. Gray cells
-mark distance beyond each flight's modeled path. Smoothing resets at tracking
-gaps.
+mark distance beyond each flight's modeled path, and white separators mark
+individual rows. The diverging color scale centers on 0.5, where the directed
+and undirected components have equal support. Values toward 0 favor the
+undirected component and values toward 1 favor the directed component.
+Smoothing resets at tracking gaps.
 
 ## Composite with flight heatmaps
 
 [Composite PDF](bat_composite_heatmaps.pdf) · [PNG preview](bat_composite_heatmaps.png)
 
 Panel b shows the geography of the 67 routes, including release sites, the
-roost, the lake and tracking gaps. Panel d aligns the corresponding treatment
+roost, the lake and tracking gaps. Shades of each treatment color distinguish
+individual routes. Panel d aligns the corresponding treatment
 heatmaps below the maps. Each row is one bat, and all four tiles show the
 last 6.6 km of modeled path on the same distance and directedness scales.
 Gray cells mark distance beyond an individual's modeled path. The

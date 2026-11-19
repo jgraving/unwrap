@@ -20,11 +20,48 @@ import goldshtein_bats_publication_figure as source
 
 INK = "#222222"
 MAP_FACE = "#f5f6f5"
-HEATMAP_ABSENT = "#eeeeee"
+HEATMAP_CMAP = mpl.colors.LinearSegmentedColormap.from_list(
+    "directedness", ("#86255f", "#f7f5ef", "#456e23"), N=257
+).with_extremes(bad="#d8dcdf")
+HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
 PAGE_W, PAGE_H = 646, 489
 OUTPUT_DIR = source.ROOT / 'assets' / 'goldshtein-bats-layout-review'
+
+
+def _route_shades(color, n_routes):
+    """Alternate dark and light tones within one treatment's color."""
+    rgb = np.asarray(mpl.colors.to_rgb(color))
+    ramp = mpl.colors.LinearSegmentedColormap.from_list(
+        'route_shades', (rgb * .48, rgb, rgb + .35 * (1 - rgb))
+    )
+    order = np.empty(n_routes, dtype=int)
+    order[::2] = np.arange((n_routes + 1) // 2)
+    order[1::2] = np.arange(n_routes - 1, (n_routes - 1) // 2, -1)
+    return ramp(np.linspace(0, 1, n_routes)[order])
+
+
+def draw_flight_heatmap(ax, scores):
+    """Plot one row per individual with fine white row separators."""
+    n_bats, n_steps = scores.shape
+    step_km = source.STEP_LENGTH_M / 1000
+    far, end = (n_steps - .5) * step_km, -.5 * step_km
+    ax.imshow(scores, extent=(far, end, n_bats, 0), aspect='auto',
+              interpolation='nearest', cmap=HEATMAP_CMAP, norm=HEATMAP_NORM)
+    ax.hlines(np.arange(1, n_bats), end, far, colors='white', linewidth=.42)
+
+
+def draw_flight_colorbar(fig, cax):
+    """Label the direction of evidence on either side of the neutral midpoint."""
+    cb = fig.colorbar(mpl.cm.ScalarMappable(norm=HEATMAP_NORM, cmap=HEATMAP_CMAP),
+                      cax=cax, orientation='horizontal')
+    cb.solids.set_rasterized(False)
+    cb.solids.set_edgecolor('face')
+    cb.outline.set_linewidth(.5)
+    cb.set_ticks((0, .5, 1), labels=('0\nUndirected', '0.5\nEqual evidence', '1\nDirected'))
+    cb.ax.tick_params(labelsize=8, length=2.25, pad=2)
+    cb.ax.set_title('Posterior directedness', fontsize=9, pad=3)
 
 
 def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
@@ -88,8 +125,9 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     for index, drawing in sorted(icons.items()):
         patch = source.draw_drawing(icon_ax, drawing, zorder=index+10)
         patch.set_linewidth(patch.get_linewidth()*icon_scale)
-    for y, label in zip((126.58,158.73,190.90,223.05), LABELS, strict=True):
-        page_text(108, icon_top+(y-iy0)*icon_scale, label, fontsize=9.3)
+    for y, level, label in zip((126.58,158.73,190.90,223.05), levels, LABELS, strict=True):
+        page_text(108, icon_top+(y-iy0)*icon_scale, label, fontsize=9.3,
+                  color=colors[level] if flight_view else INK)
 
     # b. Four map panels share metric bounds.
     letter(190, 24, 'b')
@@ -118,32 +156,42 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
         for spine in ax.spines.values():
             spine.set_color(colors[level])
             spine.set_linewidth(.8)
-        page_text(center, 45, label, ha='center', weight='bold', fontsize=9.8)
+        page_text(center, 45, label, ha='center', weight='bold', fontsize=9.8,
+                  color=colors[level] if flight_view else INK)
         for poly in polygons:
             ax.fill(*poly.exterior.xy, fc='#d9e9ed', ec='#a3bcc3', lw=.55, zorder=2)
 
         unscored, gaps, segments, means = [], [], [], []
+        route_colors, gap_colors = [], []
         treatment = tracks.loc[tracks['treatment']==level]
         groups = treatment.groupby('tag', sort=False, observed=True)
         counts[level] = len(groups)
-        for _, flight in groups:
+        shades = _route_shades(colors[level], len(groups)) if flight_view else [None] * len(groups)
+        for (_, flight), shade in zip(groups, shades, strict=True):
             xy = flight[['x_m','y_m']].to_numpy()
             indexed_segments = np.stack((xy[:-1], xy[1:]), axis=1)
             after_gap = flight['gap_before'].to_numpy()[1:] == 1
+            gaps.extend(indexed_segments[after_gap])
+            if shade is not None:
+                gap_colors.extend([shade] * np.count_nonzero(after_gap))
+                route = indexed_segments[~after_gap]
+                segments.extend(route)
+                route_colors.extend([shade] * len(route))
+                continue
             # The heading at a row is the displacement ending at that row.
             score = flight['directedness'].to_numpy()[1:]
             valid = np.isfinite(score) & ~after_gap
-            gaps.extend(indexed_segments[after_gap])
             unscored.extend(indexed_segments[~np.isfinite(score) & ~after_gap])
             segments.extend(indexed_segments[valid])
             means.extend(score[valid])
 
         if flight_view:
-            ax.add_collection(LineCollection(segments + unscored, colors='#40545d', lw=.65,
-                                             alpha=.70, capstyle='round', zorder=3))
+            ax.add_collection(LineCollection(segments, colors=route_colors, lw=.70,
+                                             alpha=.88, capstyle='round', zorder=3))
         else:
             ax.add_collection(LineCollection(unscored, colors='#a7aeae', lw=.53, alpha=.64, zorder=3))
-        ax.add_collection(LineCollection(gaps, colors='#959b9c', lw=.5, alpha=.65,
+        ax.add_collection(LineCollection(gaps, colors=gap_colors if flight_view else '#959b9c',
+                                         lw=.5, alpha=.65,
                                          linestyles=(0,(2.3,2)), zorder=3))
         if not flight_view:
             colored = LineCollection(segments, cmap=cmap, norm=norm, lw=.76, alpha=.88,
@@ -171,7 +219,7 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
         directedness_scale(318, 279, 173)
 
     # c. Step-level PSIS-LOO ELPD and one standard error per model.
-    title_y, plot_top, plot_bottom = (289, 320, 391) if flight_view else (314, 337, 456)
+    title_y, plot_top, plot_bottom = (289, 314, 391) if flight_view else (314, 337, 456)
     comparison_y, comparison_top = (309, 330) if flight_view else (title_y, plot_top)
     letter(22, comparison_y, 'c')
     page_text(103, comparison_y, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
@@ -192,26 +240,23 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     # d. Flight-level or group-level homing progression.
     if flight_view:
         letter(190, title_y, 'd')
-        page_text(410, title_y, 'Directedness by flight', ha='center', weight='bold', fontsize=11)
-        page_text(410, 303, 'One row per bat', ha='center', fontsize=8.5)
-        step_km = source.STEP_LENGTH_M / 1000
+        page_text(410, title_y, 'Directedness by individual', ha='center', weight='bold', fontsize=11)
         n_steps = source.LAST_N_STEPS + 1
-        far, end = (n_steps - .5) * step_km, -.5 * step_km
         row_count = max(counts.values())
-        heat_cmap = cmap.with_extremes(bad=HEATMAP_ABSENT)
         for center, level in zip(centers, levels, strict=True):
             scores = flight_heatmaps[level][:, -n_steps:]
             n_bats = counts[level]
             assert scores.shape == (n_bats, n_steps)
-            page_text(center, 313, f'n = {n_bats}', color=colors[level], ha='center', fontsize=8.5)
+            page_text(center, 307, f'n = {n_bats}', color=colors[level], ha='center', fontsize=8.5)
             ax = axes_at(center-map_w/2, plot_top, map_w, plot_bottom-plot_top)
-            ax.imshow(scores, extent=(far, end, n_bats, 0), aspect='auto',
-                      interpolation='nearest', cmap=heat_cmap, norm=norm)
+            draw_flight_heatmap(ax, scores)
             ax.set(ylim=(row_count, 0), yticks=[], xticks=(6, 3, 0))
             ax.spines[['left', 'top', 'right']].set_visible(False)
             ax.tick_params(axis='x', labelsize=8, width=.6, length=2, pad=2)
-        page_text(410, 410, 'Modeled path distance remaining (km)', ha='center', fontsize=9.5)
-        directedness_scale(309, 423, 132)
+            if level == levels[0]:
+                ax.set_ylabel('Individual', fontsize=9.5, labelpad=4)
+        page_text(410, 410, 'Path distance remaining (km)', ha='center', fontsize=9.5)
+        draw_flight_colorbar(fig, axes_at(344, 433, 132, 5.5))
     else:
         letter(182, title_y, 'd')
         page_text(309, title_y, 'Homing progression', ha='center', weight='bold', fontsize=11)
@@ -271,14 +316,23 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
         d.errorbar(mean, y, xerr=[[mean-lo],[hi-mean]], color=colors[level],
                    fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
     d.set(xlim=(-.34,.04), ylim=(2.57,-.57), xticks=(-.3,-.2,-.1,0),
-          yticks=range(3), yticklabels=LABELS[1:],
-          xlabel='Change vs. control (per radian)')
+          yticks=range(3), yticklabels=LABELS[1:])
     d.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
     setup_axes(d)
     d.spines['left'].set_visible(False)
     d.tick_params(axis='y', length=0, pad=5)
     for text_artist, color in zip(d.get_yticklabels(), PALETTE[1:], strict=True):
         text_artist.set_color(color)
+    if flight_view:
+        from locust_density_figure import add_compact_unit_label
+
+        x, y, width, height = contrast_box
+        prop = d.xaxis.label.get_fontproperties()
+        add_compact_unit_label(fig, x+width/2, page_h-(y+height+24),
+                               'Change vs. control', 'radian', -1,
+                               fontsize=prop.get_size_in_points(), prop=prop)
+    else:
+        d.set_xlabel('Change vs. control (per radian)')
     return fig
 
 

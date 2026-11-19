@@ -21,7 +21,7 @@ from goldshtein_bats_layout_data import (
 )
 
 
-PAGE_W, PAGE_H = composite.PAGE_W, 317
+PAGE_W, PAGE_H = composite.PAGE_W, 331
 OUTPUT_DIR = source.ROOT / "assets" / "goldshtein-bats-figure-ideas"
 
 
@@ -77,7 +77,7 @@ def draw_ideas(cones, heatmaps, levels):
     page_text(23, 24, "A", fontsize=15, weight="bold")
     page_text(43, 24, "Heading within the goal cone", fontsize=12, weight="bold")
     page_text(336, 24, "B", fontsize=15, weight="bold")
-    page_text(356, 24, "Homing, flight by flight", fontsize=12, weight="bold")
+    page_text(356, 24, "Directedness by individual", fontsize=12, weight="bold")
 
     cone = axes_at(51, 38, 87, 45)
     cone.set(xlim=(-0.07, 2.35), ylim=(-0.69, 0.71), aspect="equal")
@@ -95,7 +95,8 @@ def draw_ideas(cones, heatmaps, levels):
 
     fig.legend([Line2D([], [], color=colors[level], lw=1.5) for level in levels],
                composite.LABELS, loc="center", bbox_to_anchor=(216 / PAGE_W, 1 - 57 / PAGE_H),
-               ncols=2, frameon=False, columnspacing=1.3, handlelength=1.45, fontsize=8.5)
+               ncols=2, frameon=False, columnspacing=1.3, handlelength=1.45, fontsize=8.5,
+               labelcolor=composite.PALETTE)
 
     angles, means, contrasts = cones
     share = axes_at(58, 91, 248, 85)
@@ -119,38 +120,30 @@ def draw_ideas(cones, heatmaps, levels):
     delta.set(xlabel="Half-angle α from the goal bearing (°)",
               ylabel="Difference in probability\nvs. control")
 
-    page_text(356, 43, "One row per bat. Gray marks distance beyond its modeled path.",
+    page_text(356, 43, "Gray marks distance beyond each flight.",
               fontsize=8.5, color="#555555")
-    cmap = mpl.colormaps["viridis"].with_extremes(bad=composite.HEATMAP_ABSENT)
-    norm = mpl.colors.Normalize(0, 1)
-    step_km = source.STEP_LENGTH_M / 1000
-    far, end = (heatmaps[levels[0]].shape[1] - .5) * step_km, -.5 * step_km
     top = 57
     for level, label in zip(levels, composite.LABELS, strict=True):
         heatmap = heatmaps[level]
         n_bats = len(heatmap)
         height = 2.77 * n_bats
         ax = axes_at(356, top, 202, height)
-        ax.imshow(heatmap, extent=(far, end, n_bats, 0), aspect="auto",
-                  interpolation="nearest", cmap=cmap, norm=norm)
+        composite.draw_flight_heatmap(ax, heatmap)
         ax.set(yticks=[])
         ax.spines[:].set_visible(False)
         page_text(568, top + height / 2 - 4.4, label, color=colors[level],
                   fontsize=9.5, weight="bold")
         page_text(568, top + height / 2 + 6.4, f"{n_bats} bats", fontsize=8.5, color="#555555")
         if level == levels[-1]:
-            ax.set(xticks=np.arange(0, far, 2), xlabel="Modeled path remaining (km)")
+            ax.set(xticks=np.arange(0, ax.get_xlim()[0], 2), xlabel="Path distance remaining (km)")
             ax.tick_params(axis="x", length=2.6, width=.6, pad=2)
             ax.spines["bottom"].set_visible(True)
         else:
             ax.set(xticks=[])
         top += height + 5.2
 
-    cb = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=axes_at(386, 295, 112, 5.5),
-                      orientation="horizontal", ticks=(0, .5, 1), format="%g")
-    cb.outline.set_linewidth(.5)
-    cb.ax.tick_params(labelsize=8, length=2.25, pad=2)
-    page_text(506, 298, "Posterior directedness", fontsize=8.5)
+    page_text(342, (57 + top - 5.2) / 2, "Individual", rotation=90, ha="center", fontsize=9)
+    composite.draw_flight_colorbar(fig, axes_at(398, 297, 118, 5.5))
     return fig
 
 
