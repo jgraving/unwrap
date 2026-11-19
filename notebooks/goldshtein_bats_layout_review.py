@@ -28,8 +28,8 @@ OUTPUT_DIR = source.ROOT / 'assets' / 'goldshtein-bats-layout-review'
 
 
 def _directedness_colormap():
-    """Use matched purple and orange Oklab ramps from black."""
-    hue = np.deg2rad([286, 43])
+    """Use matched purple and olive-green Oklab ramps from black."""
+    hue = np.deg2rad([286, 129])
     lightness, chroma = .71, .15
     endpoints = np.column_stack(([lightness] * 2, chroma * np.cos(hue), chroma * np.sin(hue)))
     position = np.linspace(-1, 1, 257)
@@ -93,7 +93,7 @@ def draw_flight_colorbar(fig, cax):
 def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     """Compose the photo, matched maps, and three fitted summaries."""
     flight_view = flight_heatmaps is not None
-    page_h = 565 if flight_view else PAGE_H
+    page_h = 675 if flight_view else PAGE_H
     levels = data["levels"]
     colors = dict(zip(levels, PALETTE, strict=True))
     norm = mpl.colors.Normalize(0, 1)
@@ -302,22 +302,23 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
               yticklabels=('0','0.5','1'))
         setup_axes(c)
 
-    # e. Full-mixture polar densities and their 0° contrasts against control.
+    # e. Full-mixture polar densities and paired contrasts at the goal bearing.
     if flight_view:
         letter_x, density_y = 22, 450
-        polar_centers, polar_top, polar_size = (59, 141, 223, 305), 473, 72
-        contrast_box = (424, 471, 196, 64)
+        polar_positions = ((71, 483), (200, 483), (71, 576), (200, 576))
+        polar_size = 76
+        page_text(135.5, 469, 'Full mixture densities', ha='center', weight='bold', fontsize=9.5)
     else:
         letter_x, density_y = 420, 314
-        polar_centers, polar_top, polar_size = (444, 497, 550, 603), 341, 47
-        contrast_box = (486, 407, 134, plot_bottom-407)
+        polar_positions = ((444, 341), (497, 341), (550, 341), (603, 341))
+        polar_size = 47
     letter(letter_x, density_y, 'e')
     page_text(letter_x+23, density_y, 'Predictive heading density', weight='bold', fontsize=11)
     bearings = data['density_bearings']
     profiles = data['density_profiles']
     zero_radius = 1.0
     radius_max = zero_radius + 1.08 * max(profile['hi'].max() for profile in profiles.values())
-    for center, level, label in zip(polar_centers, levels, LABELS, strict=True):
+    for (center, polar_top), level, label in zip(polar_positions, levels, LABELS, strict=True):
         polar = axes_at(center-polar_size/2, polar_top, polar_size, polar_size, projection='polar')
         polar.set_theta_zero_location('N')
         polar.set_theta_direction(-1)
@@ -335,33 +336,51 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
         page_text(center, polar_top-3, '0°', ha='center', fontsize=8)
         page_text(center, polar_top+polar_size+7, label, ha='center', color=color, fontsize=8.5)
 
-    d = axes_at(*contrast_box)
-    d.axvline(0, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
-    contrast_labels = LABELS if flight_view else LABELS[1:]
-    contrast_levels = levels if flight_view else levels[1:]
-    if flight_view:
-        d.plot(0, 0, 'o', color=colors[levels[0]], ms=4.1, zorder=3)
-    for y, level in enumerate(levels[1:], start=1 if flight_view else 0):
-        mean, lo, hi = data['full_contrasts'][level]
-        d.errorbar(mean, y, xerr=[[mean-lo],[hi-mean]], color=colors[level],
-                   fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
-    d.set(xlim=(-.34,.04), ylim=(len(contrast_labels)-1+.57,-.57), xticks=(-.3,-.2,-.1,0),
-          yticks=range(len(contrast_labels)), yticklabels=contrast_labels)
-    d.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
-    setup_axes(d)
-    d.spines['left'].set_visible(False)
-    d.tick_params(axis='y', length=0, pad=5)
-    for text_artist, level in zip(d.get_yticklabels(), contrast_levels, strict=True):
-        text_artist.set_color(colors[level])
+    def draw_density_contrasts(box, contrasts, limits):
+        ax = axes_at(*box)
+        ax.axvline(0, color='#888888', lw=.65, ls=(0, (2, 2)), zorder=0)
+        contrast_labels = LABELS if flight_view else LABELS[1:]
+        contrast_levels = levels if flight_view else levels[1:]
+        if flight_view:
+            ax.plot(0, 0, 'o', color=colors[levels[0]], ms=4.1, zorder=3)
+        for y, level in enumerate(levels[1:], start=1 if flight_view else 0):
+            mean, lo, hi = contrasts[level]
+            ax.errorbar(mean, y, xerr=[[mean-lo], [hi-mean]], color=colors[level],
+                        fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
+        n_rows = len(contrast_labels)
+        ax.set(xlim=limits, ylim=(n_rows-1+.57, -.57), xticks=(-.3, -.2, -.1, 0),
+               yticks=range(n_rows), yticklabels=contrast_labels)
+        ax.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
+        setup_axes(ax)
+        ax.spines['left'].set_visible(False)
+        ax.tick_params(axis='y', length=0, pad=5)
+        for text_artist, level in zip(ax.get_yticklabels(), contrast_levels, strict=True):
+            text_artist.set_color(colors[level])
+        return ax
+
     if flight_view:
         from locust_density_figure import add_compact_unit_label
 
-        x, y, width, height = contrast_box
-        prop = d.xaxis.label.get_fontproperties()
+        full, directed = data['full_contrasts'], data['directed_contrasts']
+        summaries = (*full.values(), *directed.values())
+        limits = (min(lo for _, lo, _ in summaries) - .018,
+                  max(hi for _, _, hi in summaries) + .018)
+        x, width, height = 323, 297, 64
+        page_text(x+width/2, 469, 'Full mixture at 0°', ha='center', weight='bold', fontsize=9.5)
+        top = draw_density_contrasts((x, 483, width, height), full, limits)
+        top.spines['bottom'].set_visible(False)
+        top.tick_params(axis='x', bottom=False, labelbottom=False)
+        page_text(x+width/2, 562, 'Directed component at 0°',
+                  ha='center', weight='bold', fontsize=9.5)
+        y = 576
+        bottom = draw_density_contrasts((x, y, width, height), directed, limits)
+        prop = bottom.xaxis.label.get_fontproperties()
         add_compact_unit_label(fig, x+width/2, page_h-(y+height+24),
                                'Density change vs. control', 'radian', -1,
                                fontsize=prop.get_size_in_points(), prop=prop)
     else:
+        d = draw_density_contrasts((486, 407, 134, plot_bottom-407),
+                                   data['full_contrasts'], (-.34, .04))
         d.set_xlabel('Change vs. control (per radian)')
     return fig
 

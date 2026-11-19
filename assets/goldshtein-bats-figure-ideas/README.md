@@ -16,7 +16,7 @@ directedness measure and trailing smoother as the main composite. Rows are
 sorted by modeled path length within treatment. Zero is the last modeled step
 of each flight. The horizontal scale uses 60 m per modeled step. White cells
 mark distance beyond each flight's modeled path, and white separators mark
-individual rows. The purple and orange ramps use even Oklab steps from black
+individual rows. The purple and olive-green ramps use even Oklab steps from black
 at 0.5, with matched lightness and chroma across the midpoint. At 0.5 the
 directed and undirected components have equal support. Values toward 0 favor
 the undirected component and values toward 1 favor the directed component.
@@ -33,7 +33,22 @@ heatmaps below the maps. Each row is one bat, and all four tiles show the
 last 6.6 km of modeled path on the same distance and directedness scales.
 White cells mark distance beyond an individual's modeled path. The
 group-average curves and their uncertainty are candidates for a supplement.
-The blue Control point in panel e marks the zero difference from control.
+
+Panel e shows full-mixture polar densities and two sets of paired contrasts
+at the 0° goal bearing. The upper contrast combines directed and undirected
+densities using the fitted mixture weight. The lower contrast uses the
+conditional density of the directed component. Both use the same posterior
+draws, with individual offsets set to zero. The blue Control point marks
+zero in each plot.
+
+| Group vs. control | Full mixture | Directed component | Full minus directed |
+| --- | ---: | ---: | ---: |
+| Eye cover | −0.132 [−0.267, −0.008] | −0.123 [−0.250, 0.019] | −0.009 [−0.077, 0.045] |
+| + Magnet | −0.157 [−0.285, −0.029] | −0.150 [−0.286, −0.022] | −0.007 [−0.065, 0.048] |
+| + Anosmia | −0.169 [−0.308, −0.014] | −0.192 [−0.344, −0.034] | 0.024 [−0.029, 0.070] |
+
+Entries are posterior means and 95% highest-density intervals in inverse
+radians. Differences are calculated within each draw before summarizing.
 
 Render from the same verified tracks and model fits as the main composite.
 
