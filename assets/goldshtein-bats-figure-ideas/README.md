@@ -8,21 +8,26 @@
 maps. Shades of each treatment color distinguish individual trajectories.
 Faded icons identify the senses manipulated in each group.
 
-**b.** The notebook's left plot compares total PSIS-LOO ELPD across models.
-The right plot shows the paired ELPD difference (von Mises–Uniform Mixture
-minus von Mises) overall and for each treatment. Bars show one standard error.
+**b.** The likelihood diagrams show the von Mises model and the von
+Mises–Uniform Mixture (vMU). Both use the same illustrative directed von
+Mises distribution. The mixture adds a weighted uniform component beneath
+the weighted directed component. The plot shows the notebook's paired
+PSIS-LOO ELPD difference (vMU minus von Mises) overall and for each
+treatment. Bars show one standard error.
 
 **c.** The four polar plots show the full population-level mixture predictive
 densities on a common scale. The dots identify density at the goal bearing
 (0°). The contrast plot shows within-draw density differences at 0° against
 control with 95% highest-density intervals.
 
-**d.** The small maps and heatmaps share one posterior directedness scale.
-Map segments and heatmap cells use the mean of the same draw-wise smoothed
-values. Gray dashed map segments cross tracking gaps. White heatmap cells
-mark missing data, including gap-crossing steps and distances beyond each
-individual's modeled path. One row represents one bat, and all four heatmaps
-show the last 6.6 km at 60 m per modeled step.
+**d.** The 2×2 map and heatmap grids use matching treatment order and one
+posterior directedness scale. Map segments and heatmap cells use the mean of
+the same draw-wise smoothed values. Gray dashed map segments cross tracking
+gaps. White heatmap cells mark missing data, including gap-crossing steps
+and distances beyond each individual's modeled path. Each row represents
+one bat. The treatments include 29 control, 14 eye cover, 15 eye cover plus
+magnet, and 9 eye cover plus magnet and anosmia bats. Each heatmap shows the
+last 6.6 km at 60 m per modeled step.
 
 Gold dots mark the estimated start of the first sustained goalward bout,
 defined as the first of five consecutive usable goalward steps with
