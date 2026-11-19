@@ -104,7 +104,7 @@ def _draw_treatment_icons(ax, drawings, row_ys, colors):
             center = ((x0 + x1) / 2, source.PAGE_H - row_y)
             muted = column in faded
             ax.add_patch(Circle(center, 10.5, facecolor=color, edgecolor='none',
-                                alpha=.08 if muted else .27, zorder=10))
+                                alpha=.12 if muted else .42, zorder=10))
             patch = source.draw_drawing(ax, glyph, zorder=11)
             patch.set_transform(transform)
             patch.set_alpha(.30 if muted else 1)
@@ -281,7 +281,7 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
                             ms=4.1, elinewidth=1, capsize=2.2, capthick=1, zorder=3)
     lo = min(s['elpd']-s['se'] for s in data['scores'].values())-16
     hi = max(s['elpd']+s['se'] for s in data['scores'].values())+16
-    model_names = ('von Mises', 'von Mises–Uniform\nMixture') if flight_view else ('vM', 'vMU')
+    model_names = ('von Mises', 'von Mises\n–Uniform Mixture') if flight_view else ('vM', 'vMU')
     comparison.set(xlim=(lo,hi), ylim=(1.63,-.63), yticks=(0,1),
                    yticklabels=model_names, xlabel='ELPD')
     comparison.xaxis.set_major_locator(MultipleLocator(100))
@@ -291,7 +291,7 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None):
     if flight_view:
         comparison.tick_params(axis='y', labelsize=8.5)
         for label in comparison.get_yticklabels():
-            label.set_multialignment('left')
+            label.set_multialignment('right')
 
     # d. Flight-level or group-level homing progression.
     if flight_view:
