@@ -22,7 +22,7 @@ INK = "#222222"
 MAP_FACE = "#f5f6f5"
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
-PAGE_W, PAGE_H = 646, 456
+PAGE_W, PAGE_H = 646, 489
 OUTPUT_DIR = source.ROOT / 'assets' / 'goldshtein-bats-layout-review'
 
 
@@ -34,8 +34,8 @@ def draw_composite(data, *, photo_path=None):
     cmap = mpl.colormaps["viridis"]
     fig = plt.figure(figsize=(PAGE_W / 72, PAGE_H / 72), facecolor="white")
 
-    def axes_at(x, y, w, h):
-        return fig.add_axes([x/PAGE_W, 1-(y+h)/PAGE_H, w/PAGE_W, h/PAGE_H])
+    def axes_at(x, y, w, h, **kwargs):
+        return fig.add_axes([x/PAGE_W, 1-(y+h)/PAGE_H, w/PAGE_W, h/PAGE_H], **kwargs)
 
 
     def page_text(x, y, text, **kwargs):
@@ -158,9 +158,10 @@ def draw_composite(data, *, photo_path=None):
     page_text(502, 281.6, 'Posterior directedness', fontsize=9.5)
 
     # c. Step-level PSIS-LOO ELPD and one standard error per model.
+    plot_bottom = 456
     letter(22, 314, 'c')
     page_text(103, 314, 'Model comparison', ha='center', weight='bold', fontsize=10.7)
-    comparison = axes_at(51, 337, 114, 85)
+    comparison = axes_at(51, 337, 114, plot_bottom-337)
     for y, key in enumerate(('vm','vmu')):
         score = data['scores'][key]
         comparison.errorbar(score['elpd'], y, xerr=score['se'], color=INK, fmt='o',
@@ -177,7 +178,7 @@ def draw_composite(data, *, photo_path=None):
     # d. Progression plot. Low-support tails are subdued and defined in the caption.
     letter(182, 314, 'd')
     page_text(309, 314, 'Homing progression', ha='center', weight='bold', fontsize=11)
-    c = axes_at(224, 337, 178, 85)
+    c = axes_at(224, 337, 178, plot_bottom-337)
     for level, color in colors.items():
         curve = data['curves'][level]
         x = np.abs(np.asarray(curve['x_mid']))/1000
@@ -193,24 +194,32 @@ def draw_composite(data, *, photo_path=None):
           yticklabels=('0','0.5','1'))
     setup_axes(c)
 
-    # e. Full-mixture predictive density at the goal bearing, relative to control.
+    # e. Full-mixture polar densities and their 0° contrasts against control.
     letter(420, 314, 'e')
-    page_text(443, 314, 'Predictive density at 0°', weight='bold', fontsize=11)
-    diagram = axes_at(571, 299, 48, 31)
-    diagram.set(xlim=(-1.12, 1.12), ylim=(-.33, .95))
-    diagram.axis('off')
-    # An offset peak emphasizes the height at one bearing.
-    angle = np.linspace(-1, 1, 101)
-    profile = .12 + .69 * np.exp(-.5 * ((angle - .22) / .40)**2)
-    height = np.interp(0, angle, profile)
-    diagram.plot([-1, 1], [0, 0], color='#a6a6a6', lw=.65)
-    diagram.plot(angle, profile, color='#7b8c94', lw=.9)
-    diagram.plot([0, 0], [0, height], color=INK, lw=.7)
-    diagram.plot(0, height, 'o', color=INK, ms=2.6)
-    diagram.annotate('0°', (0, 0), xytext=(0, -1.5), textcoords='offset points',
-                     ha='center', va='top', fontsize=8)
+    page_text(443, 314, 'Predictive heading density', weight='bold', fontsize=11)
+    bearings = data['density_bearings']
+    profiles = data['density_profiles']
+    zero_radius = 1.0
+    radius_max = zero_radius + 1.08 * max(profile['hi'].max() for profile in profiles.values())
+    for center, level, label in zip((444, 497, 550, 603), levels, LABELS, strict=True):
+        polar = axes_at(center-23.5, 341, 47, 47, projection='polar')
+        polar.set_theta_zero_location('N')
+        polar.set_theta_direction(-1)
+        polar.set(ylim=(0, radius_max), xticks=[], yticks=[])
+        polar.spines['polar'].set_visible(False)
+        polar.plot(bearings, np.full_like(bearings, zero_radius), color='#aaaaaa', lw=.55)
+        polar.plot([0, 0], [zero_radius, radius_max], color='#9a9a9a', lw=.6)
+        profile = profiles[level]
+        color = colors[level]
+        polar.fill_between(bearings, zero_radius + profile['lo'], zero_radius + profile['hi'],
+                           color=color, alpha=.26, linewidth=0)
+        polar.plot(bearings, zero_radius + profile['mean'], color=color, lw=1.05)
+        mean_at_goal = profile['mean'][bearings.size // 2]
+        polar.plot(0, zero_radius + mean_at_goal, 'o', color=color, ms=2.8)
+        page_text(center, 338, '0°', ha='center', fontsize=8)
+        page_text(center, 395, label, ha='center', color=color, fontsize=8.5)
 
-    d = axes_at(486, 337, 134, 85)
+    d = axes_at(486, 407, 134, plot_bottom-407)
     d.axvline(0, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
     for y, level in enumerate(levels[1:]):
         mean, lo, hi = data['full_contrasts'][level]
@@ -269,6 +278,7 @@ def main(argv=None):
         'n_bats_by_treatment': data['counts'],
         'n_model_steps': len(data['evidence']),
         'elpd': data['scores'],
+        'density_at_zero_by_treatment': data['density_at_zero_by_treatment'],
         'density_at_zero_treatment_contrasts': data['full_contrasts'],
         'goal_window_half_width_degrees': data['goal_window_half_width_degrees'],
         'goal_window_rates': data['goal_window_groups'],

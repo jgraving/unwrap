@@ -6,19 +6,21 @@ icons (a) with all 67 flight trajectories colored by posterior directedness
 model (c), posterior directedness over remaining path distance (d), and
 changes in predictive density at the goal bearing from control (e).
 
-Panel e evaluates the full von Mises–Uniform (vMU) predictive heading density
-at 0° relative to the local goal bearing, using fitted group parameters with
-individual offsets set to zero. The diagram marks the height of an illustrative
-density at 0°. The plot subtracts the control density from each treatment
-density within the same posterior draw. Points and whiskers show posterior
-means and 95% highest-density intervals. The dashed line at zero marks the
-control reference.
+Panel e draws the full von Mises–Uniform (vMU) predictive heading density for
+each group, using fitted group parameters with individual offsets set to zero.
+The polar plots share a radial scale. The gray circle marks zero density,
+the colored curves are posterior means, and the bands are pointwise 95%
+highest-density intervals. The dot in each polar plot marks the mean density
+at 0° relative to the local goal bearing. The plot below subtracts the control
+density at 0° from each treatment density within the same posterior draw.
+Points and whiskers show posterior means and 95% highest-density intervals.
+The dashed line at zero marks the control reference.
 
 From the repository root, install the figure dependencies and render from the
 pinned fit and data snapshots:
 
 ```bash
-uv pip install -e '.[figure]'
+uv pip install -e '.[figure,notebook]'
 python notebooks/goldshtein_bats_layout_review.py --download \
     --font-family Arial --font-dir /path/to/arial-fonts
 ```

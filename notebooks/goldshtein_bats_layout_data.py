@@ -53,9 +53,20 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     # Use the near-uniform background specified by the notebook's predictive
     # summaries for both the density and the window probabilities.
     kappa_uniform = posthoc.KAPPA_UNIFORM
-    directed_density = posthoc.vonmises_pdf_scalar(0.0, mu, kappa)
-    uniform_density = posthoc.vonmises_pdf_scalar(0.0, 0.0, kappa_uniform)
-    density = weight * directed_density + (1 - weight) * uniform_density
+    bearings = np.deg2rad(np.arange(-180, 181))
+    goal_index = bearings.size // 2
+    uniform_density = posthoc.vonmises_pdf_scalar(bearings, 0.0, kappa_uniform)
+    density_at_goal = np.empty_like(weight)
+    density_profiles = {}
+    for i, level in enumerate(levels):
+        directed_density = posthoc.vonmises_pdf_scalar(
+            bearings, mu[:, i, None], kappa[:, i, None]
+        )
+        p = weight[:, i, None]
+        density = p * directed_density + (1 - p) * uniform_density
+        density_at_goal[:, i] = density[:, goal_index]
+        lo, hi = posthoc.hdi_along_samples(density, prob=0.95)
+        density_profiles[level] = {"mean": density.mean(axis=0), "lo": lo, "hi": hi}
 
     half_width = posthoc.MASS_HALF_WIDTH_DEG
     tolerance = np.deg2rad(half_width)
@@ -69,8 +80,14 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     goal_window_groups = {level: summary(draws) for level, draws in zip(levels, mass.T, strict=True)}
     goal_window_contrasts = {level: summary(by_treatment[:, i]) for i, level in enumerate(levels[1:], 1)}
     return {
+        "density_bearings": bearings,
+        "density_profiles": density_profiles,
+        "density_at_zero_by_treatment": {
+            level: summary(draws) for level, draws in zip(levels, density_at_goal.T, strict=True)
+        },
         "full_contrasts": {
-            level: summary(density[:, i] - density[:, 0]) for i, level in enumerate(levels[1:], 1)
+            level: summary(density_at_goal[:, i] - density_at_goal[:, 0])
+            for i, level in enumerate(levels[1:], 1)
         },
         "goal_window_half_width_degrees": half_width,
         "goal_window_groups": goal_window_groups,
