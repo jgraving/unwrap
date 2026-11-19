@@ -8,12 +8,12 @@
 maps. Shades of each treatment color distinguish individual trajectories.
 Faded icons identify the senses manipulated in each group.
 
-**b.** The likelihood diagrams show the von Mises model and the von
-Mises–Uniform Mixture (vMU). Both use the same illustrative directed von
-Mises distribution. The mixture adds a weighted uniform component beneath
-the weighted directed component. The plot shows the notebook's paired
-PSIS-LOO ELPD difference (vMU minus von Mises) overall and for each
-treatment. Bars show one standard error.
+**b.** The polar likelihood diagrams show the von Mises (vM) and von
+Mises–Uniform Mixture (vMU) models. Both use the same illustrative directed
+von Mises distribution. The uniform contribution to the mixture forms a
+band of constant radial thickness. The plot shows the notebook's paired
+PSIS-LOO ELPD difference (vMU minus vM) overall and for each treatment. Bars
+show one standard error.
 
 **c.** The four polar plots show the full population-level mixture predictive
 densities on a common scale. The dots identify density at the goal bearing
@@ -25,20 +25,23 @@ posterior directedness scale. Map segments and heatmap cells use the mean of
 the same draw-wise smoothed values. Gray dashed map segments cross tracking
 gaps. White heatmap cells mark missing data, including gap-crossing steps
 and distances beyond each individual's modeled path. Each row represents
-one bat. The treatments include 29 control, 14 eye cover, 15 eye cover plus
+one bat and has the same height across treatments. The treatments include
+29 control, 14 eye cover, 15 eye cover plus
 magnet, and 9 eye cover plus magnet and anosmia bats. Each heatmap shows the
 last 6.6 km at 60 m per modeled step.
+
+The polar ring shows the same directedness score by heading relative to the
+goal bearing (0°). Its colors average the baseline-adjusted evidence across
+draws from the control population fit, with individual offsets set to zero.
 
 Gold dots mark the estimated start of the first sustained goalward bout,
 defined as the first of five consecutive usable goalward steps with
 smoothed directedness above 0.5 within a joint posterior draw. The trailing
 smoother weights the most recent ten steps and resets at gaps and missing
 headings. Symbols and bars show the median and central 90% interval among
-draws with a qualifying bout. Open circles indicate a median at the
-flight's first usable step. Open triangles indicate that the first usable
-step after a tracking gap or missing heading is already directed. Six
-flights have this second kind of onset, including the second Eye cover row.
-Four median onsets precede the plotted window.
+draws with a qualifying bout. Open circles indicate a median at the flight's
+first usable step. Gold dots include bouts first detected when data resume
+after a gap. Four median onsets precede the plotted window.
 [Bat model card](https://jakegraving.com/goldshtein-bats)
 
 ```bash
