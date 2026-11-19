@@ -78,6 +78,7 @@ def draw_flight_heatmap(ax, scores):
     ax.imshow(scores, extent=(far, end, n_bats, 0), aspect='auto',
               interpolation='nearest', cmap=HEATMAP_CMAP, norm=HEATMAP_NORM)
     ax.hlines(np.arange(1, n_bats), end, far, colors='white', linewidth=.42)
+    ax.set_xlim(far, end)
 
 
 def draw_flight_colorbar(fig, cax):
@@ -108,6 +109,44 @@ def _draw_treatment_icons(ax, drawings, row_ys, colors):
             patch = source.draw_drawing(ax, glyph, zorder=11)
             patch.set_transform(transform)
             patch.set_alpha(.30 if muted else 1)
+
+
+def draw_polar_density(ax, bearings, profile, color, radius_max):
+    """Draw the full mixture around a common zero-density reference ring."""
+    zero_radius = 1.0
+    ax.set_theta_zero_location('N')
+    ax.set_theta_direction(-1)
+    ax.set(ylim=(0, radius_max), xticks=[], yticks=[])
+    ax.spines['polar'].set_visible(False)
+    ax.plot(bearings, np.full_like(bearings, zero_radius), color='#aaaaaa', lw=.55)
+    ax.plot([0, 0], [zero_radius, radius_max], color='#9a9a9a', lw=.6)
+    ax.fill_between(bearings, zero_radius + profile['lo'], zero_radius + profile['hi'],
+                    color=color, alpha=.26, linewidth=0)
+    ax.plot(bearings, zero_radius + profile['mean'], color=color, lw=1.05)
+    ax.plot(0, zero_radius + profile['mean'][bearings.size // 2], 'o', color=color, ms=2.8)
+
+
+def draw_density_contrast(ax, data, colors, *, show_control=True):
+    """Plot within-draw changes in mixture density at the goal bearing."""
+    levels = data['levels']
+    contrast_labels = LABELS if show_control else LABELS[1:]
+    contrast_levels = levels if show_control else levels[1:]
+    ax.axvline(0, color='#888888', lw=.65, ls=(0, (2, 2)), zorder=0)
+    if show_control:
+        ax.plot(0, 0, 'o', color=colors[levels[0]], ms=4.1, zorder=3)
+    for y, level in enumerate(levels[1:], start=int(show_control)):
+        mean, lo, hi = data['full_contrasts'][level]
+        ax.errorbar(mean, y, xerr=[[mean-lo], [hi-mean]], color=colors[level],
+                    fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
+    ax.set(xlim=(-.34, .04), ylim=(len(contrast_labels)-1+.57, -.57),
+           xticks=(-.3, -.2, -.1, 0), yticks=range(len(contrast_labels)),
+           yticklabels=contrast_labels)
+    ax.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
+    ax.spines[['top', 'right', 'left']].set_visible(False)
+    ax.tick_params(length=3, width=.65, pad=3)
+    ax.tick_params(axis='y', length=0, pad=5)
+    for tick, level in zip(ax.get_yticklabels(), contrast_levels, strict=True):
+        tick.set_color(colors[level])
 
 
 def draw_composite(data, *, photo_path=None, flight_heatmaps=None, heading_scores=None):
@@ -382,44 +421,16 @@ def draw_composite(data, *, photo_path=None, flight_heatmaps=None, heading_score
     page_text(letter_x+23, density_y, 'Predictive heading density', weight='bold', fontsize=11)
     bearings = data['density_bearings']
     profiles = data['density_profiles']
-    zero_radius = 1.0
-    radius_max = zero_radius + 1.08 * max(profile['hi'].max() for profile in profiles.values())
+    radius_max = 1.0 + 1.08 * max(profile['hi'].max() for profile in profiles.values())
     for center, level, label in zip(polar_centers, levels, LABELS, strict=True):
         polar = axes_at(center-polar_size/2, polar_top, polar_size, polar_size, projection='polar')
-        polar.set_theta_zero_location('N')
-        polar.set_theta_direction(-1)
-        polar.set(ylim=(0, radius_max), xticks=[], yticks=[])
-        polar.spines['polar'].set_visible(False)
-        polar.plot(bearings, np.full_like(bearings, zero_radius), color='#aaaaaa', lw=.55)
-        polar.plot([0, 0], [zero_radius, radius_max], color='#9a9a9a', lw=.6)
-        profile = profiles[level]
         color = colors[level]
-        polar.fill_between(bearings, zero_radius + profile['lo'], zero_radius + profile['hi'],
-                           color=color, alpha=.26, linewidth=0)
-        polar.plot(bearings, zero_radius + profile['mean'], color=color, lw=1.05)
-        mean_at_goal = profile['mean'][bearings.size // 2]
-        polar.plot(0, zero_radius + mean_at_goal, 'o', color=color, ms=2.8)
+        draw_polar_density(polar, bearings, profiles[level], color, radius_max)
         page_text(center, polar_top-3, '0°', ha='center', fontsize=8)
         page_text(center, polar_top+polar_size+7, label, ha='center', color=color, fontsize=8.5)
 
     d = axes_at(*contrast_box)
-    d.axvline(0, color='#888888', lw=.65, ls=(0,(2,2)), zorder=0)
-    contrast_labels = LABELS if flight_view else LABELS[1:]
-    contrast_levels = levels if flight_view else levels[1:]
-    if flight_view:
-        d.plot(0, 0, 'o', color=colors[levels[0]], ms=4.1, zorder=3)
-    for y, level in enumerate(levels[1:], start=1 if flight_view else 0):
-        mean, lo, hi = data['full_contrasts'][level]
-        d.errorbar(mean, y, xerr=[[mean-lo],[hi-mean]], color=colors[level],
-                   fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
-    d.set(xlim=(-.34,.04), ylim=(len(contrast_labels)-1+.57,-.57), xticks=(-.3,-.2,-.1,0),
-          yticks=range(len(contrast_labels)), yticklabels=contrast_labels)
-    d.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
-    setup_axes(d)
-    d.spines['left'].set_visible(False)
-    d.tick_params(axis='y', length=0, pad=5)
-    for text_artist, level in zip(d.get_yticklabels(), contrast_levels, strict=True):
-        text_artist.set_color(colors[level])
+    draw_density_contrast(d, data, colors, show_control=flight_view)
     if flight_view:
         from locust_density_figure import add_compact_unit_label
 
