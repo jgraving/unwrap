@@ -1,0 +1,58 @@
+name: Render revised bat panel d
+on:
+  push:
+    branches: [review/bat-panel-d-render-b2bde57]
+    paths: ['.github/workflows/bat-panel-d-render.yml']
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+      - name: Install figure dependencies and font
+        run: |
+          sudo apt-get install -y -qq fonts-liberation
+          uv venv
+          uv pip install -e '.[test,figure,notebook]'
+      - name: Verify and render the composite
+        run: |
+          uv run --no-project python -m pytest -q tests/test_goldshtein_bats_publication_figure.py
+          uv run --no-project python notebooks/goldshtein_bats_directedness_review.py \
+            --download --font-family "Liberation Sans" --output-dir rendered
+          test -s rendered/bat_composite_directedness.pdf
+          test -s rendered/bat_composite_directedness.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bat-panel-d-exports
+          path: rendered/
+          if-no-files-found: error
+  save-exports:
+    needs: render
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bat-panel-d-exports
+          path: assets/goldshtein-bats-figure-ideas/
+      - name: Save exports on the render branch
+        run: |
+          git add assets/goldshtein-bats-figure-ideas/bat_composite_directedness.pdf \
+            assets/goldshtein-bats-figure-ideas/bat_composite_directedness.png
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Render the revised bat composite"
+          git push origin HEAD:refs/heads/review/bat-panel-d-render-b2bde57
