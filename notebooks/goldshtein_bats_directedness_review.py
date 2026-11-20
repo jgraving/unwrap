@@ -12,7 +12,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.textpath import TextToPath
-from matplotlib.ticker import MaxNLocator, MultipleLocator, StrMethodFormatter
+from matplotlib.ticker import MultipleLocator, StrMethodFormatter
 from matplotlib.transforms import ScaledTranslation
 import numpy as np
 from PIL import Image
@@ -29,9 +29,9 @@ ONSET_GOLD = "#FFC850"
 ONSET_EDGE = "#664512"
 DIRECTED_FILL = "#87a1af"
 UNDIRECTED_FILL = "#d4d5d5"
-DIRECTEDNESS_CMAP = composite._directedness_colormap(
-    (310, 169), lightness=.79, chroma=.10, neutral_lightness=.30
-)
+DIRECTEDNESS_CMAP = mpl.colors.ListedColormap(
+    np.loadtxt(source.ASSET_DIR / "managua.txt"), name="managua"
+).with_extremes(bad="white")
 MAP_DROPOUT_COLOR = "#959b9c"
 MAP_DROPOUT_STYLE = (0, (2, 2))
 ONSET_MARKERS = {
@@ -316,7 +316,8 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         photo.text(.5, .075, "Photo placeholder", transform=photo.transAxes,
                    ha="center", va="center", color="white", fontsize=8,
                    bbox={"facecolor": "#272727", "edgecolor": "none", "alpha": .58, "pad": 2.3})
-    letter(26, photo_top + 14, "a", color="white")
+    letter(18, route_top - 9, "a")
+    page_text(39, route_top - 9, "Homing experiment", weight="bold", fontsize=11)
     page_text(139, photo_top + 4, "Treatment groups", fontsize=10.7, weight="bold")
     ix0, iy0, ix1, iy1 = 202.9, 114.76, 304.79, 234.88
     icon_top, icon_scale = photo_top + 14, .74
@@ -378,11 +379,10 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     contrast_top, contrast_h = body_top + 80, 63
     contrast = axes_at(contrast_x, contrast_top, contrast_w, contrast_h)
     composite.draw_density_contrast(contrast, data, colors, vertical=True)
-    contrast.set_ylabel("Density difference", fontsize=8.5, va="center")
-    contrast.yaxis.set_label_coords(-43 / contrast_w, .5)
-    prop = contrast.yaxis.label.get_fontproperties()
-    add_compact_unit_label(fig, contrast_x - 29, PAGE_H - (contrast_top + contrast_h / 2),
-                           "vs. control", "radian", -1, rotation=90,
+    label_x, label_y = contrast_x + column_w / 2, contrast_top + 24
+    label = page_text(label_x, label_y, "Density difference", ha="center", fontsize=7.6)
+    prop = label.get_fontproperties()
+    add_compact_unit_label(fig, label_x, PAGE_H - (label_y + 11), "vs. control", "rad", -1,
                            fontsize=prop.get_size_in_points(), prop=prop)
 
     flight_top = 350
@@ -397,10 +397,9 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     lower_rows = max(data["counts"][level] for level in levels[2:])
     tile_w = 160
     step_km = source.STEP_LENGTH_M / 1000
-    n_steps = heatmaps[levels[0]].shape[1]
-    distance_limits = ((n_steps - .5) * step_km, -.5 * step_km)
-    ticks = MaxNLocator(nbins=4, integer=True).tick_values(0, distance_limits[0])
-    distance_ticks = ticks[(0 <= ticks) & (ticks <= distance_limits[0])]
+    # Keep the half-step padding so the cells at both ends are fully visible.
+    distance_limits = ((source.LAST_N_STEPS + .5) * step_km, -.5 * step_km)
+    distance_ticks = (6, 3, 0)
     for i, (level, label) in enumerate(zip(levels, composite.LABELS, strict=True)):
         row, col = divmod(i, 2)
         top = tops[row]
@@ -418,7 +417,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         tile = axes_at(tile_left, top, tile_w, n_bats * row_height)
         composite.draw_flight_heatmap(tile, heatmaps[level], cmap=DIRECTEDNESS_CMAP)
         draw_onsets(tile, onsets[level])
-        tile.set(ylim=(n_bats, 0), yticks=[], xticks=distance_ticks)
+        tile.set(xlim=distance_limits, ylim=(n_bats, 0), yticks=[], xticks=distance_ticks)
         tile.spines[["left", "top", "right"]].set_visible(False)
         tile.spines["bottom"].set_visible(row == 1)
         if row == 1:
@@ -443,7 +442,6 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                bbox_to_anchor=((key_left + key_w / 2) / PAGE_W, 1 - (key_top + 32) / PAGE_H),
                fontsize=7.6, handletextpad=.5, handlelength=1.65, borderaxespad=0)
 
-    page_text(175, flight_top + 141, "Individual", rotation=90, ha="center", fontsize=9.2)
     heatmap_bottom = tops[1] + lower_rows * row_height
     tile_center = (tile_lefts[0] + tile_lefts[1] + tile_w) / 2
     page_text(tile_center, heatmap_bottom + 18, "Path distance remaining (km)", ha="center", fontsize=8.7)
