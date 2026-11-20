@@ -31,8 +31,8 @@ def _read_context(data_root):
     return ctx, posthoc, plots, lake_path
 
 
-def _mixture_predictions(posterior, levels, counts, posthoc):
-    """Evaluate the pinned vMU with individual offsets set to zero."""
+def _population_parameters(posterior, levels, posthoc):
+    """Return the pinned vMU draws with individual offsets set to zero."""
     if levels != [1, 2, 3, 4]:
         raise ValueError(f"Unexpected treatment order for the bat fit: {levels}")
 
@@ -46,6 +46,12 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     mu = circular_modulo(population_draws("mu0", "mu_treat"))
     kappa = softplus(population_draws("eta_kappa0", "kappa_treat"))
     weight = expit(population_draws("logit_p0", "beta_treat"))
+    return mu, kappa, weight
+
+
+def _mixture_predictions(posterior, levels, counts, posthoc):
+    """Summarize the pinned population-level vMU predictive densities."""
+    mu, kappa, weight = _population_parameters(posterior, levels, posthoc)
 
     def summary(draws):
         return (float(np.mean(draws)), *map(float, posthoc.hdi_1d(draws, prob=0.95)))
@@ -99,7 +105,11 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
 def load_layout_data(data_root):
     """Validate the input pins and assemble the map, model, and heading panels."""
     root = publication.prepare_inputs(data_root)
-    ctx, posthoc, plots, lake_path = _read_context(root)
+    return assemble_layout_data(*_read_context(root))
+
+
+def assemble_layout_data(ctx, posthoc, plots, lake_path):
+    """Build the composite's panel data from the restored notebook context."""
     observed = ctx["df_track"]
     tracks = ctx["track_w_treat"]
     if not (observed.index.is_unique and tracks.index.is_unique and observed.index.isin(tracks.index).all()):
