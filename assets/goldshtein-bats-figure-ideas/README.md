@@ -33,17 +33,17 @@ cells mark missing data, including gap-crossing steps and distances beyond
 each individual's modeled path. Each row represents one bat and has the
 same height across treatments. The treatments include 29 control, 14 eye
 cover, 15 eye cover plus magnet, and 9 eye cover plus magnet and anosmia
-bats. Each heatmap shows the last 6.6 km at 60 m per modeled step.
+bats. The heatmaps include the full recorded range at 60 m per modeled step.
 
 The shared polar key shows directedness by heading relative to the goal
 bearing (0°). Its colors average baseline-adjusted evidence across draws
 from the control population fit, with individual offsets set to zero. The
 ring shares the maps' and heatmaps' color scale.
 
-The population plot shows the notebook's treatment means and pointwise 90%
-highest-density intervals over the same path distance. The notebook averages
-the smoothed scores equally across animals in each draw and plots positions
-with at least two contributing animals.
+The mean plot uses the heatmaps' full distance scale. At distances where
+at least two bats contribute, it averages the smoothed scores equally
+across those bats within each joint draw. The bands show pointwise 90%
+highest-density intervals for that mean conditional on the contributing bats.
 
 Gold dots mark the estimated start of the first sustained goalward bout,
 defined as the first of five consecutive usable goalward steps with
@@ -52,7 +52,7 @@ smoother weights the most recent ten steps and resets at gaps and missing
 headings. Symbols and bars show the median and central 90% interval among
 draws with a qualifying bout. Open circles indicate a median at the flight's
 first usable step. Gold dots include bouts first detected when data resume
-after a gap. Four median onsets precede the plotted window.
+after a gap.
 [Bat model card](https://jakegraving.com/goldshtein-bats)
 
 ```bash
