@@ -25,10 +25,12 @@ The lower plot shows within-draw density differences at 0° against control
 with 95% highest-density intervals.
 
 **d.** The 2×2 map and heatmap grids use matching treatment order and one
-posterior directedness scale. Crameri's reversed Managua palette runs from
-blue for undirected evidence through a dark midpoint at 0.5 to amber for
-directed evidence. Map segments and heatmap cells use the mean of the same
-draw-wise smoothed values. Gray dashed map segments cross tracking gaps.
+posterior directedness scale. Crameri's reversed Vanimo palette runs from
+yellow-green for undirected evidence through a near-black midpoint at 0.5
+to pink for directed evidence. Equal prior odds for the two heading
+components put their likelihood ratio on a probability scale. Map segments
+and heatmap cells use the mean of the same draw-wise smoothed values. Gray
+dashed map segments cross tracking gaps.
 White heatmap cells mark missing data, including gap-crossing steps and
 distances beyond each individual's modeled path. Each row represents one
 bat and has the same height across treatments. The treatments include 29
@@ -46,13 +48,13 @@ at least two bats contribute, it averages the smoothed scores equally
 across those bats within each joint draw. The bands show pointwise 90%
 highest-density intervals for that mean conditional on the contributing bats.
 
-Mint-green dots mark the estimated start of the first sustained goalward bout,
+Charcoal dots mark the estimated start of the first sustained goalward bout,
 defined as the first of five consecutive usable goalward steps with
 smoothed directedness above 0.5 within a joint posterior draw. The trailing
 smoother weights the most recent ten steps and resets at gaps and missing
 headings. Symbols and bars show the median and central 90% interval among
 draws with a qualifying bout. Open circles indicate a median at the flight's
-first usable step. Green dots include bouts first detected when data resume
+first usable step. Solid dots include bouts first detected when data resume
 after a gap.
 [Bat model card](https://jakegraving.com/goldshtein-bats)
 

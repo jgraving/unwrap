@@ -25,18 +25,17 @@ from locust_density_figure import add_compact_unit_label
 PAGE_W, PAGE_H = 532, 736
 OUTPUT_DIR = source.ROOT / "assets" / "goldshtein-bats-figure-ideas"
 STEM = "bat_composite_directedness"
-ONSET_COLOR = "#6EEB9A"
-ONSET_EDGE = "#244634"
+ONSET_INK = "#262626"
 DIRECTED_FILL = "#87a1af"
 UNDIRECTED_FILL = "#d4d5d5"
 DIRECTEDNESS_CMAP = mpl.colors.ListedColormap(
-    np.loadtxt(source.ASSET_DIR / "managua.txt"), name="managua"
+    np.loadtxt(source.ASSET_DIR / "vanimo.txt"), name="vanimo"
 ).reversed().with_extremes(bad="white")
 MAP_DROPOUT_COLOR = "#959b9c"
 MAP_DROPOUT_STYLE = (0, (2, 2))
 ONSET_MARKERS = {
-    "bout_onset": ("o", ONSET_COLOR, 2.5, "Directed bout onset and 90% interval"),
-    "flight_start": ("o", "white", 2.6, "Directed at first usable step of flight"),
+    "bout_onset": (ONSET_INK, "white", 2.9, "Directed bout onset and 90% interval"),
+    "flight_start": ("white", ONSET_INK, 2.6, "Directed at first usable step of flight"),
 }
 
 
@@ -274,10 +273,10 @@ def draw_onsets(ax, onsets):
     """Mark each bout start's median and conditional 90% interval."""
     for row, early, median, late, kind in onsets:
         y = row + .5
-        ax.hlines(y, late, early, colors=ONSET_EDGE, linewidth=1.05, zorder=4)
-        ax.hlines(y, late, early, colors=ONSET_COLOR, linewidth=.58, zorder=5)
-        marker, fill, size, _ = ONSET_MARKERS[kind]
-        ax.plot(median, y, marker=marker, ms=size, mfc=fill, mec=ONSET_EDGE, mew=.45, zorder=6)
+        ax.hlines(y, late, early, colors="white", linewidth=1.15, zorder=4)
+        ax.hlines(y, late, early, colors=ONSET_INK, linewidth=.58, zorder=5)
+        fill, edge, size, _ = ONSET_MARKERS[kind]
+        ax.plot(median, y, marker="o", ms=size, mfc=fill, mec=edge, mew=.5, zorder=6)
 
 
 def draw_composite(data, delta, flights, plots, *, photo_path=None):
@@ -441,11 +440,11 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     composite.draw_flight_colorbar(fig, axes_at(key_center - key_w / 2, key_top, key_w, 5.5),
                                    cmap=DIRECTEDNESS_CMAP, tick_fontsize=7.3)
 
-    onset_key = [Line2D([], [], color=ONSET_COLOR, linewidth=1.1,
-                        linestyle="-" if fill == ONSET_COLOR else "none",
-                        marker=marker, markersize=size + .8, markerfacecolor=fill,
-                        markeredgecolor=ONSET_EDGE, markeredgewidth=.5, label=label)
-                 for marker, fill, size, label in ONSET_MARKERS.values()]
+    onset_key = [Line2D([], [], color=ONSET_INK, linewidth=1.1,
+                        linestyle="-" if fill == ONSET_INK else "none",
+                        marker="o", markersize=size + .8, markerfacecolor=fill,
+                        markeredgecolor=edge, markeredgewidth=.5, label=label)
+                 for fill, edge, size, label in ONSET_MARKERS.values()]
     fig.legend(handles=onset_key, frameon=False, loc="upper center",
                bbox_to_anchor=(key_center / PAGE_W, 1 - (key_top + 32) / PAGE_H),
                fontsize=7.6, handletextpad=.5, handlelength=1.65, borderaxespad=0)
