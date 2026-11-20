@@ -19,10 +19,10 @@ ELPD difference (vMU minus vM) overall and for each treatment. Bars show
 one standard error.
 
 **c.** The four polar plots show the full population-level mixture predictive
-densities on a common scale. They follow the treatment order of the contrast
-plot when read left to right, then top to bottom. The dots identify density
-at the goal bearing (0°). The contrast plot shows within-draw density
-differences at 0° against control with 95% highest-density intervals.
+densities on a common scale. Each polar sits above its treatment's density
+contrast. The dots on the polars identify density at the goal bearing (0°).
+The lower plot shows within-draw density differences at 0° against control
+with 95% highest-density intervals.
 
 **d.** The 2×2 map and heatmap grids use matching treatment order and one
 posterior directedness scale. Matched Oklab ramps run from lavender for
@@ -35,10 +35,10 @@ same height across treatments. The treatments include 29 control, 14 eye
 cover, 15 eye cover plus magnet, and 9 eye cover plus magnet and anosmia
 bats. Each heatmap shows the last 6.6 km at 60 m per modeled step.
 
-Each heatmap has a polar ring showing directedness by heading relative to
-the goal bearing (0°). The colors average the baseline-adjusted evidence
-across draws from that treatment's population fit, with individual offsets
-set to zero. The rings share the maps' and heatmaps' color scale.
+The shared polar key shows directedness by heading relative to the goal
+bearing (0°). Its colors average baseline-adjusted evidence across draws
+from the control population fit, with individual offsets set to zero. The
+ring shares the maps' and heatmaps' color scale.
 
 The population plot shows the notebook's treatment means and pointwise 90%
 highest-density intervals over the same path distance. The notebook averages
