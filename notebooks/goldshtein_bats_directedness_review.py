@@ -426,17 +426,18 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         draw_onsets(tile, onsets[level])
         tile.set(xlim=distance_limits, ylim=(n_bats, 0), yticks=[], xticks=distance_ticks)
         tile.spines[["left", "top", "right"]].set_visible(False)
-        tile.spines["bottom"].set_visible(row == 1)
+        tile.spines["bottom"].set_visible(True)
         if row == 1:
             tile.spines["bottom"].set_position(("outward", (lower_rows - n_bats) * row_height))
         tile.tick_params(axis="x", labelsize=8, width=.6, length=2, pad=2,
-                         bottom=row == 1, labelbottom=row == 1)
+                         bottom=True, labelbottom=True)
 
     # Use the empty parts of the heatmap grid for its keys.
     evidence_polar = axes_at(tile_lefts[0] + 10, tops[0] + 60, 45, 45, projection="polar")
     draw_heading_evidence(evidence_polar, bearings, data["heading_evidence"])
     key_center, key_w = tile_lefts[1] + tile_w / 2, 110
-    key_top = tops[0] + data["counts"][levels[1]] * row_height + 12
+    # Clear the upper-right heatmap's distance tick labels.
+    key_top = tops[0] + data["counts"][levels[1]] * row_height + 28
     composite.draw_flight_colorbar(fig, axes_at(key_center - key_w / 2, key_top, key_w, 5.5),
                                    cmap=DIRECTEDNESS_CMAP, tick_fontsize=7.3)
 
