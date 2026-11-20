@@ -11,11 +11,12 @@ segments mark signal dropout. The north arrow and 1 km scale apply to all
 four maps. Faded icons identify the senses manipulated in each group.
 
 **b.** The polar likelihood diagrams show the von Mises (vM) and von
-Mises–Uniform Mixture (vMU) models. Both use the same illustrative directed
-von Mises distribution. The uniform contribution to the mixture forms a
-band of constant radial thickness. The plot shows the notebook's paired
-PSIS-LOO ELPD difference (vMU minus vM) overall and for each treatment. Bars
-show one standard error.
+Mises–Uniform Mixture (vMU) models on one density scale. The illustrative
+vM density has concentration 1.1. The vMU uses a directed component with
+concentration 2 and weight 0.55. The uniform contribution forms a band of
+constant radial thickness. The plot shows the notebook's paired PSIS-LOO
+ELPD difference (vMU minus vM) overall and for each treatment. Bars show
+one standard error.
 
 **c.** The four polar plots show the full population-level mixture predictive
 densities on a common scale. They follow the treatment order of the contrast
@@ -34,9 +35,15 @@ same height across treatments. The treatments include 29 control, 14 eye
 cover, 15 eye cover plus magnet, and 9 eye cover plus magnet and anosmia
 bats. Each heatmap shows the last 6.6 km at 60 m per modeled step.
 
-The polar ring shows the same directedness score by heading relative to the
-goal bearing (0°). Its colors average the baseline-adjusted evidence across
-draws from the control population fit, with individual offsets set to zero.
+Each heatmap has a polar ring showing directedness by heading relative to
+the goal bearing (0°). The colors average the baseline-adjusted evidence
+across draws from that treatment's population fit, with individual offsets
+set to zero. The rings share the maps' and heatmaps' color scale.
+
+The population plot shows the notebook's treatment means and pointwise 90%
+highest-density intervals over the same path distance. The notebook averages
+the smoothed scores equally across animals in each draw and plots positions
+with at least two contributing animals.
 
 Gold dots mark the estimated start of the first sustained goalward bout,
 defined as the first of five consecutive usable goalward steps with
