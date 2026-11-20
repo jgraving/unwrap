@@ -349,14 +349,19 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     body_top = 168
     letter(18, body_top, "b")
     page_text(39, body_top, "Model selection", weight="bold", fontsize=11)
-    page_text(63, body_top + 16, "von Mises (vM)", fontsize=8.5, ha="center")
-    page_text(151, body_top + 16, "von Mises–Uniform\nMixture (vMU)", fontsize=8.3, ha="center")
-    draw_likelihood_diagrams(axes_at(41.5, body_top + 28, 43, 43, projection="polar"),
-                             axes_at(129.5, body_top + 28, 43, 43, projection="polar"))
+    vm_center, vmu_center = 44, 115
+    model_top, model_size = body_top + 28, 43
+    page_text(vm_center, body_top + 16, "von Mises (vM)", fontsize=8.5, ha="center")
+    page_text(vmu_center, body_top + 16, "von Mises–Uniform\nMixture (vMU)", fontsize=8.3, ha="center")
+    draw_likelihood_diagrams(
+        axes_at(vm_center - model_size / 2, model_top, model_size, model_size, projection="polar"),
+        axes_at(vmu_center - model_size / 2, model_top, model_size, model_size, projection="polar"),
+    )
     fig.legend(handles=[Patch(facecolor=DIRECTED_FILL, label="Directed"),
                         Patch(facecolor=UNDIRECTED_FILL, label="Undirected")],
-               frameon=False, loc="center", bbox_to_anchor=(107 / PAGE_W, 1 - (body_top + 69) / PAGE_H),
-               ncols=2, fontsize=7.8, handlelength=1.3, handletextpad=.45, columnspacing=1.2)
+               frameon=False, loc="center left",
+               bbox_to_anchor=(150 / PAGE_W, 1 - (model_top + model_size / 2) / PAGE_H),
+               ncols=1, fontsize=7.8, handlelength=1.3, handletextpad=.45, borderaxespad=0)
     delta_ax = axes_at(69, body_top + 80, 126, 51)
     draw_elpd_difference(plots, delta, delta_ax, colors)
 
