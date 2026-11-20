@@ -58,14 +58,11 @@ def onset_kind(start, usable, gaps):
     return "bout_onset"
 
 
-def population_heading_evidence(posterior, levels, posthoc, bearing_edges):
-    """Average baseline-adjusted evidence over each treatment's population draws."""
+def control_heading_evidence(posterior, levels, posthoc, bearing_edges):
+    """Average baseline-adjusted evidence over the control population draws."""
     mu, kappa, _ = _population_parameters(posterior, levels, posthoc)
     centers = ((bearing_edges[:-1] + bearing_edges[1:]) / 2)[:, None]
-    return {
-        level: expit(posthoc.evidence_log_ratio(centers, mu[:, i], kappa[:, i])).mean(axis=1)
-        for i, level in enumerate(levels)
-    }
+    return expit(posthoc.evidence_log_ratio(centers, mu[:, 0], kappa[:, 0])).mean(axis=1)
 
 
 def flight_directedness(ctx, posthoc, levels):
@@ -354,19 +351,21 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     bearings = data["density_bearings"]
     profiles = data["density_profiles"]
     radius_max = 1 + 1.08 * max(profile["hi"].max() for profile in profiles.values())
-    polar_size = 61
-    slots = ((412, 22), (479, 22), (412, 90), (479, 90))
-    for (center, offset), level in zip(slots, levels, strict=True):
-        y = body_top + offset
-        polar = axes_at(center - polar_size / 2, y, polar_size, polar_size, projection="polar")
+    contrast_x, contrast_w = 230, 286
+    column_w = contrast_w / len(levels)
+    polar_top, polar_size = body_top + 18, 68
+    for i, level in enumerate(levels):
+        center = contrast_x + (i + .5) * column_w
+        polar = axes_at(center - polar_size / 2, polar_top, polar_size, polar_size,
+                        projection="polar")
         composite.draw_polar_density(polar, bearings, profiles[level], colors[level], radius_max)
-        center_zero_digit(page_text(center, y - 3, "0°", ha="center", fontsize=8))
+        center_zero_digit(page_text(center, polar_top - 3, "0°", ha="center", fontsize=8))
 
-    x, y, width, height = 259, body_top + 25, 104, 68
-    contrast = axes_at(x, y, width, height)
-    composite.draw_density_contrast(contrast, data, colors)
-    prop = contrast.xaxis.label.get_fontproperties()
-    add_compact_unit_label(fig, x + width / 2, PAGE_H - (y + height + 23),
+    contrast_top = body_top + 87
+    contrast = axes_at(contrast_x, contrast_top, contrast_w, 56)
+    composite.draw_density_contrast(contrast, data, colors, vertical=True)
+    prop = contrast.yaxis.label.get_fontproperties()
+    add_compact_unit_label(fig, contrast_x + contrast_w / 2, PAGE_H - (contrast_top - 6),
                            "Density difference vs. control", "radian", -1,
                            fontsize=prop.get_size_in_points(), prop=prop)
 
@@ -380,7 +379,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     tops = (flight_top + 27, flight_top + 177)
     row_height = 4
     lower_rows = max(data["counts"][level] for level in levels[2:])
-    tile_w, ring_size, ring_gap = 110, 45, 5
+    tile_w = 160
     for i, (level, label) in enumerate(zip(levels, composite.LABELS, strict=True)):
         row, col = divmod(i, 2)
         top = tops[row]
@@ -393,7 +392,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         draw_track_map(map_ax, data, treatments[level], color, xlim, ylim,
                        scores=route_scores, show_scale=level == levels[-1])
 
-        page_text(tile_left + (tile_w + ring_gap + ring_size) / 2, top - 8, label, ha="center", color=color,
+        page_text(tile_left + tile_w / 2, top - 8, label, ha="center", color=color,
                   fontsize=9.3, weight="bold")
         tile = axes_at(tile_left, top, tile_w, n_bats * row_height)
         composite.draw_flight_heatmap(tile, heatmaps[level], cmap=DIRECTEDNESS_CMAP)
@@ -405,23 +404,26 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
             tile.spines["bottom"].set_position(("outward", (lower_rows - n_bats) * row_height))
         tile.tick_params(axis="x", labelsize=8, width=.6, length=2, pad=2,
                          bottom=row == 1, labelbottom=row == 1)
-        evidence_polar = axes_at(tile_left + tile_w + ring_gap, top + 5,
-                                 ring_size, ring_size, projection="polar")
-        draw_heading_evidence(evidence_polar, bearings, data["heading_evidence_by_treatment"][level])
+
+    # The shorter upper-right heatmap leaves room for the shared angular and scalar keys.
+    key_top = tops[0] + data["counts"][levels[1]] * row_height + 11
+    evidence_polar = axes_at(353, key_top, 45, 45, projection="polar")
+    draw_heading_evidence(evidence_polar, bearings, data["heading_evidence"])
+    composite.draw_flight_colorbar(fig, axes_at(415, key_top + 17, 95, 5.5),
+                                   cmap=DIRECTEDNESS_CMAP, tick_fontsize=7.3)
 
     page_text(175, flight_top + 141, "Individual", rotation=90, ha="center", fontsize=9.2)
     page_text(363, flight_top + 263, "Population mean", ha="center", fontsize=9.5, weight="bold")
     population_ax = axes_at(210, flight_top + 284, 303, 73)
     draw_population_directedness(plots, population_ax, data, colors)
 
-    composite.draw_flight_colorbar(fig, axes_at(29, flight_top + 327, 122, 5.5), cmap=DIRECTEDNESS_CMAP)
     onset_key = [Line2D([], [], color=ONSET_GOLD, linewidth=1.1,
                         linestyle="-" if fill == ONSET_GOLD else "none",
                         marker=marker, markersize=size + .8, markerfacecolor=fill,
                         markeredgecolor=ONSET_EDGE, markeredgewidth=.5, label=label)
                  for marker, fill, size, label in ONSET_MARKERS.values()]
     fig.legend(handles=onset_key, frameon=False,
-               loc="center left", bbox_to_anchor=(16 / PAGE_W, 1 - (flight_top + 371) / PAGE_H),
+               loc="center left", bbox_to_anchor=(16 / PAGE_W, 1 - (flight_top + 326) / PAGE_H),
                fontsize=7.6, handletextpad=.5, handlelength=1.65, borderaxespad=0)
     return fig
 
@@ -440,7 +442,7 @@ def main(argv=None):
     source.resolve_fonts(args.font_dir, args.font_family)
     ctx, posthoc, plots, lake_path = _read_context(root)
     data = assemble_layout_data(ctx, posthoc, plots, lake_path)
-    data["heading_evidence_by_treatment"] = population_heading_evidence(
+    data["heading_evidence"] = control_heading_evidence(
         ctx["idata_vmu"].posterior, data["levels"], posthoc, data["density_bearings"]
     )
     flights = flight_directedness(ctx, posthoc, data["levels"])

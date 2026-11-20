@@ -81,7 +81,7 @@ def draw_flight_heatmap(ax, scores, *, cmap=HEATMAP_CMAP):
     ax.set_xlim(far, end)
 
 
-def draw_flight_colorbar(fig, cax, *, cmap=HEATMAP_CMAP):
+def draw_flight_colorbar(fig, cax, *, cmap=HEATMAP_CMAP, tick_fontsize=8):
     """Label the direction of evidence on either side of the neutral midpoint."""
     cb = fig.colorbar(mpl.cm.ScalarMappable(norm=HEATMAP_NORM, cmap=cmap),
                       cax=cax, orientation='horizontal')
@@ -89,7 +89,7 @@ def draw_flight_colorbar(fig, cax, *, cmap=HEATMAP_CMAP):
     cb.solids.set_edgecolor('face')
     cb.outline.set_linewidth(.5)
     cb.set_ticks((0, .5, 1), labels=('0\nUndirected', '0.5\nEqual evidence', '1\nDirected'))
-    cb.ax.tick_params(labelsize=8, length=2.25, pad=2)
+    cb.ax.tick_params(labelsize=tick_fontsize, length=2.25, pad=2)
     cb.ax.set_title('Posterior directedness', fontsize=9, pad=3)
 
 
@@ -126,26 +126,39 @@ def draw_polar_density(ax, bearings, profile, color, radius_max):
     ax.plot(0, zero_radius + profile['mean'][bearings.size // 2], 'o', color=color, ms=2.8)
 
 
-def draw_density_contrast(ax, data, colors, *, show_control=True):
+def draw_density_contrast(ax, data, colors, *, show_control=True, vertical=False):
     """Plot within-draw changes in mixture density at the goal bearing."""
     levels = data['levels']
     contrast_labels = LABELS if show_control else LABELS[1:]
     contrast_levels = levels if show_control else levels[1:]
-    ax.axvline(0, color='#888888', lw=.65, ls=(0, (2, 2)), zorder=0)
+    reference_line = ax.axhline if vertical else ax.axvline
+    reference_line(0, color='#888888', lw=.65, ls=(0, (2, 2)), zorder=0)
     if show_control:
         ax.plot(0, 0, 'o', color=colors[levels[0]], ms=4.1, zorder=3)
-    for y, level in enumerate(levels[1:], start=int(show_control)):
+    for index, level in enumerate(levels[1:], start=int(show_control)):
         mean, lo, hi = data['full_contrasts'][level]
-        ax.errorbar(mean, y, xerr=[[mean-lo], [hi-mean]], color=colors[level],
-                    fmt='o', ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
-    ax.set(xlim=(-.34, .04), ylim=(len(contrast_labels)-1+.57, -.57),
-           xticks=(-.3, -.2, -.1, 0), yticks=range(len(contrast_labels)),
-           yticklabels=contrast_labels)
-    ax.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
-    ax.spines[['top', 'right', 'left']].set_visible(False)
+        point = (index, mean) if vertical else (mean, index)
+        error = {'yerr' if vertical else 'xerr': [[mean-lo], [hi-mean]]}
+        ax.errorbar(*point, color=colors[level], fmt='o', ms=4.1, elinewidth=1,
+                    capsize=2.2, capthick=1, **error)
     ax.tick_params(length=3, width=.65, pad=3)
-    ax.tick_params(axis='y', length=0, pad=5)
-    for tick, level in zip(ax.get_yticklabels(), contrast_levels, strict=True):
+    ax.spines[['top', 'right']].set_visible(False)
+    if vertical:
+        ax.set(xlim=(-.5, len(contrast_labels)-.5), ylim=(-.34, .04),
+               xticks=range(len(contrast_labels)), xticklabels=contrast_labels,
+               yticks=(-.3, -.2, -.1, 0))
+        ax.yaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
+        ax.tick_params(axis='x', length=0, pad=5)
+        labels = ax.get_xticklabels()
+    else:
+        ax.set(xlim=(-.34, .04), ylim=(len(contrast_labels)-1+.57, -.57),
+               xticks=(-.3, -.2, -.1, 0), yticks=range(len(contrast_labels)),
+               yticklabels=contrast_labels)
+        ax.xaxis.set_major_formatter(StrMethodFormatter('{x:g}'))
+        ax.spines['left'].set_visible(False)
+        ax.tick_params(axis='y', length=0, pad=5)
+        labels = ax.get_yticklabels()
+    for tick, level in zip(labels, contrast_levels, strict=True):
         tick.set_color(colors[level])
 
 
