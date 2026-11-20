@@ -357,10 +357,12 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         axes_at(vm_center - model_size / 2, model_top, model_size, model_size, projection="polar"),
         axes_at(vmu_center - model_size / 2, model_top, model_size, model_size, projection="polar"),
     )
+    # The likelihood outlines are taller toward the goal than away from it.
+    model_key_y = model_top + model_size / 2 - 5
     fig.legend(handles=[Patch(facecolor=DIRECTED_FILL, label="Directed"),
                         Patch(facecolor=UNDIRECTED_FILL, label="Undirected")],
                frameon=False, loc="center left",
-               bbox_to_anchor=(150 / PAGE_W, 1 - (model_top + model_size / 2) / PAGE_H),
+               bbox_to_anchor=(150 / PAGE_W, 1 - model_key_y / PAGE_H),
                ncols=1, fontsize=7.8, handlelength=1.3, handletextpad=.45, borderaxespad=0)
     delta_ax = axes_at(69, body_top + 80, 126, 51)
     draw_elpd_difference(plots, delta, delta_ax, colors)
@@ -406,8 +408,8 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     row_height = 4
     upper_rows = max(data["counts"][level] for level in levels[:2])
     lower_rows = max(data["counts"][level] for level in levels[2:])
-    heatmap_top = grid_top + 119
-    heatmap_tops = (heatmap_top, heatmap_top + upper_rows * row_height + 32)
+    heatmap_top = grid_top + 111
+    heatmap_tops = (heatmap_top, heatmap_top + upper_rows * row_height + 40)
     tile_x, tile_w, tile_gap = 187, 159, 11
     tile_lefts = (tile_x, tile_x + tile_w + tile_gap)
     right_width = 2 * tile_w + tile_gap
@@ -433,9 +435,6 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                        scores=route_scores, show_scale=level == levels[-1])
 
         tile_top = heatmap_tops[row]
-        if row == 0:
-            # Align the upper axes below the heatmaps, with room for the keys above Eye cover.
-            tile_top += (upper_rows - n_bats) * row_height
         page_text(tile_left + tile_w / 2, tile_top - 8, label, ha="center", color=color,
                   fontsize=9.3, weight="bold")
         tile = axes_at(tile_left, tile_top, tile_w, n_bats * row_height)
@@ -453,7 +452,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     evidence_polar = axes_at(tile_lefts[0] + 10, heatmap_top + 60, 45, 45, projection="polar")
     draw_heading_evidence(evidence_polar, bearings, data["heading_evidence"])
     key_center, key_w = tile_lefts[1] + tile_w / 2, 110
-    key_top = heatmap_top - 13
+    key_top = heatmap_top + data["counts"][levels[1]] * row_height + 26
     composite.draw_flight_colorbar(fig, axes_at(key_center - key_w / 2, key_top, key_w, 5.5),
                                    cmap=DIRECTEDNESS_CMAP, tick_fontsize=7.3)
 
