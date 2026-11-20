@@ -26,6 +26,15 @@ without running the notebook or sampling again. See the
 [reproduction instructions](BEETLE_FIGURE.md) and the
 [rendered preview](../assets/beetles-publication/beetles_publication.png).
 
+The Goldschtein bat figure can be regenerated as SVG, PDF, PNG, HTML and a
+provenance JSON from the notebook's own plotting code, the pinned data and
+the pinned model fits; every panel is the current notebook cell's figure
+embedded in the authored 583 × 626-point composite at the measured
+Inkscape scale, and only panel b plus the panel letters are pinned
+artwork. See the [reproduction instructions](GOLDSHTEIN_BATS_FIGURE.md)
+and the
+[rendered preview](../assets/goldshtein-bats-publication/goldshtein_bats_publication.png).
+
 ## Setup
 
 Follow the [Python setup guide](../docs/getting-started.md). The animal-behaviour

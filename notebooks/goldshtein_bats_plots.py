@@ -862,6 +862,23 @@ def plot_destination_panels(
         _save(fig, save, save_path)
         return fig
 
+
+def _compact_destination_legend(*, show_dropout, gap_linestyle="--", gap_color="black"):
+    """Return the notebook's map key for the roost, releases, and signal gaps."""
+    handles = [
+        Line2D([0], [0], marker="*", color="none",
+               markerfacecolor="white", markeredgecolor="black",
+               markeredgewidth=0.8, markersize=7.2, label="Roost"),
+        Line2D([0], [0], marker="X", color="none",
+               markerfacecolor="white", markeredgecolor="black",
+               markeredgewidth=0.8, markersize=6.2, label="Translocation"),
+    ]
+    if show_dropout:
+        handles.append(Line2D([0, 1], [0, 0], color=gap_color, lw=1.0,
+                              linestyle=gap_linestyle, alpha=0.95, label="Signal dropout"))
+    return handles
+
+
 def plot_destination_panels_compact(
     resampled_df,
     meta_df,
@@ -877,6 +894,11 @@ def plot_destination_panels_compact(
     res_lw=1.35,
     res_alpha=0.95,
     basemap_alpha=1.0,
+    # offline basemap: an RGB raster (e.g. the published figure's own
+    # CartoDB tile raster) drawn over the unified data extent in place of
+    # a contextily fetch; the notebook default (None) keeps the network
+    # basemap
+    basemap_img=None,
     # gap style
     gap_lw=None,
     gap_alpha=0.85,
@@ -958,11 +980,15 @@ def plot_destination_panels_compact(
         ax.set_ylim(*ylim)
 
         # basemap (already raster by nature)
-        try:
-            with _cartodb_quiet():
-                cx.add_basemap(ax, source=_carto_auth(cx.providers.CartoDB.PositronNoLabels), attribution=False, alpha=basemap_alpha)
-        except Exception as e:
-            print("Basemap failed (continuing without tiles):", e)
+        if basemap_img is not None:
+            ax.imshow(basemap_img, extent=(*xlim, *ylim), aspect="auto",
+                      alpha=basemap_alpha, zorder=0)
+        else:
+            try:
+                with _cartodb_quiet():
+                    cx.add_basemap(ax, source=_carto_auth(cx.providers.CartoDB.PositronNoLabels), attribution=False, alpha=basemap_alpha)
+            except Exception as e:
+                print("Basemap failed (continuing without tiles):", e)
 
         # lake ONLY on Agamon panel (keep vector)
         if dest == "Agamon" and len(lake_gdf_3857):
@@ -1049,22 +1075,9 @@ def plot_destination_panels_compact(
         ax.add_patch(rect)
 
     # --- Legend: top-right INSIDE right plot, compact and properly fitting ---
-    other_handles = [
-        Line2D([0], [0], marker="*", color="none",
-               markerfacecolor="white", markeredgecolor="black",
-               markeredgewidth=0.8, markersize=7.2, label="Roost"),
-        Line2D([0], [0], marker="X", color="none",
-               markerfacecolor="white", markeredgecolor="black",
-               markeredgewidth=0.8, markersize=6.2, label="Translocation"),
-    ]
-    if len(res_gaps_gdf):
-        other_handles.append(
-            Line2D([0, 1], [0, 0], color="black", lw=1.0,
-                   linestyle=gap_linestyle, alpha=0.95, label="Signal dropout")
-        )
-
     axes[1].legend(
-        handles=other_handles,
+        handles=_compact_destination_legend(show_dropout=not res_gaps_gdf.empty,
+                                            gap_linestyle=gap_linestyle),
         loc="upper right",
         bbox_to_anchor=(0.985, 0.985),
         borderaxespad=0.2,
@@ -2151,7 +2164,10 @@ def plot_delta_total_and_by_treatment(
     vline_at_zero=True,
     y_step=1.35,
     y_margins=0.10,
+    ax=None,
+    treatment_colors=None,
 ):
+    """Plot paired ELPD differences on a new or supplied axis."""
     import numpy as np
     import pandas as pd
     import matplotlib.pyplot as plt
@@ -2175,14 +2191,18 @@ def plot_delta_total_and_by_treatment(
 
     out = pd.concat([total_row, treat_rows], ignore_index=True)
 
-    cmap = mpl.colormaps.get_cmap("tab10")
-    treat_to_color = {t: cmap(i % 10) for i, t in enumerate(treatment_order)}
+    if treatment_colors is None:
+        cmap = mpl.colormaps.get_cmap("tab10")
+        treatment_colors = {t: cmap(i % 10) for i, t in enumerate(treatment_order)}
 
     y = np.arange(len(out), dtype=float) * float(y_step)
 
-    fig_h = max(1.35, (0.20 * y_step) * len(out) + 0.20)
-    fig = plt.figure(figsize=(3.0, fig_h), dpi=dpi)
-    ax = plt.gca()
+    standalone = ax is None
+    if standalone:
+        fig_h = max(1.35, (0.20 * y_step) * len(out) + 0.20)
+        fig, ax = plt.subplots(figsize=(3.0, fig_h), dpi=dpi)
+    else:
+        fig = ax.figure
 
     if vline_at_zero:
         ax.axvline(0.0, linestyle="--", linewidth=1.0, color="k", zorder=0)
@@ -2196,7 +2216,7 @@ def plot_delta_total_and_by_treatment(
             ecolor = "black"
         else:
             t = r["treatment"]
-            color = treat_to_color.get(t, "black")
+            color = treatment_colors.get(t, "black")
             ecolor = color
 
         if np.isfinite(se):
@@ -2233,7 +2253,8 @@ def plot_delta_total_and_by_treatment(
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    plt.tight_layout()
+    if standalone:
+        fig.tight_layout()
     _save(fig, save, save_path)
     return fig, ax
 
@@ -4500,6 +4521,11 @@ def plot_tracks_pgoal_small_bigfont(
     # style
     basemap_source=cx.providers.CartoDB.Positron,
     basemap_alpha=1.0,
+    # offline basemap: an RGB raster (e.g. the published figure's own
+    # CartoDB tile raster) drawn over each panel's data extent in place of
+    # a contextily fetch; the notebook default (None) keeps the network
+    # basemap
+    basemap_img=None,
     lake_facecolor="tab:cyan",
     lake_alpha=0.25,
     lake_edge_lw=0.8,
@@ -4523,6 +4549,11 @@ def plot_tracks_pgoal_small_bigfont(
     cbar_width=0.60,
     cbar_ticksize=8,      # BIGGER
     cbar_labelsize=9,     # BIGGER
+    # explicit figure-fraction box for the colorbar axis; when given it
+    # overrides the four cbar_* fraction knobs above (the publication
+    # figure generator passes it so the gradient bar lands on the
+    # published composite's measured colorbar)
+    cbar_box=None,
     # colorbar name of the encoded per-step score (default keeps the
     # original directed-component probability figure unchanged)
     cbar_label="Directed-component probability",
@@ -4631,11 +4662,15 @@ def plot_tracks_pgoal_small_bigfont(
         ax.set_ylim(*ylim)
 
         # basemap (already raster by nature)
-        try:
-            with _cartodb_quiet():
-                cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
-        except Exception as e:
-            print("Basemap failed (continuing without tiles):", e)
+        if basemap_img is not None:
+            ax.imshow(basemap_img, extent=(*xlim, *ylim), aspect="auto",
+                      alpha=basemap_alpha, zorder=0)
+        else:
+            try:
+                with _cartodb_quiet():
+                    cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
+            except Exception as e:
+                print("Basemap failed (continuing without tiles):", e)
 
         # lake (keep vector)
         if len(lake_gdf):
@@ -4782,7 +4817,9 @@ def plot_tracks_pgoal_small_bigfont(
         hspace=hspace
     )
 
-    cax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
+    cax = fig.add_axes(
+        cbar_box if cbar_box is not None
+        else [cbar_left, cbar_bottom, cbar_width, cbar_height])
 
     sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
@@ -4900,11 +4937,18 @@ def plot_population_curve_smooth_compact(
     tick_label_fs=6,
     y_labelpad=1,
     x_labelpad=1,
+    ax=None,
+    treatment_colors=None,
 ):
-    colors = sns.color_palette(palette_name, n_colors=len(treat_levels))
-    treat_to_color = {t: colors[i] for i, t in enumerate(treat_levels)}
+    if treatment_colors is None:
+        colors = sns.color_palette(palette_name, n_colors=len(treat_levels))
+        treatment_colors = dict(zip(treat_levels, colors))
 
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=DPI)
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=DPI)
+    else:
+        fig = ax.figure
 
     ax.axhline(0.5, color="0.88", lw=0.8, ls="--", zorder=0)
 
@@ -4920,9 +4964,9 @@ def plot_population_curve_smooth_compact(
         order = np.argsort(x)
         x, m, lo, hi = x[order], m[order], lo[order], hi[order]
 
-        c = treat_to_color[t]
+        c = treatment_colors[t]
         ax.fill_between(x, lo, hi, color=c, alpha=band_alpha, linewidth=0)
-        ax.plot(x, m, color=c, lw=line_lw)
+        ax.plot(x, m, color=c, lw=line_lw, label=s.get("label", str(t)))
 
     ax.set_ylim(0, 1)
     ax.set_xlabel(xlabel, fontsize=axis_label_fs, labelpad=x_labelpad)
@@ -4950,8 +4994,8 @@ def plot_population_curve_smooth_compact(
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    # No legend; use manual margins because tight_layout can struggle at tiny height
-    fig.subplots_adjust(left=0.13, right=0.995, bottom=0.30, top=0.98)
+    if standalone:
+        fig.subplots_adjust(left=0.13, right=0.995, bottom=0.30, top=0.98)
 
     _save(fig, save, save_path)
     return fig
