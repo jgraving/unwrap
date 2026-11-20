@@ -25,22 +25,23 @@ The lower plot shows within-draw density differences at 0° against control
 with 95% highest-density intervals.
 
 **d.** The 2×2 map and heatmap grids use matching treatment order and one
-posterior directedness scale. Matched Oklab ramps run from lavender for
-undirected evidence through charcoal at 0.5 to sea green for directed
+posterior directedness scale. Crameri's Managua palette runs from amber for
+undirected evidence through a dark midpoint at 0.5 to blue for directed
 evidence. Map segments and heatmap cells use the mean of the same draw-wise
 smoothed values. Gray dashed map segments cross tracking gaps. White heatmap
 cells mark missing data, including gap-crossing steps and distances beyond
 each individual's modeled path. Each row represents one bat and has the
 same height across treatments. The treatments include 29 control, 14 eye
 cover, 15 eye cover plus magnet, and 9 eye cover plus magnet and anosmia
-bats. The heatmaps include the full recorded range at 60 m per modeled step.
+bats. The heatmaps show the last 6.6 km at 60 m per modeled step.
+[Scientific colour maps](https://www.fabiocrameri.ch/colourpalettes/)
 
 The shared polar key shows directedness by heading relative to the goal
 bearing (0°). Its colors average baseline-adjusted evidence across draws
 from the control population fit, with individual offsets set to zero. The
 ring shares the maps' and heatmaps' color scale.
 
-The mean plot uses the heatmaps' full distance scale. At distances where
+The mean plot uses the same 6.6 km window as the heatmaps. At distances where
 at least two bats contribute, it averages the smoothed scores equally
 across those bats within each joint draw. The bands show pointwise 90%
 highest-density intervals for that mean conditional on the contributing bats.
