@@ -25,17 +25,17 @@ from locust_density_figure import add_compact_unit_label
 PAGE_W, PAGE_H = 532, 736
 OUTPUT_DIR = source.ROOT / "assets" / "goldshtein-bats-figure-ideas"
 STEM = "bat_composite_directedness"
-ONSET_GOLD = "#FFC850"
-ONSET_EDGE = "#664512"
+ONSET_COLOR = "#6EEB9A"
+ONSET_EDGE = "#244634"
 DIRECTED_FILL = "#87a1af"
 UNDIRECTED_FILL = "#d4d5d5"
 DIRECTEDNESS_CMAP = mpl.colors.ListedColormap(
     np.loadtxt(source.ASSET_DIR / "managua.txt"), name="managua"
-).with_extremes(bad="white")
+).reversed().with_extremes(bad="white")
 MAP_DROPOUT_COLOR = "#959b9c"
 MAP_DROPOUT_STYLE = (0, (2, 2))
 ONSET_MARKERS = {
-    "bout_onset": ("o", ONSET_GOLD, 2.5, "Directed bout onset and 90% interval"),
+    "bout_onset": ("o", ONSET_COLOR, 2.5, "Directed bout onset and 90% interval"),
     "flight_start": ("o", "white", 2.6, "Directed at first usable step of flight"),
 }
 
@@ -205,7 +205,7 @@ def draw_population_directedness(plots, ax, population, colors, distance_limits,
         x_labelpad=3, save=False, ax=ax, treatment_colors=colors,
     )
     ax.set(xticks=distance_ticks, yticks=(0, .5, 1), yticklabels=("0", "0.5", "1"))
-    ax.legend(loc="upper left", bbox_to_anchor=(.014, .98), frameon=False,
+    ax.legend(loc="lower right", bbox_to_anchor=(.99, .04), frameon=False,
               ncols=2, fontsize=7.5, labelcolor="linecolor", handlelength=1.55, handletextpad=.42,
               columnspacing=1.0, borderaxespad=0, labelspacing=.25)
 
@@ -275,7 +275,7 @@ def draw_onsets(ax, onsets):
     for row, early, median, late, kind in onsets:
         y = row + .5
         ax.hlines(y, late, early, colors=ONSET_EDGE, linewidth=1.05, zorder=4)
-        ax.hlines(y, late, early, colors=ONSET_GOLD, linewidth=.58, zorder=5)
+        ax.hlines(y, late, early, colors=ONSET_COLOR, linewidth=.58, zorder=5)
         marker, fill, size, _ = ONSET_MARKERS[kind]
         ax.plot(median, y, marker=marker, ms=size, mfc=fill, mec=ONSET_EDGE, mew=.45, zorder=6)
 
@@ -318,7 +318,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                    bbox={"facecolor": "#272727", "edgecolor": "none", "alpha": .58, "pad": 2.3})
     letter(18, route_top - 9, "a")
     page_text(39, route_top - 9, "Homing experiment", weight="bold", fontsize=11)
-    page_text(139, photo_top + 4, "Treatment groups", fontsize=10.7, weight="bold")
+    page_text(139, photo_top + 4, "Treatment groups", fontsize=10.7)
     ix0, iy0, ix1, iy1 = 202.9, 114.76, 304.79, 234.88
     icon_top, icon_scale = photo_top + 14, .74
     icons = axes_at(139, icon_top, (ix1 - ix0) * icon_scale, (iy1 - iy0) * icon_scale)
@@ -379,23 +379,31 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     contrast_top, contrast_h = body_top + 80, 63
     contrast = axes_at(contrast_x, contrast_top, contrast_w, contrast_h)
     composite.draw_density_contrast(contrast, data, colors, vertical=True)
-    label_x, label_y = contrast_x + column_w / 2, contrast_top + 24
-    label = page_text(label_x, label_y, "Density difference", ha="center", fontsize=7.6)
+    # The open area is bounded by the zero line and the first treatment interval.
+    lo, hi = contrast.get_ylim()
+    zero_y = contrast_top + contrast_h * hi / (hi - lo)
+    open_right = contrast_x + 1.5 * column_w - 3
+    label_x = (contrast_x + open_right) / 2
+    label_center_y = (zero_y + contrast_top + contrast_h) / 2
+    label = page_text(label_x, label_center_y - 4, "Density difference", ha="center", fontsize=8.2)
     prop = label.get_fontproperties()
-    add_compact_unit_label(fig, label_x, PAGE_H - (label_y + 11), "vs. control", "rad", -1,
+    add_compact_unit_label(fig, label_x, PAGE_H - (label_center_y + 7), "vs. control", "rad", -1,
                            fontsize=prop.get_size_in_points(), prop=prop)
 
     flight_top = 350
     letter(18, flight_top, "d")
     page_text(39, flight_top, "Directedness along homing routes", weight="bold", fontsize=11)
-    map_h = 140
+    map_h = 160
     map_w = map_h * map_ratio
-    map_centers = (52, 127)
-    tile_lefts = (188, 357)
-    tops = (flight_top + 27, flight_top + 184)
+    map_x = 18
+    map_lefts = (map_x, map_x + map_w + 14)
+    grid_top = flight_top + 27
+    tops = (grid_top, grid_top + map_h + 16)
     row_height = 4
     lower_rows = max(data["counts"][level] for level in levels[2:])
-    tile_w = 160
+    tile_x, tile_w, tile_gap = 221, 142, 11
+    tile_lefts = (tile_x, tile_x + tile_w + tile_gap)
+    right_width = 2 * tile_w + tile_gap
     step_km = source.STEP_LENGTH_M / 1000
     # Keep the half-step padding so the cells at both ends are fully visible.
     distance_limits = ((source.LAST_N_STEPS + .5) * step_km, -.5 * step_km)
@@ -403,12 +411,12 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     for i, (level, label) in enumerate(zip(levels, composite.LABELS, strict=True)):
         row, col = divmod(i, 2)
         top = tops[row]
-        map_center = map_centers[col]
+        left = map_lefts[col]
         tile_left = tile_lefts[col]
         color = colors[level]
         n_bats = data["counts"][level]
-        page_text(map_center, top - 8, label, ha="center", color=color, fontsize=9.1, weight="bold")
-        map_ax = axes_at(map_center - map_w / 2, top, map_w, map_h)
+        page_text(left + map_w / 2, top - 8, label, ha="center", color=color, fontsize=9.1, weight="bold")
+        map_ax = axes_at(left, top, map_w, map_h)
         draw_track_map(map_ax, data, treatments[level], color, xlim, ylim,
                        scores=route_scores, show_scale=level == levels[-1])
 
@@ -426,26 +434,26 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                          bottom=row == 1, labelbottom=row == 1)
 
     # Use the empty parts of the heatmap grid for its keys.
-    evidence_polar = axes_at(tile_lefts[0] + 14, tops[0] + 60, 45, 45, projection="polar")
+    evidence_polar = axes_at(tile_lefts[0] + 10, tops[0] + 60, 45, 45, projection="polar")
     draw_heading_evidence(evidence_polar, bearings, data["heading_evidence"])
-    key_left, key_w = 373, 121
+    key_center, key_w = tile_lefts[1] + tile_w / 2, 110
     key_top = tops[0] + data["counts"][levels[1]] * row_height + 12
-    composite.draw_flight_colorbar(fig, axes_at(key_left, key_top, key_w, 5.5),
+    composite.draw_flight_colorbar(fig, axes_at(key_center - key_w / 2, key_top, key_w, 5.5),
                                    cmap=DIRECTEDNESS_CMAP, tick_fontsize=7.3)
 
-    onset_key = [Line2D([], [], color=ONSET_GOLD, linewidth=1.1,
-                        linestyle="-" if fill == ONSET_GOLD else "none",
+    onset_key = [Line2D([], [], color=ONSET_COLOR, linewidth=1.1,
+                        linestyle="-" if fill == ONSET_COLOR else "none",
                         marker=marker, markersize=size + .8, markerfacecolor=fill,
                         markeredgecolor=ONSET_EDGE, markeredgewidth=.5, label=label)
                  for marker, fill, size, label in ONSET_MARKERS.values()]
     fig.legend(handles=onset_key, frameon=False, loc="upper center",
-               bbox_to_anchor=((key_left + key_w / 2) / PAGE_W, 1 - (key_top + 32) / PAGE_H),
+               bbox_to_anchor=(key_center / PAGE_W, 1 - (key_top + 32) / PAGE_H),
                fontsize=7.6, handletextpad=.5, handlelength=1.65, borderaxespad=0)
 
     heatmap_bottom = tops[1] + lower_rows * row_height
-    tile_center = (tile_lefts[0] + tile_lefts[1] + tile_w) / 2
+    tile_center = tile_x + right_width / 2
     page_text(tile_center, heatmap_bottom + 18, "Path distance remaining (km)", ha="center", fontsize=8.7)
-    population_ax = axes_at(210, heatmap_bottom + 32, 303, 73)
+    population_ax = axes_at(tile_x, heatmap_bottom + 27, right_width, 69)
     draw_population_directedness(plots, population_ax, population, colors, distance_limits, distance_ticks)
     return fig
 
