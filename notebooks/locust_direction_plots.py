@@ -1020,16 +1020,18 @@ def plot_predictive_models_polar(trace_bimodal, trace_unimodal, df, *,
     for ax, (model, color) in zip(axes, (("Bimodal", BIMODAL),
                                          ("Unimodal", UNIMODAL))):
         s = stats[model]
-        ax.plot(angles, edge_radius + s["kde_median"], color=color,
-                linewidth=1.5, zorder=5)
-        ax.fill_between(angles, edge_radius + s["kde_lower"],
-                        edge_radius + s["kde_upper"], color=color, alpha=0.2,
-                        edgecolor="none", zorder=2)
+        # the data first, the model over it - the model's reproduction of the
+        # data's shape is the subject, the data the standard (as in panel c)
         ax.plot(obs["kde_angles"], edge_radius + obs["kde_median"],
-                color="black", linewidth=1.5, zorder=6)
+                color="black", linewidth=1.5, zorder=2)
         ax.fill_between(obs["kde_angles"], edge_radius + obs["kde_lower_bounds"],
                         edge_radius + obs["kde_upper_bounds"], color="black",
-                        alpha=0.12, edgecolor="none", zorder=3)
+                        alpha=0.12, edgecolor="none", zorder=1)
+        ax.plot(angles, edge_radius + s["kde_median"], color=color,
+                linewidth=1.5, zorder=4)
+        ax.fill_between(angles, edge_radius + s["kde_lower"],
+                        edge_radius + s["kde_upper"], color=color, alpha=0.2,
+                        edgecolor="none", zorder=3)
 
         ax.add_artist(Circle((0, 0), edge_radius, transform=ax.transData._b,
                              color="black", fill=False, linewidth=0.5))
