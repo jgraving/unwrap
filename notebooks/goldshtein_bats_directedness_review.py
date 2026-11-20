@@ -261,12 +261,12 @@ def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_sca
         ax.plot([x - 1000, x], [y, y], color=composite.INK, lw=1.1, zorder=6)
         ax.annotate("1 km", (x - 500, y), textcoords="offset points", xytext=(0, 3),
                     ha="center", fontsize=7)
-        arrow_top = ylim[1] - 1580
-        ax.annotate("", (x, arrow_top), (x, arrow_top - 720), zorder=6,
+        north_tip = (.90, .90)
+        ax.annotate("", north_tip, (.90, .83), xycoords="axes fraction", zorder=6,
                     arrowprops={"arrowstyle": "-|>", "lw": .8, "color": composite.INK,
                                 "shrinkA": 0, "shrinkB": 0})
-        ax.annotate("N", (x, arrow_top), textcoords="offset points", xytext=(0, 2),
-                    ha="center", fontsize=7)
+        ax.annotate("N", north_tip, xycoords="axes fraction", textcoords="offset points",
+                    xytext=(0, 2), ha="center", fontsize=7, zorder=6)
 
 
 def draw_onsets(ax, onsets):
@@ -382,7 +382,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     lo, hi = contrast.get_ylim()
     zero_y = contrast_top + contrast_h * hi / (hi - lo)
     open_right = contrast_x + 1.5 * column_w - 3
-    label_x = (contrast_x + open_right) / 2
+    label_x = (contrast_x + open_right) / 2 - 5
     label_center_y = (zero_y + contrast_top + contrast_h) / 2
     label = page_text(label_x, label_center_y - 4, "Density difference", ha="center", fontsize=8.2)
     prop = label.get_fontproperties()
@@ -397,31 +397,43 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     map_x = 18
     map_lefts = (map_x, map_x + map_w + 14)
     grid_top = flight_top + 27
-    tops = (grid_top, grid_top + map_h + 16)
+    map_tops = (grid_top, grid_top + map_h + 16)
     row_height = 4
+    upper_rows = max(data["counts"][level] for level in levels[:2])
     lower_rows = max(data["counts"][level] for level in levels[2:])
-    tile_x, tile_w, tile_gap = 221, 142, 11
+    heatmap_top = grid_top + 119
+    heatmap_tops = (heatmap_top, heatmap_top + upper_rows * row_height + 32)
+    tile_x, tile_w, tile_gap = 187, 159, 11
     tile_lefts = (tile_x, tile_x + tile_w + tile_gap)
     right_width = 2 * tile_w + tile_gap
     step_km = source.STEP_LENGTH_M / 1000
     # Keep the half-step padding so the cells at both ends are fully visible.
     distance_limits = ((source.LAST_N_STEPS + .5) * step_km, -.5 * step_km)
     distance_ticks = (6, 3, 0)
+    population_x = 221
+    population_ax = axes_at(population_x, grid_top, tile_x + right_width - population_x, 69)
+    draw_population_directedness(plots, population_ax, population, colors, distance_limits, distance_ticks)
+
     for i, (level, label) in enumerate(zip(levels, composite.LABELS, strict=True)):
         row, col = divmod(i, 2)
-        top = tops[row]
+        map_top = map_tops[row]
         left = map_lefts[col]
         tile_left = tile_lefts[col]
         color = colors[level]
         n_bats = data["counts"][level]
-        page_text(left + map_w / 2, top - 8, label, ha="center", color=color, fontsize=9.1, weight="bold")
-        map_ax = axes_at(left, top, map_w, map_h)
+        page_text(left + map_w / 2, map_top - 8, label, ha="center", color=color,
+                  fontsize=9.1, weight="bold")
+        map_ax = axes_at(left, map_top, map_w, map_h)
         draw_track_map(map_ax, data, treatments[level], color, xlim, ylim,
                        scores=route_scores, show_scale=level == levels[-1])
 
-        page_text(tile_left + tile_w / 2, top - 8, label, ha="center", color=color,
+        tile_top = heatmap_tops[row]
+        if row == 0:
+            # Align the upper axes below the heatmaps, with room for the keys above Eye cover.
+            tile_top += (upper_rows - n_bats) * row_height
+        page_text(tile_left + tile_w / 2, tile_top - 8, label, ha="center", color=color,
                   fontsize=9.3, weight="bold")
-        tile = axes_at(tile_left, top, tile_w, n_bats * row_height)
+        tile = axes_at(tile_left, tile_top, tile_w, n_bats * row_height)
         composite.draw_flight_heatmap(tile, heatmaps[level], cmap=DIRECTEDNESS_CMAP)
         draw_onsets(tile, onsets[level])
         tile.set(xlim=distance_limits, ylim=(n_bats, 0), yticks=[], xticks=distance_ticks)
@@ -433,11 +445,10 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                          bottom=True, labelbottom=True)
 
     # Use the empty parts of the heatmap grid for its keys.
-    evidence_polar = axes_at(tile_lefts[0] + 10, tops[0] + 60, 45, 45, projection="polar")
+    evidence_polar = axes_at(tile_lefts[0] + 10, heatmap_top + 60, 45, 45, projection="polar")
     draw_heading_evidence(evidence_polar, bearings, data["heading_evidence"])
     key_center, key_w = tile_lefts[1] + tile_w / 2, 110
-    # Clear the upper-right heatmap's distance tick labels.
-    key_top = tops[0] + data["counts"][levels[1]] * row_height + 28
+    key_top = heatmap_top - 13
     composite.draw_flight_colorbar(fig, axes_at(key_center - key_w / 2, key_top, key_w, 5.5),
                                    cmap=DIRECTEDNESS_CMAP, tick_fontsize=7.3)
 
@@ -450,11 +461,9 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                bbox_to_anchor=(key_center / PAGE_W, 1 - (key_top + 32) / PAGE_H),
                fontsize=7.6, handletextpad=.5, handlelength=1.65, borderaxespad=0)
 
-    heatmap_bottom = tops[1] + lower_rows * row_height
+    heatmap_bottom = heatmap_tops[1] + lower_rows * row_height
     tile_center = tile_x + right_width / 2
     page_text(tile_center, heatmap_bottom + 18, "Path distance remaining (km)", ha="center", fontsize=8.7)
-    population_ax = axes_at(tile_x, heatmap_bottom + 27, right_width, 69)
-    draw_population_directedness(plots, population_ax, population, colors, distance_limits, distance_ticks)
     return fig
 
 
