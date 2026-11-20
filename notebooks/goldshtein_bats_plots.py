@@ -4937,11 +4937,18 @@ def plot_population_curve_smooth_compact(
     tick_label_fs=6,
     y_labelpad=1,
     x_labelpad=1,
+    ax=None,
+    treatment_colors=None,
 ):
-    colors = sns.color_palette(palette_name, n_colors=len(treat_levels))
-    treat_to_color = {t: colors[i] for i, t in enumerate(treat_levels)}
+    if treatment_colors is None:
+        colors = sns.color_palette(palette_name, n_colors=len(treat_levels))
+        treatment_colors = dict(zip(treat_levels, colors))
 
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=DPI)
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=DPI)
+    else:
+        fig = ax.figure
 
     ax.axhline(0.5, color="0.88", lw=0.8, ls="--", zorder=0)
 
@@ -4957,9 +4964,9 @@ def plot_population_curve_smooth_compact(
         order = np.argsort(x)
         x, m, lo, hi = x[order], m[order], lo[order], hi[order]
 
-        c = treat_to_color[t]
+        c = treatment_colors[t]
         ax.fill_between(x, lo, hi, color=c, alpha=band_alpha, linewidth=0)
-        ax.plot(x, m, color=c, lw=line_lw)
+        ax.plot(x, m, color=c, lw=line_lw, label=s.get("label", str(t)))
 
     ax.set_ylim(0, 1)
     ax.set_xlabel(xlabel, fontsize=axis_label_fs, labelpad=x_labelpad)
@@ -4987,8 +4994,8 @@ def plot_population_curve_smooth_compact(
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    # No legend; use manual margins because tight_layout can struggle at tiny height
-    fig.subplots_adjust(left=0.13, right=0.995, bottom=0.30, top=0.98)
+    if standalone:
+        fig.subplots_adjust(left=0.13, right=0.995, bottom=0.30, top=0.98)
 
     _save(fig, save, save_path)
     return fig
