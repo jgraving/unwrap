@@ -57,11 +57,6 @@ def schematic(x, y, model, scale=1):
             profile([(-47, 4.5, 14)], 7, LINK),
             profile([(42, 3, 11)], 7, RUST, "2.4 1.5"),
         ),
-        "continuous": (
-            profile([(0, 1, 8)], 7, "#9eb3ae", "2 1.5"),
-            profile([(0, 2.8, 12)], 7, "#729691", "2 1.5"),
-            profile([(0, 5, 17)], 7, LINK),
-        ),
         "mixture": (
             '<circle r="7" fill="none" stroke="#9e6646" stroke-width="1.2" stroke-dasharray="2 1.5"/>',
             profile([(-11, 7, 12)], 9, LINK),
@@ -82,6 +77,23 @@ def connector(path, *, arrow=True):
             f'stroke-linejoin="round" fill="none"{marker}/>')
 
 
+def density_schematic(x):
+    """Illustrate a continuous, saturating relationship without a data scale."""
+    left, right, bottom, top = x - 43, x + 28, 231, 196
+    points = [
+        f"{left + (right - left) * t / 80:.2f},{227 - 27 * (1 - exp(-4 * t / 80)):.2f}"
+        for t in range(81)
+    ]
+    return [
+        f'<path d="M{left} {top}V{bottom}H{right}" stroke="{EDGE}" fill="none"/>',
+        f'<path d="M{" L".join(points)}" stroke="{LINK}" stroke-width="1.7" fill="none"/>',
+        text(left - 7, 201, "Predictive", size=11.65, color=MUTED, anchor="end"),
+        text(left - 7, 214, "density", size=11.65, color=MUTED, anchor="end"),
+        text(left - 7, 227, "at 0°", size=11.65, color=MUTED, anchor="end"),
+        text(right + 6, 235, "Swarm order", size=11.65, color=MUTED),
+    ]
+
+
 def notebook_links(x, y, notebook):
     return [
         link(f"{notebook}-python", x, y, "Python", f"notebooks/{notebook}/", size=11.8),
@@ -94,10 +106,10 @@ def render():
     topics = (
         (130, "glm", "Treatment groups",
          ("Does direction or consistency", "differ between conditions?"),
-         (("Beetle light pollution", "beetles"), ("Zebra escape response", "zebra_escape"))),
+         (("Beetle light pollution", "beetles"), ("Zebra escape", "zebra_escape"))),
         (363, "continuous", "Continuous predictors",
          ("How does direction or consistency", "change along a gradient?"),
-         (("Locust order and density", "locust_density_order"),)),
+         (("Locust heading density", "locust_density_order"),)),
         (596, "mixture", "Mixtures",
          ("Directed and undirected travel,", "or two preferred directions?"),
          (("Bat homing", "goldshtein_bats"), ("Locust decision-making", "locust_direction_mixture_model"))),
@@ -109,8 +121,9 @@ def render():
         'aria-labelledby="figure-title figure-desc">',
         '<title id="figure-title">Getting started with unwrap</title>',
         '<desc id="figure-desc">The package guide branches to foundations, setup instructions, '
-        'and a coding-agent prompt. Treatment groups and continuous predictors lead to circular GLMMs, '
-        'and mixtures lead to the circular mixture GLMM. The final three boxes link to worked examples.</desc>',
+        'and a coding-agent prompt. Treatment groups and continuous predictors lead to circular GLMMs. '
+        'A schematic curve shows increasing predictive density at 0° with swarm order. Mixtures lead to the '
+        'circular mixture GLMM. The final three boxes link to worked examples.</desc>',
         '<defs><marker id="arrow" viewBox="0 0 7 7" refX="6.5" refY="3.5" markerWidth="6" '
         'markerHeight="6" orient="auto" markerUnits="userSpaceOnUse">'
         f'<path d="M1 1 6.5 3.5 1 6" stroke="{EDGE}" stroke-width="1" fill="none"/>'
@@ -161,6 +174,8 @@ def render():
         parts.append(card(x - 108, 167, 216, 101))
         if family == "mixture":
             parts.extend([schematic(x - 31, 215, family, .79), schematic(x + 31, 215, "bimodal", .79)])
+        elif family == "continuous":
+            parts.extend(density_schematic(x))
         else:
             parts.append(schematic(x, 215, family, .84))
         parts.extend([
