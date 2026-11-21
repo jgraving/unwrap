@@ -23,8 +23,19 @@ def link(key, x, y, label, path, *, size=12.5, anchor="start"):
             f'{text(x, y, label, size=size, color=LINK, bold=True, anchor=anchor)}</a>')
 
 
-def rule(y):
-    return f'<path d="M22 {y}H704" stroke="{RULE}" fill="none"/>'
+def card(x, y, width, height, *, emphasis=False):
+    """Draw a card with softly squared corners and a thin outline."""
+    right, bottom = x + width, y + height
+    radius = 10 if height >= 45 else 8
+    fill, stroke = ("#f3f9f6", "#83a5a0") if emphasis else ("white", RULE)
+    d = (
+        f"M{x + radius} {y}H{right - radius}"
+        f"Q{right} {y} {right} {y + radius}V{bottom - radius}"
+        f"Q{right} {bottom} {right - radius} {bottom}H{x + radius}"
+        f"Q{x} {bottom} {x} {bottom - radius}V{y + radius}"
+        f"Q{x} {y} {x + radius} {y}Z"
+    )
+    return f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="1"/>'
 
 
 def profile(components, offset, color, dash=""):
@@ -46,10 +57,10 @@ def schematic(x, y, model, scale=1):
             profile([(-47, 4.5, 14)], 7, LINK),
             profile([(42, 3, 11)], 7, RUST, "2.4 1.5"),
         ),
-        "glmm": (
-            profile([(-34, 4, 12)], 7, "#7c9d97", "2 1.5"),
-            profile([(34, 4, 12)], 7, "#7c9d97", "2 1.5"),
-            profile([(0, 2.7, 15)], 7, LINK),
+        "continuous": (
+            profile([(0, 1, 8)], 7, "#9eb3ae", "2 1.5"),
+            profile([(0, 2.8, 12)], 7, "#729691", "2 1.5"),
+            profile([(0, 5, 17)], 7, LINK),
         ),
         "mixture": (
             '<circle r="7" fill="none" stroke="#9e6646" stroke-width="1.2" stroke-dasharray="2 1.5"/>',
@@ -65,92 +76,115 @@ def schematic(x, y, model, scale=1):
             f'{"".join(profiles[model])}</g>')
 
 
-def arrow(path):
-    return (f'<path d="{path}" stroke="{EDGE}" stroke-width="1" fill="none" '
-            'marker-end="url(#arrow)"/>')
+def connector(path, *, arrow=True):
+    marker = ' marker-end="url(#arrow)"' if arrow else ""
+    return (f'<path d="{path}" stroke="{EDGE}" stroke-width="1" stroke-linecap="round" '
+            f'stroke-linejoin="round" fill="none"{marker}/>')
 
 
 def example(x, y, label, notebook):
     return [
-        text(x - 97, y, label, size=12.5, bold=True),
-        link(f"{notebook}-python", x + 38, y, "Python", f"notebooks/{notebook}/", size=11.8),
+        text(x - 97, y, label, size=11.9, bold=True),
+        link(f"{notebook}-python", x + 46, y, "Python", f"notebooks/{notebook}/", size=11.8),
         link(f"{notebook}-r", x + 91, y, "R", f"notebooks_r/{notebook}/", size=11.8),
     ]
 
 
 def render():
     topics = (
-        (130, "glm", "Headings under different conditions",
-         ("Does a condition shift direction", "or change directional consistency?"),
-         "Circular GLM", "math/glms/",
-         (("Regression tutorial", "circular_regression"),)),
-        (363, "glmm", "Repeated headings",
-         ("Do animals or groups differ in their", "preferred headings or cue responses?"),
-         "Circular GLMM", "math/glmms/",
-         (("Beetle orientation", "beetles"),)),
-        (596, "mixture", "Several possible heading patterns",
-         ("Could headings reflect directed and", "undirected travel, or competing bearings?"),
-         "Circular mixture", "math/mixtures/",
-         (("Bat homing", "goldshtein_bats"), ("Locust steering", "locust_direction_mixture_model"))),
+        (130, "glm", "Treatment groups",
+         ("Does direction or consistency", "differ between conditions?"),
+         (("Dung beetle orientation", "beetles"), ("Zebra body orientation", "zebra_escape"))),
+        (363, "continuous", "Continuous predictors",
+         ("How does direction or consistency", "change along a gradient?"),
+         (("Locust order and density", "locust_density_order"),)),
+        (596, "mixture", "Mixtures",
+         ("Directed and undirected travel,", "or two preferred directions?"),
+         (("Bat homing", "goldshtein_bats"), ("Locust decision-making", "locust_direction_mixture_model"))),
     )
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
-        'width="178mm" height="89.49mm" viewBox="0 0 726 365" '
+        'width="178mm" height="97.34mm" viewBox="0 0 726 397" '
         'aria-labelledby="figure-title figure-desc">',
         '<title id="figure-title">Getting started with unwrap</title>',
-        '<desc id="figure-desc">Panel a links three schematic heading patterns to model guides '
-        'and worked examples. Animal or group effects can extend both a single circular regression '
-        'and a mixture. Panel b links to foundations and a starter prompt for coding agents.</desc>',
+        '<desc id="figure-desc">The package guide branches to foundations, setup instructions, '
+        'and a coding-agent prompt. Treatment groups and continuous predictors lead to circular GLMMs, '
+        'and mixtures lead to the circular mixture GLMM. The final three boxes link to worked examples.</desc>',
         '<defs><marker id="arrow" viewBox="0 0 7 7" refX="6.5" refY="3.5" markerWidth="6" '
         'markerHeight="6" orient="auto" markerUnits="userSpaceOnUse">'
         f'<path d="M1 1 6.5 3.5 1 6" stroke="{EDGE}" stroke-width="1" fill="none"/>'
         '</marker></defs>',
-        '<rect width="726" height="365" fill="white"/>',
+        '<rect width="726" height="397" fill="white"/>',
         '<g font-family="Arial, Liberation Sans, sans-serif">',
-        text(22, 23, "a", size=18, bold=True),
-        text(41, 23, "Choose a circular model", size=14, bold=True),
-        rule(147),
+        connector("M363 34V41M130 41H596", arrow=False),
+        connector("M130 41V48"),
+        connector("M363 41V48"),
+        connector("M596 41V48"),
+        connector("M130 104V115H596V104M363 104V115", arrow=False),
+        connector("M363 115V126"),
+        connector("M363 150V157M130 157H596", arrow=False),
+        connector("M130 157V166"),
+        connector("M363 157V166"),
+        connector("M596 157V166"),
+        card(267, 9, 192, 25, emphasis=True),
+        link("docs", 363, 26, "Start with the package guide", "", size=13.2, anchor="middle"),
+        card(22, 49, 216, 55),
+        card(255, 49, 216, 55),
+        card(488, 49, 216, 55),
+        text(130, 65, "Learn the foundations", size=12.5, bold=True, anchor="middle"),
+        link("entry-biology", 130, 81, "Biological questions", "#start-with-a-biological-question", size=11.65, anchor="middle"),
+        link("entry-angles", 41, 96, "Angles", "angle-basics/", size=11.65),
+        text(85, 96, "·", size=11.65, color=MUTED),
+        link("entry-glms", 95, 96, "GLMs", "models/#from-a-biological-question-to-a-glm", size=11.65),
+        text(131, 96, "·", size=11.65, color=MUTED),
+        link("entry-bayes", 141, 96, "Bayesian basics", "bayes-basics/", size=11.65),
+        text(363, 65, "Set up to run a notebook", size=12.5, bold=True, anchor="middle"),
+        link("setup-python", 303, 81, "Python setup", "getting-started/", size=11.65),
+        text(380, 81, "·", size=11.65, color=MUTED),
+        link("setup-r", 390, 81, "R setup", "getting-started-r/", size=11.65),
+        link("intro-tutorial", 363, 96, "Try a simulated regression", "examples/#the-tutorial", size=11.65, anchor="middle"),
+        text(596, 65, "Use a coding agent", size=12.5, bold=True, anchor="middle"),
+        link("entry-agent", 596, 81, "Copyable prompt", "coding-agents/#copyable-prompt", size=11.65, anchor="middle"),
+        text(596, 96, "Bring your question and data", size=11.65, color=MUTED, anchor="middle"),
+        card(248, 127, 230, 23, emphasis=True),
+        text(363, 143, "Match your data and question", size=12.8, bold=True, anchor="middle"),
+        connector("M130 268V281H363V268", arrow=False),
+        connector("M246.5 281V295"),
+        connector("M596 268V295"),
+        connector("M246.5 322V331M130 331H363", arrow=False),
+        connector("M130 331V340"),
+        connector("M363 331V340"),
+        connector("M596 322V340"),
     ]
-    for x, family, data, question, name, guide, examples in topics:
+    for x, family, data, question, examples in topics:
+        parts.append(card(x - 108, 167, 216, 101))
         if family == "mixture":
-            parts.extend([schematic(x - 31, 80, family, .89), schematic(x + 31, 80, "bimodal", .89)])
+            parts.extend([schematic(x - 31, 215, family, .79), schematic(x + 31, 215, "bimodal", .79)])
         else:
-            parts.append(schematic(x, 80, family))
+            parts.append(schematic(x, 215, family, .84))
         parts.extend([
-            text(x, 46, data, size=12.8, bold=True, anchor="middle"),
-            text(x, 120, question[0], size=12.2, color=MUTED, anchor="middle"),
-            text(x, 135, question[1], size=12.2, color=MUTED, anchor="middle"),
-            arrow(f"M{x} 150v17"),
-            f'<rect x="{x-64}" y="169" width="128" height="25" rx="3" '
-            f'fill="#f5faf8" stroke="{LINK}" stroke-width=".85"/>',
-            link(f"model-{family}", x, 187, name, guide, size=13.6, anchor="middle"),
-            arrow(f"M{x} 195v14"),
+            text(x, 185, data, size=13.2, bold=True, anchor="middle"),
+            text(x, 246, question[0], size=11.8, color=MUTED, anchor="middle"),
+            text(x, 261, question[1], size=11.8, color=MUTED, anchor="middle"),
+            card(x - 108, 341, 216, 46),
         ])
-        for line, (title, notebook) in enumerate(examples):
-            parts.extend(example(x, 226 + line * 17, title, notebook))
+        if len(examples) == 1:
+            (title, notebook), = examples
+            parts.extend([
+                text(x, 358, title, size=11.9, bold=True, anchor="middle"),
+                link(f"{notebook}-python", x - 31, 376, "Python", f"notebooks/{notebook}/", size=11.8),
+                text(x + 11, 376, "·", size=11.8, color=MUTED),
+                link(f"{notebook}-r", x + 22, 376, "R", f"notebooks_r/{notebook}/", size=11.8),
+            ])
+        else:
+            for line, (title, notebook) in enumerate(examples):
+                parts.extend(example(x, 359 + line * 17, title, notebook))
     parts.extend([
-        arrow("M195 183H297"),
-        text(246, 176, "Add group effects", size=11.55, color=MUTED, anchor="middle"),
-        text(596, 261, "Mixtures can also include group effects.", size=11.6, color=MUTED, anchor="middle"),
-        rule(271),
-        text(22, 292, "b", size=18, bold=True),
-        text(41, 292, "Choose an entry point", size=14, bold=True),
-        text(22, 314, "New to statistical modeling", size=12.25, bold=True),
-        link("entry-biology", 22, 332, "Start with a biological question", "#start-with-a-biological-question", size=11.7),
-        text(219, 314, "New to circular data", size=12.25, bold=True),
-        link("entry-angles", 219, 332, "Angles and concentration", "math/von-mises/#angular-conventions", size=11.7),
-        text(397, 314, "New to Bayesian GLMs", size=12.25, bold=True),
-        link("entry-glms", 397, 332, "GLMs", "models/#from-a-biological-question-to-a-glm", size=11.7),
-        text(432, 332, "·", size=11.7, color=MUTED),
-        link("entry-bayes", 443, 332, "Bayesian basics", "#read-a-fitted-model", size=11.7),
-        text(569, 314, "Using a coding agent", size=12.25, bold=True),
-        link("entry-agent", 569, 332, "Copyable prompt", "coding-agents/#copyable-prompt", size=11.7),
-        rule(342),
-        link("docs", 22, 352, "Package documentation", "", size=11.6),
-        link("setup-python", 577, 352, "Python setup", "getting-started/", size=11.6),
-        text(653, 352, "·", size=11.6, color=MUTED),
-        link("setup-r", 665, 352, "R setup", "getting-started-r/", size=11.6),
+        card(155.5, 296, 182, 26, emphasis=True),
+        link("model-glmm", 246.5, 314, "Circular GLMM", "math/glmms/", size=13.5, anchor="middle"),
+        card(488, 296, 216, 26, emphasis=True),
+        link("model-mixture", 596, 314, "Circular mixture GLMM", "math/mixtures/#add-animal-differences-to-a-mixture", size=13.5, anchor="middle"),
         '</g>',
         '</svg>',
     ])

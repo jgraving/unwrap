@@ -5,17 +5,19 @@ an animal’s heading as it left an arena. You might ask where it tended to
 point, how consistently it pointed there, or whether it used more than one
 direction. The same dataset can support different questions.
 
-![Schematic heading distributions lead to circular GLMs, circular GLMMs, and mixtures, with worked examples in Python and R. A second panel links to introductory guides and a prompt for coding agents.](assets/unwrap-model-map.svg)
+![Treatment groups and continuous predictors link to circular GLMMs, and mixtures link to circular mixture GLMMs. The map includes worked examples in Python and R, foundations and setup guides, and a prompt for coding agents.](assets/unwrap-model-map.svg)
 
 [Open the linked model map](assets/unwrap-model-map.svg)
 
 ## Start from your data and question
 
+The case studies below use repeated measurements from individual animals.
+
 | Your data and question | Starting model | Worked examples |
 | --- | --- | --- |
-| **Headings with predictors.** Does a treatment change the preferred heading, directional consistency, or both? | [Circular GLM](math/glms.md). Model mean direction and concentration as functions of predictors. | Simulated circular regression in [Python](notebooks/circular_regression.ipynb) or [R](notebooks_r/circular_regression.ipynb). |
-| **Repeated headings within animals or groups.** Do animals differ in their preferred heading or in how they respond to a cue? | [Circular GLMM](math/glmms.md). Group effects account for shared differences among measurements of the same animal or group. Partial pooling lets the animals’ estimates inform one another. | Dung beetle orientation in [Python](notebooks/beetles.ipynb) or [R](notebooks_r/beetles.ipynb). |
-| **Several plausible heading patterns.** Could headings reflect directed and undirected travel, or could there be two preferred directions? | [Circular mixture](math/mixtures.md). Give each component its own heading distribution and estimate how they combine. | Bat homing ([Python](notebooks/goldshtein_bats.ipynb), [R](notebooks_r/goldshtein_bats.ipynb)) for directed and uniform components. Locust steering ([Python](notebooks/locust_direction_mixture_model.ipynb), [R](notebooks_r/locust_direction_mixture_model.ipynb)) for competing directions. |
+| **Treatment groups.** Does a treatment change the preferred heading or how consistently individuals orient? | [Circular GLMM](math/glmms.md). Estimate treatment effects on mean direction, concentration, or both while accounting for repeated measurements. | Dung beetle orientation ([Python](notebooks/beetles.ipynb), [R](notebooks_r/beetles.ipynb)) and zebra body orientation ([Python](notebooks/zebra_escape.ipynb), [R](notebooks_r/zebra_escape.ipynb)). |
+| **Continuous predictors.** Does directional alignment change along a gradient or with several continuous predictors? | [Circular GLMM](math/glmms.md). Relate mean direction or concentration to continuous predictors, with group effects for repeated observations. | Locust order and density ([Python](notebooks/locust_density_order.ipynb), [R](notebooks_r/locust_density_order.ipynb)) for directional alignment. |
+| **Mixtures.** Could headings reflect distinct movement processes or competing preferred directions? | [Circular mixture GLMM](math/mixtures.md). Estimate separate heading components and their weights within a multilevel model. | Bat homing ([Python](notebooks/goldshtein_bats.ipynb), [R](notebooks_r/goldshtein_bats.ipynb)) for directed and uniform components. Locust decision-making ([Python](notebooks/locust_direction_mixture_model.ipynb), [R](notebooks_r/locust_direction_mixture_model.ipynb)) for optic flow versus vectorial encoding. |
 
 For a single set of headings with no predictors, start with a
 [von Mises distribution](math/von-mises.md) to estimate mean direction and
@@ -24,11 +26,10 @@ with time of day, time is periodic but your outcome is not an angle. The
 [daily activity example](examples.md#periodic-but-not-circular-a-24-hour-activity-rhythm)
 shows how to put the periodicity in the predictor.
 
-The likelihood and the grouping structure answer different questions.
-You can add animal effects to a mixture when you observe each animal repeatedly.
-Group effects capture shared variation within animals. Closely spaced steps
-can additionally depend on preceding steps. Use the biological question and
-predictive checks to decide whether another component is warranted.
+Let the sampling design guide the grouping structure. Repeated observations
+from the same animal share animal-level variation. Closely spaced steps can
+also depend on preceding steps. Use the biological question and predictive
+checks to decide whether another component is warranted.
 
 ## Start from what you know
 
