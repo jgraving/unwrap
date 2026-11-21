@@ -79,18 +79,14 @@ def connector(path, *, arrow=True):
 
 def density_schematic(x):
     """Illustrate a continuous, saturating relationship without a data scale."""
-    left, right, bottom, top = x - 43, x + 28, 231, 196
+    left, right, bottom, top = x - 43, x + 43, 234, 195
     points = [
-        f"{left + (right - left) * t / 80:.2f},{227 - 27 * (1 - exp(-4 * t / 80)):.2f}"
-        for t in range(81)
+        f"{left + 4 + (right - left - 8) * t / 60:.2f},{230 - 29 * (1 - exp(-3.6 * t / 60)):.2f}"
+        for t in range(61)
     ]
     return [
-        f'<path d="M{left} {top}V{bottom}H{right}" stroke="{EDGE}" fill="none"/>',
-        f'<path d="M{" L".join(points)}" stroke="{LINK}" stroke-width="1.7" fill="none"/>',
-        text(left - 7, 201, "Predictive", size=11.65, color=MUTED, anchor="end"),
-        text(left - 7, 214, "density", size=11.65, color=MUTED, anchor="end"),
-        text(left - 7, 227, "at 0°", size=11.65, color=MUTED, anchor="end"),
-        text(right + 6, 235, "Swarm order", size=11.65, color=MUTED),
+        f'<path d="M{left} {top}V{bottom}H{right}" stroke="{RULE}" stroke-width="1.2" fill="none"/>',
+        f'<path d="M{" L".join(points)}" stroke="{LINK}" stroke-width="1.8" stroke-linecap="round" fill="none"/>',
     ]
 
 
