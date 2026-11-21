@@ -82,11 +82,11 @@ def connector(path, *, arrow=True):
             f'stroke-linejoin="round" fill="none"{marker}/>')
 
 
-def example(x, y, label, notebook):
+def notebook_links(x, y, notebook):
     return [
-        text(x - 97, y, label, size=11.9, bold=True),
-        link(f"{notebook}-python", x + 46, y, "Python", f"notebooks/{notebook}/", size=11.8),
-        link(f"{notebook}-r", x + 91, y, "R", f"notebooks_r/{notebook}/", size=11.8),
+        link(f"{notebook}-python", x, y, "Python", f"notebooks/{notebook}/", size=11.8),
+        text(x + 43, y, "·", size=11.8, color=MUTED),
+        link(f"{notebook}-r", x + 52, y, "R", f"notebooks_r/{notebook}/", size=11.8),
     ]
 
 
@@ -94,7 +94,7 @@ def render():
     topics = (
         (130, "glm", "Treatment groups",
          ("Does direction or consistency", "differ between conditions?"),
-         (("Dung beetle orientation", "beetles"), ("Zebra body orientation", "zebra_escape"))),
+         (("Beetle light pollution", "beetles"), ("Zebra escape response", "zebra_escape"))),
         (363, "continuous", "Continuous predictors",
          ("How does direction or consistency", "change along a gradient?"),
          (("Locust order and density", "locust_density_order"),)),
@@ -171,15 +171,13 @@ def render():
         ])
         if len(examples) == 1:
             (title, notebook), = examples
-            parts.extend([
-                text(x, 358, title, size=11.9, bold=True, anchor="middle"),
-                link(f"{notebook}-python", x - 31, 376, "Python", f"notebooks/{notebook}/", size=11.8),
-                text(x + 11, 376, "·", size=11.8, color=MUTED),
-                link(f"{notebook}-r", x + 22, 376, "R", f"notebooks_r/{notebook}/", size=11.8),
-            ])
+            parts.append(text(x, 358, title, size=11.9, bold=True, anchor="middle"))
+            parts.extend(notebook_links(x - 30, 376, notebook))
         else:
             for line, (title, notebook) in enumerate(examples):
-                parts.extend(example(x, 359 + line * 17, title, notebook))
+                y = 359 + line * 17
+                parts.append(text(x - 98, y, title, size=11.65, bold=True))
+                parts.extend(notebook_links(x + 42, y, notebook))
     parts.extend([
         card(155.5, 296, 182, 26, emphasis=True),
         link("model-glmm", 246.5, 314, "Circular GLMM", "math/glmms/", size=13.5, anchor="middle"),
