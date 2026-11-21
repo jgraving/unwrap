@@ -132,7 +132,7 @@ def render():
          (("Beetle light pollution", "beetles"), ("Zebra escape", "zebra_escape"))),
         (363, "continuous", "Continuous predictors",
          ("How does direction or consistency", "change along a gradient?"),
-         (("Locust heading density", "locust_density_order"),)),
+         (("Drivers of locust alignment", "locust_density_order"),)),
         (596, "mixture", "Mixtures",
          ("Directed and undirected travel,", "or two preferred directions?"),
          (("Bat homing", "goldshtein_bats"), ("Locust decision-making", "locust_direction_mixture_model"))),
