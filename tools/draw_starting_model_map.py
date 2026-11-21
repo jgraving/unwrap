@@ -1,6 +1,6 @@
 """Render the linked, full-width model map shared by the paper and docs."""
 from html import escape
-from math import cos, exp, pi, radians, sin
+from math import cos, exp, factorial, pi, radians, sin
 from pathlib import Path
 
 
@@ -50,8 +50,15 @@ def profile(components, offset, color, dash=""):
             f'stroke-width="1.35" stroke-linejoin="round"{style}/>')
 
 
-def schematic(x, y, model, scale=1):
-    """Sketch conditional, group-specific, or mixture densities on a common circle."""
+def polar(x, y, curves, scale):
+    return (f'<g transform="translate({x} {y}) scale({scale})" aria-hidden="true">'
+            f'<circle r="23" fill="none" stroke="{RULE}"/>'
+            f'<path d="M0 -26v3m0 46v3m-26 -26h3m46 0h3" stroke="{RULE}" fill="none"/>'
+            f'{"".join(curves)}</g>')
+
+
+def schematic(x, y, model, scale):
+    """Sketch conditional or mixture densities on a common circle."""
     profiles = {
         "glm": (
             profile([(-47, 4.5, 14)], 7, LINK),
@@ -65,10 +72,7 @@ def schematic(x, y, model, scale=1):
             profile([(-64, 6, 14), (64, 5, 12)], 7, LINK),
         ),
     }
-    return (f'<g transform="translate({x} {y}) scale({scale})" aria-hidden="true">'
-            f'<circle r="23" fill="none" stroke="{RULE}"/>'
-            f'<path d="M0 -26v3m0 46v3m-26 -26h3m46 0h3" stroke="{RULE}" fill="none"/>'
-            f'{"".join(profiles[model])}</g>')
+    return polar(x, y, profiles[model], scale)
 
 
 def connector(path, *, arrow=True):
@@ -77,16 +81,39 @@ def connector(path, *, arrow=True):
             f'stroke-linejoin="round" fill="none"{marker}/>')
 
 
+def predictor_parameters(fraction):
+    """Return the mean, concentration, and peak for an illustrative von Mises."""
+    mean = 112 - 88 * fraction
+    concentration = 6.3 - 4.4 * fraction
+    # The power series for I0 converges at every concentration in this sketch.
+    i0 = sum((concentration ** 2 / 4) ** n / factorial(n) ** 2 for n in range(18))
+    return mean, concentration, exp(concentration) / (2 * pi * i0)
+
+
 def density_schematic(x):
-    """Illustrate a continuous, saturating relationship without a data scale."""
-    left, right, bottom, top = x - 43, x + 43, 234, 195
-    points = [
-        f"{left + 4 + (right - left - 8) * t / 60:.2f},{230 - 29 * (1 - exp(-3.6 * t / 60)):.2f}"
-        for t in range(61)
-    ]
+    """Pair density at 0° across the predictor with three polar densities."""
+    left, right, bottom, top = x - 81, x + 10, 234, 195
+    parameters = [predictor_parameters(t / 60) for t in range(61)]
+    densities = [peak * exp(kappa * (cos(radians(mean)) - 1))
+                 for mean, kappa, peak in parameters]
+    scale = max(densities)
+    points = [(left + 4 + (right - left - 8) * i / 60, 230 - 29 * density / scale)
+              for i, density in enumerate(densities)]
+    colors = (RUST, "#638c85", LINK)
+    samples = (0, 30, 60)
+    curves = []
+    dots = []
+    for sample, color in zip(samples, colors, strict=True):
+        mean, kappa, peak = parameters[sample]
+        cx, cy = points[sample]
+        curves.append(profile([(mean, kappa, 17 * peak)], 7, color))
+        dots.append(f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="2.3" fill="{color}"/>')
+    line = " L".join(f"{a:.2f},{b:.2f}" for a, b in points)
     return [
         f'<path d="M{left} {top}V{bottom}H{right}" stroke="{RULE}" stroke-width="1.2" fill="none"/>',
-        f'<path d="M{" L".join(points)}" stroke="{LINK}" stroke-width="1.8" stroke-linecap="round" fill="none"/>',
+        f'<path d="M{line}" stroke="{EDGE}" stroke-width="1.6" stroke-linecap="round" fill="none"/>',
+        *dots,
+        polar(x + 55, 215, curves, .84),
     ]
 
 
@@ -118,7 +145,8 @@ def render():
         '<title id="figure-title">Getting started with unwrap</title>',
         '<desc id="figure-desc">The package guide branches to foundations, setup instructions, '
         'and a coding-agent prompt. Treatment groups and continuous predictors lead to circular GLMMs. '
-        'A schematic curve shows increasing predictive density at 0° with swarm order. Mixtures lead to the '
+        'An illustrative continuous predictor rotates the von Mises mean toward 0° while reducing '
+        'concentration. Three marked points on the line for density at 0° match the three polar curves. Mixtures lead to the '
         'circular mixture GLMM. The final three boxes link to worked examples.</desc>',
         '<defs><marker id="arrow" viewBox="0 0 7 7" refX="6.5" refY="3.5" markerWidth="6" '
         'markerHeight="6" orient="auto" markerUnits="userSpaceOnUse">'

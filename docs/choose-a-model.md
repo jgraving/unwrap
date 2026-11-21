@@ -9,6 +9,10 @@ direction. The same dataset can support different questions.
 
 [Open the linked model map](assets/unwrap-model-map.svg)
 
+In the continuous-predictors sketch, the three polar curves correspond to
+three predictor values along the line for predictive density at 0°. Mean
+direction rotates and concentration decreases across this illustrative example.
+
 ## Start from your data and question
 
 The case studies below use repeated measurements from individual animals.
