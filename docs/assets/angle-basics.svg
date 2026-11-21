@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 221" width="720" height="221"
+     role="img" aria-labelledby="title description">
+  <title id="title">The circular boundary and directional concentration</title>
+  <desc id="description">Headings of 350 and 10 degrees are 20 degrees apart and have a circular
+    mean of zero. Two other sets of five headings have the same mean at zero, with lower and higher
+    concentration. Dots show observations and arrows show circular means.</desc>
+  <rect width="720" height="221" fill="white"/>
+  <path d="M 280 20 V 202" fill="none" stroke="#c6d5d3"/>
+  <g font-family="Arial, sans-serif" fill="#193131" text-anchor="middle">
+    <text x="146" y="26" font-size="16" font-weight="bold">Across the circular boundary</text>
+    <text x="505" y="26" font-size="16" font-weight="bold">Same center, different concentration</text>
+    <circle cx="146" cy="126" r="60" fill="none" stroke="#c6d5d3"/>
+  <path d="M 146 126 V 78 m -4 5 l 4 -5 4 5" stroke="#a54b2d" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="135.58" cy="66.91" r="4" fill="#08726d"/>
+<circle cx="156.42" cy="66.91" r="4" fill="#08726d"/>
+    <path d="M 134.19 59.03 A 68 68 0 0 1 157.81 59.03" fill="none"
+          stroke="#08726d" stroke-width="2"/>
+    <text x="117" y="59" font-size="14">350°</text>
+    <text x="176" y="59" font-size="14">10°</text>
+    <text x="146" y="111" fill="#a54b2d" font-size="14" text-anchor="start" dx="7">0°</text>
+    <text x="146" y="210" font-size="14">20° apart</text>
+    <circle cx="400" cy="126" r="60" fill="none" stroke="#c6d5d3"/>
+  <path d="M 400 126 V 78 m -4 5 l 4 -5 4 5" stroke="#a54b2d" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="352.72" cy="89.06" r="4" fill="#08726d"/>
+<circle cx="374.64" cy="71.62" r="4" fill="#08726d"/>
+<circle cx="400.00" cy="66.00" r="4" fill="#08726d"/>
+<circle cx="425.36" cy="71.62" r="4" fill="#08726d"/>
+<circle cx="447.28" cy="89.06" r="4" fill="#08726d"/>
+    <circle cx="609" cy="126" r="60" fill="none" stroke="#c6d5d3"/>
+  <path d="M 609 126 V 78 m -4 5 l 4 -5 4 5" stroke="#a54b2d" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="588.48" cy="69.62" r="4" fill="#08726d"/>
+<circle cx="598.58" cy="66.91" r="4" fill="#08726d"/>
+<circle cx="609.00" cy="66.00" r="4" fill="#08726d"/>
+<circle cx="619.42" cy="66.91" r="4" fill="#08726d"/>
+<circle cx="629.52" cy="69.62" r="4" fill="#08726d"/>
+    <text x="400" y="210" font-size="14">Lower concentration</text>
+    <text x="609" y="210" font-size="14">Higher concentration</text>
+  </g>
+</svg>

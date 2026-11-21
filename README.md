@@ -21,7 +21,7 @@ inference, and **Bambi**, a high-level, formula-based interface built on PyMC
 for GLMs and GLMMs. `unwrap` supplies circular links and prior helpers for these existing
 APIs. The repository also includes examples in **R** and **MATLAB**.
 
-**Start here:** [Read the guide](https://jgraving.github.io/unwrap/) ·
+[Choose a model](docs/choose-a-model.md) ·
 [Try a worked example](notebooks/circular_regression.ipynb) ·
 [Explore the biological analyses](notebooks/README.md)
 
