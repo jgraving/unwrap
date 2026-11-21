@@ -11,6 +11,11 @@ title: unwrap
 conditions. Do animals turn toward a cue? Do their headings become more
 consistent? Do individuals respond differently?
 
+[Choose a circular model and worked example](choose-a-model.md) or start with
+[Angle basics](angle-basics.md) and [Bayesian basics](bayes-basics.md).
+For an agent-assisted analysis, start with the
+[coding-agent prompt](coding-agents.md#copyable-prompt).
+
 These questions can be addressed with **Bayesian generalized linear models
 (GLMs)**, which relate an outcome such as heading to predictors such as
 treatment or neighbor density. The circular GLMs here use a von Mises
@@ -29,6 +34,9 @@ inference, and **Bambi** for a high-level formula interface to GLMs and GLMMs.
 `unwrap` supplies circular links and prior helpers that work with their APIs.
 
 ## Start with a biological question
+
+[Use the model map](choose-a-model.md) to match your questions to a model and
+find an example in Python or R.
 
 | Your question | What the model describes |
 | --- | --- |
@@ -55,6 +63,9 @@ use the same observations, formulas, and prior scales. The
 [R setup page](getting-started-r.md) covers the one-time R environment.
 
 ## Read a fitted model
+
+See [Bayesian basics](bayes-basics.md) for a visual walkthrough from prior
+expectations through observed headings to a posterior.
 
 **Mean direction** tells you where observations tend to cluster. **Concentration**
 tells you how tightly they cluster: near zero, directions are nearly uniform;

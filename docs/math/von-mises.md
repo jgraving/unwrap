@@ -45,6 +45,9 @@ exact direction is not a probability.
 
 ## Angular conventions
 
+See [Angle basics](../angle-basics.md) for visual examples of wraparound,
+mean direction, and concentration.
+
 All model equations use radians. The circular-modulo link represents
 angles in $[-\pi,\pi)$. The alternative $(-\pi,\pi]$ convention is equivalent:
 the endpoints describe the same direction. Keep the angular origin
