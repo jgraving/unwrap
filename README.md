@@ -23,6 +23,7 @@ APIs. The repository also includes examples in **R** and **MATLAB**.
 
 [Choose a model](docs/choose-a-model.md) ·
 [Try a worked example](notebooks/circular_regression.ipynb) ·
+[Use a coding agent](docs/coding-agents.md) ·
 [Explore the biological analyses](notebooks/README.md)
 
 ## What can you learn from a circular model?

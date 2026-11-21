@@ -5,7 +5,7 @@ an animal’s heading as it left an arena. You might ask where it tended to
 point, how consistently it pointed there, or whether it used more than one
 direction. The same dataset can support different questions.
 
-![Model map with three rows linking predictor effects to circular GLMs, repeated observations to circular GLMMs, and multiple heading patterns to mixtures. A second panel links to introductory guides.](assets/unwrap-model-map.svg)
+![Schematic heading distributions lead to circular GLMs, circular GLMMs, and mixtures, with worked examples in Python and R. A second panel links to introductory guides and a prompt for coding agents.](assets/unwrap-model-map.svg)
 
 [Open the linked model map](assets/unwrap-model-map.svg)
 
@@ -43,6 +43,8 @@ predictive checks to decide whether another component is warranted.
   [biological questions](index.md#start-with-a-biological-question), then
   work through [Angle basics](angle-basics.md) and
   [Bayesian basics](bayes-basics.md).
+- **I’m using a coding agent.** Use the [copyable prompt](coding-agents.md#copyable-prompt)
+  to describe your question and data, find a relevant example, and check the fit.
 
 ## Fit a first model
 

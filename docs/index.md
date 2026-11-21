@@ -13,6 +13,8 @@ consistent? Do individuals respond differently?
 
 [Choose a circular model and worked example](choose-a-model.md) or start with
 [Angle basics](angle-basics.md) and [Bayesian basics](bayes-basics.md).
+For an agent-assisted analysis, start with the
+[coding-agent prompt](coding-agents.md#copyable-prompt).
 
 These questions can be addressed with **Bayesian generalized linear models
 (GLMs)**, which relate an outcome such as heading to predictors such as

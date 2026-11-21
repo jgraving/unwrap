@@ -50,6 +50,7 @@ markdown_extensions:
 nav:
   - Overview: index.md
   - Choose a circular model: choose-a-model.md
+  - Use a coding agent: coding-agents.md
   - Foundations:
       - Angle basics: angle-basics.md
       - Bayesian basics: bayes-basics.md
