@@ -640,6 +640,68 @@ def plot_hypothesis_density(trace_bimodal, *, save=True,
     _save(fig, save, save_path)
 
 
+def plot_hypothesis_density_polar(trace_bimodal, df, *, save=True,
+                                  save_path="figures/locust/locust_directional_hypothesis_polar.pdf"):
+    """Polar view of the same test as ``plot_hypothesis_density``: the
+    bimodal model's posterior predictive direction density (median + 95%
+    band, the same estimate as ``plot_directional_validation_polar``) with
+    the two hypothesized directions marked where they score on that scale -
+    optic flow (forward) as a blue circle at 0 degrees, vectorial encoding
+    (perpendicular) as orange squares at both +/-90 degrees - against the
+    uniform 1/(2*pi) reference, drawn as a dashed circle. Density zero sits
+    on the ``r = 0.5`` circle, as on the validation polar. The twin of panel
+    d of the composite figure (``locust_circ_stats_figure``)."""
+    stats = posthoc.population_validation_stats(trace_bimodal, df)
+    hyp = posthoc.hypothesis_density_stats(trace_bimodal)
+    angles = stats["angles"]
+
+    edge_radius = 0.5
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"},
+                           figsize=(3, 3), dpi=_plots.DEFAULT_DISPLAY_DPI)
+
+    ax.fill_between(angles, edge_radius + stats["density_lower"],
+                    edge_radius + stats["density_upper"],
+                    color=BIMODAL, alpha=0.25, edgecolor="none")
+    ax.plot(angles, edge_radius + stats["density_median"], color=BIMODAL,
+            linewidth=1.5, zorder=3)
+
+    # the hypothesis densities; the perpendicular hypothesis is symmetric,
+    # so it marks both sideways axes (point estimates - the HDIs are too
+    # short to read at this scale)
+    centers = np.asarray(hyp["centers"], dtype=float)
+    handles = []
+    for thetas, i, color, marker, label in (
+            ((0.0,), 0, UNIMODAL, "o", "Optic flow"),
+            ((-np.pi / 2, np.pi / 2), 1, BIMODAL, "s", "Vec. encoding")):
+        handle, = ax.plot(thetas, np.full(len(thetas), edge_radius + centers[i]),
+                          marker=marker, linestyle="", color=color, markersize=6,
+                          markeredgecolor=color, zorder=4)
+        handles.append((handle, label))
+
+    uniform, = ax.plot([], [], color="black", linestyle="--", linewidth=1)
+    ax.add_artist(Circle((0, 0), edge_radius + float(hyp["p_uniform"]),
+                         transform=ax.transData._b, fill=False, color="black",
+                         linestyle="--", linewidth=1))
+    ax.add_artist(Circle((0, 0), edge_radius, transform=ax.transData._b,
+                         color="black", fill=False, linewidth=0.5))
+
+    ax.spines["polar"].set_visible(False)
+    ax.set_ylim(0, edge_radius + np.max(stats["density_upper"]) * 1.2)
+    ax.set_xlim(-np.pi, np.pi)
+    ax.set_yticks([edge_radius, edge_radius + 0.5])
+    ax.set_yticklabels(["", ""])
+    ax.set_xticks([-np.pi / 2, 0, np.pi / 2, np.pi])
+    ax.set_xticklabels(["−90°", "0°", " 90°", "±180°     "])
+    ax.tick_params(axis="x", pad=-4)
+
+    handles.append((uniform, "Uniform"))
+    ax.legend([h for h, _ in handles], [label for _, label in handles],
+              bbox_to_anchor=(1, 1), loc="center left", frameon=True)
+
+    plt.tight_layout()
+    _save(fig, save, save_path)
+
+
 def plot_hypothesis_elpd(trace_bimodal, *, save=True,
                          save_path="figures/locust/locust_directional_hypothesis_horizontal_elpd.pdf"):
     """ELPD at the hypothesized directions (mean +/- 1.96*SE, computed in

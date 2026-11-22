@@ -4,7 +4,8 @@ figure's own flow of information: setup (a), model selection (b) and
 predictive check (c), then the hypothesis test at three levels (d, e, f).
 The reference page drew its four panels as a, b, c (bottom left, empty
 here), d; the panels it drew as c and d are d and e here, with their
-measured geometry kept exactly.
+measured geometry kept - the two columns' axes rectangles draw narrower,
+at the measured centres (see the layout block).
 
 Panels:
   a. Virtual-swarm schematic, rebuilt from the reference artwork geometry
@@ -39,13 +40,17 @@ models are rebuilt only to attach the per-observation log-likelihood the
 LOO/ELPD post-hoc reads (PyMC 6 replacement for ``idata_kwargs=
 {"log_likelihood": True}``), mirroring notebook cells 10 and 14.
 
-The page is 900 x 900 pt, drawn in PDF points through a full-page stage axes;
+The page is 900 x 864 pt, drawn in PDF points through a full-page stage axes;
 positions/colors/sizes reproduce the reference layout for the panels the
 reference page has (a, b and the two hypothesis panels, here d and e), which
-fill its 900 x 600 pt, and the predictive-check pair (c) and the individual
-hypothesis panel (f) fill a third row of 300 pt below it. The composite being
-matched is the manuscript's figure, so it is called the reference figure -
-and its PDF the reference PDF - throughout. Saves to
+fill its 900 x 600 pt - panel b and the right column's axes are drawn narrower
+than measured, centred on the measured centres - and the predictive-check pair
+(c) and the individual hypothesis panel (f) fill a third row that starts 44 pt
+under the reference page's second row, and the page height shrinks with the
+row. Panel a is replayed at 0.85 of the reference size, to fit its
+"Experimental design" title above the artwork. The composite
+being matched is the manuscript's figure, so it is called the reference figure
+- and its PDF the reference PDF - throughout. Saves to
 ``figures/locust/locust_circ_stats_figure.pdf``.
 
 ``--snapshot-dir`` (default ``assets/locust-circ-stats``) additionally writes
@@ -98,8 +103,9 @@ import locust_posthoc as posthoc  # noqa: E402
 import locust_direction_plots as plots  # noqa: E402
 
 ASSETS = HERE / "assets" / "locust_circ_stats"
-PAGE_W, PAGE_H = 900.0, 900.0  # PDF points, origin top-left (the reference's
-# 900 x 600 plus a 300 pt third row; see ROW_3_TOP below)
+PAGE_W, PAGE_H = 900.0, 864.0  # PDF points, origin top-left (the reference's
+# 900 x 600 plus a third row raised into the whitespace under its second row;
+# see ROW_3_TOP below)
 #: The reference PDF's own height. Panel a's photo placements are recorded in
 #: that page's bottom-left space, so they are flipped against it rather than
 #: against this (taller) page.
@@ -129,12 +135,21 @@ CAPTION = (
 # ---------------------------------------------------------------------------
 # layout and type (measured from the reference PDF, in pt)
 # ---------------------------------------------------------------------------
-PANEL_B = (146.2, 401.8, 284.8, 98.0)   # axes rectangle (x, y_top, w, h)
-PANEL_D = (577.2, 401.8, 296.0, 97.9)
-#: centre x of the right-hand column's plots (panels d's polar, e's inset and
-#: f's swarm all share it, and so do their titles).  e and f take it from
-#: their measured axes rectangles; d's polar is moved from the reference
-#: page's centre (615.1, 206.3) to sit under them.
+#: The reference page measures b's forest axes (146.2, 401.8, 284.8, 98.0) and
+#: the right column's axes (577.2, 401.8, 296.0, 97.9).  Both are drawn
+#: narrower - two forest rows and two dots read lost across 285-296 pt, and
+#: the wide axes pull the titles and row labels apart from the marks - at the
+#: same centres: b is 226 pt wide, e and f 260.  f takes e's width (it is the
+#: same test on the same rows), and 260 is the narrowest it can be without
+#: the swarm's dense vectorial-encoding stack gaining a row (the packing is
+#: done in points, so a narrower axes means fewer dots per row).
+PANEL_B = (172.0, 401.8, 226.0, 98.0)   # axes rectangle (x, y_top, w, h)
+PANEL_D = (595.2, 401.8, 260.0, 97.9)
+#: centre x of the right-hand column's plots (panels d's polar, e's axes and
+#: f's swarm all share it, and so do their titles).  e and f derive it from
+#: their axes rectangles (narrower than the reference's, but centred on the
+#: measured centre); d's polar is moved from the reference page's centre
+#: (615.1, 206.3) to sit under them.
 PLOT_COLUMN_CX = PANEL_D[0] + 0.5 * PANEL_D[2]          # 725.2
 POLAR_CENTER = (PLOT_COLUMN_CX, 206.3)                  # polar center
 POLAR_R_OUT = 118.7                                     # outer grid circle radius (r = 1.0)
@@ -145,6 +160,17 @@ POLAR_R_OUT = 118.7                                     # outer grid circle radi
 #: shifting it 40 pt right puts it at 81.4-416.6, centre 249 - which is the
 #: content centre of b (64.6-431) and of the c pair's tick labels (35.7-462.8).
 PANEL_A_DX = 40.0
+#: Panel a also draws 0.85 of its reference size, scaled about the centre of
+#: the measured content (x = 209, before the shift) and its bottom edge
+#: (y = 348, where the lower "Virtual swarm" label sits): the panel now
+#: carries a title of its own ("Experimental design", at the same offset above
+#: the row as every other title), and the scale is what makes room for it
+#: without lifting the artwork off the row it shares with panel d.  Photo
+#: sampling, stroke widths and the artwork's own text scale with it; the
+#: scaled content spans x = 106.5-391.5 and y = 67.9-348.
+PANEL_A_SCALE = 0.85
+PANEL_A_CX = 209.0
+PANEL_A_BOTTOM = 348.0
 
 #: The reference page is 900 x 600 pt and carries the reference figure's four
 #: panels. This figure tells a longer story, so the page grows by a third row
@@ -159,14 +185,21 @@ PANEL_A_DX = 40.0
 #:                 level
 #:
 #: So the panels the reference page drew as c and d are letters d and e here.
-#: Their internal geometry - axes rectangles, radii, ticks, weights - is kept
-#: exactly as measured; the two things that move are where the content sits
-#: inside its column (panel a shifts right by PANEL_A_DX, panel d's polar
-#: right to PLOT_COLUMN_CX, so each lines up with the panels below it).
-#: Only c (a pair of polars, where the reference page had nothing) and f
-#: (panel e's inset, taller, because the swarm needs the height for its
-#: stacks) are new.
-ROW_3_TOP = 600.0
+#: Their internal geometry - radii, ticks, weights - is kept exactly as
+#: measured (the axes rectangles are narrower, see above); the two things that
+#: move are where the content sits inside its column (panel a shifts right by
+#: PANEL_A_DX, panel d's polar right to PLOT_COLUMN_CX, so each lines up with
+#: the panels below it).  Only c (a pair of polars, where the reference page
+#: had nothing) and f (panel e's inset, taller, because the swarm needs the
+#: height for its stacks) are new.
+#:
+#: The third row starts 197.3 pt under the reference page's second row, not
+#: its old 241.3: the reference page has nothing below y = 545 (b and e's
+#: axis labels), so the extra 100 pt the taller page gave the row read as a
+#: hole on this page.  Lifting the row 44 pt closes the gap between the two
+#: rows' content from 68 pt to 24 pt, and PAGE_H shrinks with it, keeping the
+#: bottom margin in step with the top ones.
+ROW_3_TOP = 556.0
 ROW_3_H = PAGE_H - ROW_3_TOP
 #: where the reference page's second row starts (the y of its b. and d.
 #: letters); panel e sits 43.1 pt below it, and panel f the same below row three
@@ -182,7 +215,7 @@ PANEL_F_INSET_Y = PANEL_D[1] - ROW_2_TOP
 #: did not compute.
 SWARM_DOT_PT = 4.5
 SWARM_PACK_GAP = 1.25
-PANEL_F = (577.2, ROW_3_TOP + PANEL_F_INSET_Y, 296.0, 1.0)
+PANEL_F = (PANEL_D[0], ROW_3_TOP + PANEL_F_INSET_Y, PANEL_D[2], 1.0)
 
 #: The predictive-check pair: one polar per model, each showing that model's
 #: replicated posterior-predictive heading density against the observed KDE, so
@@ -194,22 +227,31 @@ PANEL_F = (577.2, ROW_3_TOP + PANEL_F_INSET_Y, 296.0, 1.0)
 #: label has to stop short of panel f's row labels (x ~ 472), and the left
 #: polar's "0°" has to clear the right polar's "±180°" in the middle.
 POLAR_PAIR_R_OUT = 68.0
-POLAR_PAIR_CENTRES = ((152.0, 759.0), (373.0, 759.0))
-POLAR_PAIR_DATA_KEY = (262.5, 873.0)      # "Data" key, centred under the pair
+POLAR_PAIR_CENTRES = ((152.0, ROW_3_TOP + 159.0), (373.0, ROW_3_TOP + 159.0))
+POLAR_PAIR_DATA_KEY = (262.5, ROW_3_TOP + 273.0)      # "Data" key, centred under the pair
 
 #: Titles and panel letters.  The reference page's letters and titles come out
 #: of ``panel_a.json`` in Helvetica Neue at the reference's weight; they are
-#: filtered at draw time and redrawn here, because the flow (and so three of
-#: the six titles) is ours.  Style as the reference: 32 pt bold letters and
-#: 17 pt titles at 13.74 and 21.465 pt from the row top - but bold, matching
-#: the bat composite's panel titles.
+#: filtered at draw time and redrawn here, because the flow - and the titles
+#: themselves - are ours: the hypothesis panels are named by what they do
+#: (predictive density at the hypothesized directions, then the test at
+#: population and individual level), and panel a gets a title of its own,
+#: "Experimental design", centred over the scaled artwork.  Style as the
+#: reference: 32 pt bold letters and 17 pt titles at 13.74 and 21.465 pt from
+#: the row top - but bold, matching the bat composite's panel titles.
 PANEL_TITLES = (
-    ("Model selection", 292.8, 366.465),
+    ("Experimental design", PANEL_A_CX + PANEL_A_DX, 21.465),
+    ("Model selection", PANEL_B[0] + 0.5 * PANEL_B[2], 366.465),
     ("Predictive check", 0.5 * (POLAR_PAIR_CENTRES[0][0] + POLAR_PAIR_CENTRES[1][0]),
      ROW_3_TOP + 21.465),
-    ("Hypothesis testing: predictive density", PLOT_COLUMN_CX, 21.465),
-    ("Hypothesis testing: population level", PLOT_COLUMN_CX, 366.465),
-    ("Hypothesis testing: individual level", PLOT_COLUMN_CX, ROW_3_TOP + 21.465),
+    # d's title is the one long name of the six; kept at the page's type size
+    # it would run past the right page edge, so it goes on two lines and
+    # starts at the top of its panel letter (12.639) instead of the title
+    # offset - the two lines sit as a block opposite the polar's 90 degree
+    # tick label below them.
+    ("Predictive density at\nhypothesized directions", PLOT_COLUMN_CX, 12.639),
+    ("Population-level hypothesis testing", PLOT_COLUMN_CX, 366.465),
+    ("Individual-level hypothesis testing", PLOT_COLUMN_CX, ROW_3_TOP + 21.465),
 )
 PANEL_LETTERS = (
     ("a.", 31.823, 13.743),
@@ -254,8 +296,12 @@ MARK_SCALE = 2.09   # marker/cap/elinewidth factor in the reference figure's dot
 #: inside (0.0462/0.3152 against 0.0576/0.3034).
 #: The reference page prints three ELPD ticks because its axis starts at
 #: -3549.6; ours starts at -3581.7 (our unimodal whisker reaches -3571.7, see
-#: the PR note), so a fourth tick keeps the spacing even across the axis.
-PANEL_B_XTICKS = [-3550.0, -3500.0, -3450.0, -3400.0]
+#: the PR note), which on the full-width axes asked for a fourth.  On the
+#: narrowed axes four full labels crowd - 17 pt "-3550" is 46 pt wide and
+#: the ticks only 50 pt apart - so the labels sit on alternate ticks and the
+#: in-between ticks draw as short marks.
+PANEL_B_XTICKS = [-3550.0, -3450.0]
+PANEL_B_MINORTICKS = [-3500.0, -3400.0]
 PANEL_B_PAD = 10.0
 PANEL_D_XTICKS = [0.1, 0.2, 0.3]
 PANEL_D_PAD = 0.0115
@@ -490,17 +536,26 @@ def draw_panel_a(ax, spec):
 
     Everything shifts right by ``PANEL_A_DX`` (see the layout block): the
     reference page's artwork is centred on the text annotation that sits at
-    its left edge, so on this page it reads left of the panels below it."""
+    its left edge, so on this page it reads left of the panels below it.
+    Everything also draws at ``PANEL_A_SCALE`` of the reference size, scaled
+    about the measured content centre and bottom edge, which keeps the
+    artwork where its title - "Experimental design" - fits above it."""
+    s = PANEL_A_SCALE
+    off_x = PANEL_A_CX * (1.0 - s) + PANEL_A_DX
+    off_y = PANEL_A_BOTTOM * (1.0 - s)
+    _x = lambda v: v * s + off_x        # noqa: E731 - one-liners in a replay
+    _y = lambda v: v * s + off_y
+
     layer, (left, top, right, bottom) = _photo_layer(spec)
     ax.imshow(np.asarray(layer),
-              extent=(left + PANEL_A_DX, right + PANEL_A_DX, top, bottom),
+              extent=(_x(left), _x(right), _y(top), _y(bottom)),
               origin="lower", zorder=50, interpolation="lanczos")
 
     for i, d in enumerate(spec["paths"]):
         p = _path_from_items(d["items"])
         if p is None:
             continue
-        p = p.transformed(Affine2D().translate(PANEL_A_DX, 0))
+        p = p.transformed(Affine2D().scale(s, s).translate(off_x, off_y))
         kw = dict(zorder=10 + i)
         face = "none"
         if d["fill"] is not None:
@@ -513,7 +568,7 @@ def draw_panel_a(ax, spec):
             edge = tuple(d["stroke"])
             if d.get("stroke_opacity") is not None:
                 edge += (d["stroke_opacity"],)
-            lw = d.get("width") or 1.0
+            lw = (d.get("width") or 1.0) * s
         patch = PathPatch(p, facecolor=face, edgecolor=edge, linewidth=lw, **kw)
         cap, join = d.get("lineCap"), d.get("lineJoin")
         cap = cap[0] if isinstance(cap, list) else cap
@@ -523,20 +578,20 @@ def draw_panel_a(ax, spec):
         if join is not None:
             patch.set_joinstyle(["miter", "round", "bevel"][int(join)])
         if d.get("dashes"):
-            seq = [float(v) for v in re.findall(r"[-\d.]+", d["dashes"])]
+            seq = [float(v) * s for v in re.findall(r"[-\d.]+", d["dashes"])]
             if any(seq):
                 patch.set_linestyle((0, seq))
         ax.add_patch(patch)
 
-    for s in spec["spans"]:
-        color = f"#{s['color']:06x}"
-        if s["text"] in SPAN_DROP_TEXTS:      # letters and titles are redrawn
+    for s_ in spec["spans"]:
+        color = f"#{s_['color']:06x}"
+        if s_["text"] in SPAN_DROP_TEXTS:    # letters and titles are redrawn
             continue                          # by draw_panel_titles, in our flow
-        text = s["text"].replace("\u2028", "\n")
-        ax.text(s["bbox"][0] + PANEL_A_DX, s["bbox"][1], text,
-                fontsize=s["size"], color=color, va="top", ha="left",
+        text = s_["text"].replace("\u2028", "\n")
+        ax.text(_x(s_["bbox"][0]), _y(s_["bbox"][1]), text,
+                fontsize=s_["size"] * s, color=color, va="top", ha="left",
                 family="Arial",
-                fontweight="bold" if "Bold" in s["font"] else "normal",
+                fontweight="bold" if "Bold" in s_["font"] else "normal",
                 zorder=100)
 
 
@@ -546,10 +601,11 @@ def draw_panel_titles(stage):
     The reference page draws its own letters and titles, and its geometry is
     replayed for panels a, b and the two hypothesis panels; the texts are
     filtered out of that replay and redrawn here, because the flow of the
-    figure (and so the wording of three of the titles) is ours.  Sizes and
-    offsets are the reference page's - 32 pt bold letters, 17 pt titles at
-    13.74 / 21.465 pt from the row top - but the titles are bold, as the bat
-    composite's are."""
+    figure - and every one of the titles - is ours.  Sizes and offsets are
+    the reference page's - 32 pt bold letters, 17 pt titles at 13.74 / 21.465
+    pt from the row top (d's two-line title starts at the letter instead,
+    see PANEL_TITLES) - but the titles are bold, as the bat composite's are.
+    """
     for text, x, y in PANEL_TITLES:
         stage.text(x, y, text, fontsize=TITLE_SZ, family="Arial", ha="center",
                    va="top", fontweight="bold", zorder=100)
@@ -978,6 +1034,9 @@ def build_figure():
     hi = max(r[1] + r[2] for r in rows)
     panel_b.ax.set_xlim(lo - PANEL_B_PAD, hi + PANEL_B_PAD)
     panel_b.ax.set_xticks(PANEL_B_XTICKS)
+    panel_b.ax.set_xticks(PANEL_B_MINORTICKS, minor=True)
+    panel_b.ax.tick_params(axis="x", which="minor", length=0.5 * TICK_LEN,
+                           width=LINE_W)
 
     with _house_panel(fig, PANEL_D, dash=UNIFORM_DASH) as panel_d:
         plots.plot_hypothesis_density(trace_bimodal, save=False)
@@ -1125,52 +1184,46 @@ def provenance(plotted):
             "the bottom swarm's second row (y = 301-321 pt).",
             "the panel letters and titles are not replayed from panel_a.json: "
             "the reference page's four letters and three titles are filtered out "
-            "of the span replay and redrawn, because the flow (and so the "
-            "wording of three of the titles) is ours.  Sizes and offsets are the "
-            "reference's - 32 pt bold letters and 17 pt titles at 13.74 and "
-            "21.465 pt from the row top - but the titles are bold, matching the "
-            "bat composite's panel titles.",
+            "of the span replay and redrawn - the flow, and every title, is ours "
+            "(panel a's \"Experimental design\" has no counterpart on the "
+            "reference page).  Sizes and offsets are the reference's - 32 pt "
+            "bold letters and 17 pt titles at 13.74 and 21.465 pt from the row "
+            "top - but the titles are bold, matching the bat composite's panel "
+            "titles.  d's title is the one long name of the six; kept at 17 pt "
+            "it would run off the right page edge, so it goes on two lines and "
+            "starts at the top of its panel letter (y = 12.639) rather than the "
+            "title offset.",
             "panel d's arrows are drawn as a shaft plus a 16.8 pt triangular head "
             "in page points, i.e. panel a's arrow style; matplotlib's \"-|>\" head "
             "is blunter and shorter at the same nominal size.",
             "panel d's polar tick labels are placed at their reference page "
             "positions: matplotlib puts polar tick labels on the grid circle, which "
             "lands \"±180°\" on top of the 180° grid line.",
-            "panel b prints four ELPD ticks where the reference page prints three, "
-            "because our axis spans to -3581.7 rather than -3549.6.",
-            "panel d (the reference page's c) is not the reference page's panel "
-            "any more: the observed-data band is gone (that comparison is panel "
-            "c's, where each model's predictive density meets the data), the "
-            "bimodal predictive density draws as a solid line over a tinted "
-            "band, both over the dashed uniform circle, and the two hypothesis "
-            "densities of panel e are marked at their directions - optic flow "
-            "at 0 degrees, vectorial encoding at both +/-90 - against the "
-            "uniform reference.  The markers are point estimates only: their "
-            "+/-HDIs would be 3.6 pt long at the polar's scale (shorter than a "
-            "marker), so panel e remains the place the intervals are read.",
-            "panel c is a pair of polar plots, one per model, each against the "
-            "observed bootstrap KDE - the reference page had nothing there.  The "
-            "observed KDE is drawn solid rather than the dashed line of the "
-            "reference and the house panels: on this page dashed is the uniform "
-            "reference (panel d's circle, panels e and f's vertical lines), and "
-            "a dashed data line reads as a second uniform.  Each polar draws "
-            "the model's line and band over the data: the data is the "
-            "standard, the model is the subject.  Splitting the models "
-            "is the point: on a shared axis the two bands lie so close together "
-            "that the only reading is which is nearer the data.",
-            "panel c's polars are 68 pt radius against panel d's 118.7, so the "
-            "two can share the page's left half with their horizontal tick "
-            "labels; their labels sit at the reference page's own clearances "
-            "(3.8-5.5 pt beyond the circle horizontally, 9.5-14 pt vertically) "
-            "rather than its offsets scaled down, which would run the left "
-            "\"±180°\" label off the page.",
-            "panel a's artwork shifts 40 pt right and panel d's polar 110.1 pt, "
-            "each to sit visually centred with the panels below it: panel a's "
-            "content centres on x = 249 pt, the content centre of b and of the "
-            "c pair, and d's polar, like e's and f's axes, centres on x = "
-            "725.2 pt, the right column's axes centre - and so do the d, e and "
-            "f titles.  The internal geometry of both panels (radii, ticks, "
-            "weights, the artwork itself) is unchanged.",
+            "panel b labels the ELPD axis on alternate ticks (-3550, -3450) with "
+            "short minor marks at -3500 and -3400: the reference page prints three "
+            "labels because its axis starts at -3549.6, ours spans to -3581.7 so "
+            "four are in range, but the narrowed axes (see below) crowd four full "
+            "17 pt labels - each is 46 pt wide and the ticks only 50 pt apart.",
+            "panel a draws at 0.85 of the reference size, scaled about the centre "
+            "of its measured content (x = 209, bottom y = 348): the panel now "
+            "carries a title - \"Experimental design\", centred over it like every "
+            "other panel's - and the scale is what makes room for it.  Photo "
+            "sampling, stroke widths, dash rhythms and the artwork's own labels "
+            "scale with it; the shifted, scaled content spans x = 106.5-391.5, "
+            "y = 67.9-348.",
+            "panel b's forest axes draw 226 pt wide and the right column's (e's "
+            "dots, f's swarm) 260, against the reference page's measured 284.8 "
+            "and 296, both at the measured axes centres (285, 725.2): two forest "
+            "rows and two dots read lost across the measured widths, and the wide "
+            "axes pulled the titles and row labels apart from the marks.  f "
+            "shares e's width - it is the same test on the same rows - and 260 is "
+            "as narrow as the swarm can go without its dense vectorial-encoding "
+            "stack gaining a row (the packing is done in points).",
+            "the third row starts at y = 556, 44 pt into the whitespace under the "
+            "reference page's second row, and the page is 864 pt tall rather than "
+            "900: the reference page has nothing below y = 545, so the gap the "
+            "first builds left between the rows' content read as a hole.  The row "
+            "pitch from the reference page's second row is 197.3 pt.",
             "panel f's axes height is read from the house swarm's own y limits "
             "after it draws (4 * the stack reach + 4 * the packing clearance = "
             "202.5 pt at dot 4.5 pt and gap 1.25) and the axes re-placed to it: "
@@ -1184,15 +1237,18 @@ def provenance(plotted):
             "1.2 ELPD, then reads as one solid block.",
         ],
         "known_differences": [
-            "The page is 900 x 900 pt against the reference's 900 x 600: panels "
-            "c and f are new in a third row of 300 pt, and the letters follow "
-            "this figure's flow of information (setup, model selection, "
-            "predictive check, then hypothesis testing at three levels), so the "
-            "reference page's c and d are d and e here.  Their internal geometry "
-            "is kept exactly as measured, as is b's; what differs is where "
-            "content sits inside a column - panel a's artwork and panel d's "
-            "polar shift right to centre on the panels below them, and the d, "
-            "e and f titles centre over the same x.",
+            "The page is 900 x 864 pt against the reference's 900 x 600: panels "
+            "c and f are new in a third row starting 197.3 pt under the reference "
+            "page's second row, and the letters follow this figure's flow of "
+            "information (setup, model selection, predictive check, then "
+            "hypothesis testing at three levels), so the reference page's c and "
+            "d are d and e here.  Their internal geometry (radii, ticks, weights, "
+            "dash rhythms) is kept exactly as measured, as is b's; what differs "
+            "is where content sits inside a column - panel a's artwork shifts "
+            "right and scales to 0.85, panel d's polar shifts right to centre on "
+            "the panels below it, and the d, e and f titles centre over the same "
+            "x - and in the two axes widths above (b 226 against 284.8, the "
+            "right column 260 against 296).",
             "Text is set in Arial; the reference page uses Helvetica Neue, whose "
             "glyph widths differ by 1-4% at the same size and position.",
             "Panel b's cached unimodal fit gives ELPD -3533.40 +/- 38.34 where "
@@ -1200,35 +1256,40 @@ def provenance(plotted):
             "(-3404.51 +/- 39.27 against -3403.8 +/- 39.2).",
         ],
         "verification": {
-            "stable_panels_against_the_previous_build": {
-                "method": "text spans and drawing primitives of row 2 (panels b "
-                          "and e, the panels the reference page has that were "
-                          "neither repositioned nor restyled), compared between "
-                          "the previously committed PDF and this one; the panel "
-                          "letters and titles are excluded, they are redrawn to "
-                          "this figure's flow",
-                "text_spans": "15 of 15 identical to 0.000 pt",
-                "drawing_primitives": "34 of 34 identical to 0.05 pt",
-                "png_note": "the page is 900 x 900 pt in both builds, so unlike "
-                            "the previous change of page height this one keeps "
-                            "the raster phase of the whole figure; the shifts "
-                            "(panel a, panel d, the titles) are the only things "
-                            "that move.",
+            "panel_d_against_the_previous_build": {
+                "method": "the only drawing that neither moved nor was restyled "
+                          "this change is panel d's polar - its centre, radius "
+                          "and marks are untouched, while a, b, c, e and f all "
+                          "move by design (a scaled, b and the right column "
+                          "narrowed, the third row raised); the text spans and "
+                          "drawing primitives of its region (x 540-900, y 55-350 "
+                          "pt, below its title) compared between the previously "
+                          "committed PDF and this one",
+                "text_spans": "4 of 4 identical to 0.007 pt",
+                "drawing_primitives": "20 of 20 identical to 0.000 pt",
             },
             "mean_abs_pixel_difference_against_reference_pdf": {
-                "panel_a": 5.6, "panel_b": 12.7, "panel_d": 15.1, "panel_e": 12.3,
-                "regions": "panel a: x 72-492, y 5-350; panel b: 28-448, 360-520; "
-                           "panel d: 595-900, 5-350; panel e: 455-880, 360-520 "
-                           "(pt, top-left origin); panel a's and panel d's crops "
-                           "compare the artwork at its shifted position (the "
-                           "reference crop is taken 40 pt / 110.1 pt to the "
-                           "left), so the numbers measure the drawing, not the "
-                           "centring move.  d's number is above the previous "
-                           "build's 12.9 because the model density now draws as "
-                           "a solid saturated line and band over the uniform "
-                           "circle, where the reference page draws it faint.",
-                "method": "300 dpi, with the best shift within +/-4 px taken up.  "
-                          "Panels c and f are new and have no reference panel.",
+                "panel_a": 22.8, "panel_b": 13.8, "panel_d": 16.5, "panel_e": 17.2,
+                "regions": "300 dpi, (pt, top-left origin): panel a: x 106.5-391.5, "
+                           "y 67.6-348; panel b: 28-448, 360-545; panel d: 595-900, "
+                           "5-350; panel e: 455-880, 360-545.  d's crop compares "
+                           "the polar at its shifted position (the reference crop "
+                           "is taken 110.1 pt to the left); a's compares the "
+                           "reference artwork crop resized to the page's 0.85 "
+                           "panel scale, so neither number measures the centring "
+                           "or scaling move - a's does include the resampling of "
+                           "the photo detail those two crops need.",
+                "note": "the numbers sit above the previous build's "
+                        "(5.6/12.7/15.1/12.3) for reasons of layout, not "
+                        "drawing: panel a's because resizing the reference crop "
+                        "resamples the photo detail on one side of the "
+                        "comparison; panels b and e because the narrowed axes "
+                        "move every tick, label and mark relative to the "
+                        "reference page (which draws its axes at the measured "
+                        "widths) and b now labels alternate ELPD ticks; and d's "
+                        "because its title runs to two lines.  Panels c and f "
+                        "are new and have no reference panel.",
+                "method": "300 dpi, with the best shift within +/-4 px taken up.",
             },
         },
     }
@@ -1282,14 +1343,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output-dir", type=pathlib.Path, default=plots.FIG_DIR,
                         help="where to write the generated figure (default: figures/locust)")
-    parser.add_argument("--snapshot-dir", type=pathlib.Path, default=SNAPSHOT_DIR,
+    parser.add_argument("--snapshot-dir", default=str(SNAPSHOT_DIR),
                         help="review snapshot directory, or '' to skip it "
                              "(default: assets/locust-circ-stats)")
     args = parser.parse_args(argv)
 
     fig, plotted = build_figure()
-    outputs = write_outputs(fig, plotted, args.output_dir,
-                            args.snapshot_dir or None)
+    # '' has to stay falsy to mean "skip", which type=pathlib.Path undoes
+    # (Path('') is Path('.'), and truthy)
+    snapshot = pathlib.Path(args.snapshot_dir) if args.snapshot_dir else None
+    outputs = write_outputs(fig, plotted, args.output_dir, snapshot)
     for target, hashes in outputs.items():
         print(f"saved {target / (STEM + '.pdf')} "
               f"(png {hashes['.png'][:8]}, pdf {hashes['.pdf'][:8]})")

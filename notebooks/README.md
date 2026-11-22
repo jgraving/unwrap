@@ -30,21 +30,27 @@ without running the notebook or sampling again. See the
 
 `locust_circ_stats_figure.py` rebuilds the locust circular-statistics composite
 from the pinned fits and data in `unwrap-data`, extends it with a third row, and
-relays the panels so the letters follow the figure's flow of information: setup
-(a), model selection (b) and predictive check (c), then the hypothesis test at
-three levels - predictive density (d), population level (e), individual level
-(f). The reference page drew its four panels as a, b, c, d; its panels c and d
-are d and e here, with their measured geometry kept exactly. Panel b is the
-house `plot_loo_elpd` panel, panel e the house `plot_hypothesis_density` panel,
-panel a replays the reference figure's artwork geometry kept in
-`assets/locust_circ_stats/`, panel d draws the hypothesis test in polar form
-(the two hypothesis densities at their directions, against the uniform
+relays the panels so the letters follow the figure's flow of information:
+experimental design (a), model selection (b) and predictive check (c), then the
+hypothesis test at three levels - predictive density at the hypothesized
+directions (d), population level (e), individual level (f). The reference page
+drew its four panels as a, b, c, d; its panels c and d are d and e here, with
+their measured geometry kept (the two columns' axes draw narrower than
+measured, at the measured centres). Panel b is the house `plot_loo_elpd`
+panel, panel e the house `plot_hypothesis_density` panel, panel a replays the
+reference figure's artwork geometry kept in `assets/locust_circ_stats/`
+(scaled to 0.85, to fit its title), panel d draws the hypothesis test in polar
+form (the two hypothesis densities at their directions, against the uniform
 reference), and the new panels take their house twins:
+`plot_hypothesis_density_polar` (panel d's test standalone),
 `plot_predictive_models_polar` (a pair of polar plots, one per model, each
 against the observed KDE drawn solid) and `plot_hypothesis_elpd_swarm` (one dot
-per animal). The composite being matched comes from the manuscript, so it is
-called the reference figure throughout; its page is 900 x 600 pt and this one
-is 900 x 900, the extra 300 pt being the new row. Rendered preview:
+per animal). All of these twins are called from
+`locust_direction_mixture_model.ipynb`, so every panel of the composite has a
+standalone figure in the notebook too. The composite being matched comes from
+the manuscript, so it is called the reference figure throughout; its page is
+900 x 600 pt and this one is 900 x 864: the new row starts 44 pt under the
+reference page's second row. Rendered preview:
 [PDF](../assets/locust-circ-stats/locust_circ_stats_figure.pdf) ·
 [PNG](../assets/locust-circ-stats/locust_circ_stats_figure.png) ·
 [SVG](../assets/locust-circ-stats/locust_circ_stats_figure.svg) ·
