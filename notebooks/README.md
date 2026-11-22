@@ -44,8 +44,9 @@ form (the two hypothesis densities at their directions, against the uniform
 reference), and the new panels take their house twins:
 `plot_hypothesis_density_polar` (panel d's test standalone),
 `plot_predictive_models_polar` (a pair of polar plots, one per model, each
-against the observed KDE drawn solid) and `plot_hypothesis_elpd_swarm` (one dot
-per animal). All of these twins are called from
+against the observed KDE drawn solid) and `plot_hypothesis_density_swarm` (one
+dot per animal, each animal's geometric-mean predictive density on a log
+axis). All of these twins are called from
 `locust_direction_mixture_model.ipynb`, so every panel of the composite has a
 standalone figure in the notebook too. The composite being matched comes from
 the manuscript, so it is called the reference figure throughout; its page is
