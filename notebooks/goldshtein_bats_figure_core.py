@@ -62,6 +62,8 @@ INPUT_HASHES = {
 ASSET_SHA256 = {
     "artwork.json":
         "9da0eb2639fea22d6af64820e1072524de6b159705b42cfe8d12c05e3d851730",
+    "basemap_osm.geojson.gz":
+        "f8eecc4a968875ada1dace186651d49239aeb94955a832b453bd63f16c4392d7",
     "image_279.jpeg":
         "6ffabea4e91fc7e53c7a97a97cb651642c8f8c392b1e4add3ae2fc7fad269734",
     "reference.pdf":

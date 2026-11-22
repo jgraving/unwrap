@@ -9,6 +9,13 @@
     "goldshtein_bats/dataAll_trackDest.xls": "1d6194f9ca52f4ef9522f073f7b45ee4af16448a67e6bf6353527bdeb331c036"
   },
   "data_revision": "86c41b5f43eb61191405b9bc85baf730a492a06f",
+  "basemap": {
+    "vector_extract": "notebooks/assets/goldshtein_bats_figure/basemap_osm.geojson.gz",
+    "vector_extract_sha256": "f8eecc4a968875ada1dace186651d49239aeb94955a832b453bd63f16c4392d7",
+    "attribution": "Basemap features \u00a9 OpenStreetMap contributors (ODbL), Geofabrik israel-and-palestine extract",
+    "raster_fallback": "live CartoDB Positron tiles via contextily when the vector extract is absent (CARTO_API_KEY for clean tiles)",
+    "raster_tile_zoom": 16
+  },
   "fonts": {
     "normal": {
       "file": "Arial.ttf",

@@ -19,6 +19,13 @@ What lives here is only what has no code counterpart:
 * `image_279.jpeg` — the tagged-bat photograph panel b sits on (page
   alpha 0.4684, a uniform mask the renderer synthesises; the "1.4cm"
   ruler is baked into the JPEG).
+* `basemap_osm.geojson.gz` — the pinned vector basemap: water, roads and
+  buildings clipped to the map extents from the Geofabrik
+  israel-and-palestine free-shp extract (retrieved 2026-11-22), written
+  by `notebooks/build_bats_vector_basemap.py`. The renderer draws this
+  file directly — no map service or download at render time. Features
+  are © OpenStreetMap contributors (ODbL), so the figure caption should
+  credit "Basemap © OpenStreetMap contributors".
 * `vanimo.txt` — Fabio Crameri's Vanimo colour table (256 stops) used
   for the directedness scale, so renders do not depend on the Scientific
   Colour Maps package being installed.

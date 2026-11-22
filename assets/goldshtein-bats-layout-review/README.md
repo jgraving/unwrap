@@ -61,19 +61,25 @@ the tagged-bat photograph.
 
 ## Basemaps
 
-The eight flight maps (panels a and d) draw a live CartoDB "Positron"
-basemap: tiles are fetched from CARTO's map API at render time and
-reprojected onto the metric CRS the tracks live in, so the routes sit on
-the actual landscape in Positron's light grey (the pinned lake outline is
-still drawn on top, since it is part of the pinned inputs). CARTO now
-serves these tiles against a key — with `CARTO_API_KEY` in the
-environment the keyless anonymous pool answers with watermarked "API key
-required" tiles instead of the map — so set the key when a clean render
-is wanted (it is read by the basemap helper in
-`goldshtein_bats_plots.py`; it is never stored in the repository).
-Without network access the maps fall back to their plain face and the
-renderer says so. The basemap is therefore provenance of the render
-environment, like the fonts; the data, fits and geometry behind every
+The eight flight maps (panels a and d) sit on a **vector basemap**
+drawn from a pinned OpenStreetMap extract (water, roads, buildings —
+clipped to the map extents from the Geofabrik israel-and-palestine
+shapefile by `notebooks/build_bats_vector_basemap.py`, committed as
+`notebooks/assets/goldshtein_bats_figure/basemap_osm.geojson.gz`).
+Because the basemap is real vectors rather than map tiles, it stays
+sharp at any zoom in the PDF and renders fully offline.  Basemap
+features are © OpenStreetMap contributors (ODbL) — the render JSON
+records the extract hash and this attribution; a figure credit
+("Basemap © OpenStreetMap contributors") belongs in the caption.
+
+The pinned lake outline is drawn on top of the OSM water (it is part of
+the pinned inputs); its interior rings render as holes, so islands
+inside the outline stay land.  If the vector extract is ever missing,
+the renderer falls back to live CartoDB "Positron" raster tiles at a
+pinned z16 (`CARTO_API_KEY` in the environment for clean tiles — never
+stored in the repository — otherwise the anonymous pool answers with
+watermarked "API key required" tiles), and finally to the plain map
+face with a printed notice.  The data, fits and geometry behind every
 panel remain the pinned inputs recorded in `bat_layout_review.json`.
 
 The directedness scale uses Fabio Crameri’s Vanimo in reverse order, with

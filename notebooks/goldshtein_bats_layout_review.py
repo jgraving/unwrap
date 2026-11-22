@@ -1,12 +1,18 @@
 """Render the bat composite from the pinned tracks and model fits.
 
-The flight maps (panels a and d) sit on a live CartoDB "Positron"
-basemap fetched through contextily (see :func:`draw_track_map`); every
-other input — tracks, fits, the lake outline, the artwork — is the
-pinned material :mod:`goldshtein_bats_layout_data` validates."""
+The flight maps (panels a and d) sit on a vector basemap drawn from the
+pinned OpenStreetMap extract in the figure materials (water, roads,
+buildings as true vectors — sharp at any zoom; attribution and
+provenance in the asset README and the render JSON; see
+:func:`draw_track_map` for the live CartoDB raster and plain-face
+fallbacks); every other input — tracks, fits, the lake outline, the
+artwork — is the pinned material :mod:`goldshtein_bats_layout_data`
+validates."""
 from __future__ import annotations
 
 import argparse
+from functools import lru_cache
+import gzip
 import json
 from pathlib import Path
 
@@ -15,7 +21,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
-from matplotlib.patches import Circle, Patch
+from matplotlib.patches import Circle, Patch, PathPatch
+from matplotlib.path import Path as MplPath
 from matplotlib.textpath import TextToPath
 from matplotlib.ticker import MultipleLocator, StrMethodFormatter
 from matplotlib.transforms import Affine2D, ScaledTranslation
@@ -23,6 +30,7 @@ import numpy as np
 from PIL import Image
 import pymupdf
 from scipy.special import expit
+from shapely.geometry.polygon import orient
 
 from goldshtein_bats_layout_data import _population_parameters, _read_context, assemble_layout_data
 from locust_density_figure import add_compact_unit_label
@@ -34,11 +42,25 @@ HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
 PAGE_W, PAGE_H = 532, 736
-#: Tile zoom for the live CartoDB basemap, pinned rather than left to
-#: contextily's auto-zoom: auto matches screen-pixel sizes, which on a
-#: print page undershoots into visibly blocky tiles.  z16 is ~2 m/px,
-#: roughly double the density the 250-dpi PNG export displays.
+#: Tile zoom for the live CartoDB raster fallback (used only when the
+#: vector extract below is absent): pinned rather than left to
+#: contextily's auto-zoom, which matches screen-pixel sizes and on a
+#: print page undershoots into visibly blocky tiles.
 TILE_ZOOM = 16
+
+#: Pinned OpenStreetMap extract (water/roads/buildings clipped to the map
+#: extents) drawn as the vector basemap; © OpenStreetMap contributors
+#: (ODbL), Geofabrik israel-and-palestine extract, clipped by
+#: notebooks/build_bats_vector_basemap.py.
+OSM_BASEMAP_PATH = source.ASSET_DIR / "basemap_osm.geojson.gz"
+OSM_ATTRIBUTION = ("Basemap features © OpenStreetMap contributors (ODbL), "
+                   "Geofabrik israel-and-palestine extract")
+OSM_WATER_FILL, OSM_WATER_EDGE = "#d9e9ed", "#a3bcc3"
+OSM_BUILDING_FILL = "#dcdcdc"
+OSM_ROAD_COLOR = "#cfcdca"
+OSM_ROAD_WIDTHS = {"primary": .6, "secondary": .55, "secondary_link": .5,
+                   "tertiary": .5, "tertiary_link": .45,
+                   "unclassified": .32, "residential": .32, "road": .32}
 OUTPUT_DIR = source.ROOT / "assets" / "goldshtein-bats-layout-review"
 STEM = "bat_composite"
 ONSET_INK = "#262626"
@@ -312,25 +334,103 @@ def draw_population_directedness(plots, ax, population, colors, distance_limits,
               columnspacing=1.0, borderaxespad=0, labelspacing=.25)
 
 
+@lru_cache(maxsize=1)
+def _vector_basemap():
+    """The pinned OSM extract, projected (cached across maps)."""
+    import geopandas as gpd
+    features = json.load(gzip.open(OSM_BASEMAP_PATH, "rt"))["features"]
+    return gpd.GeoDataFrame.from_features(
+        features, crs="EPSG:4326").to_crs(f"EPSG:{source.METRIC_EPSG}")
+
+
+def _ring_path(ring):
+    xy = np.asarray(ring.xy).T
+    codes = [MplPath.MOVETO] + [MplPath.LINETO] * (len(xy) - 2) + [MplPath.CLOSEPOLY]
+    return MplPath(xy, codes)
+
+
+def _polygon_path(polygon):
+    """Compound path over a polygon's rings (holes oriented to punch out),
+    flattened over MultiPolygon parts."""
+    geoms = polygon.geoms if polygon.geom_type == "MultiPolygon" else [polygon]
+    rings = []
+    for geom in geoms:
+        geom = orient(geom)
+        rings.extend([geom.exterior, *geom.interiors])
+    return MplPath.make_compound_path(*(_ring_path(ring) for ring in rings))
+
+
+def draw_vector_basemap(ax, xlim, ylim):
+    """Draw the pinned OpenStreetMap extract (water, roads, buildings) as a
+    vector basemap — sharp at any zoom, no network.  Returns False when the
+    extract is missing, leaving the caller to try raster tiles."""
+    if not OSM_BASEMAP_PATH.exists():
+        return False
+    from shapely.geometry import box
+
+    osm = _vector_basemap()
+    extent = box(*xlim, *ylim)
+    sel = osm[osm.intersects(extent)].clip(extent)
+
+    for row in sel.itertuples():
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+        if row.kind == "water":
+            ax.add_patch(PathPatch(_polygon_path(geom), facecolor=OSM_WATER_FILL,
+                                   edgecolor=OSM_WATER_EDGE, lw=.35, zorder=1.0))
+
+    road_segments = {}
+    for row in sel.itertuples():
+        if row.kind != "road":
+            continue
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+        width = OSM_ROAD_WIDTHS.get(getattr(row, "fclass", None), .3)
+        parts = geom.geoms if geom.geom_type == "MultiLineString" else [geom]
+        for part in parts:
+            if part.geom_type == "LineString" and len(part.coords) > 1:
+                road_segments.setdefault(width, []).append(np.asarray(part.xy).T)
+    for width, segments in road_segments.items():
+        ax.add_collection(LineCollection(segments, colors=OSM_ROAD_COLOR,
+                                         linewidths=width, zorder=1.4))
+
+    rings = []
+    for row in sel.itertuples():
+        if row.kind != "building" or row.geometry is None or row.geometry.is_empty:
+            continue
+        geoms = (row.geometry.geoms
+                 if row.geometry.geom_type == "MultiPolygon" else [row.geometry])
+        for geom in geoms:
+            geom = orient(geom)
+            rings.extend([geom.exterior, *geom.interiors])
+    if rings:
+        ax.add_patch(PathPatch(MplPath.make_compound_path(*(_ring_path(r) for r in rings)),
+                               facecolor=OSM_BUILDING_FILL, edgecolor="none", zorder=1.6))
+    return True
+
+
 def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_scale=False,
                    basemap=True, zoom="auto"):
     """Show routes in individual treatment shades or on the directedness scale.
 
-    ``basemap`` draws the live CartoDB "Positron" basemap (the map API
-    behind the published figure's own tile rasters) underneath: tiles are
-    fetched and reprojected onto the map's metric CRS, so the area reads
-    as the actual landscape in Positron's light grey.  With
-    ``CARTO_API_KEY`` set (see :func:`goldshtein_bats_plots._carto_auth`)
-    tiles are served against the key rather than the throttled anonymous
-    pool; without network access the plain ``MAP_FACE`` remains and the
-    figure still renders.  ``zoom`` fixes the tile zoom level (default:
-    contextily's pick from the axis size, which overshoots for small
-    panels and floods the tile service with requests)."""
+    ``basemap`` draws the landscape underneath.  The default source is the
+    pinned OpenStreetMap extract (water/roads/buildings as true vectors,
+    :func:`draw_vector_basemap` — sharp at any zoom, works offline).  When
+    that extract is absent it falls back to live CartoDB "Positron" raster
+    tiles (tiles fetched and reprojected onto the map's metric CRS; a
+    ``CARTO_API_KEY`` in the environment, see
+    :func:`goldshtein_bats_plots._carto_auth`, gets clean tiles rather than
+    the watermarked anonymous pool); without either, the plain ``MAP_FACE``
+    remains and the renderer says so.  ``zoom`` selects the fallback tile
+    zoom (default: contextily's pick from the axis size, which overshoots
+    for small panels and floods the tile service with requests)."""
     ax.set(xlim=xlim, ylim=ylim, xticks=[], yticks=[], facecolor=MAP_FACE, aspect="equal")
     for spine in ax.spines.values():
         spine.set_color(color)
         spine.set_linewidth(.65)
-    if basemap:
+    if basemap and not draw_vector_basemap(ax, xlim, ylim):
         try:
             import contextily as cx
             from goldshtein_bats_plots import _carto_auth, _cartodb_quiet
@@ -346,7 +446,15 @@ def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_sca
     lake = data["lake"]
     polygons = [lake] if lake.geom_type == "Polygon" else lake.geoms
     for polygon in polygons:
-        ax.fill(*polygon.exterior.xy, fc="#d9e9ed", ec="#a3bcc3", lw=.45, zorder=2)
+        # Interior rings (holes/islands) are compound subpaths; orienting
+        # the rings (exterior CCW, interiors CW) makes the fill rule punch
+        # them out instead of painting over them.
+        polygon = orient(polygon)
+        rings = [polygon.exterior, *polygon.interiors]
+        path = MplPath.make_compound_path(
+            *(MplPath(np.asarray(ring.xy).T) for ring in rings))
+        ax.add_patch(PathPatch(path, facecolor="#d9e9ed", edgecolor="#a3bcc3",
+                               lw=.45, zorder=2))
 
     missing, gaps, route, values, route_colors = [], [], [], [], []
     flights = tracks.groupby("tag", sort=False, observed=True)
@@ -639,6 +747,15 @@ def main(argv=None):
     summary = {
         "inputs_sha256": source.INPUT_HASHES,
         "data_revision": source.DATA_REVISION,
+        "basemap": {
+            "vector_extract": "notebooks/assets/goldshtein_bats_figure/basemap_osm.geojson.gz",
+            "vector_extract_sha256": (source.sha256(OSM_BASEMAP_PATH)
+                                      if OSM_BASEMAP_PATH.exists() else None),
+            "attribution": OSM_ATTRIBUTION,
+            "raster_fallback": ("live CartoDB Positron tiles via contextily when the "
+                                "vector extract is absent (CARTO_API_KEY for clean tiles)"),
+            "raster_tile_zoom": TILE_ZOOM,
+        },
         "fonts": fonts,
         "n_bats_by_treatment": data["counts"],
         "n_model_steps": len(data["evidence"]),
