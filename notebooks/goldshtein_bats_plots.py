@@ -156,6 +156,11 @@ EVIDENCE_LABEL = "Posterior directedness"
 # ------------------------------------------------------------------ anchors
 #: map anchors and the Web Mercator EPSG for every basemap figure
 LAKE_GEOJSON = bats_lake_outline_path()
+#: the lake is the homing destination, so it reads as water against the
+#: pale basemap: cyan fill with a deeper shore line, shared by the map
+#: cells and the composite's flight maps (and its legend key)
+LAKE_FILL, LAKE_EDGE = "#7fd3e0", "#3f97a5"
+LAKE_LEGEND_LABEL = "Lake"
 WEBMERC_EPSG = 3857
 ROOST_LAT, ROOST_LON = 33.112373, 35.584135
 TRANS_POINTS = [(33.135136, 35.592712), (33.081932, 35.604462)]
@@ -647,8 +652,8 @@ def plot_destination_panels(
     treat_name_col="treatmentName",
 
     # colorblind-ish cyan replacement for tab:cyan
-    lake_facecolor="#56B4E9",
-    lake_alpha=0.35,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     # style knobs
     res_lw: float = 1.6,
     res_alpha: float = 0.95,
@@ -774,14 +779,14 @@ def plot_destination_panels(
                 lake_gdf_3857.plot(
                     ax=ax,
                     facecolor=lake_facecolor,
-                    edgecolor=lake_facecolor,
+                    edgecolor=LAKE_EDGE,
                     alpha=lake_alpha,
                     linewidth=1.2,
                     zorder=12
                 )
                 lake_gdf_3857.boundary.plot(
                     ax=ax,
-                    color=lake_facecolor,
+                    color=LAKE_EDGE,
                     linewidth=1.4,
                     alpha=1.0,
                     zorder=13
@@ -865,8 +870,10 @@ def plot_destination_panels(
 
 
 def _compact_destination_legend(*, show_dropout, gap_linestyle="--", gap_color="black"):
-    """Return the notebook's map key for the roost, releases, and signal gaps."""
+    """Return the notebook's map key for the lake, roost, releases, and gaps."""
     handles = [
+        Patch(facecolor=LAKE_FILL, edgecolor=LAKE_EDGE, linewidth=.7,
+              label=LAKE_LEGEND_LABEL),
         Line2D([0], [0], marker="*", color="none",
                markerfacecolor="white", markeredgecolor="black",
                markeredgewidth=0.8, markersize=7.2, label="Roost"),
@@ -889,8 +896,8 @@ def plot_destination_panels_compact(
     lon_col="lon",
     treat_col="treatment",
     treat_name_col="treatmentName",
-    lake_facecolor="tab:cyan",
-    lake_alpha=0.35,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     # line style
     res_lw=1.35,
     res_alpha=0.95,
@@ -996,14 +1003,14 @@ def plot_destination_panels_compact(
             lake_gdf_3857.plot(
                 ax=ax,
                 facecolor=lake_facecolor,
-                edgecolor=lake_facecolor,
+                edgecolor=LAKE_EDGE,
                 alpha=lake_alpha,
                 linewidth=1.0,
                 zorder=12,
             )
             lake_gdf_3857.boundary.plot(
                 ax=ax,
-                color=lake_facecolor,
+                color=LAKE_EDGE,
                 linewidth=1.1,
                 alpha=1.0,
                 zorder=13,
@@ -1280,8 +1287,8 @@ def plot_destination_flow_fields(
     lat_col="lat",
     lon_col="lon",
     figsize=(8, 9),                     # EXACT match to your trajectory panels
-    lake_facecolor="tab:cyan",
-    lake_alpha=0.35,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     lake_edge_lw=1.4,
     basemap_alpha: float = 1.0,
     basemap_source=cx.providers.CartoDB.DarkMatter,
@@ -1412,14 +1419,14 @@ def plot_destination_flow_fields(
             lake_gdf_3857.plot(
                 ax=ax,
                 facecolor=lake_facecolor,
-                edgecolor=lake_facecolor,
+                edgecolor=LAKE_EDGE,
                 alpha=lake_alpha,
                 linewidth=1.2,
                 zorder=12,
             )
             lake_gdf_3857.boundary.plot(
                 ax=ax,
-                color=lake_facecolor,
+                color=LAKE_EDGE,
                 linewidth=lake_edge_lw,
                 alpha=1.0,
                 zorder=13,
@@ -4128,8 +4135,8 @@ def plot_tracks_pgoal_viridis(
     # style
     basemap_source=cx.providers.CartoDB.Positron,
     basemap_alpha=1.0,
-    lake_facecolor="tab:cyan",
-    lake_alpha=0.25,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     lake_edge_lw=1.0,
     seg_lw=0.9,
     seg_alpha=0.92,
@@ -4270,9 +4277,9 @@ def plot_tracks_pgoal_viridis(
 
         # lake
         if len(lake_gdf):
-            lake_gdf.plot(ax=ax, facecolor=lake_facecolor, edgecolor=lake_facecolor,
+            lake_gdf.plot(ax=ax, facecolor=lake_facecolor, edgecolor=LAKE_EDGE,
                           alpha=lake_alpha, linewidth=lake_edge_lw, zorder=12)
-            lake_gdf.boundary.plot(ax=ax, color=lake_facecolor, linewidth=lake_edge_lw + 0.2,
+            lake_gdf.boundary.plot(ax=ax, color=LAKE_EDGE, linewidth=lake_edge_lw + 0.2,
                                    alpha=1.0, zorder=13)
 
         # roost + trans points
@@ -4408,7 +4415,8 @@ def plot_tracks_pgoal_viridis(
 
     # legend (+ optional gap entry)
     legend_handles = [
-        Patch(facecolor=lake_facecolor, edgecolor=lake_facecolor, alpha=lake_alpha, label="Lake"),
+        Patch(facecolor=lake_facecolor, edgecolor=LAKE_EDGE, alpha=lake_alpha,
+              label=LAKE_LEGEND_LABEL),
         Line2D([0], [0], marker="*", color="none", markerfacecolor="white",
                markeredgecolor="black", markersize=11, label="Roost"),
         Line2D([0], [0], marker="X", color="none", markerfacecolor="white",
@@ -4545,8 +4553,8 @@ def plot_tracks_pgoal_small_bigfont(
     # a contextily fetch; the notebook default (None) keeps the network
     # basemap
     basemap_img=None,
-    lake_facecolor="tab:cyan",
-    lake_alpha=0.25,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     lake_edge_lw=0.8,
     seg_lw=0.8,
     seg_alpha=0.90,
@@ -4696,14 +4704,14 @@ def plot_tracks_pgoal_small_bigfont(
             lake_gdf.plot(
                 ax=ax,
                 facecolor=lake_facecolor,
-                edgecolor=lake_facecolor,
+                edgecolor=LAKE_EDGE,
                 alpha=lake_alpha,
                 linewidth=lake_edge_lw,
                 zorder=12
             )
             lake_gdf.boundary.plot(
                 ax=ax,
-                color=lake_facecolor,
+                color=LAKE_EDGE,
                 linewidth=lake_edge_lw + 0.15,
                 alpha=1.0,
                 zorder=13

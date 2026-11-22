@@ -13,9 +13,10 @@ with 0° toward the goal and ±180° directly away.
 **(a)** Homing trajectories after translocation. Control bats carried a tracking
 tag only (n = 29). Vision was occluded alone (n = 14), in combination with a
 magnetic manipulation (n = 15), or in combination with both magnetic
-manipulation and anosmia (n = 9). Crosses mark release sites, the star marks
-the roost, and dashed segments indicate tracking gaps. Tagged-bat photograph
-by [Photographer]. © [Year] [Copyright holder].
+manipulation and anosmia (n = 9). The cyan polygon is the lake (Agamon), one of
+the two homing destinations; the star marks the roost (the other destination),
+crosses mark release sites, and dashed segments indicate tracking gaps.
+Tagged-bat photograph by [Photographer]. © [Year] [Copyright holder].
 
 **(b)** The von Mises–uniform mixture (vMU) represents headings as a mixture
 of a directed von Mises component and an undirected uniform component.
@@ -72,9 +73,12 @@ features are © OpenStreetMap contributors (ODbL) — the render JSON
 records the extract hash and this attribution; a figure credit
 ("Basemap © OpenStreetMap contributors") belongs in the caption.
 
-The pinned lake outline is drawn on top of the OSM water (it is part of
-the pinned inputs); its interior rings render as holes, so islands
-inside the outline stay land.  If the vector extract is ever missing,
+The pinned lake outline is drawn on top of the OSM water in a cyan that the
+basemap's pale water never matches, so the destination reads at a glance, and
+panel a's key carries a matching colour box ("Lake"); its interior
+rings render as holes, so islands inside the outline stay land.  Both colours
+live once in `goldshtein_bats_plots.py` (`LAKE_FILL`, `LAKE_EDGE`), which the
+notebook's own map cells use too.  If the vector extract is ever missing,
 the renderer falls back to live CartoDB "Positron" raster tiles at a
 pinned z16 (`CARTO_API_KEY` in the environment for clean tiles — never
 stored in the repository — otherwise the anonymous pool answers with

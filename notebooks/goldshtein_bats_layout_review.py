@@ -444,6 +444,7 @@ def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_sca
             # URL, which carries the CARTO key when one is configured.
             print("basemap tiles unavailable; drawing without tiles")
     lake = data["lake"]
+    from goldshtein_bats_plots import LAKE_EDGE, LAKE_FILL  # data-root-safe local import
     polygons = [lake] if lake.geom_type == "Polygon" else lake.geoms
     for polygon in polygons:
         # Interior rings (holes/islands) are compound subpaths; orienting
@@ -453,7 +454,7 @@ def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_sca
         rings = [polygon.exterior, *polygon.interiors]
         path = MplPath.make_compound_path(
             *(MplPath(np.asarray(ring.xy).T) for ring in rings))
-        ax.add_patch(PathPatch(path, facecolor="#d9e9ed", edgecolor="#a3bcc3",
+        ax.add_patch(PathPatch(path, facecolor=LAKE_FILL, edgecolor=LAKE_EDGE,
                                lw=.45, zorder=2))
 
     missing, gaps, route, values, route_colors = [], [], [], [], []
