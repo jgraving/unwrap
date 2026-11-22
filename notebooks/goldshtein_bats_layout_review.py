@@ -1,4 +1,9 @@
-"""Render the bat composite from the pinned tracks and model fits."""
+"""Render the bat composite from the pinned tracks and model fits.
+
+The flight maps (panels a and d) sit on a live CartoDB "Positron"
+basemap fetched through contextily (see :func:`draw_track_map`); every
+other input — tracks, fits, the lake outline, the artwork — is the
+pinned material :mod:`goldshtein_bats_layout_data` validates."""
 from __future__ import annotations
 
 import argparse
@@ -302,12 +307,37 @@ def draw_population_directedness(plots, ax, population, colors, distance_limits,
               columnspacing=1.0, borderaxespad=0, labelspacing=.25)
 
 
-def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_scale=False):
-    """Show routes in individual treatment shades or on the directedness scale."""
+def draw_track_map(ax, data, tracks, color, xlim, ylim, *, scores=None, show_scale=False,
+                   basemap=True, zoom="auto"):
+    """Show routes in individual treatment shades or on the directedness scale.
+
+    ``basemap`` draws the live CartoDB "Positron" basemap (the map API
+    behind the published figure's own tile rasters) underneath: tiles are
+    fetched and reprojected onto the map's metric CRS, so the area reads
+    as the actual landscape in Positron's light grey.  With
+    ``CARTO_API_KEY`` set (see :func:`goldshtein_bats_plots._carto_auth`)
+    tiles are served against the key rather than the throttled anonymous
+    pool; without network access the plain ``MAP_FACE`` remains and the
+    figure still renders.  ``zoom`` fixes the tile zoom level (default:
+    contextily's pick from the axis size, which overshoots for small
+    panels and floods the tile service with requests)."""
     ax.set(xlim=xlim, ylim=ylim, xticks=[], yticks=[], facecolor=MAP_FACE, aspect="equal")
     for spine in ax.spines.values():
         spine.set_color(color)
         spine.set_linewidth(.65)
+    if basemap:
+        try:
+            import contextily as cx
+            from goldshtein_bats_plots import _carto_auth, _cartodb_quiet
+            with _cartodb_quiet():
+                cx.add_basemap(
+                    ax, crs=f"EPSG:{source.METRIC_EPSG}", zorder=1, zoom=zoom,
+                    source=_carto_auth(cx.providers.CartoDB.PositronNoLabels),
+                    attribution=False)
+        except Exception:  # offline renderer: keep the flat face
+            # Never echo the exception text: tile failures quote the request
+            # URL, which carries the CARTO key when one is configured.
+            print("basemap tiles unavailable; drawing without tiles")
     lake = data["lake"]
     polygons = [lake] if lake.geom_type == "Polygon" else lake.geoms
     for polygon in polygons:

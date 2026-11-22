@@ -59,6 +59,7 @@ from goldshtein_bats_posthoc import (
     hdi_1d,
     hdi_along_samples,
     _format_treatment_name,
+    _title_first_alpha,
     log_i0_stable,
     log_vonmises_pdf,
     build_res_treat_from_vonmises_idata,
@@ -1645,8 +1646,12 @@ def plot_per_tag_polar_kde(
     _save(fig, save, save_path)
     return fig
 
-def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True, save_path=None):
-    """Population mu/kappa coefficients of the Bambi von Mises model (intercept + treatment effects) with circular/linear mean + 95% HDI."""
+def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, ax=None,
+                                         save=True, save_path=None):
+    """Population mu/kappa coefficients of the Bambi von Mises model (intercept + treatment effects) with circular/linear mean + 95% HDI.
+
+    ``ax``: draw into an existing axes (for multi-panel figures) instead of
+    creating its own figure; ``save`` is then the caller's business."""
     post = idata_treatment.posterior
 
     def _has(varname: str) -> bool:
@@ -1705,7 +1710,7 @@ def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True
         if not parts:
             parts = ["control"]
         parts = sorted(parts)
-        parts = [p[:1].upper() + p[1:] for p in parts]
+        parts = [_title_first_alpha(p) for p in parts]
         return ", ".join(parts)
 
     # ---- treatment levels in fit order (for consistent colors/labels) ----
@@ -1823,8 +1828,12 @@ def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True
         y_k  = y_base
 
     # ---- plot ----
-    fig = plt.figure(figsize=(1.8, 0.40 * len(terms_order)), dpi=_plots.DEFAULT_DISPLAY_DPI)
-    ax = plt.gca()
+    own_fig = ax is None
+    if own_fig:
+        fig = plt.figure(figsize=(1.8, 0.40 * len(terms_order)), dpi=_plots.DEFAULT_DISPLAY_DPI)
+        ax = plt.gca()
+    else:
+        fig = ax.figure
 
     for i in range(n):
         c = treat_to_color[row_treatment[i]]
@@ -1865,11 +1874,16 @@ def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True
     if handles:
         ax.legend(handles=handles, loc="lower right", frameon=True)
 
-    _save(fig, save, save_path)
+    if own_fig:
+        _save(fig, save, save_path)
     return fig
 
-def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=True, save_path=None):
-    """Predictive density at 0 deg of the Bambi von Mises model for the population intercept and each treatment shift (mean + 95% HDI, uniform reference line)."""
+def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, ax=None,
+                                             save=True, save_path=None):
+    """Predictive density at 0 deg of the Bambi von Mises model for the population intercept and each treatment shift (mean + 95% HDI, uniform reference line).
+
+    ``ax``: draw into an existing axes (for multi-panel figures) instead of
+    creating its own figure; ``save`` is then the caller's business."""
     post = idata_treatment.posterior
 
     # ----------------------
@@ -1916,7 +1930,7 @@ def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=
         if not parts:
             parts = ["control"]
         parts = sorted(parts)
-        parts = [p[:1].upper() + p[1:] for p in parts]
+        parts = [_title_first_alpha(p) for p in parts]
         return ", ".join(parts)
 
     def _cat_dim(varname: str):
@@ -2039,8 +2053,12 @@ def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=
     # ----------------------
     y = np.arange(len(labels), dtype=float)
 
-    fig = plt.figure(figsize=(fig_width, fig_height), dpi=DPI)
-    ax = plt.gca()
+    own_fig = ax is None
+    if own_fig:
+        fig = plt.figure(figsize=(fig_width, fig_height), dpi=DPI)
+        ax = plt.gca()
+    else:
+        fig = ax.figure
 
     for i in range(len(labels)):
         c = colors[i]
@@ -2082,8 +2100,9 @@ def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    plt.tight_layout()
-    _save(fig, save, save_path)
+    if own_fig:
+        plt.tight_layout()
+        _save(fig, save, save_path)
     return fig
 
 def plot_total_elpd(
@@ -4850,6 +4869,8 @@ def plot_population_curve_smooth(
     invert_x=False,
     xlim=None,
     x_tick_abs=False,
+    ax=None,
+    legend=True,
     save=True,
     save_path=None,
     palette_name="colorblind",
@@ -4858,8 +4879,12 @@ def plot_population_curve_smooth(
     colors = sns.color_palette(palette_name, n_colors=len(treat_levels))
     treat_to_color = {t: colors[i] for i, t in enumerate(treat_levels)}
 
-    fig = plt.figure(figsize=(fig_w, fig_h), dpi=DPI)
-    ax = plt.gca()
+    own_fig = ax is None
+    if own_fig:
+        fig = plt.figure(figsize=(fig_w, fig_h), dpi=DPI)
+        ax = plt.gca()
+    else:
+        fig = ax.figure
     ax.axhline(0.5, color="0.90", lw=0.9, ls="--", zorder=0)
 
     for t in treat_levels:
@@ -4901,18 +4926,21 @@ def plot_population_curve_smooth(
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    ax.legend(
-        frameon=True,
-        fontsize=legend_fontsize,
-        ncol=1,
-        handlelength=1.4,
-        loc="center left",
-        bbox_to_anchor=(1.02, 0.5),
-        borderaxespad=0.0,
-    )
-    fig.subplots_adjust(right=0.78)
+    if legend:
+        ax.legend(
+            frameon=True,
+            fontsize=legend_fontsize,
+            ncol=1,
+            handlelength=1.4,
+            loc="center left",
+            bbox_to_anchor=(1.02, 0.5),
+            borderaxespad=0.0,
+        )
+        if own_fig:
+            fig.subplots_adjust(right=0.78)
 
-    _save(fig, save, save_path)
+    if own_fig:
+        _save(fig, save, save_path)
     return fig
 
 def plot_population_curve_smooth_compact(

@@ -59,6 +59,23 @@ renderer writes the PDF, PNG, and provenance JSON to this directory by default.
 Pass `--output-dir` to choose a separate destination and `--photo` to supply
 the tagged-bat photograph.
 
+## Basemaps
+
+The eight flight maps (panels a and d) draw a live CartoDB "Positron"
+basemap: tiles are fetched from CARTO's map API at render time and
+reprojected onto the metric CRS the tracks live in, so the routes sit on
+the actual landscape in Positron's light grey (the pinned lake outline is
+still drawn on top, since it is part of the pinned inputs). CARTO now
+serves these tiles against a key — with `CARTO_API_KEY` in the
+environment the keyless anonymous pool answers with watermarked "API key
+required" tiles instead of the map — so set the key when a clean render
+is wanted (it is read by the basemap helper in
+`goldshtein_bats_plots.py`; it is never stored in the repository).
+Without network access the maps fall back to their plain face and the
+renderer says so. The basemap is therefore provenance of the render
+environment, like the fonts; the data, fits and geometry behind every
+panel remain the pinned inputs recorded in `bat_layout_review.json`.
+
 The directedness scale uses Fabio Crameri’s Vanimo in reverse order, with
 yellow-green for undirected evidence and purple-pink for directed evidence.
 [Scientific Colour Maps](https://www.fabiocrameri.ch/colourpalettes/)
