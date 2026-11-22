@@ -8,7 +8,7 @@ from pyproj import Transformer
 from scipy.special import expit
 from scipy.stats import vonmises
 
-import goldshtein_bats_publication_figure as publication
+import goldshtein_bats_figure_core as core
 from unwrap import datasets
 from unwrap.link.numpy import circular_modulo, softplus
 
@@ -24,10 +24,10 @@ def _read_context(data_root):
         import goldshtein_bats_plots as plots
 
     lake_path = configured_lake_path()
-    with (patch.object(publication, "_import_notebook_modules",
+    with (patch.object(core, "_import_notebook_modules",
                        return_value=(preprocess, posthoc, plots)),
           patch.object(plots, "LAKE_GEOJSON", str(lake_path))):
-        ctx = publication.build_context(data_root)
+        ctx = core.build_context(data_root)
     return ctx, posthoc, plots, lake_path
 
 
@@ -104,7 +104,7 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
 
 def load_layout_data(data_root):
     """Validate the input pins and assemble the map, model, and heading panels."""
-    root = publication.prepare_inputs(data_root)
+    root = core.prepare_inputs(data_root)
     return assemble_layout_data(*_read_context(root))
 
 
@@ -129,10 +129,10 @@ def assemble_layout_data(ctx, posthoc, plots, lake_path):
     model_keys = {"von Mises": "vm", "von Mises-Uniform": "vmu"}
     scores = {model_keys[row.model]: {"elpd": float(row.elpd), "se": float(row.se_elpd)}
               for row in ctx["res_total"].itertuples()}
-    lake = gpd.read_file(lake_path).to_crs(publication.METRIC_EPSG).union_all()
-    transform = Transformer.from_crs(4326, publication.METRIC_EPSG, always_xy=True)
+    lake = gpd.read_file(lake_path).to_crs(core.METRIC_EPSG).union_all()
+    transform = Transformer.from_crs(4326, core.METRIC_EPSG, always_xy=True)
     sites = [transform.transform(lon, lat) for lat, lon in plots.TRANS_POINTS]
-    roost = transform.transform(publication.ROOST_LON, publication.ROOST_LAT)
+    roost = transform.transform(core.ROOST_LON, core.ROOST_LAT)
     return {
         "tracks": tracks[["tag", "treatment", "dest", *coordinates, "gap_before",
                           "step_bearing_deg", "bearing_to_dest_deg"]],

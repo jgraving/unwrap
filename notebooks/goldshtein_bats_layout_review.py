@@ -10,7 +10,7 @@ import argparse
 import json
 from pathlib import Path
 
-import goldshtein_bats_publication_figure as source
+import goldshtein_bats_figure_core as source
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
@@ -34,6 +34,11 @@ HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
 PAGE_W, PAGE_H = 532, 736
+#: Tile zoom for the live CartoDB basemap, pinned rather than left to
+#: contextily's auto-zoom: auto matches screen-pixel sizes, which on a
+#: print page undershoots into visibly blocky tiles.  z16 is ~2 m/px,
+#: roughly double the density the 250-dpi PNG export displays.
+TILE_ZOOM = 16
 OUTPUT_DIR = source.ROOT / "assets" / "goldshtein-bats-layout-review"
 STEM = "bat_composite"
 ONSET_INK = "#262626"
@@ -460,7 +465,8 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         color = colors[level]
         page_text(center, route_top - 9, label, ha="center", color=color, fontsize=8.7)
         map_ax = axes_at(center - route_w / 2, route_top, route_w, route_h)
-        draw_track_map(map_ax, data, treatments[level], color, xlim, ylim, show_scale=level == levels[-1])
+        draw_track_map(map_ax, data, treatments[level], color, xlim, ylim, show_scale=level == levels[-1],
+                       zoom=TILE_ZOOM)
     map_key = plots._compact_destination_legend(
         show_dropout=tracks["gap_before"].eq(1).any(), gap_linestyle=MAP_DROPOUT_STYLE,
         gap_color=MAP_DROPOUT_COLOR,
@@ -555,7 +561,8 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                   fontsize=9.1, weight="bold")
         map_ax = axes_at(left, map_top, map_w, map_h)
         draw_track_map(map_ax, data, treatments[level], color, xlim, ylim,
-                       scores=route_scores, show_scale=level == levels[-1])
+                       scores=route_scores, show_scale=level == levels[-1],
+                       zoom=TILE_ZOOM)
 
         tile_top = heatmap_tops[row]
         page_text(tile_left + tile_w / 2, tile_top - 8, label, ha="center", color=color,

@@ -26,14 +26,13 @@ without running the notebook or sampling again. See the
 [reproduction instructions](BEETLE_FIGURE.md) and the
 [rendered preview](../assets/beetles-publication/beetles_publication.png).
 
-The Goldschtein bat figure can be regenerated as SVG, PDF, PNG, HTML and a
-provenance JSON from the notebook's own plotting code, the pinned data and
-the pinned model fits; every panel is the current notebook cell's figure
-embedded in the authored 583 × 626-point composite at the measured
-Inkscape scale, and only panel b plus the panel letters are pinned
-artwork. See the [reproduction instructions](GOLDSHTEIN_BATS_FIGURE.md)
+The Goldshtein bat publication composite can be regenerated as PDF, PNG
+and a provenance JSON from the notebook's own code path, the pinned data
+and the pinned model fits (`python notebooks/goldshtein_bats_layout_review.py
+--data-root …`); the flight maps sit on live CartoDB "Positron" tiles.
+See the [render instructions and caption](../assets/goldshtein-bats-layout-review/README.md)
 and the
-[rendered preview](../assets/goldshtein-bats-publication/goldshtein_bats_publication.png).
+[rendered preview](../assets/goldshtein-bats-layout-review/bat_composite.png).
 
 ## Setup
 
