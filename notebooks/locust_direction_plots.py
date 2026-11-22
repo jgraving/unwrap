@@ -26,7 +26,6 @@ import matplotlib.legend_handler as ml_handler
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
-from matplotlib.ticker import FuncFormatter
 import numpy as np
 from unwrap.circular import vonmises_logpdf
 
@@ -628,16 +627,21 @@ def plot_individual_ppc_grid(trace_bimodal, df, *, save=True,
 # Population hypothesis / alignment dot figures.
 # ---------------------------------------------------------------------------
 def plot_hypothesis_density(trace_bimodal, *, save=True,
-                            save_path="figures/locust/locust_directional_hypothesis_horizontal.pdf"):
+                            save_path="figures/locust/locust_directional_hypothesis_horizontal.pdf",
+                            uniform_text_off=0.01):
     """Posterior predictive density at the hypothesized directions (forward
     vs perpendicular, computed in
     ``locust_posthoc.hypothesis_density_stats``): densities with asymmetric
-    HDI error bars and the uniform 1/(2*pi) reference (dashed)."""
+    HDI error bars and the uniform 1/(2*pi) reference (dashed).
+    ``uniform_text_off`` is the distance from the dashed line to the rotated
+    "Uniform" label, in density units - sized for the house axis width; a
+    page drawing it wider needs a bigger offset to keep the same visual
+    gap."""
     stats = posthoc.hypothesis_density_stats(trace_bimodal)
     fig, _ = _horizontal_dots(stats["centers"], stats["xerr"],
                               "Predictive density",
                               uniform=stats["p_uniform"], invert=True,
-                              uniform_text_off=0.01)
+                              uniform_text_off=uniform_text_off)
     _save(fig, save, save_path)
 
 
@@ -840,11 +844,6 @@ def _swarm_offsets(values, dot_pt, pt_per_unit):
     return offsets
 
 
-def _density_tick(value, _pos=None):
-    """Tick label for the log10-density axis: the density itself."""
-    return f"{10.0 ** value:g}"
-
-
 def plot_hypothesis_density_swarm(trace_bimodal, *, save=True,
                                   save_path="figures/locust/locust_directional_hypothesis_density_swarm.pdf",
                                   dot_pt=3.5, pack_gap=1.2, xlim=None, xticks=None,
@@ -855,9 +854,8 @@ def plot_hypothesis_density_swarm(trace_bimodal, *, save=True,
     .hypothesis_elpd_individual_stats``, the geometric mean of its per-draw
     predictive density - as a swarm, one dot per animal, on the rows, labels,
     colours and markers of the population panel (Optic flow, blue circle,
-    above Vec. encoding, orange square) and the same log-uniform reference.
-    The densities span two orders of magnitude across animals, so the axis
-    is log10 with the ticks labelled as densities. The pooled mean
+    above Vec. encoding, orange square) and the same uniform reference, on a
+    plain linear density axis like the population panel. The pooled mean
     predictive density from the same stats sits on each row as an open
     marker.
 
@@ -873,21 +871,20 @@ def plot_hypothesis_density_swarm(trace_bimodal, *, save=True,
     ``xlim`` / ``xticks`` fix the value axis; the packing needs the limit, so
     pass them rather than setting them afterwards.  ``uniform_label`` turns
     the rotated "Uniform" text off - the composite page leaves it to the
-    population panel, which labels the same reference on the density scale."""
+    population panel, which labels the same reference."""
     stats = posthoc.hypothesis_elpd_individual_stats(trace_bimodal)
     n_ind = int(stats["n_ind"])
-    # ELPD is the natural log of the predictive density; the drawn axis is
-    # log10 density, so exp(ELPD) - the geometric mean density - sits one
-    # decade per unit on it.
-    log10_e = float(np.log10(np.e))
-    uniform = float(stats["logp_uniform"]) * log10_e
+    # ELPD is the natural log of the predictive density; the axis draws the
+    # density itself, so exp(ELPD) - the geometric mean density - goes on it
+    # directly.
+    uniform = float(np.exp(stats["logp_uniform"]))
     rows = [
         ("Optic flow", UNIMODAL, "o",
-         np.asarray(stats["elpd_f_all"])[:n_ind] * log10_e,
-         float(stats["elpd_f_all"][n_ind]) * log10_e),
+         np.exp(np.asarray(stats["elpd_f_all"])[:n_ind]),
+         float(np.exp(stats["elpd_f_all"][n_ind]))),
         ("Vec. encoding", BIMODAL, "s",
-         np.asarray(stats["elpd_p_all"])[:n_ind] * log10_e,
-         float(stats["elpd_p_all"][n_ind]) * log10_e),
+         np.exp(np.asarray(stats["elpd_p_all"])[:n_ind]),
+         float(np.exp(stats["elpd_p_all"][n_ind]))),
     ]
 
     fig, ax = plt.subplots(figsize=(3.0, 1.6), dpi=_plots.DEFAULT_DISPLAY_DPI)
@@ -910,9 +907,8 @@ def plot_hypothesis_density_swarm(trace_bimodal, *, save=True,
     for label, row in zip(ax.get_yticklabels(), rows):
         label.set_color(row[1])
     if xticks is None:
-        xticks = [-2.0, -1.0]              # 0.01 and 0.1: the decades spanned
-    ax.set_xticks(xticks)
-    ax.xaxis.set_major_formatter(FuncFormatter(_density_tick))
+        xticks = [0.1 * k for k in range(1, 6)]   # 0.1 up to 0.5, inside xlim
+    ax.set_xticks([t for t in xticks if xlim[0] < t < xlim[1]])
     ax.set_ylabel("")
     ax.set_title("")
     ax.set_xlabel("Mean predictive density")

@@ -45,12 +45,12 @@ reference), and the new panels take their house twins:
 `plot_hypothesis_density_polar` (panel d's test standalone),
 `plot_predictive_models_polar` (a pair of polar plots, one per model, each
 against the observed KDE drawn solid) and `plot_hypothesis_density_swarm` (one
-dot per animal, each animal's geometric-mean predictive density on a log
-axis). All of these twins are called from
+dot per animal, each animal's geometric-mean predictive density on a linear
+density axis). All of these twins are called from
 `locust_direction_mixture_model.ipynb`, so every panel of the composite has a
 standalone figure in the notebook too. The composite being matched comes from
 the manuscript, so it is called the reference figure throughout; its page is
-900 x 600 pt and this one is 900 x 864: the new row starts 44 pt under the
+900 x 600 pt and this one is 900 x 844: the new row starts 44 pt under the
 reference page's second row. Rendered preview:
 [PDF](../assets/locust-circ-stats/locust_circ_stats_figure.pdf) ·
 [PNG](../assets/locust-circ-stats/locust_circ_stats_figure.png) ·
