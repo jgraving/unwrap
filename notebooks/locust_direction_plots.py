@@ -855,9 +855,9 @@ def plot_hypothesis_density_swarm(trace_bimodal, *, save=True,
     predictive density - as a swarm, one dot per animal, on the rows, labels,
     colours and markers of the population panel (Optic flow, blue circle,
     above Vec. encoding, orange square) and the same uniform reference, on a
-    plain linear density axis like the population panel. The pooled mean
-    predictive density from the same stats sits on each row as an open
-    marker.
+    plain linear density axis labelled "Predictive density" like the
+    population panel. The pooled mean predictive density from the same stats
+    sits on each row as an open marker.
 
     ``dot_pt`` is the drawn dot diameter in points; ``pack_gap`` is that
     packing distance as a multiple of it, so the dots are separated rather
@@ -911,7 +911,7 @@ def plot_hypothesis_density_swarm(trace_bimodal, *, save=True,
     ax.set_xticks([t for t in xticks if xlim[0] < t < xlim[1]])
     ax.set_ylabel("")
     ax.set_title("")
-    ax.set_xlabel("Mean predictive density")
+    ax.set_xlabel("Predictive density")
     _despine(ax)
 
     # The packing needs the axes box, and the box is only settled once

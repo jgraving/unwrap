@@ -225,6 +225,10 @@ PANEL_F_INSET_Y = PANEL_D[1] - ROW_2_TOP
 #: did not compute.
 SWARM_DOT_PT = 4.5
 SWARM_PACK_GAP = 1.25
+#: PANEL_F's y is only the seed for the house call's 1 pt starter box; build
+#: re-places the axes once the packing sets its height, centring the axes box
+#: on the polar pair's centres (PANEL_F_CENTER_Y, below the pair's constants)
+#: so f sits level with the plots it is paired with in c.
 PANEL_F = (PANEL_D[0], ROW_3_TOP + PANEL_F_INSET_Y, PANEL_D[2], 1.0)
 
 #: The predictive-check pair: one polar per model, each showing that model's
@@ -238,6 +242,9 @@ PANEL_F = (PANEL_D[0], ROW_3_TOP + PANEL_F_INSET_Y, PANEL_D[2], 1.0)
 #: polar's "0°" has to clear the right polar's "±180°" in the middle.
 POLAR_PAIR_R_OUT = 68.0
 POLAR_PAIR_CENTRES = ((152.0, ROW_3_TOP + 159.0), (373.0, ROW_3_TOP + 159.0))
+#: the row's content centre: panel f's axes box centres on it, so the swarm
+#: sits at the same height as the two polars
+PANEL_F_CENTER_Y = POLAR_PAIR_CENTRES[0][1]
 #: the "Data" key under the pair, centred on the pair's centre (262.5) as a
 #: block; the key's y leaves ~6 pt under the polars' lowest ink (the "-90 deg"
 #: tick labels, 797.2) so it reads as the polars' key rather than a caption
@@ -252,10 +259,15 @@ POLAR_PAIR_DATA_KEY = (262.5, ROW_3_TOP + 253.5)
 #: population and individual level), and panel a gets a title of its own,
 #: "Experimental design", centred over the scaled artwork.  Style as the
 #: reference: 32 pt bold letters and 17 pt titles at 13.74 and 21.465 pt from
-#: the row top - but bold, matching the bat composite's panel titles.
+#: the row top - but bold, matching the bat composite's panel titles.  Every
+#: title keeps that 21.465 offset from its row top, which is what puts it on
+#: its letter's baseline (the letter's own 13.74 cap sits ~3 pt lower, as on
+#: the reference page); the left column's titles centre on the shared
+#: LEFT_TITLE_X, so a's and b's stack directly over one another.
+LEFT_TITLE_X = PANEL_A_CX + PANEL_A_DX        # 249: the artwork's ink centre
 PANEL_TITLES = (
-    ("Experimental design", PANEL_A_CX + PANEL_A_DX, 21.465),
-    ("Model selection", PANEL_B[0] + 0.5 * PANEL_B[2], 366.465),
+    ("Experimental design", LEFT_TITLE_X, 21.465),
+    ("Model selection", LEFT_TITLE_X, ROW_2_TOP + 21.465),
     ("Predictive check", 0.5 * (POLAR_PAIR_CENTRES[0][0] + POLAR_PAIR_CENTRES[1][0]),
      ROW_3_TOP + 21.465),
     # d's title is the one long name of the six; kept at the page's type size
@@ -264,7 +276,7 @@ PANEL_TITLES = (
     # offset - the two lines sit as a block opposite the polar's 90 degree
     # tick label below them.
     ("Predictive density at\nhypothesized directions", PLOT_COLUMN_CX, 12.639),
-    ("Population-level hypothesis testing", PLOT_COLUMN_CX, 366.465),
+    ("Population-level hypothesis testing", PLOT_COLUMN_CX, ROW_2_TOP + 21.465),
     ("Individual-level hypothesis testing", PLOT_COLUMN_CX, ROW_3_TOP + 21.465),
 )
 PANEL_LETTERS = (
@@ -1112,7 +1124,8 @@ def build_figure():
     # tall: the house swarm sets its y limits in points from its own packing,
     # and a polar/axes in points only draws 1 unit per point when the box
     # height equals the limit span, so the panel height is read back from the
-    # limits and the axes re-placed.  (The height cannot be predicted from
+    # limits and the axes re-placed, centred on PANEL_F_CENTER_Y to sit level
+    # with panel c's polars.  (The height cannot be predicted from
     # the dot size alone: the greedy packer's stack reach is not monotonic in
     # the packing distance.)
     with _house_panel(fig, PANEL_F, dash=UNIFORM_DASH) as panel_f:
@@ -1120,8 +1133,9 @@ def build_figure():
             trace_bimodal, save=False, dot_pt=SWARM_DOT_PT,
             pack_gap=SWARM_PACK_GAP, xlim=PANEL_F_XLIM, xticks=PANEL_F_XTICKS,
             uniform_label=False)
-    f_x, f_y, f_w, _ = PANEL_F
-    _place(panel_f.ax, (f_x, f_y, f_w, abs(panel_f.ax.get_ylim()[0]) * 2))
+    f_x, _, f_w, _ = PANEL_F
+    f_h = abs(panel_f.ax.get_ylim()[0]) * 2
+    _place(panel_f.ax, (f_x, PANEL_F_CENTER_Y - 0.5 * f_h, f_w, f_h))
 
     hip = posthoc.hypothesis_elpd_individual_stats(trace_bimodal)
     n_ind = int(hip["n_ind"])
@@ -1315,12 +1329,13 @@ def provenance(plotted):
             "panel_d_against_the_previous_build": {
                 "method": "the only drawing that neither moved nor was restyled "
                           "this change is panel d's polar - its centre, radius "
-                          "and marks are untouched, while a and f move by design "
-                          "(a scaled and now centred on its title, f redrawn on "
-                          "the density scale) and c's key recentres; the text "
-                          "spans and drawing primitives of its region (x 540-900, "
-                          "y 55-350 pt, below its title) compared between the "
-                          "previously committed PDF and this one",
+                          "and marks are untouched, while b, e and f move by "
+                          "design (b's axes widened and relabelled, its and e's "
+                          "titles brought onto their letters' baselines, f's "
+                          "axes centred on the c pair); the text spans and "
+                          "drawing primitives of d's region (x 540-900, y 55-350 "
+                          "pt, below its title) compared between the previously "
+                          "committed PDF and this one",
                 "text_spans": "4 of 4 identical to 0.007 pt",
                 "drawing_primitives": "13 of 13 identical to 0.000 pt (the "
                                       "full-page axes rectangle is excluded - it "
@@ -1328,7 +1343,7 @@ def provenance(plotted):
                                       "with the page height)",
             },
             "mean_abs_pixel_difference_against_reference_pdf": {
-                "panel_a": 7.2, "panel_b": 14.1, "panel_d": 16.8, "panel_e": 17.1,
+                "panel_a": 7.2, "panel_b": 15.1, "panel_d": 16.8, "panel_e": 18.0,
                 "regions": "300 dpi, (pt, top-left origin): panel a: x 83.0-368.0, "
                            "y 67.6-348; panel b: 28-448, 360-545; panel d: 595-900, "
                            "5-350; panel e: 455-880, 360-545.  d's crop compares "
@@ -1340,9 +1355,14 @@ def provenance(plotted):
                            "the photo detail those two crops need.",
                 "note": "the previous build measured 7.4/14.1/16.8/16.4.  The "
                         "page height changed (844 pt) so every crop's raster "
-                        "phase moved, which is most of what separates "
-                        "7.2/14.1/16.8/17.1 from it (e's shift is the rotated "
-                        "'Uniform' label moving clear of its dashed line).  "
+                        "phase moved, and since then b and e have moved again "
+                        "for legibility (their titles onto their letters' "
+                        "baselines, b's ticks spread to 100-unit pitch, f's "
+                        "axes centred on the c pair), which separates "
+                        "7.2/15.1/16.8/18.0 from that: b's and e's crops "
+                        "include those titles and ticks, and where this page "
+                        "places them deliberately (aligned to its own letter "
+                        "grid), they differ further from the reference's.  "
                         "Going further back, a's 22.8 in the build before the "
                         "matplotlib pin fell to 7 because the drawing itself "
                         "improved: the build environment had drifted to "

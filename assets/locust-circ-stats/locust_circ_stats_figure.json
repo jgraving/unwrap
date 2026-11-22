@@ -4,7 +4,7 @@
     900.0,
     844.0
   ],
-  "code_revision": "ce8c95ba07e1acacb5d9e0595ed8ae5600d6b146",
+  "code_revision": "c84cfc7fc602b90f8155ed2afc706a0902121d2d",
   "data_repository": "jgraving/unwrap-data",
   "data_revision": "86c41b5f43eb61191405b9bc85baf730a492a06f",
   "font_family": "Arial",
@@ -160,23 +160,23 @@
   ],
   "verification": {
     "panel_d_against_the_previous_build": {
-      "method": "the only drawing that neither moved nor was restyled this change is panel d's polar - its centre, radius and marks are untouched, while a and f move by design (a scaled and now centred on its title, f redrawn on the density scale) and c's key recentres; the text spans and drawing primitives of its region (x 540-900, y 55-350 pt, below its title) compared between the previously committed PDF and this one",
+      "method": "the only drawing that neither moved nor was restyled this change is panel d's polar - its centre, radius and marks are untouched, while b, e and f move by design (b's axes widened and relabelled, its and e's titles brought onto their letters' baselines, f's axes centred on the c pair); the text spans and drawing primitives of d's region (x 540-900, y 55-350 pt, below its title) compared between the previously committed PDF and this one",
       "text_spans": "4 of 4 identical to 0.007 pt",
       "drawing_primitives": "13 of 13 identical to 0.000 pt (the full-page axes rectangle is excluded - it is not panel d's drawing and it changes with the page height)"
     },
     "mean_abs_pixel_difference_against_reference_pdf": {
       "panel_a": 7.2,
-      "panel_b": 14.1,
+      "panel_b": 15.1,
       "panel_d": 16.8,
-      "panel_e": 17.1,
+      "panel_e": 18.0,
       "regions": "300 dpi, (pt, top-left origin): panel a: x 83.0-368.0, y 67.6-348; panel b: 28-448, 360-545; panel d: 595-900, 5-350; panel e: 455-880, 360-545.  d's crop compares the polar at its shifted position (the reference crop is taken 110.1 pt to the left); a's compares the reference artwork crop resized to the page's 0.85 panel scale, so neither number measures the centring or scaling move - a's does include the resampling of the photo detail those two crops need.",
-      "note": "the previous build measured 7.4/14.1/16.8/16.4.  The page height changed (844 pt) so every crop's raster phase moved, which is most of what separates 7.2/14.1/16.8/17.1 from it (e's shift is the rotated 'Uniform' label moving clear of its dashed line).  Going further back, a's 22.8 in the build before the matplotlib pin fell to 7 because the drawing itself improved: the build environment had drifted to matplotlib 3.10, whose photo resampling drew a dark halo on every sprite edge; back on the provenance version (3.11.2) the layer rasterises as it did when the reference page was built.  The four remain above the 5.6/12.7/15.1/12.3 of the build before the layout changes, for reasons of layout, not drawing: a's because resizing the reference crop resamples the photo detail on one side of the comparison; b's and e's because the re-widthed axes move every tick, label and mark relative to the reference page (which draws its axes at the measured widths); and d's because its title runs to two lines.  Panels c and f are new and have no reference panel.",
+      "note": "the previous build measured 7.4/14.1/16.8/16.4.  The page height changed (844 pt) so every crop's raster phase moved, and since then b and e have moved again for legibility (their titles onto their letters' baselines, b's ticks spread to 100-unit pitch, f's axes centred on the c pair), which separates 7.2/15.1/16.8/18.0 from that: b's and e's crops include those titles and ticks, and where this page places them deliberately (aligned to its own letter grid), they differ further from the reference's.  Going further back, a's 22.8 in the build before the matplotlib pin fell to 7 because the drawing itself improved: the build environment had drifted to matplotlib 3.10, whose photo resampling drew a dark halo on every sprite edge; back on the provenance version (3.11.2) the layer rasterises as it did when the reference page was built.  The four remain above the 5.6/12.7/15.1/12.3 of the build before the layout changes, for reasons of layout, not drawing: a's because resizing the reference crop resamples the photo detail on one side of the comparison; b's and e's because the re-widthed axes move every tick, label and mark relative to the reference page (which draws its axes at the measured widths); and d's because its title runs to two lines.  Panels c and f are new and have no reference panel.",
       "method": "300 dpi, with the best shift within +/-4 px taken up."
     }
   },
   "outputs_sha256": {
-    ".pdf": "f77af558d2936b8ff970a1a421081dc686a6afb2f8fe7a6316545983c304ece9",
-    ".png": "5a8aa55dfc3ca9d77e0ddb5411534bdaf9c769e33c9a5ebcf8cfd2b02f4028aa",
-    ".svg": "e14989f28d47f26ad2b2778ddb7703665c803a83947f696149b0f724d4052291"
+    ".pdf": "32fe18f82d24c3d1ec1c131b8cf9844fb9323aa2450f04487163607a2fffeded",
+    ".png": "1ebe50cf820bbf96198c7a252fccebfbc1db3e874689c353d3ca4dc25c47ddc4",
+    ".svg": "501616ac258bf91f5e355a1366667ccd53d8eb3f36df70ba70577a71076f8a71"
   }
 }
