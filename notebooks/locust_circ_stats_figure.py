@@ -147,7 +147,12 @@ CAPTION = (
 #: narrowest it can be without the swarm's dense vectorial-encoding stack
 #: gaining a row (the packing is done in points, so a narrower axes means
 #: fewer dots per row); b needs 260 to spread its ELPD tick labels, which
-#: crowd at the previous 226 (a 17 pt label is 46 pt wide).
+#: crowd at the previous 226 (a 17 pt label is 46 pt wide).  b keeps the
+#: reference page's measured axes centre (285): centring it on the page's
+#: title axis (LEFT_TITLE_X, 262.5, below) would drag its widest row label,
+#: "(Vec. encoding)", to 6 pt off the page edge - tighter than the
+#: reference page itself (about 20) - so its title aligns with the column's
+#: titles while its axes sit where the reference put them.
 PANEL_B = (155.0, 401.8, 260.0, 98.0)   # axes rectangle (x, y_top, w, h)
 PANEL_D = (595.2, 401.8, 260.0, 97.9)
 #: centre x of the right-hand column's plots (panels d's polar, e's axes and
@@ -161,13 +166,12 @@ POLAR_R_OUT = 118.7                                     # outer grid circle radi
 
 #: The reference page centred panel a's artwork on its left-hand text
 #: annotation, which reads left of the panels below it.  Here it centres on
-#: its title: titles sit at x = 249 (the content centre of b, 64.6-431, and
-#: of the c pair's tick labels, 35.7-462.8), and the artwork's measured ink
-#: centroid - photo edges, vector paths and labels, from the rendered page -
-#: sits at 272.5 when drawn at DX = 40, i.e. 23.5 pt right of that centre,
-#: so it draws shifted 16.5 pt right and its ink lands on the title.  (The
-#: artwork's bounding box, not the ink, spans x = 41.4-376.6, centre 209;
-#: centring the box would leave the visible content off the title.)
+#: its own title's predecessor: the artwork's measured ink centroid - photo
+#: edges, vector paths and labels, from the rendered page - sits at 272.5
+#: when drawn at DX = 40, i.e. 23.5 pt right of 249, so it draws shifted
+#: 16.5 pt right.  (The page's titles centre on LEFT_TITLE_X, below; the
+#: artwork stays where it reads best, it does not chase the titles.)  The
+#: artwork's bounding box, not the ink, spans x = 41.4-376.6, centre 209.
 PANEL_A_DX = 16.5
 #: Panel a also draws 0.85 of its reference size, scaled about the centre of
 #: the measured content (x = 209, before the shift) and its bottom edge
@@ -263,13 +267,14 @@ POLAR_PAIR_DATA_KEY = (262.5, ROW_3_TOP + 253.5)
 #: title keeps that 21.465 offset from its row top, which is what puts it on
 #: its letter's baseline (the letter's own 13.74 cap sits ~3 pt lower, as on
 #: the reference page); the left column's titles centre on the shared
-#: LEFT_TITLE_X, so a's and b's stack directly over one another.
-LEFT_TITLE_X = PANEL_A_CX + PANEL_A_DX        # 249: the artwork's ink centre
+#: LEFT_TITLE_X - the c pair's centre, so the three left-column titles
+#: stack in one line.  The plots under them keep their own centres (the
+#: artwork's ink, b's measured axes centre): only the titles align.
+LEFT_TITLE_X = 0.5 * (POLAR_PAIR_CENTRES[0][0] + POLAR_PAIR_CENTRES[1][0])  # 262.5
 PANEL_TITLES = (
     ("Experimental design", LEFT_TITLE_X, 21.465),
     ("Model selection", LEFT_TITLE_X, ROW_2_TOP + 21.465),
-    ("Predictive check", 0.5 * (POLAR_PAIR_CENTRES[0][0] + POLAR_PAIR_CENTRES[1][0]),
-     ROW_3_TOP + 21.465),
+    ("Predictive check", LEFT_TITLE_X, ROW_3_TOP + 21.465),
     # d's title is the one long name of the six; kept at the page's type size
     # it would run past the right page edge, so it goes on two lines and
     # starts at the top of its panel letter (12.639) instead of the title
@@ -1329,11 +1334,10 @@ def provenance(plotted):
             "panel_d_against_the_previous_build": {
                 "method": "the only drawing that neither moved nor was restyled "
                           "this change is panel d's polar - its centre, radius "
-                          "and marks are untouched, while b, e and f move by "
-                          "design (b's axes widened and relabelled, its and e's "
-                          "titles brought onto their letters' baselines, f's "
-                          "axes centred on the c pair); the text spans and "
-                          "drawing primitives of d's region (x 540-900, y 55-350 "
+                          "and marks are untouched, while the left column's "
+                          "three titles move by design (brought onto one axis, "
+                          "the c pair's centre); the text spans and drawing "
+                          "primitives of d's region (x 540-900, y 55-350 "
                           "pt, below its title) compared between the previously "
                           "committed PDF and this one",
                 "text_spans": "4 of 4 identical to 0.007 pt",
@@ -1358,7 +1362,8 @@ def provenance(plotted):
                         "phase moved, and since then b and e have moved again "
                         "for legibility (their titles onto their letters' "
                         "baselines, b's ticks spread to 100-unit pitch, f's "
-                        "axes centred on the c pair), which separates "
+                        "axes centred on the c pair, and the left column's "
+                        "titles brought onto one axis), which separates "
                         "7.2/15.1/16.8/18.0 from that: b's and e's crops "
                         "include those titles and ticks, and where this page "
                         "places them deliberately (aligned to its own letter "
