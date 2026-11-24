@@ -40,7 +40,7 @@ MAP_FACE = "#f5f6f5"
 HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
-PAGE_W, PAGE_H = 532, 907
+PAGE_W, PAGE_H = 532, 898
 #: Tile zoom for the live CartoDB raster fallback (used only when the
 #: vector extract below is absent): pinned rather than left to
 #: contextily's auto-zoom, which matches screen-pixel sizes and on a
@@ -215,26 +215,29 @@ def _draw_treatment_icons(ax, drawings, row_ys, colors, *, active_alpha=.54):
             patch.set_alpha(.30 if muted else 1)
 
 
-def draw_polar_density(ax, bearings, profile, color, radius_max):
+def draw_polar_density(ax, bearings, profile, color, radius_max, half_width_deg):
     """Draw the full mixture around a common zero-density reference ring."""
     zero_radius = 1.0
     ax.set_theta_zero_location('N')
     ax.set_theta_direction(-1)
     ax.set(ylim=(0, radius_max), xticks=[], yticks=[])
     ax.spines['polar'].set_visible(False)
+    sector = np.abs(bearings) <= np.deg2rad(half_width_deg)
+    ax.fill_between(bearings, 0, zero_radius + profile['mean'], where=sector,
+                    color=color, alpha=.12, linewidth=0)
     ax.plot(bearings, np.full_like(bearings, zero_radius), color='#aaaaaa', lw=.55)
     ax.plot([0, 0], [zero_radius, radius_max], color='#9a9a9a', lw=.6)
     ax.fill_between(bearings, zero_radius + profile['lo'], zero_radius + profile['hi'],
                     color=color, alpha=.26, linewidth=0)
     ax.plot(bearings, zero_radius + profile['mean'], color=color, lw=1.05)
-    ax.plot(0, zero_radius + profile['mean'][bearings.size // 2], 'o', color=color, ms=2.8)
 
 
 def draw_predictive_panel(data, colors, axes_at, page_text):
-    """Compare treatments at the goal, then show each bat against a uniform heading."""
+    """Compare goal-sector probabilities between groups and within each bat’s assigned group."""
     levels = data["levels"]
     bearings = data["density_bearings"]
     profiles = data["density_profiles"]
+    half_width = data["goal_window_half_width_degrees"]
     left, width = 120, 396
     column_width = width / len(levels)
     radius_max = 1 + 1.08 * max(p["hi"].max() for p in profiles.values())
@@ -243,40 +246,37 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
         page_text(center, 269, label, ha="center", color=colors[level], fontsize=10, weight="bold")
         polar_size = 74
         polar = axes_at(center - polar_size / 2, 281, polar_size, polar_size, projection="polar")
-        draw_polar_density(polar, bearings, profiles[level], colors[level], radius_max)
+        draw_polar_density(polar, bearings, profiles[level], colors[level], radius_max, half_width)
         center_zero_digit(page_text(center, 279, "0°", ha="center", fontsize=8.2))
 
     page_text(18, 300, "Population fit", fontsize=10, weight="bold")
     page_text(18, 317, "Full-mixture\nheading density", fontsize=9)
     page_text(18, 362, "Group contrast", fontsize=10, weight="bold")
-    page_text(18, 382, "Density at 0°\ntreatment − control\n(per radian)", fontsize=9)
-    contrast = axes_at(left, 355, width, 49)
+    page_text(18, 386, f"Probability within\n±{half_width:g}° of the goal\ntreatment − control", fontsize=9)
+    contrast = axes_at(left, 355, width, 61)
     contrast.axhline(0, color="#777777", lw=.8, ls=(0, (3, 2)), zorder=0)
     contrast.plot(0, 0, "o", color=colors[levels[0]], ms=3.7)
     for i, level in enumerate(levels[1:], start=1):
-        mean, lo, hi = data["full_contrasts"][level]
+        mean, lo, hi = data["goal_window_contrasts"][level]
         contrast.errorbar(i, mean, yerr=[[mean - lo], [hi - mean]], fmt="o", color=colors[level],
                           ms=4, elinewidth=1.05, capsize=2.3, capthick=1)
-    contrast.set(xlim=(-.5, len(levels) - .5), ylim=(-.345, .038), xticks=[], yticks=(-.3, -.2, -.1, 0))
+    contrast.set(xlim=(-.5, len(levels) - .5), ylim=(-.23, .036), xticks=[], yticks=(-.2, -.1, 0))
     contrast.spines[["top", "right", "bottom"]].set_visible(False)
     contrast.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     contrast.tick_params(axis="y", labelsize=8.3, length=2.5, pad=3)
 
     # Rank bats only within their observed treatment. Horizontal position encodes
-    # rank, while the vertical axis has the same density units for every bat.
-    individual = axes_at(left, 418, width, 64)
-    rows = data["density_at_zero_by_bat"]
-    uniform = 1 / (2 * np.pi)
-    ceiling = np.ceil(max(r["hi"] for r in rows) * 4) / 4
-    individual.set(xlim=contrast.get_xlim(), ylim=(0, ceiling), xticks=[], yticks=(0, .5, 1))
+    # rank, while the vertical axis is the fitted probability for each bat.
+    individual = axes_at(left, 431, width, 63)
+    rows = data["goal_window_by_bat"]
+    uniform = 2 * half_width / 360
+    individual.set(xlim=contrast.get_xlim(), ylim=(0, 1), xticks=[], yticks=(0, .5, 1))
     individual.spines[["top", "right", "bottom"]].set_visible(False)
     individual.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     individual.tick_params(axis="y", labelsize=8.3, length=2.5, pad=3)
     individual.axhline(uniform, color="#494949", lw=.9, ls=(0, (3, 2)), zorder=1)
-    page_text(18, 430, "Individual bats", fontsize=10, weight="bold")
-    page_text(18, 445, "Density at 0°\n(per radian)", fontsize=9)
-    page_text(18, 472, "Uniform = 0.159", fontsize=8.6)
-    page_text(18, 498, "HDI above uniform", fontsize=8.7)
+    page_text(18, 449, "Individual bats", fontsize=10, weight="bold")
+    page_text(18, 468, f"Probability within\n±{half_width:g}° of the goal", fontsize=9)
     for i, level in enumerate(levels):
         bats = sorted((r for r in rows if r["treatment"] == level), key=lambda r: r["mean"])
         count = len(bats)
@@ -286,9 +286,6 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
                           color=colors[level], alpha=.78, lw=.78, zorder=2)
         individual.scatter(x, [r["mean"] for r in bats], color=colors[level], s=7.4,
                            edgecolors="none", zorder=3)
-        above = sum(r["lo"] > uniform for r in bats)
-        page_text(left + (i + .5) * column_width, 498, f"{above} of {count}",
-                  color=colors[level], ha="center", fontsize=9.1, weight="bold")
 
 
 def draw_likelihood_diagrams(ax_vm, ax_vmu):
@@ -641,11 +638,10 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
 
     letter(18, 254, "c")
     page_text(39, 254, "Goal-relative headings", weight="bold", fontsize=11)
-    page_text(516, 254, "Posterior means and 95% HDIs", ha="right", fontsize=9)
     draw_predictive_panel(data, colors, axes_at, page_text)
     bearings = data["density_bearings"]
 
-    flight_top = 521
+    flight_top = 512
     letter(18, flight_top, "d")
     page_text(39, flight_top, "Directedness along homing routes", weight="bold", fontsize=11)
     map_h = 160
@@ -778,7 +774,7 @@ def main(argv=None):
             }
             for row in ctx["delta_df"].itertuples()
         },
-        "density_at_zero_by_bat": data["density_at_zero_by_bat"],
+        "goal_window_by_bat": data["goal_window_by_bat"],
         "density_at_zero_by_treatment": data["density_at_zero_by_treatment"],
         "density_at_zero_treatment_contrasts": data["full_contrasts"],
         "goal_window_half_width_degrees": data["goal_window_half_width_degrees"],

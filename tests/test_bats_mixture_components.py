@@ -1,4 +1,4 @@
-"""Regression tests for population and individual full-mixture heading densities."""
+"""Regression tests for full-mixture heading densities and goal-sector probabilities."""
 import sys
 from pathlib import Path
 
@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-from scipy.integrate import trapezoid
+from scipy.integrate import quad, trapezoid
 from scipy.stats import vonmises
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "notebooks"))
@@ -53,6 +53,28 @@ def test_draw_weighted_component_densities_and_intervals(predictions):
                                    [difference.mean(), difference.min(), difference.max()], atol=1e-14)
 
 
+def sector_integral(mu, kappa, weight):
+    """Independent quadrature of both components over the specified ±45° sector."""
+    return quad(lambda x: weight * vonmises.pdf(x, kappa, loc=mu) + (1 - weight) / (2 * np.pi),
+                -np.pi / 4, np.pi / 4)[0]
+
+
+def test_population_sector_contrasts_are_paired_in_each_draw(predictions):
+    data, mu, kappa, omega = predictions
+    assert data["goal_window_half_width_degrees"] == 45
+    group_draws = []
+    for i, level in enumerate([1, 2, 3, 4]):
+        draws = np.array([sector_integral(m, k, w)
+                          for m, k, w in zip(mu[:, i], kappa[:, i], omega[:, i], strict=True)])
+        group_draws.append(draws)
+        np.testing.assert_allclose(data["goal_window_groups"][level],
+                                   [draws.mean(), draws.min(), draws.max()], atol=1e-14)
+    for level, draws in enumerate(group_draws[1:], start=2):
+        delta = draws - group_draws[0]
+        np.testing.assert_allclose(data["goal_window_contrasts"][level],
+                                   [delta.mean(), delta.min(), delta.max()], atol=1e-14)
+
+
 def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
     # A and B share a treatment but differ in their individual effects. Each is
     # observed a different number of times, and labels appear in non-model order.
@@ -71,17 +93,15 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
         "p_goal": (("chain", "draw", "p_goal_dim_0", "p_goal_dim_1"),
                    np.stack([directed_share, 1 - directed_share], axis=-1)[None]),
     })
-    rows = layout._density_at_zero_by_bat(posterior, observed, posthoc)
+    rows = layout._goal_window_by_bat(posterior, observed, posthoc)
     assert [row["tag"] for row in rows] == list(tags)
     assert [row["treatment"] for row in rows] == groups
     for i, row in enumerate(rows):
-        uniform = 1 / (2 * np.pi)
-        draws = weight[:, i] * vonmises.pdf(0, kappa[:, i], loc=mu[:, i]) + (1 - weight[:, i]) * uniform
+        draws = np.array([sector_integral(m, k, w)
+                          for m, k, w in zip(mu[:, i], kappa[:, i], weight[:, i], strict=True)])
         np.testing.assert_allclose([row["mean"], row["lo"], row["hi"]],
                                    [draws.mean(), draws.min(), draws.max()])
-        assert row["prob_above_uniform"] == np.mean(draws > uniform)
-    assert rows[0]["hi"] > 1  # density per radian can exceed 1
-    assert rows[2]["mean"] == pytest.approx(1 / (2 * np.pi))
+    assert rows[2]["mean"] == pytest.approx(0.25)
     observed.loc[7, "treatment"] = 4
     with pytest.raises(ValueError, match="more than one treatment"):
-        layout._density_at_zero_by_bat(posterior, observed, posthoc)
+        layout._goal_window_by_bat(posterior, observed, posthoc)
