@@ -42,7 +42,7 @@ MAP_FACE = "#f5f6f5"
 HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
-PAGE_W, PAGE_H = 532, 926
+PAGE_W, PAGE_H = 532, 850
 #: Tile zoom for the live CartoDB raster fallback (used only when the
 #: vector extract below is absent): pinned rather than left to
 #: contextily's auto-zoom, which matches screen-pixel sizes and on a
@@ -199,66 +199,22 @@ def draw_flight_colorbar(fig, cax):
     cb.ax.set_title('Posterior directedness', fontsize=9, pad=3)
 
 
-def _draw_treatment_icons(ax, row_centers, colors):
-    """Draw the four senses in each treatment row, fading the manipulated senses."""
-    # Centers and disk radius in source figure points, matching the original grid.
-    column_centers = (8.858, 28.272, 47.342, 66.656)
-    disk_radius = 8.88
-
-    def path(start, segments, *, fill="none", width=.9, tilt=0):
-        vertices = [start]
-        codes = [MplPath.MOVETO]
-        for segment in segments:
-            if len(segment) == 2:
-                vertices.append(segment)
-                codes.append(MplPath.LINETO)
-            else:
-                cx, cy, ex, ey = segment
-                vertices.extend(((cx, cy), (ex, ey)))
-                codes.extend((MplPath.CURVE3, MplPath.CURVE3))
-        patch = PathPatch(MplPath(vertices, codes), facecolor=fill, edgecolor=INK,
-                          linewidth=width, joinstyle="round", capstyle="round",
-                          transform=Affine2D().rotate_deg(tilt) + transform, alpha=alpha)
-        ax.add_patch(patch)
-
-    for row, (y, color) in enumerate(zip(row_centers, colors, strict=True)):
-        for column, x in enumerate(column_centers):
-            muted = column < row
-            alpha = .30 if muted else 1
-            ax.add_patch(Circle((x, y), disk_radius, facecolor=color, edgecolor="none",
-                                alpha=.15 if muted else .76, clip_on=False))
-            transform = Affine2D().translate(x, y) + ax.transData
-            if column == 0:
-                # Almond-shaped eye with a round pupil.
-                path((-6.7, 0), [(0, -7.6, 6.7, 0), (0, 7.6, -6.7, 0)], width=1.15)
-                ax.add_patch(Circle((x, y), 2.4, facecolor=INK, edgecolor="none", alpha=alpha))
-            elif column == 1:
-                # The two squared pole tips keep the horseshoe recognizable at print size.
-                path((-4.7, -5.3), [(-4.7, 1.2), (-4.7, 6, 0, 6),
-                     (4.7, 6, 4.7, 1.2), (4.7, -5.3), (1.9, -5.3), (1.9, 1.2),
-                     (1.9, 3.25, 0, 3.25), (-1.9, 3.25, -1.9, 1.2), (-1.9, -5.3),
-                     (-4.7, -5.3)], fill=INK, width=.75, tilt=23)
-                for left in (-4.7, 1.9):
-                    path((left, -5.3), [(left + 2.8, -5.3), (left + 2.8, -3.0), (left, -3.0),
-                         (left, -5.3)], fill="white", width=.75, tilt=23)
-            elif column == 2:
-                # Paired nostrils and nasal bridge.
-                path((-1.8, -5.7), [(-2.0, -2.4, -3.5, -.5), (-6.2, 1.5, -4.8, 3.6),
-                     (-4.0, 4.6, -2.6, 4.0)], width=1.05)
-                path((1.8, -5.7), [(2.0, -2.4, 3.5, -.5), (6.2, 1.5, 4.8, 3.6),
-                     (4.0, 4.6, 2.6, 4.0)], width=1.05)
-                path((-3.2, 2.5), [(-1.7, 1.8, -.9, 3.6), (0, 5.2, .9, 3.6),
-                     (1.7, 1.8, 3.2, 2.5)], width=.95)
-            else:
-                # Echo wavefronts arriving at the outer ear and its tragus.
-                path((-4.6, -3.0), [(-1.8, -.9, -2.8, 2.2)], width=1.0)
-                path((-6.7, -3.8), [(-3.3, -.8, -4.7, 3.3)], width=1.0)
-                path((-1.25, .25), [(-1.7, -3.3, 1.1, -5.0), (2.5, -5.8, 4.0, -6.1),
-                     (6.0, -3.7, 5.3, -.9), (5.1, 1.6, 3.35, 3.0),
-                     (2.35, 3.8, 2.05, 5.0), (1.55, 6.7, .15, 6.0),
-                     (-.9, 5.65, -.95, 4.6)], width=1.0)
-                path((3.55, -3.7), [(1.20, -3.6, .55, -1.5), (.05, -.05, 1.45, .15),
-                     (3.0, .3, 2.35, 1.85), (1.95, 2.6, 1.2, 2.95)], width=.95)
+def _draw_treatment_icons(ax, drawings, row_ys, colors, *, active_alpha=.54):
+    """Repeat the original control glyphs and fade the manipulated senses."""
+    # Control-row paths for vision, magnetoreception, olfaction and echolocation.
+    glyphs = [drawings[index] for index in (60, 65, 51, 56)]
+    faded_columns = ((), (0,), (0, 1), (0, 1, 2))
+    for row_y, color, faded in zip(row_ys, colors, faded_columns, strict=True):
+        transform = Affine2D().translate(0, row_ys[0] - row_y) + ax.transData
+        for column, glyph in enumerate(glyphs):
+            x0, _, x1, _ = glyph['rect']
+            center = ((x0 + x1) / 2, source.PAGE_H - row_y)
+            muted = column in faded
+            ax.add_patch(Circle(center, 12, facecolor=color, edgecolor='none',
+                                alpha=.15 if muted else active_alpha, clip_on=False, zorder=10))
+            patch = source.draw_drawing(ax, glyph, zorder=11)
+            patch.set_transform(transform)
+            patch.set_alpha(.30 if muted else 1)
 
 
 def draw_polar_density(ax, bearings, profile, color, radius_max, half_width_deg, *,
@@ -286,71 +242,70 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     profiles = data["density_profiles"]
     examples = data["individual_density_profiles"]
     half_width = data["goal_window_half_width_degrees"]
-    left, width = 126, 384
+    left, width = 148, 344
     column_width = width / len(levels)
     population_radius = 1 + 1.08 * max(p["hi"].max() for p in profiles.values())
     for i, (level, label) in enumerate(zip(levels, LABELS, strict=True)):
         center = left + (i + .5) * column_width
-        page_text(center, 286, label, ha="center", color=colors[level], fontsize=9.3, weight="bold")
-        polar = axes_at(center - 31, 296, 62, 62, projection="polar", facecolor="none")
+        page_text(center, 273, label, ha="center", color=colors[level], fontsize=8.5, weight="bold")
+        polar = axes_at(center - 22.5, 281, 45, 45, projection="polar", facecolor="none")
         draw_polar_density(polar, bearings, profiles[level], colors[level], population_radius,
-                           half_width, line_scale=.9)
+                           half_width, line_scale=.76)
 
-    page_text(18, 308, "Population fit", fontsize=9.3, weight="bold")
-    page_text(18, 327, "Full-mixture\nheading density", fontsize=8.6)
-    page_text(18, 361, "Group contrast", fontsize=9.3, weight="bold")
-    page_text(18, 385, f"Probability within\n±{half_width:g}° of the goal\ntreatment − control", fontsize=8.6)
-    contrast = axes_at(left, 355, width, 59)
-    contrast.axhline(0, color="#777777", lw=.45, ls=(0, (3, 2)), zorder=0)
-    contrast.plot(0, 0, "o", color=colors[levels[0]], ms=3.4)
+    page_text(18, 302, "Population heading density", fontsize=8.8, weight="bold")
+    page_text(18, 338, "Treatment contrast", fontsize=8.8, weight="bold")
+    page_text(18, 350, "Probability mass difference", fontsize=8.2)
+    contrast = axes_at(left, 324, width, 43)
+    contrast.axhline(0, color="#777777", lw=.40, ls=(0, (3, 2)), zorder=0)
+    contrast.plot(0, 0, "o", color=colors[levels[0]], ms=2.9)
     for i, level in enumerate(levels[1:], start=1):
         mean, lo, hi = data["goal_window_contrasts"][level]
         contrast.errorbar(i, mean, yerr=[[mean - lo], [hi - mean]], fmt="o", color=colors[level],
-                          ms=3.6, elinewidth=.95, capsize=2.1, capthick=.6)
+                          ms=3.1, elinewidth=.78, capsize=1.8, capthick=.48)
     contrast.set(xlim=(-.5, len(levels) - .5), ylim=(-.206, .008), xticks=[], yticks=(-.2, -.1, 0))
     contrast.spines[["top", "right", "bottom"]].set_visible(False)
     contrast.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
-    contrast.tick_params(axis="y", labelsize=8.3, length=2.5, pad=3)
+    contrast.tick_params(axis="y", labelsize=7.8, length=2.1, pad=2.6)
 
     # Rank bats only within their observed treatment. Horizontal position encodes
     # rank, while the vertical axis is the fitted probability for each bat.
-    individual = axes_at(left, 426, width, 51)
+    individual = axes_at(left, 379, width, 37)
     rows = data["goal_window_by_bat"]
     uniform = 2 * half_width / 360
     individual.set(xlim=contrast.get_xlim(), ylim=(0, 1), xticks=[], yticks=(0, .5, 1))
     individual.spines[["top", "right", "bottom"]].set_visible(False)
     individual.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
-    individual.tick_params(axis="y", labelsize=8.3, length=2.5, pad=3)
-    individual.axhline(uniform, color="#494949", lw=.8, ls=(0, (3, 2)), zorder=1)
-    page_text(18, 437, "Individual bats", fontsize=9.3, weight="bold")
-    page_text(18, 456, f"Probability within\n±{half_width:g}° of the goal", fontsize=8.6)
+    individual.tick_params(axis="y", labelsize=7.8, length=2.1, pad=2.6)
+    individual.axhline(uniform, color="#494949", lw=.65, ls=(0, (3, 2)), zorder=1)
+    page_text(18, 391, "Individual bats", fontsize=8.8, weight="bold")
+    page_text(18, 403, "Probability mass", fontsize=8.2)
     for i, level in enumerate(levels):
         bats = sorted((r for r in rows if r["treatment"] == level), key=lambda r: (r["mean"], r["tag"]))
         count = len(bats)
         step = min(.055, .83 / max(count - 1, 1))
         x = i + (np.arange(count) - (count - 1) / 2) * step
         individual.vlines(x, [r["lo"] for r in bats], [r["hi"] for r in bats],
-                          color=colors[level], alpha=.78, lw=.70, zorder=2)
-        individual.scatter(x, [r["mean"] for r in bats], color=colors[level], s=6.2,
+                          color=colors[level], alpha=.78, lw=.60, zorder=2)
+        individual.scatter(x, [r["mean"] for r in bats], color=colors[level], s=4.8,
                            edgecolors="none", zorder=3)
 
     # The thumbnails share a radial scale. A smaller zero-density ring leaves
     # room for the individual lobes at this print size. Their centers fall
     # under the low, middle and high ranks with a gutter between treatments.
-    page_text(18, 509, "Individual heading\ndensity", fontsize=9.3, weight="bold")
+    page_text(18, 443, "Individual heading density", fontsize=8.8, weight="bold")
     zero_radius = .60
     largest_band = max(p["hi"].max() for group in examples.values() for p in group.values())
     radius_max = zero_radius + 1.08 * largest_band
-    size = 2 * 13 * radius_max  # 13 print points per density unit in every thumbnail
+    size = 2 * 11 * radius_max  # 11 print points per density unit in every thumbnail
     for i, level in enumerate(levels):
         group = examples[level]
         offsets = np.linspace(-.30, .30, len(group))
         for offset, profile in zip(offsets, group.values(), strict=True):
             center = left + (i + .5 + offset) * column_width
-            polar = axes_at(center - size / 2, 514 - size / 2, size, size,
+            polar = axes_at(center - size / 2, 444.5 - size / 2, size, size,
                             projection="polar", facecolor="none")
             draw_polar_density(polar, bearings, profile, colors[level], radius_max, half_width,
-                               zero_radius=zero_radius, line_scale=.60)
+                               zero_radius=zero_radius, line_scale=.53)
 
 
 def draw_likelihood_diagrams(ax_vm, ax_vmu):
@@ -654,17 +609,19 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     letter(18, route_top - 9, "a")
     page_text(39, route_top - 9, "Homing experiment", weight="bold", fontsize=11)
     page_text(139, photo_top + 4, "Treatment groups", fontsize=10.7)
-    icon_top = photo_top + 14
-    # The original row centers and 0.74 artwork scale expressed in figure points.
-    row_centers = (8.747, 32.538, 56.344, 80.135)
-    icons = axes_at(139, icon_top, 75.4, 88.9)
-    icons.set(xlim=(0, 75.4), ylim=(88.9, 0), aspect="equal")
+    ix0, iy0, ix1, iy1 = 202.9, 114.76, 304.79, 234.88
+    icon_top, icon_scale = photo_top + 14, .74
+    icons = axes_at(139, icon_top, (ix1 - ix0) * icon_scale, (iy1 - iy0) * icon_scale)
+    icons.set(xlim=(ix0, ix1), ylim=(source.PAGE_H - iy1, source.PAGE_H - iy0))
     icons.axis("off")
-    _draw_treatment_icons(icons, row_centers, colors.values())
-    for level, label, y in zip(levels, LABELS, row_centers, strict=True):
+    icon_rows = (126.58, 158.73, 190.90, 223.05)
+    drawings = source.panel_b_drawings(source.load_artwork())
+    _draw_treatment_icons(icons, drawings, icon_rows, list(colors.values()), active_alpha=.76)
+    for level, label, y in zip(levels, LABELS, icon_rows, strict=True):
+        label_y = icon_top + (y - iy0) * icon_scale
         if label.startswith("+ "):
-            page_text(223, icon_top + y, "+", ha="right", color=colors[level], fontsize=9.2)
-        page_text(226, icon_top + y, label.removeprefix("+ "), color=colors[level], fontsize=9.2)
+            page_text(223, label_y, "+", ha="right", color=colors[level], fontsize=9.2)
+        page_text(226, label_y, label.removeprefix("+ "), color=colors[level], fontsize=9.2)
 
     route_w = route_h * map_ratio
     for center, level, label in zip((296, 358, 420, 482), levels, LABELS, strict=True):
@@ -704,7 +661,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     draw_predictive_panel(data, colors, axes_at, page_text)
     bearings = data["density_bearings"]
 
-    flight_top = 540
+    flight_top = 464
     letter(18, flight_top, "d")
     page_text(39, flight_top, "Directedness along homing routes", weight="bold", fontsize=11)
     map_h = 160
