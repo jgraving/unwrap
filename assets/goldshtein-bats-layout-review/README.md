@@ -25,10 +25,10 @@ Predictive performance is compared with a single von Mises model (vM) using
 stepwise PSIS–LOO expected log predictive density. Points show vMU minus vM
 overall and within each treatment. Whiskers show one standard error.
 
-**(c)** Polar curves show full-mixture heading densities by treatment. The
-shaded sector spans ±45° around the goal. Population contrasts give the
-treatment-minus-control difference in sector probability within each draw,
-with individual offsets set to zero. Each bat’s probability includes its own
+**(c)** Polar curves show full-mixture heading densities by treatment and for
+the controls with the lowest, median, and highest fitted probability in the
+shaded ±45° goal sector. Treatment-minus-control contrasts pair draws with
+individual offsets set to zero. Each bat’s probability includes its own
 offsets under its observed treatment. Curves and points show posterior means.
 Bands and bars show 90% highest-density intervals, pointwise for the curves.
 For uniform headings, the density is 1/(2π) per radian, so the π/2-radian

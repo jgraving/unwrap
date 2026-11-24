@@ -80,6 +80,17 @@ def test_population_sector_contrasts_are_paired_in_each_draw(predictions):
         np.testing.assert_allclose(data["goal_window_contrasts"][level], expected_summary(delta), atol=1e-14)
 
 
+def individual_posterior(tag_index, mu, kappa, weight):
+    state = np.repeat([0, 1], STATE_COUNTS)
+    directed_share = weight[state][:, tag_index]
+    return xr.Dataset({
+        "mu": (("chain", "draw", "mu_dim_0"), mu[state][:, tag_index][None]),
+        "kappa": (("chain", "draw", "kappa_dim_0"), kappa[state][:, tag_index][None]),
+        "p_goal": (("chain", "draw", "p_goal_dim_0", "p_goal_dim_1"),
+                   np.stack([directed_share, 1 - directed_share], axis=-1)[None]),
+    })
+
+
 def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
     # A and B share a treatment but differ in their individual effects. Each is
     # observed a different number of times, and labels appear in non-model order.
@@ -91,15 +102,11 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
     mu = np.array([[0.1, 1.4, 2.9], [-0.5, 0.1, -2.9]])
     kappa = np.array([[9., 2., 5.], [2., 9., 4.]])
     weight = np.array([[0.9, 0.2, 0.], [0.3, 0.8, 0.]])
-    state = np.repeat([0, 1], STATE_COUNTS)
-    directed_share = weight[state][:, tag_index]
-    posterior = xr.Dataset({
-        "mu": (("chain", "draw", "mu_dim_0"), mu[state][:, tag_index][None]),
-        "kappa": (("chain", "draw", "kappa_dim_0"), kappa[state][:, tag_index][None]),
-        "p_goal": (("chain", "draw", "p_goal_dim_0", "p_goal_dim_1"),
-                   np.stack([directed_share, 1 - directed_share], axis=-1)[None]),
-    })
-    rows = layout._goal_window_by_bat(posterior, observed, posthoc)
+    posterior = individual_posterior(tag_index, mu, kappa, weight)
+    bearings = np.deg2rad(np.arange(-180, 181))
+    predictions = layout._individual_predictions(posterior, observed, posthoc, bearings)
+    rows = predictions["goal_window_by_bat"]
+    assert set(predictions["individual_density_profiles"]) == {"a", "b"}
     assert [row["tag"] for row in rows] == list(tags)
     assert [row["treatment"] for row in rows] == groups
     for i, row in enumerate(rows):
@@ -109,4 +116,33 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
     assert rows[2]["mean"] == pytest.approx(0.25)
     observed.loc[7, "treatment"] = 4
     with pytest.raises(ValueError, match="more than one treatment"):
-        layout._goal_window_by_bat(posterior, observed, posthoc)
+        layout._individual_predictions(posterior, observed, posthoc, bearings)
+
+
+def test_exemplars_use_ranked_controls_and_each_bats_joint_posterior():
+    # Ties at the lowest and middle ranks exercise the tag tie-breaker. The
+    # more concentrated treated bat must never be selected for these curves.
+    tags = np.array(["uniform-b", "uniform-a", "mid-b", "mid-a", "high", "upper-mid", "treated"])
+    groups = np.array([1, 1, 1, 1, 1, 1, 4])
+    tag_index = np.array([4, 2, 1, 6, 0, 4, 3, 5, 3, 0, 5])
+    observed = pd.DataFrame({"tag": tags[tag_index], "treatment": groups[tag_index]})
+    mu = np.array([[0., 0., .22, .22, -.16, -.12, 0.],
+                   [0., 0., -.65, -.65, .95, .6, 0.]])
+    kappa = np.array([[3., 3., 2., 2., 9., 8., 15.],
+                      [3., 3., 7., 7., 3., 4., 15.]])
+    weight = np.array([[0., 0., .25, .25, .85, .65, 1.],
+                       [0., 0., .70, .70, .25, .35, 1.]])
+    posterior = individual_posterior(tag_index, mu, kappa, weight)
+    angle = np.deg2rad(np.arange(-180, 181))
+    predictions = layout._individual_predictions(posterior, observed, posthoc, angle)
+    curves = predictions["individual_density_profiles"]
+    assert list(curves) == ["uniform-a", "mid-a", "high"]
+    for tag, profile in curves.items():
+        i = np.flatnonzero(tags == tag)[0]
+        directed = vonmises.pdf(angle, kappa[:, i, None], loc=mu[:, i, None])
+        prob = weight[:, i, None]
+        mixture = prob * directed + (1 - prob) / (2 * np.pi)
+        np.testing.assert_allclose(profile["mean"], np.average(mixture, axis=0, weights=STATE_COUNTS))
+        np.testing.assert_allclose(profile["lo"], mixture[0])
+        np.testing.assert_allclose(profile["hi"], mixture[0])
+        assert trapezoid(profile["mean"], angle) == pytest.approx(1)

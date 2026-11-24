@@ -42,7 +42,7 @@ MAP_FACE = "#f5f6f5"
 HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
-PAGE_W, PAGE_H = 532, 898
+PAGE_W, PAGE_H = 532, 980
 #: Tile zoom for the live CartoDB raster fallback (used only when the
 #: vector extract below is absent): pinned rather than left to
 #: contextily's auto-zoom, which matches screen-pixel sizes and on a
@@ -228,7 +228,8 @@ def draw_polar_density(ax, bearings, profile, color, radius_max, half_width_deg)
     ax.fill_between(bearings, 0, zero_radius + profile['mean'], where=sector,
                     color=color, alpha=.12, linewidth=0)
     ax.plot(bearings, np.full_like(bearings, zero_radius), color='#aaaaaa', lw=.55)
-    ax.plot([0, 0], [zero_radius, radius_max], color='#9a9a9a', lw=.6)
+    upper_at_goal = profile['hi'][np.argmin(np.abs(bearings))]
+    ax.plot([0, 0], [zero_radius, zero_radius + 1.08 * upper_at_goal], color='#9a9a9a', lw=.6)
     ax.fill_between(bearings, zero_radius + profile['lo'], zero_radius + profile['hi'],
                     color=color, alpha=.26, linewidth=0)
     ax.plot(bearings, zero_radius + profile['mean'], color=color, lw=1.05)
@@ -239,16 +240,28 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     levels = data["levels"]
     bearings = data["density_bearings"]
     profiles = data["density_profiles"]
+    examples = data["individual_density_profiles"]
+    if len(examples) != 3:
+        raise ValueError("The bat composite requires three distinct control bats for the exemplar row")
     half_width = data["goal_window_half_width_degrees"]
     left, width = 120, 396
     column_width = width / len(levels)
-    radius_max = 1 + 1.08 * max(p["hi"].max() for p in profiles.values())
+    # Keep the population ring and its density units at their original print
+    # size while extending the polar limit to fit more concentrated individuals.
+    population_radius = 1 + 1.08 * max(p["hi"].max() for p in profiles.values())
+    radius_max = max(population_radius, 1 + 1.08 * max(p["hi"].max() for p in examples.values()))
+    polar_size = 74 * radius_max / population_radius
+
+    def polar_at(x, y, profile, color):
+        polar = axes_at(x - polar_size / 2, y - polar_size / 2, polar_size, polar_size,
+                        projection="polar", facecolor="none")
+        draw_polar_density(polar, bearings, profile, color, radius_max, half_width)
+        return polar
+
     for i, (level, label) in enumerate(zip(levels, LABELS, strict=True)):
         center = left + (i + .5) * column_width
         page_text(center, 269, label, ha="center", color=colors[level], fontsize=10, weight="bold")
-        polar_size = 74
-        polar = axes_at(center - polar_size / 2, 281, polar_size, polar_size, projection="polar")
-        draw_polar_density(polar, bearings, profiles[level], colors[level], radius_max, half_width)
+        polar_at(center, 318, profiles[level], colors[level])
         center_zero_digit(page_text(center, 279, "0°", ha="center", fontsize=8.2))
 
     page_text(18, 300, "Population fit", fontsize=10, weight="bold")
@@ -279,8 +292,10 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     individual.axhline(uniform, color="#494949", lw=.9, ls=(0, (3, 2)), zorder=1)
     page_text(18, 449, "Individual bats", fontsize=10, weight="bold")
     page_text(18, 468, f"Probability within\n±{half_width:g}° of the goal", fontsize=9)
+    markers = dict(zip(examples, ("^", "s", "D"), strict=True))
+    control_color = colors[levels[0]]
     for i, level in enumerate(levels):
-        bats = sorted((r for r in rows if r["treatment"] == level), key=lambda r: r["mean"])
+        bats = sorted((r for r in rows if r["treatment"] == level), key=lambda r: (r["mean"], r["tag"]))
         count = len(bats)
         step = min(.055, .83 / max(count - 1, 1))
         x = i + (np.arange(count) - (count - 1) / 2) * step
@@ -288,6 +303,22 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
                           color=colors[level], alpha=.78, lw=.78, zorder=2)
         individual.scatter(x, [r["mean"] for r in bats], color=colors[level], s=7.4,
                            edgecolors="none", zorder=3)
+        for pos, row in zip(x, bats, strict=True):
+            if row["tag"] in markers:
+                individual.plot(pos, row["mean"], marker=markers[row["tag"]], ms=4.6, mfc="none",
+                                mec=control_color, mew=1, zorder=4)
+
+    page_text(18, 536, "Control examples", fontsize=10, weight="bold")
+    page_text(18, 554, "Individual heading\ndensity", fontsize=9)
+    for i, (tag, profile) in enumerate(examples.items()):
+        center = left + (i + .5) * width / len(examples)
+        polar = polar_at(center, 556, profile, control_color)
+        handle = Line2D([], [], ls="none", marker=markers[tag], ms=4.6, mfc="white",
+                        mec=control_color, mew=1)
+        rank = ("Lowest", "Median", "Highest")[i]
+        polar.legend(handles=[handle], labels=[rank], frameon=False, loc="center", fontsize=8.7,
+                     bbox_to_anchor=(.5, .5 + 51 / polar_size), handlelength=.8, handletextpad=.4,
+                     borderpad=0, borderaxespad=0)
 
 
 def draw_likelihood_diagrams(ax_vm, ax_vmu):
@@ -643,7 +674,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     draw_predictive_panel(data, colors, axes_at, page_text)
     bearings = data["density_bearings"]
 
-    flight_top = 512
+    flight_top = 594
     letter(18, flight_top, "d")
     page_text(39, flight_top, "Directedness along homing routes", weight="bold", fontsize=11)
     map_h = 160
@@ -778,6 +809,7 @@ def main(argv=None):
         },
         "panel_c_hdi_probability": PANEL_C_HDI_PROB,
         "goal_window_by_bat": data["goal_window_by_bat"],
+        "individual_density_tags": list(data["individual_density_profiles"]),
         "density_at_zero_by_treatment": data["density_at_zero_by_treatment"],
         "density_at_zero_treatment_contrasts": data["full_contrasts"],
         "goal_window_half_width_degrees": data["goal_window_half_width_degrees"],

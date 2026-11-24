@@ -58,8 +58,19 @@ def _goal_window_probability(mu, kappa, weight, half_width_degrees):
     return np.clip(weight * directed_mass + (1 - weight) * tolerance / np.pi, 0, 1)
 
 
-def _goal_window_by_bat(posterior, observed, posthoc):
-    """Summarize full goal-sector probability, including each fitted bat's offsets."""
+def _mixture_density_draws(bearings, mu, kappa, weight, posthoc):
+    """Evaluate the full circular PDF for each joint posterior draw."""
+    directed = posthoc.vonmises_pdf_scalar(bearings, mu[:, None], kappa[:, None])
+    return weight[:, None] * directed + (1 - weight[:, None]) * (1 / (2 * np.pi))
+
+
+def _density_profile(density, posthoc):
+    lo, hi = posthoc.hdi_along_samples(density, prob=PANEL_C_HDI_PROB)
+    return {"mean": density.mean(axis=0), "lo": lo, "hi": hi}
+
+
+def _individual_predictions(posterior, observed, posthoc, bearings):
+    """Return each bat's sector probability and three control bats' full PDFs."""
     tags, first, inverse = np.unique(observed["tag"], return_index=True, return_inverse=True)
     treatments = observed["treatment"].to_numpy()
     if not np.array_equal(treatments, treatments[first][inverse]):
@@ -78,7 +89,16 @@ def _goal_window_by_bat(posterior, observed, posthoc):
         lo, hi = posthoc.hdi_1d(draws, prob=PANEL_C_HDI_PROB)
         rows.append({"tag": str(tag), "treatment": int(level), "mean": float(draws.mean()),
                      "lo": float(lo), "hi": float(hi)})
-    return rows
+    # Use the same within-treatment ordering as the dot plot. Holding
+    # treatment fixed makes these examples a comparison among individuals.
+    controls = sorted((i for i, row in enumerate(rows) if row["treatment"] == 1),
+                      key=lambda i: (rows[i]["mean"], rows[i]["tag"]))
+    profiles = {}
+    if controls:
+        for i in dict.fromkeys((controls[0], controls[(len(controls) - 1) // 2], controls[-1])):
+            density = _mixture_density_draws(bearings, mu[:, i], kappa[:, i], weight[:, i], posthoc)
+            profiles[rows[i]["tag"]] = _density_profile(density, posthoc)
+    return {"goal_window_by_bat": rows, "individual_density_profiles": profiles}
 
 
 def _mixture_predictions(posterior, levels, counts, posthoc):
@@ -93,12 +113,9 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     density_at_goal = np.empty_like(weight)
     density_profiles = {}
     for i, level in enumerate(levels):
-        directed = posthoc.vonmises_pdf_scalar(bearings, mu[:, i, None], kappa[:, i, None])
-        p = weight[:, i, None]
-        density = p * directed + (1 - p) * (1 / (2 * np.pi))
+        density = _mixture_density_draws(bearings, mu[:, i], kappa[:, i], weight[:, i], posthoc)
         density_at_goal[:, i] = density[:, goal_index]
-        lo, hi = posthoc.hdi_along_samples(density, prob=PANEL_C_HDI_PROB)
-        density_profiles[level] = {"mean": density.mean(axis=0), "lo": lo, "hi": hi}
+        density_profiles[level] = _density_profile(density, posthoc)
 
     half_width = posthoc.MASS_HALF_WIDTH_DEG
     mass = _goal_window_probability(mu, kappa, weight, half_width)
@@ -158,6 +175,8 @@ def assemble_layout_data(ctx, posthoc, plots, lake_path):
     transform = Transformer.from_crs(4326, core.METRIC_EPSG, always_xy=True)
     sites = [transform.transform(lon, lat) for lat, lon in plots.TRANS_POINTS]
     roost = transform.transform(core.ROOST_LON, core.ROOST_LAT)
+    posterior = ctx["idata_vmu"].posterior
+    population = _mixture_predictions(posterior, levels, counts, posthoc)
     return {
         "tracks": tracks[["tag", "treatment", "dest", *coordinates, "gap_before",
                           "step_bearing_deg", "bearing_to_dest_deg"]],
@@ -169,6 +188,6 @@ def assemble_layout_data(ctx, posthoc, plots, lake_path):
         "roost": roost,
         "counts": counts,
         "scores": scores,
-        "goal_window_by_bat": _goal_window_by_bat(ctx["idata_vmu"].posterior, observed, posthoc),
-        **_mixture_predictions(ctx["idata_vmu"].posterior, levels, counts, posthoc),
+        **population,
+        **_individual_predictions(posterior, observed, posthoc, population["density_bearings"]),
     }
