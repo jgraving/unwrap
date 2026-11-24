@@ -199,74 +199,66 @@ def draw_flight_colorbar(fig, cax):
     cb.ax.set_title('Posterior directedness', fontsize=9, pad=3)
 
 
-def _draw_treatment_icons(ax, row_centers):
-    """Show the eye cover on the bat itself and the two additional manipulations."""
-    move, line, curve = MplPath.MOVETO, MplPath.LINETO, MplPath.CURVE3
+def _draw_treatment_icons(ax, row_centers, colors):
+    """Draw the four senses in each treatment row, fading the manipulated senses."""
+    # Centers and disk radius in source figure points, matching the original grid.
+    column_centers = (8.858, 28.272, 47.342, 66.656)
+    disk_radius = 8.88
 
-    def glyph(x, y, start, segments, *, fill="none", stroke=INK, width=.95, tilt=0):
+    def path(start, segments, *, fill="none", width=.9, tilt=0):
         vertices = [start]
-        codes = [move]
+        codes = [MplPath.MOVETO]
         for segment in segments:
             if len(segment) == 2:
                 vertices.append(segment)
-                codes.append(line)
+                codes.append(MplPath.LINETO)
             else:
-                control_x, control_y, end_x, end_y = segment
-                vertices.extend(((control_x, control_y), (end_x, end_y)))
-                codes.extend((curve, curve))
-        ax.add_patch(PathPatch(MplPath(vertices, codes), facecolor=fill, edgecolor=stroke,
-                               linewidth=width, joinstyle="round", capstyle="round",
-                               transform=Affine2D().rotate_deg(tilt).translate(x, y) + ax.transData))
+                cx, cy, ex, ey = segment
+                vertices.extend(((cx, cy), (ex, ey)))
+                codes.extend((MplPath.CURVE3, MplPath.CURVE3))
+        patch = PathPatch(MplPath(vertices, codes), facecolor=fill, edgecolor=INK,
+                          linewidth=width, joinstyle="round", capstyle="round",
+                          transform=Affine2D().rotate_deg(tilt) + transform, alpha=alpha)
+        ax.add_patch(patch)
 
-    for row, y in enumerate(row_centers):
-        # Broad pinnae and a short muzzle keep the eye cover separate from the ears.
-        head_x = 13
-        glyph(head_x, y, (-6.4, -.6), [
-            (-12.7, -2.0, -11.7, -7.4), (-11.6, -10.6, -8.8, -9.3),
-            (-5.3, -8.2, -4.0, -4.3), (0, -5.8, 4.0, -4.3),
-            (5.3, -8.2, 8.8, -9.3), (11.6, -10.6, 11.7, -7.4),
-            (12.7, -2.0, 6.4, -.6), (7.6, 1.4, 6.8, 3.8),
-            (5.8, 5.9, 4.4, 5.9), (3.0, 8.0, 0, 8.0),
-            (-3.0, 8.0, -4.4, 5.9), (-5.8, 5.9, -6.8, 3.8),
-            (-7.6, 1.4, -6.4, -.6),
-        ], fill="#eff0ef")
-        for side in (-1, 1):
-            glyph(head_x, y, (side * 6.5, -1.9), [(side * 9.3, -2.8, side * 9.1, -6.2),
-                  (side * 7.0, -4.8, side * 6.5, -1.9)], fill="#565656", stroke="none")
-        if row == 0:
-            for side in (-1, 1):
-                ax.add_patch(Circle((head_x + side * 3.6, y + .45), 1.08, color=INK, lw=0))
-        else:
-            glyph(head_x, y, (-6.7, -1.25), [(0, -2.6, 6.7, -1.25), (6.2, 2.1),
-                  (4.4, 3.5, 2.4, 2.0), (0, .7, -2.4, 2.0), (-4.4, 3.5, -6.2, 2.1),
-                  (-6.7, -1.25)], fill=INK, width=.7)
-        glyph(head_x, y, (-2.8, 3.9), [(-3.2, 2.8, -1.0, 3.3), (0, 3.7, 1.0, 3.3),
-              (3.2, 2.8, 2.8, 3.9), (2.5, 5.9, 0, 5.9), (-2.5, 5.9, -2.8, 3.9)],
-              fill=INK, width=.65)
-        for side in (-1, 1):
-            ax.add_patch(Circle((head_x + side * 1.45, y + 4.2), .49, color="white", lw=0))
-
-        if row >= 2:
-            # White pole tips distinguish the magnet from a plain U.
-            x = 41
-            glyph(x, y, (-6.4, -6.5), [(-6.4, .8), (-6.4, 8.5, 0, 8.5),
-                  (6.4, 8.5, 6.4, .8), (6.4, -6.5), (2.4, -6.5), (2.4, .8),
-                  (2.4, 4.3, 0, 4.3), (-2.4, 4.3, -2.4, .8), (-2.4, -6.5),
-                  (-6.4, -6.5)], fill=INK, tilt=20)
-            for side in (-1, 1):
-                glyph(x, y, (side * 6.4, -6.5), [(side * 2.4, -6.5), (side * 2.4, -3.1),
-                      (side * 6.4, -3.1), (side * 6.4, -6.5)], fill="white", tilt=20)
-        if row == 3:
-            x = 64
-            # A struck-through snout denotes olfactory impairment.
-            glyph(x, y, (-7.0, -.85), [(-7.4, -5.7, 0, -4.7), (7.4, -5.7, 7.0, -.85),
-                  (6.4, 1.8, 3.9, 2.9), (1.7, 5.8, 0, 5.8), (-1.7, 5.8, -3.9, 2.9),
-                  (-6.4, 1.8, -7.0, -.85)], fill="#eff0ef")
-            for side in (-1, 1):
-                glyph(x, y, (side * 4.2, -.35), [(side * 2.8, -1.3, side * 2.1, .7)],
-                      width=1.25)
-            glyph(x, y, (-7.5, 7.7), [(7.5, -7.7)], stroke="white", width=3.4)
-            glyph(x, y, (-7.5, 7.7), [(7.5, -7.7)], width=1.45)
+    for row, (y, color) in enumerate(zip(row_centers, colors, strict=True)):
+        for column, x in enumerate(column_centers):
+            muted = column < row
+            alpha = .30 if muted else 1
+            ax.add_patch(Circle((x, y), disk_radius, facecolor=color, edgecolor="none",
+                                alpha=.15 if muted else .76, clip_on=False))
+            transform = Affine2D().translate(x, y) + ax.transData
+            if column == 0:
+                # Almond-shaped eye with a round pupil.
+                path((-6.7, 0), [(0, -7.6, 6.7, 0), (0, 7.6, -6.7, 0)], width=1.15)
+                ax.add_patch(Circle((x, y), 2.4, facecolor=INK, edgecolor="none", alpha=alpha))
+            elif column == 1:
+                # The two squared pole tips keep the horseshoe recognizable at print size.
+                path((-4.7, -5.3), [(-4.7, 1.2), (-4.7, 6, 0, 6),
+                     (4.7, 6, 4.7, 1.2), (4.7, -5.3), (1.9, -5.3), (1.9, 1.2),
+                     (1.9, 3.25, 0, 3.25), (-1.9, 3.25, -1.9, 1.2), (-1.9, -5.3),
+                     (-4.7, -5.3)], fill=INK, width=.75, tilt=23)
+                for left in (-4.7, 1.9):
+                    path((left, -5.3), [(left + 2.8, -5.3), (left + 2.8, -3.0), (left, -3.0),
+                         (left, -5.3)], fill="white", width=.75, tilt=23)
+            elif column == 2:
+                # Paired nostrils and nasal bridge.
+                path((-1.8, -5.7), [(-2.0, -2.4, -3.5, -.5), (-6.2, 1.5, -4.8, 3.6),
+                     (-4.0, 4.6, -2.6, 4.0)], width=1.05)
+                path((1.8, -5.7), [(2.0, -2.4, 3.5, -.5), (6.2, 1.5, 4.8, 3.6),
+                     (4.0, 4.6, 2.6, 4.0)], width=1.05)
+                path((-3.2, 2.5), [(-1.7, 1.8, -.9, 3.6), (0, 5.2, .9, 3.6),
+                     (1.7, 1.8, 3.2, 2.5)], width=.95)
+            else:
+                # Echo wavefronts arriving at the outer ear and its tragus.
+                path((-4.6, -3.0), [(-1.8, -.9, -2.8, 2.2)], width=1.0)
+                path((-6.7, -3.8), [(-3.3, -.8, -4.7, 3.3)], width=1.0)
+                path((-1.25, .25), [(-1.7, -3.3, 1.1, -5.0), (2.5, -5.8, 4.0, -6.1),
+                     (6.0, -3.7, 5.3, -.9), (5.1, 1.6, 3.35, 3.0),
+                     (2.35, 3.8, 2.05, 5.0), (1.55, 6.7, .15, 6.0),
+                     (-.9, 5.65, -.95, 4.6)], width=1.0)
+                path((3.55, -3.7), [(1.20, -3.6, .55, -1.5), (.05, -.05, 1.45, .15),
+                     (3.0, .3, 2.35, 1.85), (1.95, 2.6, 1.2, 2.95)], width=.95)
 
 
 def draw_polar_density(ax, bearings, profile, color, radius_max, half_width_deg, *,
@@ -661,13 +653,16 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     page_text(39, route_top - 9, "Homing experiment", weight="bold", fontsize=11)
     page_text(139, photo_top + 4, "Treatment groups", fontsize=10.7)
     icon_top = photo_top + 14
-    row_centers = (11, 34, 57, 80)
-    icons = axes_at(139, icon_top, 76, 90)
-    icons.set(xlim=(0, 76), ylim=(90, 0), aspect="equal")
+    # The original row centers and 0.74 artwork scale expressed in figure points.
+    row_centers = (8.747, 32.538, 56.344, 80.135)
+    icons = axes_at(139, icon_top, 75.4, 88.9)
+    icons.set(xlim=(0, 75.4), ylim=(88.9, 0), aspect="equal")
     icons.axis("off")
-    _draw_treatment_icons(icons, row_centers)
+    _draw_treatment_icons(icons, row_centers, colors.values())
     for level, label, y in zip(levels, LABELS, row_centers, strict=True):
-        page_text(218, icon_top + y, label, color=colors[level], fontsize=9.2)
+        if label.startswith("+ "):
+            page_text(223, icon_top + y, "+", ha="right", color=colors[level], fontsize=9.2)
+        page_text(226, icon_top + y, label.removeprefix("+ "), color=colors[level], fontsize=9.2)
 
     route_w = route_h * map_ratio
     for center, level, label in zip((296, 358, 420, 482), levels, LABELS, strict=True):
