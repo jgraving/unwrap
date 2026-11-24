@@ -25,12 +25,12 @@ Predictive performance is compared with a single von Mises model (vM) using
 stepwise PSIS–LOO expected log predictive density. Points show vMU minus vM
 overall and within each treatment. Whiskers show one standard error.
 
-**(c)** Polar curves show full-mixture heading densities. Within each treatment,
-the small curves follow the lowest, middle, and highest ranks in posterior mean
-probability within the shaded ±45° goal sector (7th of 14 for eye cover).
+**(c)** Polar curves show full-mixture densities with the goal at 0° (up).
+Sector probability is the fitted mass within ±45° of the goal (shaded). Small curves follow each group’s lowest, middle, and highest
+ranks in posterior mean sector probability (7th of 14 for eye cover).
 At similar sector probabilities, the lowest-ranked control peaks off goal and
-the lowest-ranked eye-covered bat has a broad peak near the goal. Treatment-minus-control contrasts pair draws with
-individual offsets set to zero. Each bat’s probability includes its own
+the lowest-ranked eye-covered bat has a broad peak near the goal.
+Treatment-minus-control contrasts pair draws with individual offsets set to zero. Each bat’s probability includes its own
 offsets under its observed treatment. Curves and points show posterior means.
 Bands and bars show 90% highest-density intervals, pointwise for the curves.
 For uniform headings, the density is 1/(2π) per radian, so the π/2-radian

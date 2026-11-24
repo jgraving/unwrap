@@ -42,7 +42,7 @@ MAP_FACE = "#f5f6f5"
 HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
-PAGE_W, PAGE_H = 532, 940
+PAGE_W, PAGE_H = 532, 890
 #: Tile zoom for the live CartoDB raster fallback (used only when the
 #: vector extract below is absent): pinned rather than left to
 #: contextily's auto-zoom, which matches screen-pixel sizes and on a
@@ -199,22 +199,74 @@ def draw_flight_colorbar(fig, cax):
     cb.ax.set_title('Posterior directedness', fontsize=9, pad=3)
 
 
-def _draw_treatment_icons(ax, drawings, row_ys, colors, *, active_alpha=.54):
-    """Repeat the original control glyphs and fade the manipulated senses."""
-    # Control-row paths for vision, magnetoreception, olfaction and echolocation.
-    glyphs = [drawings[index] for index in (60, 65, 51, 56)]
-    faded_columns = ((), (0,), (0, 1), (0, 1, 2))
-    for row_y, color, faded in zip(row_ys, colors, faded_columns, strict=True):
-        transform = Affine2D().translate(0, row_ys[0] - row_y) + ax.transData
-        for column, glyph in enumerate(glyphs):
-            x0, _, x1, _ = glyph['rect']
-            center = ((x0 + x1) / 2, source.PAGE_H - row_y)
-            muted = column in faded
-            ax.add_patch(Circle(center, 12, facecolor=color, edgecolor='none',
-                                alpha=.15 if muted else active_alpha, clip_on=False, zorder=10))
-            patch = source.draw_drawing(ax, glyph, zorder=11)
-            patch.set_transform(transform)
-            patch.set_alpha(.30 if muted else 1)
+def _draw_treatment_icons(ax, row_centers):
+    """Show the eye cover on the bat itself and the two additional manipulations."""
+    move, line, curve = MplPath.MOVETO, MplPath.LINETO, MplPath.CURVE3
+
+    def glyph(x, y, start, segments, *, fill="none", stroke=INK, width=.95, tilt=0):
+        vertices = [start]
+        codes = [move]
+        for segment in segments:
+            if len(segment) == 2:
+                vertices.append(segment)
+                codes.append(line)
+            else:
+                control_x, control_y, end_x, end_y = segment
+                vertices.extend(((control_x, control_y), (end_x, end_y)))
+                codes.extend((curve, curve))
+        ax.add_patch(PathPatch(MplPath(vertices, codes), facecolor=fill, edgecolor=stroke,
+                               linewidth=width, joinstyle="round", capstyle="round",
+                               transform=Affine2D().rotate_deg(tilt).translate(x, y) + ax.transData))
+
+    for row, y in enumerate(row_centers):
+        # Broad pinnae and a short muzzle keep the eye cover separate from the ears.
+        head_x = 13
+        glyph(head_x, y, (-6.4, -.6), [
+            (-12.7, -2.0, -11.7, -7.4), (-11.6, -10.6, -8.8, -9.3),
+            (-5.3, -8.2, -4.0, -4.3), (0, -5.8, 4.0, -4.3),
+            (5.3, -8.2, 8.8, -9.3), (11.6, -10.6, 11.7, -7.4),
+            (12.7, -2.0, 6.4, -.6), (7.6, 1.4, 6.8, 3.8),
+            (5.8, 5.9, 4.4, 5.9), (3.0, 8.0, 0, 8.0),
+            (-3.0, 8.0, -4.4, 5.9), (-5.8, 5.9, -6.8, 3.8),
+            (-7.6, 1.4, -6.4, -.6),
+        ], fill="#eff0ef")
+        for side in (-1, 1):
+            glyph(head_x, y, (side * 6.5, -1.9), [(side * 9.3, -2.8, side * 9.1, -6.2),
+                  (side * 7.0, -4.8, side * 6.5, -1.9)], fill="#565656", stroke="none")
+        if row == 0:
+            for side in (-1, 1):
+                ax.add_patch(Circle((head_x + side * 3.6, y + .45), 1.08, color=INK, lw=0))
+        else:
+            glyph(head_x, y, (-6.7, -1.25), [(0, -2.6, 6.7, -1.25), (6.2, 2.1),
+                  (4.4, 3.5, 2.4, 2.0), (0, .7, -2.4, 2.0), (-4.4, 3.5, -6.2, 2.1),
+                  (-6.7, -1.25)], fill=INK, width=.7)
+        glyph(head_x, y, (-2.8, 3.9), [(-3.2, 2.8, -1.0, 3.3), (0, 3.7, 1.0, 3.3),
+              (3.2, 2.8, 2.8, 3.9), (2.5, 5.9, 0, 5.9), (-2.5, 5.9, -2.8, 3.9)],
+              fill=INK, width=.65)
+        for side in (-1, 1):
+            ax.add_patch(Circle((head_x + side * 1.45, y + 4.2), .49, color="white", lw=0))
+
+        if row >= 2:
+            # White pole tips distinguish the magnet from a plain U.
+            x = 41
+            glyph(x, y, (-6.4, -6.5), [(-6.4, .8), (-6.4, 8.5, 0, 8.5),
+                  (6.4, 8.5, 6.4, .8), (6.4, -6.5), (2.4, -6.5), (2.4, .8),
+                  (2.4, 4.3, 0, 4.3), (-2.4, 4.3, -2.4, .8), (-2.4, -6.5),
+                  (-6.4, -6.5)], fill=INK, tilt=20)
+            for side in (-1, 1):
+                glyph(x, y, (side * 6.4, -6.5), [(side * 2.4, -6.5), (side * 2.4, -3.1),
+                      (side * 6.4, -3.1), (side * 6.4, -6.5)], fill="white", tilt=20)
+        if row == 3:
+            x = 64
+            # A struck-through snout denotes olfactory impairment.
+            glyph(x, y, (-7.0, -.85), [(-7.4, -5.7, 0, -4.7), (7.4, -5.7, 7.0, -.85),
+                  (6.4, 1.8, 3.9, 2.9), (1.7, 5.8, 0, 5.8), (-1.7, 5.8, -3.9, 2.9),
+                  (-6.4, 1.8, -7.0, -.85)], fill="#eff0ef")
+            for side in (-1, 1):
+                glyph(x, y, (side * 4.2, -.35), [(side * 2.8, -1.3, side * 2.1, .7)],
+                      width=1.25)
+            glyph(x, y, (-7.5, 7.7), [(7.5, -7.7)], stroke="white", width=3.4)
+            glyph(x, y, (-7.5, 7.7), [(7.5, -7.7)], width=1.45)
 
 
 def draw_polar_density(ax, bearings, profile, color, radius_max, half_width_deg, *,
@@ -247,30 +299,28 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     population_radius = 1 + 1.08 * max(p["hi"].max() for p in profiles.values())
     for i, (level, label) in enumerate(zip(levels, LABELS, strict=True)):
         center = left + (i + .5) * column_width
-        page_text(center, 269, label, ha="center", color=colors[level], fontsize=10, weight="bold")
-        polar = axes_at(center - 37, 281, 74, 74, projection="polar", facecolor="none")
+        page_text(center, 283, label, ha="center", color=colors[level], fontsize=10, weight="bold")
+        polar = axes_at(center - 32, 292, 64, 64, projection="polar", facecolor="none")
         draw_polar_density(polar, bearings, profiles[level], colors[level], population_radius, half_width)
-        center_zero_digit(page_text(center, 279, "0°", ha="center", fontsize=8.2))
 
-    page_text(18, 300, "Population fit", fontsize=10, weight="bold")
-    page_text(18, 317, "Full-mixture\nheading density", fontsize=9)
-    page_text(18, 362, "Group contrast", fontsize=10, weight="bold")
-    page_text(18, 386, f"Probability within\n±{half_width:g}° of the goal\ntreatment − control", fontsize=9)
-    contrast = axes_at(left, 352, width, 68)
+    page_text(18, 322, "Population density", fontsize=9.5, weight="bold")
+    page_text(18, 363, "Treatment − control", fontsize=9.5, weight="bold")
+    page_text(18, 376, "Sector probability", fontsize=9)
+    contrast = axes_at(left, 344, width, 54)
     contrast.axhline(0, color="#777777", lw=.45, ls=(0, (3, 2)), zorder=0)
     contrast.plot(0, 0, "o", color=colors[levels[0]], ms=3.7)
     for i, level in enumerate(levels[1:], start=1):
         mean, lo, hi = data["goal_window_contrasts"][level]
         contrast.errorbar(i, mean, yerr=[[mean - lo], [hi - mean]], fmt="o", color=colors[level],
                           ms=4, elinewidth=1.05, capsize=2.3, capthick=.65)
-    contrast.set(xlim=(-.5, len(levels) - .5), ylim=(-.23, .036), xticks=[], yticks=(-.2, -.1, 0))
+    contrast.set(xlim=(-.5, len(levels) - .5), ylim=(-.206, .008), xticks=[], yticks=(-.2, -.1, 0))
     contrast.spines[["top", "right", "bottom"]].set_visible(False)
     contrast.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     contrast.tick_params(axis="y", labelsize=8.3, length=2.5, pad=3)
 
     # Rank bats only within their observed treatment. Horizontal position encodes
     # rank, while the vertical axis is the fitted probability for each bat.
-    individual = axes_at(left, 431, width, 63)
+    individual = axes_at(left, 408, width, 44)
     rows = data["goal_window_by_bat"]
     uniform = 2 * half_width / 360
     individual.set(xlim=contrast.get_xlim(), ylim=(0, 1), xticks=[], yticks=(0, .5, 1))
@@ -278,8 +328,8 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     individual.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     individual.tick_params(axis="y", labelsize=8.3, length=2.5, pad=3)
     individual.axhline(uniform, color="#494949", lw=.9, ls=(0, (3, 2)), zorder=1)
-    page_text(18, 449, "Individual bats", fontsize=10, weight="bold")
-    page_text(18, 468, f"Probability within\n±{half_width:g}° of the goal", fontsize=9)
+    page_text(18, 421, "Individual bats", fontsize=9.5, weight="bold")
+    page_text(18, 434, "Sector probability", fontsize=9)
     for i, level in enumerate(levels):
         bats = sorted((r for r in rows if r["treatment"] == level), key=lambda r: (r["mean"], r["tag"]))
         count = len(bats)
@@ -293,7 +343,7 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     # The thumbnails share a radial scale. A smaller zero-density ring leaves
     # room for the individual lobes at this print size. Their centers fall
     # under the low, middle and high ranks with a gutter between treatments.
-    page_text(18, 522, "Individual heading\ndensity", fontsize=9.5, weight="bold")
+    page_text(18, 472, "Individual density", fontsize=9.5, weight="bold")
     zero_radius = .60
     largest_band = max(p["hi"].max() for group in examples.values() for p in group.values())
     radius_max = zero_radius + 1.08 * largest_band
@@ -303,7 +353,7 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
         offsets = np.linspace(-.30, .30, len(group))
         for offset, profile in zip(offsets, group.values(), strict=True):
             center = left + (i + .5 + offset) * column_width
-            polar = axes_at(center - size / 2, 528 - size / 2, size, size,
+            polar = axes_at(center - size / 2, 477 - size / 2, size, size,
                             projection="polar", facecolor="none")
             draw_polar_density(polar, bearings, profile, colors[level], radius_max, half_width,
                                zero_radius=zero_radius, line_scale=2 / 3)
@@ -610,19 +660,14 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     letter(18, route_top - 9, "a")
     page_text(39, route_top - 9, "Homing experiment", weight="bold", fontsize=11)
     page_text(139, photo_top + 4, "Treatment groups", fontsize=10.7)
-    ix0, iy0, ix1, iy1 = 202.9, 114.76, 304.79, 234.88
-    icon_top, icon_scale = photo_top + 14, .74
-    icons = axes_at(139, icon_top, (ix1 - ix0) * icon_scale, (iy1 - iy0) * icon_scale)
-    icons.set(xlim=(ix0, ix1), ylim=(source.PAGE_H - iy1, source.PAGE_H - iy0))
+    icon_top = photo_top + 14
+    row_centers = (11, 34, 57, 80)
+    icons = axes_at(139, icon_top, 76, 90)
+    icons.set(xlim=(0, 76), ylim=(90, 0), aspect="equal")
     icons.axis("off")
-    icon_rows = (126.58, 158.73, 190.90, 223.05)
-    drawings = source.panel_b_drawings(source.load_artwork())
-    _draw_treatment_icons(icons, drawings, icon_rows, list(colors.values()), active_alpha=.76)
-    for level, label, y in zip(levels, LABELS, icon_rows, strict=True):
-        label_y = icon_top + (y - iy0) * icon_scale
-        if label.startswith("+ "):
-            page_text(223, label_y, "+", ha="right", color=colors[level], fontsize=9.2)
-        page_text(226, label_y, label.removeprefix("+ "), color=colors[level], fontsize=9.2)
+    _draw_treatment_icons(icons, row_centers)
+    for level, label, y in zip(levels, LABELS, row_centers, strict=True):
+        page_text(218, icon_top + y, label, color=colors[level], fontsize=9.2)
 
     route_w = route_h * map_ratio
     for center, level, label in zip((296, 358, 420, 482), levels, LABELS, strict=True):
@@ -639,30 +684,30 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                bbox_to_anchor=(389 / PAGE_W, 1 - 150 / PAGE_H), fontsize=8,
                handlelength=1.45, handletextpad=.45, columnspacing=1.25, markerscale=.85)
 
-    body_top = 167
+    body_top = 170
     letter(18, body_top, "b")
     page_text(39, body_top, "Model selection", weight="bold", fontsize=11)
     vm_center, vmu_center = 48, 134
-    model_top, model_size = 192, 35
-    page_text(vm_center, 185, "von Mises (vM)", fontsize=8.7, ha="center")
-    page_text(vmu_center, 185, "vM–Uniform mixture", fontsize=8.7, ha="center")
+    model_top, model_size = 197, 35
+    page_text(vm_center, 190, "von Mises (vM)", fontsize=8.7, ha="center")
+    page_text(vmu_center, 190, "vM–Uniform mixture", fontsize=8.7, ha="center")
     draw_likelihood_diagrams(
         axes_at(vm_center - model_size / 2, model_top, model_size, model_size, projection="polar"),
         axes_at(vmu_center - model_size / 2, model_top, model_size, model_size, projection="polar"),
     )
     fig.legend(handles=[Patch(facecolor=DIRECTED_FILL, label="Directed"),
                         Patch(facecolor=UNDIRECTED_FILL, label="Undirected")],
-               frameon=False, loc="center left", bbox_to_anchor=(177 / PAGE_W, 1 - 207 / PAGE_H),
+               frameon=False, loc="center left", bbox_to_anchor=(177 / PAGE_W, 1 - 214 / PAGE_H),
                fontsize=8.6, handlelength=1.3, handletextpad=.45, borderaxespad=0)
-    delta_ax = axes_at(320, 164, 193, 53)
+    delta_ax = axes_at(320, 187, 193, 49)
     draw_elpd_difference(plots, delta, delta_ax, colors)
 
-    letter(18, 254, "c")
-    page_text(39, 254, "Goal-relative headings", weight="bold", fontsize=11)
+    letter(18, 268, "c")
+    page_text(39, 268, "Goal-relative headings", weight="bold", fontsize=11)
     draw_predictive_panel(data, colors, axes_at, page_text)
     bearings = data["density_bearings"]
 
-    flight_top = 554
+    flight_top = 504
     letter(18, flight_top, "d")
     page_text(39, flight_top, "Directedness along homing routes", weight="bold", fontsize=11)
     map_h = 160
