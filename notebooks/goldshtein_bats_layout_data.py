@@ -2,14 +2,13 @@
 from functools import partial
 from unittest.mock import patch
 
-import geopandas as gpd
 import numpy as np
-from pyproj import Transformer
 from scipy.special import expit
 from scipy.stats import vonmises
 
 import goldshtein_bats_figure_core as core
 from unwrap import datasets
+from unwrap.circular import circ_hdi_centered, wrap_pi
 from unwrap.link.numpy import circular_modulo, softplus
 
 
@@ -56,29 +55,54 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     def summary(draws):
         return (float(np.mean(draws)), *map(float, posthoc.hdi_1d(draws, prob=0.95)))
 
-    # Use the near-uniform background specified by the notebook's predictive
-    # summaries for both the density and the window probabilities.
-    kappa_uniform = posthoc.KAPPA_UNIFORM
+    def angle_summary(draws):
+        # Signed degrees, with lo > hi if the credible arc crosses ±180°.
+        return tuple(map(float, np.rad2deg(wrap_pi(circ_hdi_centered(draws, prob=0.95)))))
+
     bearings = np.deg2rad(np.arange(-180, 181))
     goal_index = bearings.size // 2
-    uniform_density = posthoc.vonmises_pdf_scalar(bearings, 0.0, kappa_uniform)
+    # The fitted likelihood uses a constant log-density for its undirected component.
+    uniform_density = 1 / (2 * np.pi)
     density_at_goal = np.empty_like(weight)
     density_profiles = {}
+    directed_profiles = {}
+    contributions = {}
+    parameters = {}
+    contrasts = {}
     for i, level in enumerate(levels):
         directed_density = posthoc.vonmises_pdf_scalar(
             bearings, mu[:, i, None], kappa[:, i, None]
         )
         p = weight[:, i, None]
-        density = p * directed_density + (1 - p) * uniform_density
+        # Weight the conditional density within each joint posterior draw.
+        directed_contribution = p * directed_density
+        undirected_contribution = (1 - p) * uniform_density
+        density = directed_contribution + undirected_contribution
         density_at_goal[:, i] = density[:, goal_index]
         lo, hi = posthoc.hdi_along_samples(density, prob=0.95)
         density_profiles[level] = {"mean": density.mean(axis=0), "lo": lo, "hi": hi}
+        directed_profiles[level] = {"mean": directed_density.mean(axis=0)}
+        contributions[level] = {
+            "directed": directed_contribution.mean(axis=0),
+            "undirected": np.full_like(bearings, undirected_contribution.mean()),
+        }
+        parameters[level] = {
+            "mu_deg": angle_summary(mu[:, i]),
+            "kappa": summary(kappa[:, i]),
+            "omega": summary(weight[:, i]),
+        }
+        if i:
+            contrasts[level] = {
+                "mu_deg": angle_summary(wrap_pi(mu[:, i] - mu[:, 0])),
+                "kappa": summary(kappa[:, i] - kappa[:, 0]),
+                "omega": summary(weight[:, i] - weight[:, 0]),
+            }
 
     half_width = posthoc.MASS_HALF_WIDTH_DEG
     tolerance = np.deg2rad(half_width)
     directed_mass = (vonmises.cdf(tolerance, kappa, loc=mu)
                      - vonmises.cdf(-tolerance, kappa, loc=mu))
-    uniform_mass = vonmises.cdf(tolerance, kappa_uniform) - vonmises.cdf(-tolerance, kappa_uniform)
+    uniform_mass = tolerance / np.pi
     mass = np.clip(weight * directed_mass + (1 - weight) * uniform_mass, 0, 1)
     by_treatment = mass - mass[:, :1]
     pooled = np.average(by_treatment[:, 1:], axis=1,
@@ -88,6 +112,11 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     return {
         "density_bearings": bearings,
         "density_profiles": density_profiles,
+        "directed_density_profiles": directed_profiles,
+        "undirected_density_profile": np.full_like(bearings, uniform_density),
+        "component_contributions": contributions,
+        "component_parameters": parameters,
+        "component_contrasts": contrasts,
         "density_at_zero_by_treatment": {
             level: summary(draws) for level, draws in zip(levels, density_at_goal.T, strict=True)
         },
@@ -110,6 +139,9 @@ def load_layout_data(data_root):
 
 def assemble_layout_data(ctx, posthoc, plots, lake_path):
     """Build the composite's panel data from the restored notebook context."""
+    import geopandas as gpd
+    from pyproj import Transformer
+
     observed = ctx["df_track"]
     tracks = ctx["track_w_treat"]
     if not (observed.index.is_unique and tracks.index.is_unique and observed.index.isin(tracks.index).all()):

@@ -33,7 +33,6 @@ from scipy.special import expit
 from shapely.geometry.polygon import orient
 
 from goldshtein_bats_layout_data import _population_parameters, _read_context, assemble_layout_data
-from locust_density_figure import add_compact_unit_label
 
 
 INK = "#222222"
@@ -41,7 +40,7 @@ MAP_FACE = "#f5f6f5"
 HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
-PAGE_W, PAGE_H = 532, 736
+PAGE_W, PAGE_H = 532, 821
 #: Tile zoom for the live CartoDB raster fallback (used only when the
 #: vector extract below is absent): pinned rather than left to
 #: contextily's auto-zoom, which matches screen-pixel sizes and on a
@@ -216,38 +215,97 @@ def _draw_treatment_icons(ax, drawings, row_ys, colors, *, active_alpha=.54):
             patch.set_alpha(.30 if muted else 1)
 
 
-def draw_polar_density(ax, bearings, profile, color, radius_max):
-    """Draw the full mixture around a common zero-density reference ring."""
-    zero_radius = 1.0
-    ax.set_theta_zero_location('N')
-    ax.set_theta_direction(-1)
-    ax.set(ylim=(0, radius_max), xticks=[], yticks=[])
-    ax.spines['polar'].set_visible(False)
-    ax.plot(bearings, np.full_like(bearings, zero_radius), color='#aaaaaa', lw=.55)
-    ax.plot([0, 0], [zero_radius, radius_max], color='#9a9a9a', lw=.6)
-    ax.fill_between(bearings, zero_radius + profile['lo'], zero_radius + profile['hi'],
-                    color=color, alpha=.26, linewidth=0)
-    ax.plot(bearings, zero_radius + profile['mean'], color=color, lw=1.05)
-    ax.plot(0, zero_radius + profile['mean'][bearings.size // 2], 'o', color=color, ms=2.8)
-
-
-def draw_density_contrast(ax, data, colors):
-    """Plot paired treatment differences from control at the goal bearing."""
+def draw_component_panel(fig, data, colors, axes_at, page_text):
+    """Compare conditional densities, their weighted sum, and paired treatment contrasts."""
     levels = data["levels"]
-    ax.axhline(0, color="#888888", lw=.65, ls=(0, (2, 2)), zorder=0)
-    ax.plot(0, 0, "o", color=colors[levels[0]], ms=4.1, zorder=3)
-    for index, level in enumerate(levels[1:], start=1):
-        mean, lo, hi = data["full_contrasts"][level]
-        ax.errorbar(index, mean, yerr=[[mean - lo], [hi - mean]], color=colors[level],
-                    fmt="o", ms=4.1, elinewidth=1, capsize=2.2, capthick=1)
-    ax.set(xlim=(-.5, len(levels) - .5), ylim=(-.34, .04),
-           xticks=range(len(levels)), xticklabels=LABELS, yticks=(-.3, -.2, -.1, 0))
-    ax.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
-    ax.tick_params(length=3, width=.65, pad=3)
-    ax.tick_params(axis="x", length=0, pad=5)
-    ax.spines[["top", "right"]].set_visible(False)
-    for tick, level in zip(ax.get_xticklabels(), levels, strict=True):
-        tick.set_color(colors[level])
+    angles = np.rad2deg(data["density_bearings"])
+    centers = np.arange(4) * 27 + 294
+    density_max = max(max(data["density_profiles"][level]["hi"].max(),
+                          data["directed_density_profiles"][level]["mean"].max())
+                      for level in levels)
+    # Keep a common density scale across both columns and every treatment.
+    top = max(1.0, np.ceil(density_max * 2) / 2)
+    density_columns = ((79, 79), (177, 79))
+    page_text(118.5, 270, "Component densities", ha="center", fontsize=9.4, weight="bold")
+    page_text(216.5, 270, "Weighted mixture", ha="center", fontsize=9.4, weight="bold")
+    for row, (level, name, center) in enumerate(zip(levels, LABELS, centers, strict=True)):
+        color = colors[level]
+        share = data["component_parameters"][level]["omega"][0]
+        page_text(18, center - 6, name, color=color, fontsize=9.2, weight="bold")
+        page_text(18, center + 3, f"ω = {share:.0%}", fontsize=8.5)
+        weights = axes_at(18, center + 9, 40, 2.6)
+        weights.set(xlim=(0, 1), ylim=(0, 1))
+        weights.axis("off")
+        weights.axvspan(0, share, color=color, linewidth=0)
+        weights.axvspan(share, 1, color="#777b7d", linewidth=0)
+        (conditional, mixture) = [
+            axes_at(left, center - 10, width, 21) for left, width in density_columns
+        ]
+        for ax in (conditional, mixture):
+            ax.set(xlim=(-180, 180), ylim=(0, top), xticks=(-180, 0, 180), yticks=[])
+            ax.spines[["top", "right", "left"]].set_visible(False)
+            ax.spines["bottom"].set(color="#a8aaab", linewidth=.55)
+            ax.tick_params(axis="x", length=2, pad=2, labelsize=8, labelbottom=row == 3)
+            ax.axvline(0, color="#b9babb", lw=.5, zorder=0)
+        if row == 0:
+            conditional.set_yticks([0, top], labels=["0", f"{top:g}"])
+            conditional.tick_params(axis="y", labelsize=7.5, length=2, pad=2)
+        conditional.plot(angles, data["undirected_density_profile"], color="#55595b",
+                         lw=.95, ls=(0, (3, 2)))
+        conditional.plot(angles, data["directed_density_profiles"][level]["mean"],
+                         color=color, lw=1.3)
+
+        profile = data["density_profiles"][level]
+        parts = data["component_contributions"][level]
+        background = parts["undirected"]
+        total = background + parts["directed"]
+        mixture.fill_between(angles, 0, background, color="#777b7d", linewidth=0)
+        mixture.fill_between(angles, background, total, color=color, alpha=.47, linewidth=0)
+        mixture.fill_between(angles, profile["lo"], profile["hi"], color=INK, alpha=.13,
+                             linewidth=0)
+        mixture.plot(angles, profile["mean"], color=INK, lw=1)
+    page_text(167, 406, "Heading relative to goal (°)", ha="center", fontsize=9)
+
+    page_text(398, 254, "Treatment minus control (95% HDI)", ha="center", fontsize=10, weight="bold")
+    contrasts = data["component_contrasts"]
+    columns = (
+        ("Direction\nμ (°)", "mu_deg", 1, (-25, 25), (-20, 0, 20)),
+        ("Concentration\nκ", "kappa", 1, (-3.5, 1.5), (-3, 0, 1)),
+        ("Weight ω\n(% points)", "omega", 100, (-18, 12), (-15, 0, 10)),
+        ("Goal density\n(per radian)", "density", 1, (-.36, .06), (-.3, 0)),
+    )
+    for col, (title, key, scale, limits, ticks) in enumerate(columns):
+        left, width = 276 + col * 62, 51
+        page_text(left + width / 2, 273, title, ha="center", multialignment="center", fontsize=8.7)
+        ax = axes_at(left, centers[0] - 6, width, centers[-1] - centers[0] + 12)
+        ax.set(xlim=limits, ylim=(3 + 6 / 27, -6 / 27), yticks=[], xticks=ticks)
+        ax.axvline(0, color="#858a8c", lw=.75, ls=(0, (2, 2)), zorder=0)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+        ax.spines["bottom"].set(linewidth=.6, color="#777b7d")
+        ax.tick_params(axis="x", labelsize=8, pad=2, length=2)
+        ax.xaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
+        # A control-minus-itself contrast is fixed at zero; it has no interval.
+        ax.plot(0, 0, marker="_", color=colors[levels[0]], ms=4.5)
+        for row, level in enumerate(levels[1:], start=1):
+            values = data["full_contrasts"][level] if key == "density" else contrasts[level][key]
+            mean, lo, hi = np.asarray(values) * scale
+            ax.hlines(row, lo, hi, color=colors[level], linewidth=1.4)
+            fill = "white" if lo <= 0 <= hi else colors[level]
+            ax.plot(mean, row, marker="o", mec=colors[level], mfc=fill, ms=4, mew=1)
+    density_key = [
+        Line2D([], [], color=INK, lw=1.2, label="Directed"),
+        Line2D([], [], color="#55595b", lw=1, ls=(0, (3, 2)), label="Uniform"),
+        Patch(facecolor="#dddddd", edgecolor=INK, lw=.7, label="Mixture & 95% HDI"),
+    ]
+    interval_key = [
+        Line2D([], [], marker="o", ms=4, color=INK, mfc=fill, linestyle="none", label=label)
+        for fill, label in (("white", "HDI includes zero"), (INK, "HDI excludes zero"))
+    ]
+    for x, key in ((149, density_key), (395, interval_key)):
+        fig.legend(handles=key, loc="center", ncols=len(key), frameon=False,
+                   bbox_to_anchor=(x / PAGE_W, 1 - 420 / PAGE_H), fontsize=8.2,
+                   handlelength=1.2, handletextpad=.35, columnspacing=1)
+
 
 
 def draw_likelihood_diagrams(ax_vm, ax_vmu):
@@ -580,57 +638,30 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                bbox_to_anchor=(389 / PAGE_W, 1 - 150 / PAGE_H), fontsize=8,
                handlelength=1.45, handletextpad=.45, columnspacing=1.25, markerscale=.85)
 
-    body_top = 168
+    body_top = 167
     letter(18, body_top, "b")
     page_text(39, body_top, "Model selection", weight="bold", fontsize=11)
-    vm_center, vmu_center = 44, 115
-    model_top, model_size = body_top + 28, 43
-    page_text(vm_center, body_top + 16, "von Mises (vM)", fontsize=8.5, ha="center")
-    page_text(vmu_center, body_top + 16, "von Mises–Uniform\nMixture (vMU)", fontsize=8.3, ha="center")
+    vm_center, vmu_center = 48, 134
+    model_top, model_size = 192, 35
+    page_text(vm_center, 185, "von Mises (vM)", fontsize=8.7, ha="center")
+    page_text(vmu_center, 185, "vM–Uniform mixture", fontsize=8.7, ha="center")
     draw_likelihood_diagrams(
         axes_at(vm_center - model_size / 2, model_top, model_size, model_size, projection="polar"),
         axes_at(vmu_center - model_size / 2, model_top, model_size, model_size, projection="polar"),
     )
-    # The likelihood outlines are taller toward the goal than away from it.
-    model_key_y = model_top + model_size / 2 - 5
     fig.legend(handles=[Patch(facecolor=DIRECTED_FILL, label="Directed"),
                         Patch(facecolor=UNDIRECTED_FILL, label="Undirected")],
-               frameon=False, loc="center left",
-               bbox_to_anchor=(150 / PAGE_W, 1 - model_key_y / PAGE_H),
-               ncols=1, fontsize=7.8, handlelength=1.3, handletextpad=.45, borderaxespad=0)
-    delta_ax = axes_at(69, body_top + 80, 126, 51)
+               frameon=False, loc="center left", bbox_to_anchor=(177 / PAGE_W, 1 - 207 / PAGE_H),
+               fontsize=8.6, handlelength=1.3, handletextpad=.45, borderaxespad=0)
+    delta_ax = axes_at(320, 164, 193, 53)
     draw_elpd_difference(plots, delta, delta_ax, colors)
 
-    letter(211, body_top, "c")
-    page_text(232, body_top, "Predictive heading density", weight="bold", fontsize=11)
+    letter(18, 254, "c")
+    page_text(39, 254, "Decomposing the heading distribution", weight="bold", fontsize=11)
+    draw_component_panel(fig, data, colors, axes_at, page_text)
     bearings = data["density_bearings"]
-    profiles = data["density_profiles"]
-    radius_max = 1 + 1.08 * max(profile["hi"].max() for profile in profiles.values())
-    contrast_x, contrast_w = 250, 266
-    column_w = contrast_w / len(levels)
-    polar_top, polar_size = body_top + 18, 64
-    for i, level in enumerate(levels):
-        center = contrast_x + (i + .5) * column_w
-        polar = axes_at(center - polar_size / 2, polar_top, polar_size, polar_size,
-                        projection="polar")
-        draw_polar_density(polar, bearings, profiles[level], colors[level], radius_max)
-        center_zero_digit(page_text(center, polar_top - 3, "0°", ha="center", fontsize=8))
 
-    contrast_top, contrast_h = body_top + 80, 63
-    contrast = axes_at(contrast_x, contrast_top, contrast_w, contrast_h)
-    draw_density_contrast(contrast, data, colors)
-    # The open area is bounded by the zero line and the first treatment interval.
-    lo, hi = contrast.get_ylim()
-    zero_y = contrast_top + contrast_h * hi / (hi - lo)
-    open_right = contrast_x + 1.5 * column_w - 3
-    label_x = (contrast_x + open_right) / 2 - 5
-    label_center_y = (zero_y + contrast_top + contrast_h) / 2
-    label = page_text(label_x, label_center_y - 4, "Density difference", ha="center", fontsize=8.2)
-    prop = label.get_fontproperties()
-    add_compact_unit_label(fig, label_x, PAGE_H - (label_center_y + 7), "vs. control", "rad", -1,
-                           fontsize=prop.get_size_in_points(), prop=prop)
-
-    flight_top = 350
+    flight_top = 435
     letter(18, flight_top, "d")
     page_text(39, flight_top, "Directedness along homing routes", weight="bold", fontsize=11)
     map_h = 160
@@ -763,6 +794,8 @@ def main(argv=None):
             }
             for row in ctx["delta_df"].itertuples()
         },
+        "component_parameters": data["component_parameters"],
+        "component_contrasts": data["component_contrasts"],
         "density_at_zero_by_treatment": data["density_at_zero_by_treatment"],
         "density_at_zero_treatment_contrasts": data["full_contrasts"],
         "goal_window_half_width_degrees": data["goal_window_half_width_degrees"],

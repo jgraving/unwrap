@@ -25,12 +25,17 @@ Predictive performance is compared with a single von Mises model (vM) using
 stepwise PSIS–LOO expected log predictive density. Points show vMU minus vM
 overall and within each treatment. Whiskers show one standard error.
 
-**(c)** Population-level posterior predictive heading densities under the full
-mixture. Curves and bands show posterior means and pointwise 95% highest-density
-intervals. The lower plot shows treatment-minus-control differences in density
-at 0° (rad⁻¹), calculated within each posterior draw. Points and bars show
-posterior means and 95% highest-density intervals. The dashed line marks zero
-difference.
+**(c)** Conditional densities are shown for the directed von Mises (solid)
+and undirected uniform (dashed) components. Within each posterior draw,
+their weights are ω and 1−ω. The stacked areas show their mean contributions,
+the black line their sum, and the band its pointwise 95% highest-density
+interval (HDI). Row labels give posterior mean ω. Points and bars show
+posterior means and 95% HDIs for paired treatment-minus-control differences in
+directed mean (Δμ), concentration (Δκ), directed weight (Δω, percentage
+points), and full density at the goal (0°). The directed component broadened
+with eye cover alone and the triple treatment. Its mean shifted −9.8° with
+eye cover plus magnet. All Δω intervals include zero. All goal-density
+contrast intervals lie below zero.
 
 **(d)** Directedness compares the directed and undirected heading likelihoods
 under equal prior odds, with 0.5 indicating equal evidence. Step scores were
