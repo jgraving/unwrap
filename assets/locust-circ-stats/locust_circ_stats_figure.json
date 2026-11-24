@@ -1,0 +1,182 @@
+{
+  "figure": "locust circular-statistics composite (the reference page's panels with the letters following this figure's information flow: a setup, b model selection, c predictive check, d-f hypothesis testing)",
+  "page_points": [
+    900.0,
+    844.0
+  ],
+  "code_revision": "a0fa0f4591c1fed7aeaba6499e7bf2754d834b12",
+  "data_repository": "jgraving/unwrap-data",
+  "data_revision": "86c41b5f43eb61191405b9bc85baf730a492a06f",
+  "font_family": "Arial",
+  "python": "3.12.3",
+  "packages": {
+    "numpy": "2.4.6",
+    "scipy": "1.18.1",
+    "pandas": "3.1.0",
+    "matplotlib": "3.11.2",
+    "arviz": "1.3.0",
+    "pymc": "6.3.2",
+    "pytensor": "3.3.6",
+    "xarray": "2026.9.0",
+    "pillow": "13.0.0"
+  },
+  "panel_a_source": {
+    "kind": "extracted from the reference figure PDF",
+    "assets": [
+      "notebooks/assets/locust_circ_stats/panel_a.json",
+      "notebooks/assets/locust_circ_stats/virtual_swarm.png"
+    ],
+    "note": "image placements, vector paths and text spans read from the reference PDF and replayed; the sprite is the virtual-swarm photograph inside it"
+  },
+  "fits": {
+    "locust_direction_bimodal": {
+      "snapshot": "/home/jake/.cache/unwrap-data/unwrap-data/fit_cache/locust_direction_bimodal.nc",
+      "sha256": "145afc211aa3f218aab69fd28bbc6faa040cbaa104aa786025698f6f8de64827",
+      "draws": 1000,
+      "model": "locust_direction_bimodal",
+      "seed": 42,
+      "target_accept": 0.9,
+      "tune": 2000
+    },
+    "locust_direction_unimodal": {
+      "snapshot": "/home/jake/.cache/unwrap-data/unwrap-data/fit_cache/locust_direction_unimodal.nc",
+      "sha256": "4ecfa5de6026e3165c383d0eed7a5edea7b28831e9142d976a7bb8d785740e4a",
+      "draws": 1000,
+      "model": "locust_direction_unimodal",
+      "seed": 42,
+      "target_accept": 0.9,
+      "tune": 2000
+    }
+  },
+  "plotted_values": {
+    "loo_elpd": [
+      {
+        "model": "Bimodal",
+        "elpd": -3404.511970711303,
+        "se": 39.26640114768437
+      },
+      {
+        "model": "Unimodal",
+        "elpd": -3533.403704346026,
+        "se": 38.337251501213785
+      }
+    ],
+    "hypothesis_density": [
+      {
+        "hypothesis": "forward",
+        "density": 0.07687365730068632,
+        "hdi_low": 0.05761261012911439,
+        "hdi_high": 0.1003698176311377
+      },
+      {
+        "hypothesis": "perpendicular",
+        "density": 0.27744120845611187,
+        "hdi_low": 0.254641079704035,
+        "hdi_high": 0.30341553274064126
+      }
+    ],
+    "uniform_density_reference": 0.15915494309189535,
+    "hypothesis_polar": {
+      "model_density_max": 0.28619781030918234,
+      "model_density_max_angle_deg": -84.73537604456826,
+      "hypothesis_densities": [
+        {
+          "hypothesis": "optic flow (forward)",
+          "at_deg": 0.0,
+          "density": 0.07687365730068632,
+          "hdi_low": 0.05761261012911439,
+          "hdi_high": 0.1003698176311377
+        },
+        {
+          "hypothesis": "vectorial encoding (perpendicular)",
+          "at_deg": 90.0,
+          "density": 0.27744120845611187,
+          "hdi_low": 0.254641079704035,
+          "hdi_high": 0.30341553274064126
+        }
+      ],
+      "uniform_density_reference": 0.15915494309189535,
+      "note": "observed-data band omitted; panel c draws it for each model"
+    },
+    "predictive_pair": {
+      "bimodal": {
+        "max": 0.2714505195617676,
+        "max_angle_deg": -87.74373259052926
+      },
+      "unimodal": {
+        "max": 0.20058604329824448,
+        "max_angle_deg": -81.72701949860725
+      },
+      "data": {
+        "max": 0.30798103695926937,
+        "max_angle_deg": -91.7548746518106
+      },
+      "estimate": "von Mises KDE, histogram estimate omitted",
+      "data_line": "solid (dashed is the uniform reference on this page)"
+    },
+    "hypothesis_density_individual": {
+      "n_individuals": 52,
+      "reference": "mean predictive density per animal at each hypothesised direction - the geometric mean of the per-draw predictive density, i.e. exp(ELPD) - on a linear axis; dots are animals, open markers the pooled values",
+      "uniform_density_reference": 0.15915494309189535,
+      "by_hypothesis": [
+        {
+          "hypothesis": "optic flow (forward)",
+          "pooled_mean_density": 0.058966086814886305,
+          "pooled_se_elpd": 0.0015230905264563513,
+          "min": 0.002452358022192124,
+          "median": 0.08012519546835845,
+          "max": 0.24026655622808704
+        },
+        {
+          "hypothesis": "vectorial encoding (perpendicular)",
+          "pooled_mean_density": 0.25155148245720177,
+          "pooled_se_elpd": 0.00036284653575889564,
+          "min": 0.1528277395262023,
+          "median": 0.2396563216355614,
+          "max": 0.5020073388959478
+        }
+      ],
+      "p_VE_gt_OF_median": 0.989125,
+      "frac_individuals_P_VE_gt_OF_above_half": 0.9615384615384616
+    },
+    "observations": 2435,
+    "individuals": 52
+  },
+  "corrections": [
+    "panel a records 34 path primitives: the first extraction pass kept paths above y = 300 pt only and missed the two grey flight arrows of the bottom swarm's second row (y = 301-321 pt).",
+    "the panel letters and titles are not replayed from panel_a.json: the reference page's four letters and three titles are filtered out of the span replay and redrawn - the flow, and every title, is ours (panel a's \"Experimental design\" has no counterpart on the reference page).  Sizes and offsets are the reference's - 32 pt bold letters and 17 pt titles at 13.74 and 21.465 pt from the row top - but the titles are bold, matching the bat composite's panel titles.  d's title is the one long name of the six; kept at 17 pt it would run off the right page edge, so it goes on two lines and starts at the top of its panel letter (y = 12.639) rather than the title offset.",
+    "panel d's arrows are drawn as a shaft plus a 16.8 pt triangular head in page points, i.e. panel a's arrow style; matplotlib's \"-|>\" head is blunter and shorter at the same nominal size.",
+    "panel d's polar tick labels are placed at their reference page positions: matplotlib puts polar tick labels on the grid circle, which lands \"\u00b1180\u00b0\" on top of the 180\u00b0 grid line.",
+    "panel b labels the ELPD axis every 100 units (-3550, -3450, -3350) and widens its range to -3330 (35 past the bimodal whisker) to bring the third label on: five labels at 50-unit pitch crowd any axes this narrow - a 17 pt label is 46 pt wide - so the labels spread evenly across the range instead, and the axes grows to 260 pt wide, the width e and f use.",
+    "panel a draws at 0.85 of the reference size, scaled about the centre of its measured content (x = 209, bottom y = 348): the panel now carries a title - \"Experimental design\", centred over it like every other panel's - and the scale is what makes room for it.  Photo sampling, stroke widths, dash rhythms and the artwork's own labels scale with it; the shifted, scaled content spans x = 83.0-368.0, y = 67.9-348.",
+    "panel b's forest axes draw 226 pt wide and the right column's (e's dots, f's swarm) 260, against the reference page's measured 284.8 and 296, both at the measured axes centres (285, 725.2): two forest rows and two dots read lost across the measured widths, and the wide axes pulled the titles and row labels apart from the marks.  f shares e's width - it is the same test on the same rows - and 260 is as narrow as the swarm can go without its dense vectorial-encoding stack gaining a row (the packing is done in points).",
+    "the third row starts at y = 556, 44 pt into the whitespace under the reference page's second row, and the page is 844 pt tall rather than 900: the reference page has nothing below y = 545, so the gap the first builds left between the rows' content read as a hole.  The row pitch from the reference page's second row is 197.3 pt.  The page came down a further 20 pt when f's swarm went to the linear scale (the stacks flatten) and c's key closed on the polars: the bottom margin stays in step with the top ones.",
+    "panel f's axes height is read from the house swarm's own y limits after it draws (4 * the stack reach + 4 * the packing clearance = 202.5 pt at dot 4.5 pt and gap 1.25) and the axes re-placed to it: the swarm sets its limits in points, so the axes height has to equal that number or the packing the function computes is not the packing that gets drawn - and the height is not predictable from the dot size alone, because the greedy packer's stack reach is not monotonic in the packing distance.  Dots are packed 1.25 times their own diameter apart: packed at their own size they only touch, and the vectorial-encoding row, where all 52 animals fall between 0.15 and 0.5 on the density axis, then reads as one solid block."
+  ],
+  "known_differences": [
+    "The page is 900 x 844 pt against the reference's 900 x 600: panels c and f are new in a third row starting 197.3 pt under the reference page's second row, and the letters follow this figure's flow of information (setup, model selection, predictive check, then hypothesis testing at three levels), so the reference page's c and d are d and e here.  Their internal geometry (radii, ticks, weights, dash rhythms) is kept exactly as measured, as is b's; what differs is where content sits inside a column - panel a's artwork shifts right and scales to 0.85, panel d's polar shifts right to centre on the panels below it, and the d, e and f titles centre over the same x - and in the two axes widths above (b 226 against 284.8, the right column 260 against 296).",
+    "Text is set in Arial; the reference page uses Helvetica Neue, whose glyph widths differ by 1-4% at the same size and position.",
+    "Panel b's cached unimodal fit gives ELPD -3533.40 +/- 38.34 where the reference page prints -3502.0 +/- 38.8; the bimodal fit matches (-3404.51 +/- 39.27 against -3403.8 +/- 39.2)."
+  ],
+  "verification": {
+    "panel_d_against_the_previous_build": {
+      "method": "the only drawing that neither moved nor was restyled this change is panel d's polar - its centre, radius and marks are untouched, while the left column's three titles move by design (brought onto one axis, the c pair's centre); the text spans and drawing primitives of d's region (x 540-900, y 55-350 pt, below its title) compared between the previously committed PDF and this one",
+      "text_spans": "4 of 4 identical to 0.007 pt",
+      "drawing_primitives": "13 of 13 identical to 0.000 pt (the full-page axes rectangle is excluded - it is not panel d's drawing and it changes with the page height)"
+    },
+    "mean_abs_pixel_difference_against_reference_pdf": {
+      "panel_a": 7.2,
+      "panel_b": 15.1,
+      "panel_d": 16.8,
+      "panel_e": 18.0,
+      "regions": "300 dpi, (pt, top-left origin): panel a: x 83.0-368.0, y 67.6-348; panel b: 28-448, 360-545; panel d: 595-900, 5-350; panel e: 455-880, 360-545.  d's crop compares the polar at its shifted position (the reference crop is taken 110.1 pt to the left); a's compares the reference artwork crop resized to the page's 0.85 panel scale, so neither number measures the centring or scaling move - a's does include the resampling of the photo detail those two crops need.",
+      "note": "the previous build measured 7.4/14.1/16.8/16.4.  The page height changed (844 pt) so every crop's raster phase moved, and since then b and e have moved again for legibility (their titles onto their letters' baselines, b's ticks spread to 100-unit pitch, f's axes centred on the c pair, and the left column's titles brought onto one axis), which separates 7.2/15.1/16.8/18.0 from that: b's and e's crops include those titles and ticks, and where this page places them deliberately (aligned to its own letter grid), they differ further from the reference's.  Going further back, a's 22.8 in the build before the matplotlib pin fell to 7 because the drawing itself improved: the build environment had drifted to matplotlib 3.10, whose photo resampling drew a dark halo on every sprite edge; back on the provenance version (3.11.2) the layer rasterises as it did when the reference page was built.  The four remain above the 5.6/12.7/15.1/12.3 of the build before the layout changes, for reasons of layout, not drawing: a's because resizing the reference crop resamples the photo detail on one side of the comparison; b's and e's because the re-widthed axes move every tick, label and mark relative to the reference page (which draws its axes at the measured widths); and d's because its title runs to two lines.  Panels c and f are new and have no reference panel.",
+      "method": "300 dpi, with the best shift within +/-4 px taken up."
+    }
+  },
+  "outputs_sha256": {
+    ".pdf": "768a272340e5d6fb60a4524233ff8633c2181154c5d7080c17f1a1ab2bcaa209",
+    ".png": "43d2278008f4d81ff89f383edf56c727e66c33f2133b86bbb4ea483fe92daaef",
+    ".svg": "4ccf6db0ca8ef1c44969cdd30e78dd69cd32a01a1dc935cca9b0db6e88490a64"
+  }
+}
