@@ -8,7 +8,6 @@ from scipy.stats import vonmises
 
 import goldshtein_bats_figure_core as core
 from unwrap import datasets
-from unwrap.circular import circ_hdi_centered, wrap_pi
 from unwrap.link.numpy import circular_modulo, softplus
 
 
@@ -48,16 +47,39 @@ def _population_parameters(posterior, levels, posthoc):
     return mu, kappa, weight
 
 
+def _goal_window_probability(mu, kappa, weight, half_width_degrees):
+    """Full-mixture probability within a symmetric goal window, for each joint draw."""
+    tolerance = np.deg2rad(half_width_degrees)
+    directed_mass = (vonmises.cdf(tolerance, kappa, loc=mu)
+                     - vonmises.cdf(-tolerance, kappa, loc=mu))
+    return np.clip(weight * directed_mass + (1 - weight) * tolerance / np.pi, 0, 1)
+
+
+def _goal_window_by_bat(posterior, observed, posthoc):
+    """Use one fitted parameter vector per bat, including its individual offsets."""
+    tags, first, inverse = np.unique(observed["tag"], return_index=True, return_inverse=True)
+    treatments = observed["treatment"].to_numpy()
+    if not np.array_equal(treatments, treatments[first][inverse]):
+        raise ValueError("A modeled bat has more than one treatment")
+
+    # The fitted parameters are constant within a bat. Subset before stacking
+    # so only one column per bat is read, including for lazily restored observations.
+    mu = posthoc._stack_samples_first(posterior["mu"].isel(mu_dim_0=first))
+    kappa = posthoc._stack_samples_first(posterior["kappa"].isel(kappa_dim_0=first))
+    weight = posthoc._stack_samples_first(posterior["p_goal"].isel(p_goal_dim_0=first, p_goal_dim_1=0))
+    mass = _goal_window_probability(mu, kappa, weight, posthoc.MASS_HALF_WIDTH_DEG).mean(axis=0)
+    if not np.isfinite(mass).all():
+        raise ValueError("Non-finite posterior goal-window probability for a fitted bat")
+    return [{"tag": str(tag), "treatment": int(level), "probability": float(probability)}
+            for tag, level, probability in zip(tags, treatments[first], mass, strict=True)]
+
+
 def _mixture_predictions(posterior, levels, counts, posthoc):
     """Summarize the pinned population-level vMU predictive densities."""
     mu, kappa, weight = _population_parameters(posterior, levels, posthoc)
 
     def summary(draws):
         return (float(np.mean(draws)), *map(float, posthoc.hdi_1d(draws, prob=0.95)))
-
-    def angle_summary(draws):
-        # Signed degrees, with lo > hi if the credible arc crosses ±180°.
-        return tuple(map(float, np.rad2deg(wrap_pi(circ_hdi_centered(draws, prob=0.95)))))
 
     bearings = np.deg2rad(np.arange(-180, 181))
     goal_index = bearings.size // 2
@@ -66,44 +88,20 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     density_at_goal = np.empty_like(weight)
     density_profiles = {}
     directed_profiles = {}
-    contributions = {}
-    parameters = {}
-    contrasts = {}
     for i, level in enumerate(levels):
         directed_density = posthoc.vonmises_pdf_scalar(
             bearings, mu[:, i, None], kappa[:, i, None]
         )
         p = weight[:, i, None]
         # Weight the conditional density within each joint posterior draw.
-        directed_contribution = p * directed_density
-        undirected_contribution = (1 - p) * uniform_density
-        density = directed_contribution + undirected_contribution
+        density = p * directed_density + (1 - p) * uniform_density
         density_at_goal[:, i] = density[:, goal_index]
         lo, hi = posthoc.hdi_along_samples(density, prob=0.95)
         density_profiles[level] = {"mean": density.mean(axis=0), "lo": lo, "hi": hi}
         directed_profiles[level] = {"mean": directed_density.mean(axis=0)}
-        contributions[level] = {
-            "directed": directed_contribution.mean(axis=0),
-            "undirected": np.full_like(bearings, undirected_contribution.mean()),
-        }
-        parameters[level] = {
-            "mu_deg": angle_summary(mu[:, i]),
-            "kappa": summary(kappa[:, i]),
-            "omega": summary(weight[:, i]),
-        }
-        if i:
-            contrasts[level] = {
-                "mu_deg": angle_summary(wrap_pi(mu[:, i] - mu[:, 0])),
-                "kappa": summary(kappa[:, i] - kappa[:, 0]),
-                "omega": summary(weight[:, i] - weight[:, 0]),
-            }
 
     half_width = posthoc.MASS_HALF_WIDTH_DEG
-    tolerance = np.deg2rad(half_width)
-    directed_mass = (vonmises.cdf(tolerance, kappa, loc=mu)
-                     - vonmises.cdf(-tolerance, kappa, loc=mu))
-    uniform_mass = tolerance / np.pi
-    mass = np.clip(weight * directed_mass + (1 - weight) * uniform_mass, 0, 1)
+    mass = _goal_window_probability(mu, kappa, weight, half_width)
     by_treatment = mass - mass[:, :1]
     pooled = np.average(by_treatment[:, 1:], axis=1,
                         weights=[counts[level] for level in levels[1:]])
@@ -113,10 +111,6 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
         "density_bearings": bearings,
         "density_profiles": density_profiles,
         "directed_density_profiles": directed_profiles,
-        "undirected_density_profile": np.full_like(bearings, uniform_density),
-        "component_contributions": contributions,
-        "component_parameters": parameters,
-        "component_contrasts": contrasts,
         "density_at_zero_by_treatment": {
             level: summary(draws) for level, draws in zip(levels, density_at_goal.T, strict=True)
         },
@@ -176,5 +170,6 @@ def assemble_layout_data(ctx, posthoc, plots, lake_path):
         "roost": roost,
         "counts": counts,
         "scores": scores,
+        "goal_window_by_bat": _goal_window_by_bat(ctx["idata_vmu"].posterior, observed, posthoc),
         **_mixture_predictions(ctx["idata_vmu"].posterior, levels, counts, posthoc),
     }

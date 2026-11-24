@@ -1,9 +1,12 @@
-"""Regression tests for the publication figure's paired mixture summaries."""
+"""Regression tests for population density profiles and individual goal-window probabilities."""
 import sys
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
+import xarray as xr
+from scipy.integrate import quad, trapezoid
 from scipy.stats import vonmises
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "notebooks"))
@@ -29,7 +32,6 @@ def test_draw_weighted_component_densities_and_intervals(predictions):
     data, mu, kappa, omega = predictions
     angle = data["density_bearings"]
     uniform = 1 / (2 * np.pi)
-    np.testing.assert_array_equal(data["undirected_density_profile"], np.full_like(angle, uniform))
     for i, level in enumerate([1, 2, 3, 4]):
         directed = vonmises.pdf(angle, kappa[:, i, None], loc=mu[:, i, None])
         weight = omega[:, i, None]
@@ -41,28 +43,39 @@ def test_draw_weighted_component_densities_and_intervals(predictions):
         np.testing.assert_allclose(curve["lo"], mixture.min(axis=0))
         np.testing.assert_allclose(curve["hi"], mixture.max(axis=0))
 
-        contributions = data["component_contributions"][level]
-        np.testing.assert_allclose(contributions["directed"], (weight * directed).mean(axis=0))
-        np.testing.assert_allclose(contributions["undirected"], (1 - weight.mean()) * uniform)
-        np.testing.assert_allclose(contributions["directed"] + contributions["undirected"],
-                                   data["density_profiles"][level]["mean"])
-        assert not np.allclose(contributions["directed"], weight.mean() * directed.mean(axis=0))
+        assert trapezoid(curve["mean"], angle) == pytest.approx(1)
+        assert trapezoid(data["directed_density_profiles"][level]["mean"], angle) == pytest.approx(1)
 
 
-def test_paired_contrasts_and_circular_intervals(predictions):
-    data, mu, kappa, omega = predictions
-    contrasts = data["component_contrasts"]
-    np.testing.assert_allclose(contrasts[2]["omega"], [0.1, 0.1, 0.1])
-    np.testing.assert_allclose(contrasts[2]["kappa"], [2, 2, 2])
-    np.testing.assert_allclose(contrasts[2]["mu_deg"], [4, 3, 5])
-    mean, start, end = contrasts[3]["mu_deg"]
-    np.testing.assert_allclose([abs(mean), start, end], [180, 179, -179])
-    np.testing.assert_allclose(data["component_parameters"][1]["omega"], [0.5, 0.2, 0.8])
-    np.testing.assert_allclose(data["component_parameters"][1]["kappa"], [5, 1, 9])
-    mean, start, end = data["component_parameters"][1]["mu_deg"]
-    np.testing.assert_allclose([abs(mean), start, end], [180, 178, -178])
-    full_at_goal = omega * vonmises.pdf(0.0, kappa, loc=mu) + (1 - omega) / (2 * np.pi)
-    for i, level in enumerate([2, 3, 4], start=1):
-        paired = full_at_goal[:, i] - full_at_goal[:, 0]
-        np.testing.assert_allclose(data["full_contrasts"][level],
-                                   [paired.mean(), paired.min(), paired.max()], atol=1e-15)
+def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
+    # A and B share a treatment but differ in their individual effects. Each is
+    # observed a different number of times, and labels appear in non-model order.
+    tag_index = np.array([1, 0, 1, 2, 0, 1])
+    tags = np.array(["a", "b", "c"])
+    groups = [1, 1, 3]
+    observed = pd.DataFrame({"tag": tags[tag_index], "treatment": np.array(groups)[tag_index]},
+                            index=[29, 13, 7, 31, 9, 3])
+    mu = np.array([[0.1, 1.4, 2.9], [-0.5, 0.1, -2.9]])
+    kappa = np.array([[9., 2., 5.], [2., 9., 4.]])
+    weight = np.array([[0.9, 0.2, 0.], [0.3, 0.8, 0.]])
+    directed_share = weight[:, tag_index]
+    posterior = xr.Dataset({
+        "mu": (("chain", "draw", "mu_dim_0"), mu[:, tag_index][None]),
+        "kappa": (("chain", "draw", "kappa_dim_0"), kappa[:, tag_index][None]),
+        "p_goal": (("chain", "draw", "p_goal_dim_0", "p_goal_dim_1"),
+                   np.stack([directed_share, 1 - directed_share], axis=-1)[None]),
+    })
+    rows = layout._goal_window_by_bat(posterior, observed, posthoc)
+    assert [row["tag"] for row in rows] == list(tags)
+    assert [row["treatment"] for row in rows] == groups
+    for i, row in enumerate(rows):
+        draws = []
+        for m, k, w in zip(mu[:, i], kappa[:, i], weight[:, i], strict=True):
+            probability, _ = quad(lambda x: w * vonmises.pdf(x, k, loc=m) + (1 - w) / (2 * np.pi),
+                                  -np.pi / 4, np.pi / 4)
+            draws.append(probability)
+        assert row["probability"] == pytest.approx(np.mean(draws), abs=1e-12)
+    assert rows[2]["probability"] == pytest.approx(0.25)
+    observed.loc[7, "treatment"] = 4
+    with pytest.raises(ValueError, match="more than one treatment"):
+        layout._goal_window_by_bat(posterior, observed, posthoc)
