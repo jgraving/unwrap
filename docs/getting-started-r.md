@@ -63,7 +63,7 @@ In any R session (RStudio's console or `R` in a terminal), from the
 repository root:
 
 ```r
-# Stan's r-universe supplies cmdstanr, loo, and bayesplot:
+# Stan's r-universe supplies cmdstanr and loo.
 ru <- "https://stan-dev.r-universe.dev"
 # The dated CRAN snapshot serves prebuilt binaries on Linux and Windows:
 cran <- "https://packagemanager.posit.co/cran/2026-11-03"
@@ -76,10 +76,10 @@ renv::restore(repos = repos)
 ```
 
 The final line restores the pinned packages into a project-local `renv/`
-library. The lockfile fetches `posterior` 1.7.1 directly from its upstream
-GitHub commit, so setup can still install that release as Stan's r-universe
-publishes newer versions. CRAN packages usually arrive as prebuilt binaries
-on Linux and Windows. Some packages build from source, so a first install
+library. The lockfile installs `posterior` 1.7.1 and `bayesplot`
+1.16.0.9000 from their recorded GitHub commits, so those versions remain
+available when Stan’s r-universe publishes a new build. CRAN packages usually
+arrive as prebuilt binaries on Linux and Windows. Some packages build from source, so a first install
 can take 20–60 minutes. Re-running the script is fast.
 
 `renv::activate()` writes a machine-local `.Rprofile` (gitignored), so
