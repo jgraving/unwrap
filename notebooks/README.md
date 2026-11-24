@@ -68,3 +68,7 @@ renderer with original source images: [reproduction instructions](LOCUST_DENSITY
 The zebra escape-response paper figure has a saved-fit publication
 renderer that rebuilds the published 900 × 1080-point composite from the
 pinned data and cached fit: [reproduction instructions](ZEBRA_FIGURE.md).
+
+The circstats paper's graphical abstract has a deterministic vector
+renderer with a reproducible circular-model example in panel B.
+See the [reproduction instructions](CIRCSTATS_GRAPHICAL_ABSTRACT.md).
