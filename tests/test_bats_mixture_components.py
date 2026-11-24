@@ -106,7 +106,10 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
     bearings = np.deg2rad(np.arange(-180, 181))
     predictions = layout._individual_predictions(posterior, observed, posthoc, bearings)
     rows = predictions["goal_window_by_bat"]
-    assert set(predictions["individual_density_profiles"]) == {"a", "b"}
+    curves = predictions["individual_density_profiles"]
+    assert set(curves) == {1, 3}
+    assert set(curves[1]) == {"a", "b"}
+    assert list(curves[3]) == ["c"]
     assert [row["tag"] for row in rows] == list(tags)
     assert [row["treatment"] for row in rows] == groups
     for i, row in enumerate(rows):
@@ -119,30 +122,40 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
         layout._individual_predictions(posterior, observed, posthoc, bearings)
 
 
-def test_exemplars_use_ranked_controls_and_each_bats_joint_posterior():
-    # Ties at the lowest and middle ranks exercise the tag tie-breaker. The
-    # more concentrated treated bat must never be selected for these curves.
-    tags = np.array(["uniform-b", "uniform-a", "mid-b", "mid-a", "high", "upper-mid", "treated"])
-    groups = np.array([1, 1, 1, 1, 1, 1, 4])
-    tag_index = np.array([4, 2, 1, 6, 0, 4, 3, 5, 3, 0, 5])
+def test_exemplars_use_each_treatments_ranks_and_individual_joint_posteriors():
+    # Six ranked controls include ties at the low and lower-middle ranks.
+    # The other groups have odd and even sizes and different sets of bats.
+    labels = np.array(["uniform-b", "uniform-a", "mid-b", "mid-a", "high", "upper-mid"])
+    group_members = [[0, 1, 2, 3, 4, 5], [0, 1, 2, 4, 5], [0, 2, 4, 5], [0, 3, 5]]
+    index = np.concatenate(group_members)
+    groups = np.repeat([1, 2, 3, 4], [len(members) for members in group_members])
+    tags = np.array([f"{group}-{label}" for group, label in zip(groups, labels[index], strict=True)])
+    # Mix group order and repeat observations. Ranking is over bats, not observations.
+    tag_index = np.r_[np.arange(len(tags))[::-1], 0, 4, 2, 3, 0, 5]
     observed = pd.DataFrame({"tag": tags[tag_index], "treatment": groups[tag_index]})
-    mu = np.array([[0., 0., .22, .22, -.16, -.12, 0.],
-                   [0., 0., -.65, -.65, .95, .6, 0.]])
-    kappa = np.array([[3., 3., 2., 2., 9., 8., 15.],
-                      [3., 3., 7., 7., 3., 4., 15.]])
-    weight = np.array([[0., 0., .25, .25, .85, .65, 1.],
-                       [0., 0., .70, .70, .25, .35, 1.]])
+    mu = np.array([[0., 0., .22, .22, -.16, -.12],
+                   [0., 0., -.65, -.65, .95, .6]])[:, index] + .04 * groups
+    kappa = np.array([[3., 3., 2., 2., 9., 8.],
+                      [3., 3., 7., 7., 3., 4.]])[:, index]
+    weight = np.array([[0., 0., .25, .25, .85, .65],
+                       [0., 0., .70, .70, .25, .35]])[:, index]
     posterior = individual_posterior(tag_index, mu, kappa, weight)
     angle = np.deg2rad(np.arange(-180, 181))
     predictions = layout._individual_predictions(posterior, observed, posthoc, angle)
-    curves = predictions["individual_density_profiles"]
-    assert list(curves) == ["uniform-a", "mid-a", "high"]
-    for tag, profile in curves.items():
-        i = np.flatnonzero(tags == tag)[0]
-        directed = vonmises.pdf(angle, kappa[:, i, None], loc=mu[:, i, None])
-        prob = weight[:, i, None]
-        mixture = prob * directed + (1 - prob) / (2 * np.pi)
-        np.testing.assert_allclose(profile["mean"], np.average(mixture, axis=0, weights=STATE_COUNTS))
-        np.testing.assert_allclose(profile["lo"], mixture[0])
-        np.testing.assert_allclose(profile["hi"], mixture[0])
-        assert trapezoid(profile["mean"], angle) == pytest.approx(1)
+    grouped = predictions["individual_density_profiles"]
+    assert {level: list(profiles) for level, profiles in grouped.items()} == {
+        1: ["1-uniform-a", "1-mid-a", "1-high"],
+        2: ["2-uniform-a", "2-mid-b", "2-high"],
+        3: ["3-uniform-b", "3-mid-b", "3-high"],
+        4: ["4-uniform-b", "4-mid-a", "4-upper-mid"],
+    }
+    for curves in grouped.values():
+        for tag, profile in curves.items():
+            i = np.flatnonzero(tags == tag)[0]
+            directed = vonmises.pdf(angle, kappa[:, i, None], loc=mu[:, i, None])
+            prob = weight[:, i, None]
+            mixture = prob * directed + (1 - prob) / (2 * np.pi)
+            np.testing.assert_allclose(profile["mean"], np.average(mixture, axis=0, weights=STATE_COUNTS))
+            np.testing.assert_allclose(profile["lo"], mixture[0])
+            np.testing.assert_allclose(profile["hi"], mixture[0])
+            assert trapezoid(profile["mean"], angle) == pytest.approx(1)

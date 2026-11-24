@@ -70,7 +70,7 @@ def _density_profile(density, posthoc):
 
 
 def _individual_predictions(posterior, observed, posthoc, bearings):
-    """Return each bat's sector probability and three control bats' full PDFs."""
+    """Return each bat's sector probability and ranked example PDFs for each treatment."""
     tags, first, inverse = np.unique(observed["tag"], return_index=True, return_inverse=True)
     treatments = observed["treatment"].to_numpy()
     if not np.array_equal(treatments, treatments[first][inverse]):
@@ -89,15 +89,16 @@ def _individual_predictions(posterior, observed, posthoc, bearings):
         lo, hi = posthoc.hdi_1d(draws, prob=PANEL_C_HDI_PROB)
         rows.append({"tag": str(tag), "treatment": int(level), "mean": float(draws.mean()),
                      "lo": float(lo), "hi": float(hi)})
-    # Use the same within-treatment ordering as the dot plot. Holding
-    # treatment fixed makes these examples a comparison among individuals.
-    controls = sorted((i for i, row in enumerate(rows) if row["treatment"] == 1),
-                      key=lambda i: (rows[i]["mean"], rows[i]["tag"]))
+    # Use the dot plot's ordering. With an even count, use the lower of the
+    # two middle ranks so every curve belongs to one actual fitted bat.
     profiles = {}
-    if controls:
-        for i in dict.fromkeys((controls[0], controls[(len(controls) - 1) // 2], controls[-1])):
+    for level in np.unique(treatments):
+        group = sorted((i for i, row in enumerate(rows) if row["treatment"] == level),
+                       key=lambda i: (rows[i]["mean"], rows[i]["tag"]))
+        profiles[int(level)] = {}
+        for i in dict.fromkeys((group[0], group[(len(group) - 1) // 2], group[-1])):
             density = _mixture_density_draws(bearings, mu[:, i], kappa[:, i], weight[:, i], posthoc)
-            profiles[rows[i]["tag"]] = _density_profile(density, posthoc)
+            profiles[int(level)][rows[i]["tag"]] = _density_profile(density, posthoc)
     return {"goal_window_by_bat": rows, "individual_density_profiles": profiles}
 
 
