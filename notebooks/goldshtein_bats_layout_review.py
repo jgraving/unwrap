@@ -32,7 +32,9 @@ import pymupdf
 from scipy.special import expit
 from shapely.geometry.polygon import orient
 
-from goldshtein_bats_layout_data import _population_parameters, _read_context, assemble_layout_data
+from goldshtein_bats_layout_data import (
+    PANEL_C_HDI_PROB, _population_parameters, _read_context, assemble_layout_data,
+)
 
 
 INK = "#222222"
@@ -253,13 +255,13 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     page_text(18, 317, "Full-mixture\nheading density", fontsize=9)
     page_text(18, 362, "Group contrast", fontsize=10, weight="bold")
     page_text(18, 386, f"Probability within\n±{half_width:g}° of the goal\ntreatment − control", fontsize=9)
-    contrast = axes_at(left, 355, width, 61)
-    contrast.axhline(0, color="#777777", lw=.8, ls=(0, (3, 2)), zorder=0)
+    contrast = axes_at(left, 352, width, 68)
+    contrast.axhline(0, color="#777777", lw=.45, ls=(0, (3, 2)), zorder=0)
     contrast.plot(0, 0, "o", color=colors[levels[0]], ms=3.7)
     for i, level in enumerate(levels[1:], start=1):
         mean, lo, hi = data["goal_window_contrasts"][level]
         contrast.errorbar(i, mean, yerr=[[mean - lo], [hi - mean]], fmt="o", color=colors[level],
-                          ms=4, elinewidth=1.05, capsize=2.3, capthick=1)
+                          ms=4, elinewidth=1.05, capsize=2.3, capthick=.65)
     contrast.set(xlim=(-.5, len(levels) - .5), ylim=(-.23, .036), xticks=[], yticks=(-.2, -.1, 0))
     contrast.spines[["top", "right", "bottom"]].set_visible(False)
     contrast.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
@@ -774,6 +776,7 @@ def main(argv=None):
             }
             for row in ctx["delta_df"].itertuples()
         },
+        "panel_c_hdi_probability": PANEL_C_HDI_PROB,
         "goal_window_by_bat": data["goal_window_by_bat"],
         "density_at_zero_by_treatment": data["density_at_zero_by_treatment"],
         "density_at_zero_treatment_contrasts": data["full_contrasts"],

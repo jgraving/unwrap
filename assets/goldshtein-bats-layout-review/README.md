@@ -30,11 +30,10 @@ shaded sector spans ±45° around the goal. Population contrasts give the
 treatment-minus-control difference in sector probability within each draw,
 with individual offsets set to zero. Each bat’s probability includes its own
 offsets under its observed treatment. Curves and points show posterior means.
-Bands and bars show 95% highest-density intervals, pointwise for the curves.
+Bands and bars show 90% highest-density intervals, pointwise for the curves.
 For uniform headings, the density is 1/(2π) per radian, so the π/2-radian
 sector has probability (π/2)/(2π) = 0.25 (dashed line in the individual panel).
-Individual intervals lay
-entirely above this value for 28/29 controls, 14/14 bats with eye cover,
+Individual intervals lay entirely above this value for 28/29 controls, 14/14 bats with eye cover,
 14/15 with the added magnet, and 9/9 with added anosmia.
 
 **(d)** Directedness compares the directed and undirected heading likelihoods

@@ -11,6 +11,9 @@ from unwrap import datasets
 from unwrap.link.numpy import circular_modulo, softplus
 
 
+PANEL_C_HDI_PROB = 0.90
+
+
 def _read_context(data_root):
     # The notebook helpers resolve a lake path at import time. Supply the
     # pinned path to those imports so a figure build does not need a checkout
@@ -72,7 +75,7 @@ def _goal_window_by_bat(posterior, observed, posthoc):
         raise ValueError("Non-finite posterior goal-sector probability for a fitted bat")
     rows = []
     for tag, level, draws in zip(tags, treatments[first], probabilities.T, strict=True):
-        lo, hi = posthoc.hdi_1d(draws, prob=0.95)
+        lo, hi = posthoc.hdi_1d(draws, prob=PANEL_C_HDI_PROB)
         rows.append({"tag": str(tag), "treatment": int(level), "mean": float(draws.mean()),
                      "lo": float(lo), "hi": float(hi)})
     return rows
@@ -83,7 +86,7 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
     mu, kappa, weight = _population_parameters(posterior, levels, posthoc)
 
     def summary(draws):
-        return (float(np.mean(draws)), *map(float, posthoc.hdi_1d(draws, prob=0.95)))
+        return (float(np.mean(draws)), *map(float, posthoc.hdi_1d(draws, prob=PANEL_C_HDI_PROB)))
 
     bearings = np.deg2rad(np.arange(-180, 181))
     goal_index = bearings.size // 2
@@ -94,7 +97,7 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
         p = weight[:, i, None]
         density = p * directed + (1 - p) * (1 / (2 * np.pi))
         density_at_goal[:, i] = density[:, goal_index]
-        lo, hi = posthoc.hdi_along_samples(density, prob=0.95)
+        lo, hi = posthoc.hdi_along_samples(density, prob=PANEL_C_HDI_PROB)
         density_profiles[level] = {"mean": density.mean(axis=0), "lo": lo, "hi": hi}
 
     half_width = posthoc.MASS_HALF_WIDTH_DEG

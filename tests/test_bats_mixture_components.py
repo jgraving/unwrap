@@ -14,18 +14,26 @@ import goldshtein_bats_layout_data as layout
 import goldshtein_bats_posthoc as posthoc
 
 
+# The first state alone contains the 90% HDI. A 95% interval must include both.
+STATE_COUNTS = [74, 6]
+
+
+def expected_summary(draws):
+    return [np.average(draws, weights=STATE_COUNTS), draws[0], draws[0]]
+
+
 @pytest.fixture
 def predictions(monkeypatch):
     # Two joint states with positively correlated directed weight and concentration.
     # The control mean bearing straddles the ±180° seam.
-    state = np.arange(80) % 2
+    state = np.repeat([0, 1], STATE_COUNTS)
     mu = np.deg2rad(np.array([[178, -179, -3, 178], [-178, -173, 3, -178]])[state])
     kappa = np.array([[1, 3, 9, 1], [9, 11, 1, 9]])[state]
     omega = np.array([[0.2, 0.3, 0.8, 0.2], [0.8, 0.9, 0.2, 0.8]])[state]
     monkeypatch.setattr(layout, "_population_parameters", lambda *_: (mu, kappa, omega))
     levels = [1, 2, 3, 4]
     data = layout._mixture_predictions(None, levels, dict.fromkeys(levels, 1), posthoc)
-    return data, mu[:2], kappa[:2], omega[:2]
+    return data, mu[[0, -1]], kappa[[0, -1]], omega[[0, -1]]
 
 
 def test_draw_weighted_component_densities_and_intervals(predictions):
@@ -38,19 +46,17 @@ def test_draw_weighted_component_densities_and_intervals(predictions):
         weight = omega[:, i, None]
         mixture = weight * directed + (1 - weight) * uniform
         curve = data["density_profiles"][level]
-        np.testing.assert_allclose(curve["mean"], mixture.mean(axis=0))
-        np.testing.assert_allclose(curve["lo"], mixture.min(axis=0))
-        np.testing.assert_allclose(curve["hi"], mixture.max(axis=0))
+        np.testing.assert_allclose(curve["mean"], np.average(mixture, axis=0, weights=STATE_COUNTS))
+        np.testing.assert_allclose(curve["lo"], mixture[0])
+        np.testing.assert_allclose(curve["hi"], mixture[0])
 
         assert trapezoid(curve["mean"], angle) == pytest.approx(1)
         goal = mixture[:, angle == 0].ravel()
         goal_draws.append(goal)
-        np.testing.assert_allclose(data["density_at_zero_by_treatment"][level],
-                                   [goal.mean(), goal.min(), goal.max()])
+        np.testing.assert_allclose(data["density_at_zero_by_treatment"][level], expected_summary(goal))
     for level, draws in enumerate(goal_draws[1:], start=2):
         difference = draws - goal_draws[0]
-        np.testing.assert_allclose(data["full_contrasts"][level],
-                                   [difference.mean(), difference.min(), difference.max()], atol=1e-14)
+        np.testing.assert_allclose(data["full_contrasts"][level], expected_summary(difference), atol=1e-14)
 
 
 def sector_integral(mu, kappa, weight):
@@ -61,18 +67,17 @@ def sector_integral(mu, kappa, weight):
 
 def test_population_sector_contrasts_are_paired_in_each_draw(predictions):
     data, mu, kappa, omega = predictions
+    assert layout.PANEL_C_HDI_PROB == 0.90
     assert data["goal_window_half_width_degrees"] == 45
     group_draws = []
     for i, level in enumerate([1, 2, 3, 4]):
         draws = np.array([sector_integral(m, k, w)
                           for m, k, w in zip(mu[:, i], kappa[:, i], omega[:, i], strict=True)])
         group_draws.append(draws)
-        np.testing.assert_allclose(data["goal_window_groups"][level],
-                                   [draws.mean(), draws.min(), draws.max()], atol=1e-14)
+        np.testing.assert_allclose(data["goal_window_groups"][level], expected_summary(draws), atol=1e-14)
     for level, draws in enumerate(group_draws[1:], start=2):
         delta = draws - group_draws[0]
-        np.testing.assert_allclose(data["goal_window_contrasts"][level],
-                                   [delta.mean(), delta.min(), delta.max()], atol=1e-14)
+        np.testing.assert_allclose(data["goal_window_contrasts"][level], expected_summary(delta), atol=1e-14)
 
 
 def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
@@ -86,10 +91,11 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
     mu = np.array([[0.1, 1.4, 2.9], [-0.5, 0.1, -2.9]])
     kappa = np.array([[9., 2., 5.], [2., 9., 4.]])
     weight = np.array([[0.9, 0.2, 0.], [0.3, 0.8, 0.]])
-    directed_share = weight[:, tag_index]
+    state = np.repeat([0, 1], STATE_COUNTS)
+    directed_share = weight[state][:, tag_index]
     posterior = xr.Dataset({
-        "mu": (("chain", "draw", "mu_dim_0"), mu[:, tag_index][None]),
-        "kappa": (("chain", "draw", "kappa_dim_0"), kappa[:, tag_index][None]),
+        "mu": (("chain", "draw", "mu_dim_0"), mu[state][:, tag_index][None]),
+        "kappa": (("chain", "draw", "kappa_dim_0"), kappa[state][:, tag_index][None]),
         "p_goal": (("chain", "draw", "p_goal_dim_0", "p_goal_dim_1"),
                    np.stack([directed_share, 1 - directed_share], axis=-1)[None]),
     })
@@ -99,8 +105,7 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
     for i, row in enumerate(rows):
         draws = np.array([sector_integral(m, k, w)
                           for m, k, w in zip(mu[:, i], kappa[:, i], weight[:, i], strict=True)])
-        np.testing.assert_allclose([row["mean"], row["lo"], row["hi"]],
-                                   [draws.mean(), draws.min(), draws.max()])
+        np.testing.assert_allclose([row["mean"], row["lo"], row["hi"]], expected_summary(draws))
     assert rows[2]["mean"] == pytest.approx(0.25)
     observed.loc[7, "treatment"] = 4
     with pytest.raises(ValueError, match="more than one treatment"):
