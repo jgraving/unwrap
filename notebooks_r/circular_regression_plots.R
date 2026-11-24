@@ -23,41 +23,63 @@ trace_plot <- function(fit, parameters) {
     theme(legend.position = "bottom")
 }
 
-# Post-warmup predictions: the posterior mean direction (averaged as
-# unit vectors, so angles near +/-pi are neighbours) and the mean
-# concentration across draws, with the observations and the known
-# generating curves dashed underneath.
-predictions_plot <- function(data, grid_x, mean_direction, concentration) {
-  obs_df <- data.frame(grid = data$x, value = data$y,
-    panel = "mean direction (rad)")
-  pred_df <- data.frame(
-    grid = rep(grid_x, 2),
-    value = c(mean_direction, concentration),
-    panel = c(rep("mean direction (rad)", length(grid_x)),
-      rep("concentration (kappa)", length(grid_x))))
-  ggplot(pred_df, aes(grid, value)) +
-    geom_line(alpha = 0.8) +
-    geom_point(data = obs_df, aes(grid, value),
-      alpha = 0.35, position = position_jitter(width = 0.02, height = 0.15)) +
-    geom_line(data = data.frame(grid = grid_x,
-      value = mod_circular(grid_x),
-      panel = "mean direction (rad)"),
-      aes(grid, value), inherit.aes = FALSE,
-      linetype = "dashed") +
-    geom_line(data = data.frame(grid = grid_x,
-      value = softplus(2 + 0.5 * grid_x),
-      panel = "concentration (kappa)"),
-      aes(grid, value), inherit.aes = FALSE,
-      linetype = "dashed") +
-    facet_wrap(~ panel, scales = "free_y") +
-    labs(x = expression(x), y = "")
+bearing_degrees <- function(theta) (pi/2 + mod_circular(theta - pi/2)) * 180/pi
+
+# Draws occupy rows. Center angles before taking quantiles so a band can
+# cross the signed-angle boundary at 180 degrees.
+direction_band <- function(x, draws) {
+  center <- Arg(colMeans(exp(1i * draws)))
+  deviations <- mod_circular(sweep(draws, 2, center, "-"))
+  offsets <- apply(deviations, 2, quantile, probs = c(0.05, 0.95)) * 180/pi
+  value <- bearing_degrees(center)
+  data.frame(x, value, low = value + offsets[1, ], high = value + offsets[2, ])
 }
 
-# Posterior predictive check: the density of the posterior replicates'
-# mean resultant length against the observed one.
-ppc_plot <- function(replicated_R, observed_R) {
-  ggplot(data.frame(replicated_R), aes(replicated_R)) +
-    geom_density(alpha = 0.7, fill = "darkseagreen", colour = "grey40") +
-    geom_vline(xintercept = observed_R, colour = "firebrick", linewidth = 1) +
-    labs(x = "mean resultant length R", y = "density")
+linear_band <- function(x, draws) {
+  q <- apply(draws, 2, quantile, probs = c(0.05, 0.5, 0.95))
+  data.frame(x, value = q[2, ], low = q[1, ], high = q[3, ])
+}
+
+cue_facets <- function(p, labels) {
+  p + facet_wrap(~ panel, scales = "free_y", labeller = as_labeller(labels)) +
+    scale_x_continuous(breaks = seq(-1, 1, by = 0.5)) +
+    labs(x = "Cue strength (x)", y = NULL) +
+    theme(legend.position = "bottom", panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank(), strip.text = element_text(face = "bold"))
+}
+
+predictions_plot <- function(data, grid_x, pred, true_mu, true_kappa) {
+  mu <- transform(direction_band(grid_x, pred$mu), panel = "A", truth = bearing_degrees(true_mu))
+  kappa <- transform(linear_band(grid_x, pred$kappa), panel = "B", truth = true_kappa)
+  curves <- rbind(mu, kappa)
+  observed <- data.frame(x = data$x, value = bearing_degrees(data$y), panel = "A")
+  limits <- data.frame(x = 0, value = c(-90, 270, 0), panel = c("A", "A", "B"))
+  p <- ggplot(curves, aes(x, value)) +
+    geom_blank(data = limits) +
+    geom_point(data = observed, size = 1, alpha = 0.24, colour = "grey35") +
+    geom_ribbon(aes(ymin = low, ymax = high), fill = "#086b72", alpha = 0.24) +
+    geom_line(aes(colour = "Fitted"), linewidth = 0.9) +
+    geom_line(aes(y = truth, colour = "Generating curve"), linetype = 2, linewidth = 0.7) +
+    scale_colour_manual(values = c("Fitted" = "#086b72", "Generating curve" = "#a33b12"),
+                        name = NULL) +
+    labs(caption = "Grey points: individual headings. Shading: pointwise 90% credible band.")
+  cue_facets(p, c(A = "Preferred bearing (degrees)", B = "Concentration (kappa)"))
+}
+
+ppc_plot <- function(levels, observed, predicted) {
+  mu <- transform(direction_band(levels, Arg(predicted)), panel = "A",
+                  observed = bearing_degrees(Arg(observed)))
+  alignment <- transform(linear_band(levels, Mod(predicted)), panel = "B", observed = Mod(observed))
+  intervals <- rbind(mu, alignment)
+  limits <- data.frame(x = 0, value = c(-90, 270, 0, 1), panel = c("A", "A", "B", "B"))
+  p <- ggplot(intervals, aes(x, value)) +
+    geom_blank(data = limits) +
+    geom_linerange(aes(ymin = low, ymax = high), colour = "#086b72", linewidth = 1.2) +
+    geom_point(aes(shape = "Predictive center"), size = 2, colour = "#086b72") +
+    geom_point(aes(y = observed, shape = "Observed group"), size = 2.6,
+               fill = "#a33b12", colour = "white", stroke = 0.3) +
+    scale_shape_manual(values = c("Predictive center" = 16, "Observed group" = 23),
+                       name = NULL) +
+    labs(caption = "Bars enclose 90% of replicated groups at the same cue strength.")
+  cue_facets(p, c(A = "Group mean bearing (degrees)", B = "Group mean resultant length"))
 }

@@ -19,6 +19,7 @@ import numpy as np
 import arviz as az
 
 from unwrap import plots as _plots
+from unwrap.circular import wrap_pi
 
 #: Publication figures for this study live in
 #: <repo>/figures/circular_regression/, anchored on this file's location so
@@ -76,37 +77,83 @@ def plot_trace(idata, var_names, *, save=True,
     return pc
 
 
-def plot_predictions(data, grid, mean_direction, concentration_draws, *,
-                     save=True,
-                     save_path="figures/circular_regression/predictions.svg"):
-    """Observed points plus the posterior mean-direction and concentration
-    curves across the predictor. The dashed reference lines use the known
-    generating values (mean = x, kappa = softplus(2 + 0.5 x))."""
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-    axes[0].scatter(data.x, data.y, s=12, alpha=0.3, color="gray", label="Observed")
-    axes[0].plot(grid, mean_direction, label="Posterior circular mean")
-    axes[0].plot(grid, grid, "--", label="Generating mean")
-    axes[0].set(xlabel="Predictor x", ylabel="Direction (radians)", ylim=(-np.pi, np.pi))
-    axes[1].plot(grid, concentration_draws.mean(axis=0), label="Posterior mean")
-    axes[1].plot(grid, np.logaddexp(0, 2 + 0.5 * grid), "--",
-                 label="Generating concentration")
-    axes[1].set(xlabel="Predictor x", ylabel="Concentration kappa")
+_FIT = "#086b72"
+_TRUTH = "#a33b12"
+
+
+def _bearing_degrees(theta):
+    """Lift one turn to [-90, 270) degrees for this experiment's bearing axis."""
+    return np.degrees(np.pi / 2 + wrap_pi(theta - np.pi / 2))
+
+
+def _direction_summary(draws):
+    """Circular center and central 90% arc, in display degrees at each x."""
+    center = np.angle(np.exp(1j * draws).mean(axis=0))
+    offsets = np.quantile(wrap_pi(draws - center), [0.05, 0.95], axis=0)
+    center_deg = _bearing_degrees(center)
+    lo, hi = center_deg + np.degrees(offsets)
+    return center_deg, lo, hi
+
+
+def _cue_axes(axes):
     for ax in axes:
-        ax.legend(fontsize=8)
-    fig.tight_layout()
+        ax.set(xlabel="Cue strength (x)", xticks=[-1, -0.5, 0, 0.5, 1])
+        ax.set_axisbelow(True)
+        ax.grid(axis="y", color="0.90", linewidth=0.7)
+        ax.spines[["right", "top"]].set_visible(False)
+    axes[0].set(ylim=(-90, 270), yticks=[-90, 0, 90, 180, 270],
+                ylabel="Bearing (degrees)")
+
+
+def plot_predictions(data, grid, mu_draws, kappa_draws, true_mu, true_kappa, *,
+                     save=True, save_path="figures/circular_regression/predictions.svg"):
+    """Compare both fitted curves and pointwise credible bands with the simulation."""
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4))
+    _cue_axes(axes)
+    axes[0].set_title("Where do animals point?", loc="left")
+    axes[1].set_title("How tightly do they align?", loc="left")
+    axes[1].set_ylabel("Concentration (κ)")
+    points = axes[0].scatter(data.x, _bearing_degrees(data.y), s=8, linewidths=0,
+                             alpha=0.25, color="0.38", label="Individual headings")
+    mu_summary = _direction_summary(mu_draws)
+    lo, med, hi = np.quantile(kappa_draws, [0.05, 0.5, 0.95], axis=0)
+    for ax, (center, low, high), truth in zip(
+        axes, (mu_summary, (med, lo, hi)), (_bearing_degrees(true_mu), true_kappa)
+    ):
+        band = ax.fill_between(grid, low, high, color=_FIT, alpha=0.24,
+                               linewidth=0, label="90% credible band")
+        estimate, = ax.plot(grid, center, color=_FIT, linewidth=2, label="Fitted")
+        reference, = ax.plot(grid, truth, "--", color=_TRUTH, linewidth=1.5,
+                             label="Generating curve")
+    axes[1].set_ylim(bottom=0)
+    fig.legend(handles=[points, estimate, band, reference], loc="lower center",
+               ncols=4, frameon=False, fontsize=9)
+    fig.tight_layout(rect=(0, 0.10, 1, 1))
     _save(fig, save, save_path)
     return fig
 
 
-def plot_ppc(replicated_R, observed_R, *, save=True,
+def plot_ppc(levels, observed, predicted, *, save=True,
              save_path="figures/circular_regression/ppc.svg"):
-    """Histogram of replicated-dataset mean resultant lengths against the
-    observed value (a circular-concentration-style PPC)."""
-    fig, ax = plt.subplots(figsize=(6, 3))
-    ax.hist(replicated_R.ravel(), bins=30, alpha=0.7, label="Replicated datasets")
-    ax.axvline(observed_R, color="black", label="Observed dataset")
-    ax.set(xlabel="Mean resultant length", ylabel="Replicated dataset count")
-    ax.legend()
-    fig.tight_layout()
+    """Observed vs replicated circular means and resultant lengths by cue strength."""
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4))
+    _cue_axes(axes)
+    axes[0].set_title("Group mean bearing", loc="left")
+    axes[1].set_title("Within-group alignment", loc="left")
+    axes[1].set(ylabel="Mean resultant length", ylim=(0, 1))
+    mu_summary = _direction_summary(np.angle(predicted))
+    lo, med, hi = np.quantile(np.abs(predicted), [0.05, 0.5, 0.95], axis=0)
+    for ax, (center, low, high), obs in zip(
+        axes, (mu_summary, (med, lo, hi)), (_bearing_degrees(np.angle(observed)), np.abs(observed))
+    ):
+        interval = ax.vlines(levels, low, high, color=_FIT, linewidth=3,
+                             label="90% predictive interval")
+        dots = ax.scatter(levels, center, color=_FIT, s=18, zorder=3,
+                          label="Predictive center")
+        diamonds = ax.scatter(levels, obs, color=_TRUTH, edgecolors="white",
+                              linewidths=0.6, marker="D", s=33, zorder=4, label="Observed group")
+    fig.legend(handles=[interval, dots, diamonds], loc="lower center", ncols=3,
+               frameon=False, fontsize=9)
+    fig.tight_layout(rect=(0, 0.10, 1, 1))
     _save(fig, save, save_path)
     return fig
