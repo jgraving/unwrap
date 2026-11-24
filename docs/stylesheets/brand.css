@@ -46,6 +46,13 @@
   white-space: nowrap;
 }
 
+/* Keep the SVG's links interactive in the chooser and fit the map to the page. */
+.unwrap-model-map {
+  display: block;
+  width: 100%;
+  aspect-ratio: 726 / 397;
+}
+
 /* Examples overview: language buttons directly under each example
    title. Both stacks carry equal weight, in the language brand colors
    (Python blue/yellow, R blue). The negative top margin pulls the row

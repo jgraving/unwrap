@@ -18,7 +18,7 @@ concurrency:
 # CRAN snapshot whose binary set matches the lockfile), then a real brms
 # fit through CmdStan.
 #
-# - ubuntu-24.04: RSPM binaries for CRAN; four r-universe source builds.
+# - ubuntu-24.04: RSPM binaries for CRAN, with source builds for Stan packages.
 # - windows-latest: prebuilt R packages; CmdStan still compiles with Rtools.
 # - macos-latest: mostly CRAN binaries, with some source builds, plus CmdStan.
 #
@@ -73,15 +73,9 @@ jobs:
       # The documented setup (R setup page, step 3) joined into one
       # line. RSPM's date-pinned CRAN
       # snapshot carries the locked CRAN versions, with binaries where
-      # available. Source builds also occur; renv Hash values are cache IDs,
-      # not archive checksums. Both URLs must be in the same
-      # repos vector (passing repos to restore() replaces the
-      # lockfile's recorded repositories; the four r-universe
-      # entries record that repository ID), and every entry must be
-      # NAMED: renv matches each package's lockfile Repository id to a
-      # name in this vector, and the lockfile records the four
-      # r-universe packages under the repository id
-      # "https://stan-dev.r-universe.dev" (a URL, not "CRAN").
+      # available. Keep both named entries in the repos vector so renv
+      # can match the CRAN and r-universe repository IDs in the lockfile.
+      # The lockfile fetches posterior directly from its pinned GitHub commit.
       - name: Restore the pinned environment
         run: |
           Rscript -e 'ru <- "https://stan-dev.r-universe.dev"; repos <- c(CRAN = "https://packagemanager.posit.co/cran/2026-11-03", setNames(ru, ru)); install.packages("renv", repos = repos); renv::activate(); renv::load(); renv::restore(repos = repos)'

@@ -1,17 +1,16 @@
 # Circular models: examples and biological analyses
 
 Start with **[circular regression](circular_regression.ipynb)**. It generates
-its own data and walks through estimating mean direction and directional
-concentration, displaying uncertainty, and checking model predictions.
+independent headings at nine cue levels. Compare fitted mean direction and
+concentration with the known generating curves, then check the circular mean
+and mean resultant length in predictive replicates at each level.
 
-The research notebooks apply these ideas to animal behaviour. Each has
-been rerun end to end from this checkout on the current stack, and
-their saved outputs come from that validated run; each row above says
-what that run validated.
+The research notebooks apply these ideas to animal behaviour. The table
+describes their inputs and the checks used in their saved runs.
 
 | Notebook | Biological question or purpose | Inputs and readiness |
 | --- | --- | --- |
-| [Circular regression](circular_regression.ipynb) | How does a predictor affect mean direction and directional consistency? | Simulated data; executed automatically in CI |
+| [Circular regression](circular_regression.ipynb) | How does a predictor affect mean direction and directional consistency? | Simulated data generated locally in [Python](circular_regression.ipynb) or [R](../notebooks_r/circular_regression.ipynb) |
 | [Grevy's zebra body orientation during an escape response](zebra_escape.ipynb) | How do group orientation, alignment between animals, and consistency within animals change after an approach? | Block bearings pulled from `unwrap-data` (`load_zebra_bearings`); fully rerun and validated from this checkout (MCMC diagnostics pass; kappa random effects fitted non-centered; bootstrap-vs-posterior PPC, with the per-observation parameters from `compute_deterministics` cross-checked against the stored log-likelihood, and the `compute_deterministics` workaround for the bambi `predict(kind="response_params")` kappa bug, bambinos/bambi#1084) |
 | [Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing](goldshtein_bats.ipynb) | Do kilometer-scale bat flights align with the destination (goal-homing), and how strongly? | Tracks, metadata and the Agamon–Hula lake outline pulled from `unwrap-data` (`load_bats_tracks`, `load_bats_info`, `load_bats_lake_outline`); fully rerun and validated from this checkout (fixed 60 m re-discretization with gap segmentation; roost-vs-lake destination assignment from the harmonic lake field and the radial-to-roost bearing; vMU von Mises–uniform mixture fit vs the vM baseline on the goal-relative bearings; PSIS-LOO total / by treatment / per animal, best model the mixture; population and tag-level mixture summaries: mixture weight, goal-directed concentration, directed-component density at the goal and the ±45° mass around it; hierarchical-bootstrap PPC by treatment plus the per-animal bootstrap-vs-posterior grid; per-step goal-component responsibility with kernel-smoothed approach curves; the vM per-observation log-likelihood taken from the PyMC graph, working around the bambi vonmises kappa link bug, bambinos/bambi#1084) |
 | [Order and density shape locust directional alignment in virtual reality](locust_density_order.ipynb) | How do the density and alignment of virtual neighbours relate to movement direction? | Raw tracking parts pulled from `unwrap-data` (`load_density_order`); fully rerun and validated from this checkout (MCMC diagnostics pass; individual-level PSIS-LOO sweep selecting the Density × Order specification; final random-intercept fit validated with alignment and predictive-density statistics plus cell- and individual-level predictive checks; per-observation log-likelihood attached from the PyMC graph via `compute_deterministics`, working around the bambi `predict(kind="response_params")` kappa bug, bambinos/bambi#1084) |
@@ -99,3 +98,11 @@ For the statistical framework and biological context, see the
 [mathematical guide](../docs/math/von-mises.md).
 The locust density–order manuscript figure has a saved-fit publication
 renderer with original source images: [reproduction instructions](LOCUST_DENSITY_FIGURE.md).
+
+The zebra escape-response paper figure has a saved-fit publication
+renderer that rebuilds the published 900 × 1080-point composite from the
+pinned data and cached fit: [reproduction instructions](ZEBRA_FIGURE.md).
+
+The circstats paper's graphical abstract has a deterministic vector
+renderer with a reproducible circular-model example in panel B.
+See the [reproduction instructions](CIRCSTATS_GRAPHICAL_ABSTRACT.md).

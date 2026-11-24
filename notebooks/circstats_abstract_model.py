@@ -1,0 +1,314 @@
+"""Reproducible circular-model example for the graphical abstract."""
+from functools import lru_cache
+
+import numpy as np
+from matplotlib.lines import Line2D
+from scipy.special import i0e
+
+from unwrap.circular import circ_mod
+from unwrap.link.numpy import softplus
+
+
+SEED = 159
+# Dot centres measured on the original panel's −180° to 180° axis.
+REFERENCE_OBSERVED_DEG = (-76, -55, -55, -33, -33, -33, -12, -12,
+                           10, 10, 10, 31, 31, 53, 53, 75)
+# Bring the illustrative angles closer to their mean before fitting.
+OBSERVED_SPREAD = 0.70
+# Raises mean κ from 1.25 to 2.16 in the seeded prior draws.
+PRIOR_MEAN = (0.0, 1.5)
+PRIOR_SD = (3.5, 2.5)
+BURN_IN = 600
+N_DRAWS = 1000
+TRACE_DRAWS = 400
+MARKED_DRAWS_PER_CHAIN = 18
+DISPLAY_DOTS_PER_ANGLE = 4
+PRIOR_LINES = 36
+POSTERIOR_LINES = 44
+# A direction-only proposal improves within-turn mixing.
+MU_STEP = 0.42
+# Two concentration-only moves improve tail mixing at a fixed draw count.
+KAPPA_UPDATES = 2
+KAPPA_STEP = 1.6
+
+BLUE = "#0072b2"
+POSTERIOR_MEAN_COLOR = "#075b91"
+GRAY = "#6b7280"
+INK = "#231f20"
+GRID = "#d4d7d9"
+POLAR_GUIDE_COLOR = "#b9bdc0"
+POLAR_RING_WIDTH = 0.60
+POLAR_SPOKE_WIDTH = 0.50
+LABEL_SIZE = 7.0
+LEGEND_SIZE = 6.1
+CHAIN_COLORS = (("#973e08", "#d55e00", "#e98b43"),
+                ("#804181", "#b65fa0", "#d486bc"))
+WRAP_BRANCHES = (-1, 0, 1)
+
+
+def _parameters(eta):
+    eta_mu, eta_kappa = np.moveaxis(eta, -1, 0)
+    return circ_mod(eta_mu), softplus(eta_kappa)
+
+
+def _density(theta, mu, kappa):
+    kappa = kappa[..., None]
+    return np.exp(kappa * (np.cos(theta - mu[..., None]) - 1.0)) / (
+        2 * np.pi * i0e(kappa))
+
+
+@lru_cache(maxsize=1)
+def example():
+    """Sample an intercept-only von Mises model on the real predictor scale."""
+    prior_seed, *chain_seeds = np.random.SeedSequence(SEED).spawn(
+        1 + len(WRAP_BRANCHES))
+    rng = np.random.default_rng(prior_seed)
+    observed = np.deg2rad(REFERENCE_OBSERVED_DEG)
+    center = np.angle(np.exp(1j * observed).mean())
+    observed = circ_mod(center + OBSERVED_SPREAD * circ_mod(observed - center))
+    prior = rng.normal(loc=PRIOR_MEAN, scale=PRIOR_SD, size=(N_DRAWS, 2))
+    resultant = np.exp(1j * observed).sum()
+
+    def log_posterior(eta):
+        mu, kappa = _parameters(eta)
+        # Subtract κ before evaluating the log normalizer for stability.
+        log_likelihood = kappa * (
+            (resultant * np.exp(-1j * mu)).real - observed.size
+        ) - observed.size * np.log(i0e(kappa))
+        standardized = (eta - PRIOR_MEAN) / PRIOR_SD
+        return log_likelihood - 0.5 * np.square(standardized).sum()
+
+    posterior = np.empty((len(WRAP_BRANCHES), N_DRAWS, 2))
+    for chain, (branch, seed) in enumerate(zip(WRAP_BRANCHES, chain_seeds)):
+        rng = np.random.default_rng(seed)
+        eta = np.array([2 * np.pi * branch, 0.0])
+        logp = log_posterior(eta)
+        for i in range(BURN_IN + N_DRAWS):
+            proposal = eta + rng.normal(scale=(MU_STEP, 0.78))
+            # Symmetric jumps let the chains visit equivalent wraps.
+            if rng.random() < 0.12:
+                proposal[0] += rng.choice((-2 * np.pi, 2 * np.pi))
+            candidate = log_posterior(proposal)
+            if np.log(rng.random()) < candidate - logp:
+                eta, logp = proposal, candidate
+            proposal = eta.copy()
+            proposal[0] += rng.normal(scale=MU_STEP)
+            candidate = log_posterior(proposal)
+            if np.log(rng.random()) < candidate - logp:
+                eta, logp = proposal, candidate
+            for _ in range(KAPPA_UPDATES):
+                proposal = eta.copy()
+                proposal[1] += rng.normal(scale=KAPPA_STEP)
+                candidate = log_posterior(proposal)
+                if np.log(rng.random()) < candidate - logp:
+                    eta, logp = proposal, candidate
+            if i >= BURN_IN:
+                posterior[chain, i - BURN_IN] = eta
+    theta = np.linspace(-np.pi, np.pi, 361)
+    prior_density = _density(theta, *_parameters(prior))
+    posterior_density = _density(theta, *_parameters(posterior.reshape(-1, 2)))
+    return theta, observed, posterior, prior_density, posterior_density
+
+
+def _page_axes(fig, page, x, y, w, h, **kwargs):
+    width, height = page
+    return fig.add_axes([x / width, (height - y - h) / height,
+                         w / width, h / height], **kwargs)
+
+
+def _display_traces(draws):
+    """Keep draw order and show each direction chain on one equivalent turn."""
+    traces = draws[:, :TRACE_DRAWS].copy()
+    turns = 2 * np.pi * np.asarray(WRAP_BRANCHES)[:, None]
+    traces[:, :, 0] = circ_mod(traces[:, :, 0]) + turns
+    return traces
+
+
+def _display_observations(observed):
+    """Spread copies of coincident angles for display without changing the fit."""
+    rng = np.random.default_rng(SEED + 1)
+    angles = np.repeat(observed, DISPLAY_DOTS_PER_ANGLE)
+    offsets = np.clip(rng.normal(0, 6.5, angles.size), -14, 14)
+    radii = rng.uniform(0.82, 0.91, angles.size)
+    return angles + np.deg2rad(offsets), radii
+
+
+def _predictive_plot(fig, page, family, theta, observed, prior, posterior):
+    polar = _page_axes(fig, page, 270, 100, 63, 63, projection="polar")
+    polar.set_theta_zero_location("N")
+    polar.set_theta_direction(-1)
+    polar.set_xticks([])
+    polar.set_yticks([])
+    polar.spines["polar"].set_color(POLAR_GUIDE_COLOR)
+    polar.spines["polar"].set_linewidth(POLAR_RING_WIDTH)
+    polar.set_title("Predictive density · vM(μ, κ)", fontfamily=family,
+                    fontsize=LABEL_SIZE, color=INK, pad=2.5)
+
+    # An additive radius keeps zero density on an inner circle rather than
+    # at the origin. Both sets of draws use one radial scale.
+    prior_lines = prior[np.linspace(0, len(prior) - 1, PRIOR_LINES, dtype=int)]
+    posterior_lines = posterior[np.linspace(0, len(posterior) - 1, POSTERIOR_LINES,
+                                           dtype=int)]
+    scale = max(prior_lines.max(), posterior_lines.max())
+    polar.set_ylim(0, 2.17)
+    polar.plot(theta, np.ones_like(theta), color=POLAR_GUIDE_COLOR,
+               lw=POLAR_RING_WIDTH)
+    for angle in np.arange(4) * np.pi / 2:
+        polar.plot([angle, angle], [1, 2.17], color=POLAR_GUIDE_COLOR,
+                   lw=POLAR_SPOKE_WIDTH)
+    for sample, color, opacity in ((prior_lines, GRAY, 0.20),
+                                    (posterior_lines, BLUE, 0.28)):
+        polar.plot(theta, 1 + sample.T / scale, color=color, alpha=opacity,
+                   lw=0.40)
+    uniform_radius = 1 + 1 / (2 * np.pi * scale)
+    polar.plot(theta, np.full_like(theta, uniform_radius),
+               color="#303030", alpha=0.68, lw=0.65,
+               linestyle=(0, (2.4, 1.8)), label="Uniform", zorder=3)
+    polar.plot(theta, 1 + posterior.mean(axis=0) / scale,
+               color=POSTERIOR_MEAN_COLOR, alpha=0.88, lw=0.85,
+               label="Posterior mean", zorder=4)
+    angles, radii = _display_observations(observed)
+    polar.scatter(angles, radii, s=2.75, color=BLUE, alpha=0.48,
+                  edgecolors="none", zorder=5)
+
+    handles = [
+        Line2D([], [], color=GRAY, lw=0.8, alpha=0.65, label="Prior"),
+        Line2D([], [], color=BLUE, lw=0.8, label="Posterior"),
+        Line2D([], [], color=BLUE, marker="o", ms=2.5, lw=0, alpha=0.72,
+               label="Observed"),
+    ]
+    key = _page_axes(fig, page, 338, 106, 43, 51)
+    key.set_axis_off()
+    legend = key.legend(handles=handles, loc="center left", frameon=True,
+                        edgecolor="#c7c7c7", facecolor="white", framealpha=1,
+                        borderaxespad=0, borderpad=0.46,
+                        handlelength=1.0, handletextpad=0.48,
+                        labelspacing=0.48, prop={"family": family, "size": LEGEND_SIZE})
+    legend.get_frame().set_linewidth(0.65)
+
+
+def _sampling_diagram(fig, page, family, draws):
+    flow = _page_axes(fig, page, 389, 26, 207, 126)
+    flow.set(xlim=(0, 207), ylim=(126, 0))
+    flow.set_axis_off()
+    text_style = dict(fontfamily=family, color=INK, fontsize=LABEL_SIZE, ha="center")
+    support_style = {**text_style, "fontsize": LEGEND_SIZE}
+    for x, title in ((31, "MCMC draws"), (100, "Link"), (167, "Likelihood parameters")):
+        flow.text(x, 8, title, weight="bold", **text_style)
+    flow.plot([2, 204], [63, 63], color=GRID, lw=0.55)
+
+    traces = _display_traces(draws)
+    mu_draws, _ = _parameters(traces)
+    mu_center = np.angle(np.exp(1j * circ_mod(draws[:, :, 0])).mean())
+    mean_points = np.argmin(np.abs(circ_mod(mu_draws - mu_center)), axis=1)
+    kappa_traces = traces[:, :, 1]
+    targets = np.quantile(kappa_traces, (0.05, 0.50, 0.95))
+    kappa_points = np.argmin(np.abs(kappa_traces - targets[:, None]), axis=1)
+    x_trace = np.linspace(5, 57, traces.shape[1])
+    marked = np.linspace(0, traces.shape[1] - 1, MARKED_DRAWS_PER_CHAIN, dtype=int)
+
+    def mark(x, y, color, *, size=10):
+        flow.scatter([x], [y], s=size, color=color, edgecolors="white",
+                     linewidths=0.35, zorder=5)
+
+    def cloud(x, y, color):
+        x, y = np.broadcast_arrays(x, y)
+        flow.scatter(x, y, s=4.2, color=color, alpha=0.38,
+                     edgecolors="none", zorder=4)
+
+    def arrow(x0, x1, y, color="#848484"):
+        flow.annotate("", (x1, y), (x0, y), arrowprops={
+            "arrowstyle": "->", "color": color, "lw": 0.7, "mutation_scale": 6})
+
+    for i, (top, predictor, name_width, subscript, link, support_label, points) in enumerate((
+        (0, "Direction predictor", 49.5, "μ", "Circular modulo",
+         "Mean direction μ", mean_points),
+        (63, "Concentration predictor", 63.4, "κ", "Softplus",
+         "Concentration κ", kappa_points),
+    )):
+        left = 35 - (name_width + 10) / 2
+        eta_x = left + name_width + 2
+        predictor_style = dict(fontfamily=family, color=INK, ha="left")
+        flow.text(left, top + 23, predictor, fontsize=LEGEND_SIZE, **predictor_style)
+        flow.text(eta_x, top + 23, "η", fontsize=LEGEND_SIZE, **predictor_style)
+        flow.text(eta_x + 3.4, top + 24.4, subscript, fontsize=4.6,
+                  **predictor_style)
+        flow.text(100, top + 23, link, **text_style)
+        flow.text(169, top + 23, support_label, **text_style)
+        arrow(60, 72, top + 42)
+        arrow(128, 140, top + 42)
+
+        trace = traces[:, :, i]
+        if i == 0:
+            # Give the within-turn fluctuations the same vertical scale in
+            # each band, making them visible beside the full-turn offsets.
+            residual = circ_mod(trace - mu_center)
+            scaled = (residual - residual.min()) / np.ptp(residual) - 0.5
+            y_trace = 43 - 10 * np.asarray(WRAP_BRANCHES)[:, None] - 8 * scaled
+        else:
+            scaled = (trace - trace.min()) / np.ptp(trace)
+            y_trace = top + 55 - 24 * scaled
+        values = trace[np.arange(len(points)), points]
+        for color, y, point in zip(CHAIN_COLORS[i], y_trace, points):
+            flow.plot(x_trace, y, color=color, alpha=0.50, lw=0.5)
+            cloud(x_trace[marked], y[marked], color)
+            mark(x_trace[point], y[point], color)
+
+        left, width, baseline, height = 75, 50, top + 54, 24
+        if i == 0:
+            for branch in WRAP_BRANCHES:
+                start = (2 * branch - 1) * np.pi
+                eta = np.linspace(start, start + 2 * np.pi, 100, endpoint=False)
+                flow.plot(left + width * (eta + 3 * np.pi) / (6 * np.pi),
+                          baseline - height * (circ_mod(eta) + np.pi) / (2 * np.pi),
+                          color="#bb6a3a", lw=0.8)
+            flow.plot([left, left + width], [baseline - height / 2] * 2,
+                      color=GRID, lw=0.5, zorder=0)
+            circle = np.linspace(-np.pi, np.pi, 181)
+            flow.plot(169 + 10 * np.sin(circle), 41 - 10 * np.cos(circle),
+                      color=GRID, lw=0.7)
+            mapped = circ_mod(values)
+            for color, eta, mu, raw_samples, radius in zip(
+                CHAIN_COLORS[i], values, mapped, trace[:, marked], (7, 10, 13)
+            ):
+                samples = circ_mod(raw_samples)
+                cloud(left + width * (raw_samples + 3 * np.pi) / (6 * np.pi),
+                      baseline - height * (samples + np.pi) / (2 * np.pi), color)
+                mark(left + width * (eta + 3 * np.pi) / (6 * np.pi),
+                     baseline - height * (mu + np.pi) / (2 * np.pi), color)
+                cloud(169 + radius * np.sin(samples), 41 - radius * np.cos(samples),
+                      color)
+                mark(169 + radius * np.sin(mu), 41 - radius * np.cos(mu), color)
+            flow.text(169, 59, "[−π, π)", **support_style)
+        else:
+            eta = np.linspace(min(-4, trace.min()), max(7, trace.max()), 160)
+            support_limit = softplus(eta[-1])
+            x_range = (left, left + width)
+            y_range = (baseline, baseline - height)
+            input_limits = (eta[0], eta[-1])
+            support_limits = (0, support_limit)
+            flow.plot([left, left + width], [baseline] * 2, color=GRID, lw=0.5)
+            flow.plot(np.interp(eta, input_limits, x_range),
+                      np.interp(softplus(eta), support_limits, y_range),
+                      color="#ad5b9a", lw=0.8)
+            arrow(147, 192, 107, GRID)
+            flow.plot([148, 148], [104, 110], color="#848484", lw=0.6)
+            for color, raw, kappa, raw_samples, y in zip(
+                CHAIN_COLORS[i], values, softplus(values), trace[:, marked],
+                (105.5, 107, 108.5)
+            ):
+                samples = softplus(raw_samples)
+                cloud(np.interp(raw_samples, input_limits, x_range),
+                      np.interp(samples, support_limits, y_range), color)
+                mark(np.interp(raw, input_limits, x_range),
+                     np.interp(kappa, support_limits, y_range), color)
+                cloud(148 + 41 * samples / support_limit, y, color)
+                mark(148 + 41 * kappa / support_limit, y, color)
+            flow.text(169, 121, "κ > 0", **support_style)
+
+
+def draw_model_example(fig, page, family):
+    """Draw individual predictive samples and the linked chain excerpts."""
+    theta, observed, draws, prior, posterior = example()
+    _predictive_plot(fig, page, family, theta, observed, prior, posterior)
+    _sampling_diagram(fig, page, family, draws)

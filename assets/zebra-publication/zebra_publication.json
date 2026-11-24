@@ -1,0 +1,563 @@
+{
+  "figure": "zebra_circ_stats_figure",
+  "layout": "Published 900 x 1080-point composite geometry, measured from the reference PDF (see ZEBRA_FIGURE.md)",
+  "data_repository": "jgraving/unwrap-data",
+  "data_revision": "86c41b5f43eb61191405b9bc85baf730a492a06f",
+  "inputs_sha256": {
+    "fit_cache/zebra_escape_fit.meta.json": "324d49f261c5deebdcbe0c6dfb3607a4bc34a68183dbf8856929b8390652e23a",
+    "fit_cache/zebra_escape_fit.nc": "0c01dd8463651a817f90776e1089928e84b05a594bf1f86ad7e08bbdfe7ec71b",
+    "zebra_bearings/mosaic/manifest.json": "b705d1ea3df720ca212f510da9d00333b13c125c0831a5e74c9295d7e94e0bb3",
+    "zebra_bearings/mosaic/tile_000.png": "bebd6a8ce262377a130c90dc4f853e0109275ee6e07fea4ffdadc3ce3ef09bb8",
+    "zebra_bearings/mosaic/tile_001.png": "d49774d1977608374b97ee123573705155c8963e4a1dc338937d1046ba55705e",
+    "zebra_bearings/mosaic/tile_002.png": "1798bae732618d9b8d3ef856ad3148cae88581d674914ae9b6a4dd1a33cfc0a2",
+    "zebra_bearings/mosaic/tile_003.png": "eb4729f4dbc851fd592a2e42e24f2112b307d0f23cde738794a21097dc3a3327",
+    "zebra_bearings/mosaic/tile_004.png": "8d30110bad0939dc1938052477f632bcd78ccd94a23a7f79640f37f3e39a0c45",
+    "zebra_bearings/mosaic/tile_005.png": "ae3f1fc72c0e0019c5dc424f583386b86f7d9e48d97eae71b58ce8e9959100dc",
+    "zebra_bearings/mosaic/tile_006.png": "c471cc957edc439ba17a3288007e7bf10bcb4f91c92f6d6915b5e4fb03ccb507",
+    "zebra_bearings/mosaic/tile_007.png": "9099290a363c3c379fb95a5a39b75302bf19a5a0b9bdb65a3f7c95c56f79ceeb",
+    "zebra_bearings/postures/observation088-0.parquet": "2c57928ab2d74c8b044ffcf3098488cd2a05e3188878c18175b9e79b7b28881d",
+    "zebra_bearings/postures/observation088-1.parquet": "c118f5f35d7a71800c4bfc0bc29d86561e9f45c27b7f40ffc9fce10fc004af49",
+    "zebra_bearings/postures/observation088-10.parquet": "2a28a61d208e83a5d37081763510d9bffe660d437c6e29fa9d162dbaded46cd8",
+    "zebra_bearings/postures/observation088-11.parquet": "d1a11113260e2302fcb35f549dfd2462d16c989d67478601f167bb28ff9b9ba3",
+    "zebra_bearings/postures/observation088-12.parquet": "e49500ef46b085de061d2a59e3e79502866de6bf9b80f67bec6dcc473b9bafc5",
+    "zebra_bearings/postures/observation088-13.parquet": "6c9d9560e76ddfab2dd2bb7a2b18b9dee37c7157323a260a1c79e1b62af11b04",
+    "zebra_bearings/postures/observation088-14.parquet": "8a3b8a7f02f6284f9621c892e99292ede5a167da39b984ee6b6d0fc255e32a58",
+    "zebra_bearings/postures/observation088-15.parquet": "2bd1946e4e535d0f1c4e534a8c7be3d6b38c1359d97e3a4ac5011bb9757113a0",
+    "zebra_bearings/postures/observation088-16.parquet": "1f4827307b4ba14733ac5eba7af424d426e62a06f4b1a8c8ad7a87d56e30760b",
+    "zebra_bearings/postures/observation088-17.parquet": "774c47eb96726d0b57190c362476e69b745a4642e987be9a28e9388a2ca8d484",
+    "zebra_bearings/postures/observation088-2.parquet": "ef0a78d89288abcfccbf1073ea72f766556adcbb30f9d657d21e7a9b1f48f5a3",
+    "zebra_bearings/postures/observation088-3.parquet": "da6abd0a0b6c69e473901509e185b48fb44bb38df5b2b4a89588902a19cb2591",
+    "zebra_bearings/postures/observation088-4.parquet": "b4b1533242ab8c6ade1a6e649910799106e5ae693f6323e9d38cf593645f7c0e",
+    "zebra_bearings/postures/observation088-5.parquet": "3655f9116b01d83262f7f29cdd83e112c0a104d5409a4ea44d9b08745e26487f",
+    "zebra_bearings/postures/observation088-6.parquet": "6f7d6653b6bd5824c9eee19db77e98c2c0e706f1937ea9503b838f02da851aac",
+    "zebra_bearings/postures/observation088-7.parquet": "e213126655a389e9910ad9c7c5878dedff961cafeeb82477f562d237f2a075fe",
+    "zebra_bearings/postures/observation088-8.parquet": "098bb98ad180678c00b23f9643831c96a5e42985e8ec848663cccf79bfc693f9",
+    "zebra_bearings/postures/observation088-9.parquet": "8b3d2588ab80e2139fd47ef78f419428f35e9bbe20cd348fd36ee85abc36739b",
+    "zebra_bearings/raw/observation088-0.parquet": "852ccd30371ae568e5f25d9688b946c912ed35e62d0f1b3058c3b16d223e017e",
+    "zebra_bearings/raw/observation088-1.parquet": "7dbcafada56e5a115f7faaed3fc7bac4df4571fb6f4ee0475b46168858f7b7cf",
+    "zebra_bearings/raw/observation088-10.parquet": "a38fa10ae36f52087cc633e5d448fd925e4958a7c5610e8cfdcb93758d15952b",
+    "zebra_bearings/raw/observation088-11.parquet": "5d4a20700eb3bff4a79ca54133cd2d2fd26532e16b64b074d6dfd06997a8d9a4",
+    "zebra_bearings/raw/observation088-12.parquet": "8fdbff49f1abf9ee6219795d2ef30303a8cb718a40a7d1c317ca7558c8e49899",
+    "zebra_bearings/raw/observation088-13.parquet": "f0e3cb808f6c7921cd95dcbfd4fd655896a06dfe56783e081c6e2ace3a3f53eb",
+    "zebra_bearings/raw/observation088-14.parquet": "6405d60e6037c2c66460586df41be54a563e30c3a5ceb240f2894fa1ac74a55c",
+    "zebra_bearings/raw/observation088-15.parquet": "25bbadfd189c77e8dc0b1b8ef8b468a115eb3f9e86171858651a8b6f52860ca4",
+    "zebra_bearings/raw/observation088-16.parquet": "5e54e45feace1d3b090605136a8c1782b0a520a1b4cf44e140db78daf2059538",
+    "zebra_bearings/raw/observation088-17.parquet": "8543418cd2ca19e11aa1080b0f123f2620623c02190741230dde35cc8fc798b2",
+    "zebra_bearings/raw/observation088-2.parquet": "c4206d9b977aeb761d9c99dbf193cd6691ff46ec23f56ffb4b11a83060a19271",
+    "zebra_bearings/raw/observation088-3.parquet": "f1c22717c6168f11d925d2bb7a012b79ad02bdb3bf70fa78ef5f8e6bf42ba631",
+    "zebra_bearings/raw/observation088-4.parquet": "989d098018db81079c3f4680416ea63a77cd0e471ca6ef072db64793dfba7af8",
+    "zebra_bearings/raw/observation088-5.parquet": "cf7c327ac064f8c331fa7002ada51ecdcebfaafb83a75fe5b1f43e0bb09cebe6",
+    "zebra_bearings/raw/observation088-6.parquet": "58b07d05619eee249371d255aba6016057dd78afd66d85302c5587b92ba78f7b",
+    "zebra_bearings/raw/observation088-7.parquet": "f22b91eb524142b6b2d54c8d84b2b713f4edb19ce46db282957429444198eefa",
+    "zebra_bearings/raw/observation088-8.parquet": "6a0175fd6e7151830c888eeb38cbf9414df728be4368dcb6c09f36771136fbd2",
+    "zebra_bearings/raw/observation088-9.parquet": "9458cac455479de27905d650b7da76e0383c6dcce11e518d30358e890006c006",
+    "zebra_bearings/zebra_bearings_blocks.parquet": "51beb1e2b92fd2d71e4620d7c4e2cbdf2c1b62ec5ecafbac86b8e205847a7e6d"
+  },
+  "code_revision": "8a56a73e477458f9e0824fd7c41b0a80d6d1fbaa",
+  "python": "3.12.14",
+  "font_family": "Arial",
+  "fonts": {
+    "normal": {
+      "file": "Arial.TTF",
+      "sha256": "35c0f3559d8db569e36c31095b8a60d441643d95f59139de40e23fada819b833"
+    },
+    "bold": {
+      "file": "Arialbd.TTF",
+      "sha256": "4044aa6b5bebbc36980206b45b0aaaaa5681552a48bcadb41746d5d1d71fd7b4"
+    }
+  },
+  "packages": {
+    "numpy": "2.5.5",
+    "scipy": "1.18.1",
+    "pandas": "3.1.1",
+    "matplotlib": "3.11.2",
+    "xarray": "2026.9.0",
+    "h5netcdf": "1.8.3",
+    "h5py": "3.16.0",
+    "arviz": "1.3.0",
+    "cairosvg": "2.9.1",
+    "pymupdf": "1.28.2"
+  },
+  "posterior_chains": 4,
+  "posterior_draws_per_chain": 1000,
+  "fit_meta": {
+    "extra": {
+      "draws": 1000,
+      "model": "zebra_escape",
+      "seed": 42,
+      "target_accept": 0.8,
+      "tune": 2000
+    },
+    "n_posterior_vars": 12,
+    "posterior_shapes": {
+      "1|Track": [
+        4,
+        1000,
+        18
+      ],
+      "1|Track_kappa": [
+        4,
+        1000
+      ],
+      "Intercept": [
+        4,
+        1000
+      ],
+      "PostStimulus": [
+        4,
+        1000
+      ],
+      "PostStimulus|Track": [
+        4,
+        1000,
+        18
+      ],
+      "PostStimulus|Track_kappa": [
+        4,
+        1000
+      ],
+      "kappa_1|Track": [
+        4,
+        1000,
+        18
+      ],
+      "kappa_1|Track_sigma": [
+        4,
+        1000
+      ],
+      "kappa_Intercept": [
+        4,
+        1000
+      ],
+      "kappa_PostStimulus": [
+        4,
+        1000
+      ],
+      "kappa_PostStimulus|Track": [
+        4,
+        1000,
+        18
+      ],
+      "kappa_PostStimulus|Track_sigma": [
+        4,
+        1000
+      ]
+    },
+    "posterior_vars": [
+      "1|Track",
+      "1|Track_kappa",
+      "Intercept",
+      "PostStimulus",
+      "PostStimulus|Track",
+      "PostStimulus|Track_kappa",
+      "kappa_1|Track",
+      "kappa_1|Track_sigma",
+      "kappa_Intercept",
+      "kappa_PostStimulus",
+      "kappa_PostStimulus|Track",
+      "kappa_PostStimulus|Track_sigma"
+    ],
+    "sha256": "0c01dd8463651a817f90776e1089928e84b05a594bf1f86ad7e08bbdfe7ec71b"
+  },
+  "divergences": 0,
+  "convergence": {
+    "max_rhat_split": 1.0042051089388604,
+    "max_rhat_rank": 1.0042051089388604,
+    "min_ess_bulk": 1351.4942345577363,
+    "min_ess_tail": 1886.3667054018863,
+    "arviz": "1.3.0"
+  },
+  "notebook_gate_flagged_rows": 0,
+  "map_window": {
+    "observation": "observation088",
+    "focal_track": "observation088-5",
+    "frame_max": 90698,
+    "xlim": [
+      267525.0,
+      267680.0
+    ],
+    "ylim": [
+      37300.0,
+      37770.0
+    ],
+    "mosaic_qlim": [
+      37290.0,
+      37770.0
+    ],
+    "mosaic_max_side_px": 2600,
+    "mosaic_embed_side_px": 1940,
+    "trajectory_vertex_spacing_m": 1.0
+  },
+  "artwork": {
+    "source_sha256": "d056e63a799530e9efb89f96db0b69a1c69eccce50984cd38908292d2104ce38",
+    "author_files_sha256": {
+      "zebra_circ_stats_figure(1).pdf": "0747eb1c18e1eecea18b9a77c2e0d0d94c2fa7cb1239495b591fd619e6e580ec",
+      "2009_Jul30_IMG_5242.JPG": "fd625f63d5070816442cea00b4a7fc65180c641b3818d525c60dd76e6961a342",
+      "WhatsApp Image 2026-02-03 at 09.32.58.jpeg": "3b3054bdeb47d6a194a84f00e429f362aa08c2e705aa454a7472a41de3ad9d16",
+      "WhatsApp Image 2026-02-03 at 09.35.58.jpeg": "a43e27e80d0b609fd8f68f56d8fdb7caa749d3ef04461af559ac19f985903f49"
+    },
+    "images": {
+      "drone_inset_post.jpg": {
+        "sha256": "a43e27e80d0b609fd8f68f56d8fdb7caa749d3ef04461af559ac19f985903f49",
+        "width": 160,
+        "height": 160
+      },
+      "drone_inset_pre.jpg": {
+        "sha256": "3b3054bdeb47d6a194a84f00e429f362aa08c2e705aa454a7472a41de3ad9d16",
+        "width": 160,
+        "height": 160
+      },
+      "zebra_photo.jpg": {
+        "sha256": "e67a183182474c4d008d0ed1dfc0ed8a4fd581ed28b2f6e6b84ea2eea8cf2119",
+        "width": 1600,
+        "height": 1066
+      }
+    }
+  },
+  "inset_layout": {
+    "pre": {
+      "center": [
+        115.04,
+        331.45
+      ],
+      "r": 65.25,
+      "side": 208.7775,
+      "rotation": -90,
+      "arrow": [
+        [
+          81.36,
+          316.29
+        ],
+        [
+          129.57,
+          342.03
+        ]
+      ],
+      "anchor_frame": 17623,
+      "asset": "drone_inset_pre.jpg"
+    },
+    "post": {
+      "center": [
+        115.04,
+        743.02
+      ],
+      "r": 67.16,
+      "side": 214.9035,
+      "rotation": -45,
+      "arrow": [
+        [
+          149.63,
+          713.68
+        ],
+        [
+          108.58,
+          750.25
+        ]
+      ],
+      "anchor_frame": 80780,
+      "asset": "drone_inset_post.jpg"
+    }
+  },
+  "inset_anchors": {
+    "pre": {
+      "frame": 17623,
+      "pos": [
+        267610.04465948074,
+        37709.33224792272
+      ],
+      "arrow_bearing_deg": 93.17608800577074,
+      "n_window": 31
+    },
+    "post": {
+      "frame": 80780,
+      "pos": [
+        267637.5390379121,
+        37387.12781527472
+      ],
+      "arrow_bearing_deg": 214.1184177538376,
+      "n_window": 31
+    }
+  },
+  "inset_anchor_note": "Anchor frames back-solved from the published callout cone apexes: frame 17623 sits ~7.8 m from the apex fitted to the paper's pre-cone, frame 80780 ~5 m from the post-cone apex at the path bend. The paper's hand-drawn cone lines deviate 2.5-4 degrees from the exact tangents from the anchor positions. Measured compass bearings are recorded in inset_anchors. The two inset arrows follow the animals in the rotated photographs as drawn in the reference.",
+  "scare_frame_note": "The per-frame pre_scare flag (used for the map's pre/post arrow splitting, as in PR #154) flips at frame 53902 for all 18 observation088 tracks. scare_frames.csv lists observation088 at frame 72703; the figure follows the per-frame flag and the discrepancy is recorded as published.",
+  "summary_numbers": {
+    "group_mean_direction_deg": {
+      "pre": 104.50717961258448,
+      "post": 232.03594402671112
+    },
+    "group_alignment": {
+      "R_group_pre_mean": 0.9338364757172101,
+      "R_group_pre_lo": 0.9094202518516891,
+      "R_group_pre_hi": 0.9552297648612618,
+      "R_group_post_mean": 0.9116100035861492,
+      "R_group_post_lo": 0.8763800418623794,
+      "R_group_post_hi": 0.9438407606636351
+    },
+    "individual_concentration": {
+      "R_mean_pre": [
+        0.41283656652130507,
+        0.38079724992412733,
+        0.1917344579531818,
+        0.504105570354478,
+        0.6608425748186308,
+        0.43731441290900175,
+        0.3735528857205943,
+        0.13363982021268714,
+        0.39212352897101876,
+        0.09503888298733906,
+        0.38260308494375644,
+        0.5291012600358952,
+        0.32480060768558255,
+        0.3174055077223338,
+        0.3479501911625838,
+        0.473693690091836,
+        0.4487215160112934,
+        0.48695821631504155
+      ],
+      "R_mean_post": [
+        0.39385752510515076,
+        0.20955209626357088,
+        0.35021354797347387,
+        0.3440363827807622,
+        0.11894396143094936,
+        0.32521433441060876,
+        0.3896552179643038,
+        0.17059178826209206,
+        0.2773571539621753,
+        0.37385640961992295,
+        0.5777322496129953,
+        0.45730918592626296,
+        0.4186174833679489,
+        0.35260720815568347,
+        0.32689365144924615,
+        0.3184126406323406,
+        0.49611218233042437,
+        0.25385903108995544
+      ],
+      "R_hdi_pre": [
+        [
+          0.3307848711011403,
+          0.49778862967841747
+        ],
+        [
+          0.2934169081656845,
+          0.4653932099295913
+        ],
+        [
+          0.10284692685847974,
+          0.2803590952048032
+        ],
+        [
+          0.4187315262028685,
+          0.5817113524773194
+        ],
+        [
+          0.5926656568083535,
+          0.7212186519477018
+        ],
+        [
+          0.3528114551097353,
+          0.5220953798184655
+        ],
+        [
+          0.28173001799929714,
+          0.45881698155531236
+        ],
+        [
+          0.05133285163537761,
+          0.21198886168033973
+        ],
+        [
+          0.3010425942300992,
+          0.47141801651528864
+        ],
+        [
+          0.033407476914310834,
+          0.16132536499523056
+        ],
+        [
+          0.29494805901746507,
+          0.4666819471965447
+        ],
+        [
+          0.44694684798547973,
+          0.6052342345346096
+        ],
+        [
+          0.2352908101630769,
+          0.4224762718805924
+        ],
+        [
+          0.2301252363393408,
+          0.406979501809344
+        ],
+        [
+          0.2598286922605982,
+          0.43393977028251224
+        ],
+        [
+          0.3874771424617141,
+          0.553017875151784
+        ],
+        [
+          0.3621948043295312,
+          0.5300271370144163
+        ],
+        [
+          0.40598210155365144,
+          0.5711935133224029
+        ]
+      ],
+      "R_hdi_post": [
+        [
+          0.28054909510945525,
+          0.49656981084535134
+        ],
+        [
+          0.08463475327517167,
+          0.316925677586588
+        ],
+        [
+          0.23989401040179542,
+          0.4717557553147137
+        ],
+        [
+          0.2245454453332235,
+          0.4483487333278639
+        ],
+        [
+          0.02274010192129491,
+          0.22108756085402095
+        ],
+        [
+          0.21084934968399865,
+          0.43801002054294563
+        ],
+        [
+          0.2789713779338698,
+          0.49836485318877644
+        ],
+        [
+          0.04809362881653186,
+          0.2900363476383453
+        ],
+        [
+          0.1682326657467248,
+          0.402567521185788
+        ],
+        [
+          0.2508373086730458,
+          0.4816232312119447
+        ],
+        [
+          0.4854247115322816,
+          0.6649750805687127
+        ],
+        [
+          0.35330835240210284,
+          0.5582893315657007
+        ],
+        [
+          0.30810299524580254,
+          0.5254556391919533
+        ],
+        [
+          0.24398432709577492,
+          0.4644446320338974
+        ],
+        [
+          0.21150059743966307,
+          0.4373478308125682
+        ],
+        [
+          0.20954884396083903,
+          0.4347093749202246
+        ],
+        [
+          0.399211506195437,
+          0.5983138362074009
+        ],
+        [
+          0.12411857390348172,
+          0.3737728892741859
+        ]
+      ]
+    },
+    "empirical_mean_direction_deg": {
+      "pre": [
+        97.76502417500332,
+        119.7748231507941,
+        108.9669740764708,
+        134.77640929093036,
+        108.21336559543616,
+        105.0309910025043,
+        72.0722144848034,
+        131.10507696246893,
+        104.59736194843492,
+        334.10208161308174,
+        75.93908029329644,
+        103.03171331624574,
+        168.68790243638537,
+        96.55742099678123,
+        93.39015323762776,
+        90.61574103665107,
+        135.6442817095386,
+        58.962012178437426
+      ],
+      "post": [
+        278.2309582577599,
+        220.30627990075692,
+        213.26819678796008,
+        230.41336967396836,
+        310.8977186618788,
+        222.07259108120158,
+        223.30996483750053,
+        263.00782422182897,
+        207.2985306182536,
+        241.21353076999168,
+        194.89381828907722,
+        258.0397989742965,
+        259.59928241808296,
+        233.57859720567075,
+        235.3495670931929,
+        199.40423484822423,
+        188.71789108185266,
+        267.7606709156705
+      ]
+    },
+    "observed_headings_n": {
+      "pre": 3222,
+      "post": 2195
+    },
+    "paired_permanent_turn_deg": 130.92989533569033,
+    "tracks": [
+      "observation088-0",
+      "observation088-1",
+      "observation088-10",
+      "observation088-11",
+      "observation088-12",
+      "observation088-13",
+      "observation088-14",
+      "observation088-15",
+      "observation088-16",
+      "observation088-17",
+      "observation088-2",
+      "observation088-3",
+      "observation088-4",
+      "observation088-5",
+      "observation088-6",
+      "observation088-7",
+      "observation088-8",
+      "observation088-9"
+    ],
+    "nT": 18
+  },
+  "caption": "Escape response of a focal group of 18 Grevy's zebra (*Equus grevyi*) filmed from overhead drones at the Mpala Conservancy, Kenya. (a) Georeferenced trajectories of the 18 tracked zebra on the aerial orthomosaic of the grazing site: the focal animal of this panel in black, the rest of the group in white, with the focal animal's body orientation every 5 m of straight-line travel as arrows (orange before the approach stimulus, purple after). The circular insets (orange / purple) magnify the moments indicated by each callout and show the body-heading arrow drawn at that moment. (b) A Grevy's zebra. (c) Posterior distribution of the equally weighted mean direction of the 18 focal zebras before and after the approach: the loop traces the relative density of the group-mean-direction posterior draws (radial scale 0 to 1) and the marker the posterior mean direction. (d) Group-level alignment: the resultant length of the 18 fitted individual mean directions, with the posterior mean before and after the approach. (e) Individual-level mean directions: the posterior density of each fitted individual mean direction (loops) and each animal's observed circular-mean heading (markers). Panels c and e show model angles clockwise from 0\u00b0 at the top. Panel a uses geographic compass bearings. (f) Individual-level concentration: each animal's posterior mean resultant length with 95% HDI, before and after the approach, paired within animal across conditions. Panels c-f are evaluated from a saved hierarchical von Mises fit of the block-averaged body orientations (4 chains x 1,000 draws, zero divergent transitions); the 'group' in c-d is the finite focal group, not a population parameter.",
+  "outputs_sha256": {
+    ".svg": "2af455a6dd9a3d4b16a6833c9fab693678138f733003201cd9479848ff87d65a",
+    ".pdf": "798835c23f66fbd7cf36d5f8427b8c1a056a5b9d3e5a81c178766333db2c43cb",
+    ".png": "8a0e989a846308a60cfdc859f0004abdb50de964613563cbe2db91dc91705e15",
+    ".html": "b88b339b8ef2c53c9b828d53ae2f891c41fcdc20cc7a4ac9b4bb717dd45e21b9"
+  },
+  "caption_code_revision": "0feb3fa4add4550dedc42ec12bcacdfecafb7c9d"
+}

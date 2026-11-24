@@ -63,11 +63,9 @@ In any R session (RStudio's console or `R` in a terminal), from the
 repository root:
 
 ```r
-# Four Stan development packages (cmdstanr, loo, posterior, bayesplot),
-# from the Stan team's r-universe:
+# Stan's r-universe supplies cmdstanr and loo.
 ru <- "https://stan-dev.r-universe.dev"
-# The rest, from a dated CRAN snapshot that serves prebuilt binaries
-# on Linux and Windows:
+# The dated CRAN snapshot serves prebuilt binaries on Linux and Windows:
 cran <- "https://packagemanager.posit.co/cran/2026-11-03"
 repos <- c(CRAN = cran, setNames(ru, ru))
 
@@ -77,12 +75,12 @@ renv::load()
 renv::restore(repos = repos)
 ```
 
-The final line installs the 136 pinned packages (132 from CRAN, four
-from r-universe) into a project-local `renv/` library. The CRAN
-packages arrive as prebuilt binaries on Linux and Windows; the
-r-universe packages — and a few others on macOS — are built from
-source, so a first install can take 20–60 minutes. Re-running the
-script is fast.
+The final line restores the pinned packages into a project-local `renv/`
+library. The lockfile installs `posterior` 1.7.1 and `bayesplot`
+1.16.0.9000 from their recorded GitHub commits, so those versions remain
+available when Stan’s r-universe publishes a new build. CRAN packages usually
+arrive as prebuilt binaries on Linux and Windows. Some packages build from source, so a first install
+can take 20–60 minutes. Re-running the script is fast.
 
 `renv::activate()` writes a machine-local `.Rprofile` (gitignored), so
 any R session started in the repository — RStudio, scripts, or the
@@ -165,8 +163,8 @@ shorter draw budget when `UNWRAP_R_QUICK=1` is set; unset, they run
 the full budgets. Review R-hat, bulk ESS, the divergence report, and
 the predictive checks before interpreting results.
 
-Every notebook's stored outputs come from an end-to-end run of that
-notebook (see the [development](development.md) page).
+The docs display saved outputs. The [development guide](development.md#notebook-execution-local-only)
+gives the commands to rerun a notebook locally.
 
 ## Skip the refit with the saved fits
 

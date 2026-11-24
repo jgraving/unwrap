@@ -1,0 +1,74 @@
+name: Circstats graphical abstract fidelity
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/circstats-graphical-abstract.yml'
+      - 'notebooks/circstats_graphical_abstract.py'
+      - 'notebooks/circstats_abstract_model.py'
+      - 'notebooks/assets/circstats_graphical_abstract/**'
+      - 'tests/test_circstats_graphical_abstract.py'
+      - 'unwrap/circular.py'
+      - 'unwrap/link/**'
+      - 'requirements.txt'
+      - 'setup.py'
+      - 'pyproject.toml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: circstats-ga-artwork-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install figure and test dependencies
+        run: |
+          uv venv
+          uv pip install -e '.[test,figure]'
+      - name: Check asset fidelity and export structure
+        run: uv run --no-project python -m pytest -q tests/test_circstats_graphical_abstract.py
+  deterministic-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-liberation
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install figure and test dependencies
+        run: |
+          uv venv
+          uv pip install -e '.[test,figure]'
+      - name: Refresh exports twice and compare (Liberation Sans)
+        run: |
+          uv run --no-project python notebooks/circstats_graphical_abstract.py \
+            --font-family "Liberation Sans" \
+            --output-dir /tmp/circstats-ga-ci-1
+          uv run --no-project python notebooks/circstats_graphical_abstract.py \
+            --font-family "Liberation Sans" \
+            --output-dir /tmp/circstats-ga-ci-2
+          diff -qr /tmp/circstats-ga-ci-1 /tmp/circstats-ga-ci-2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: circstats-ga-exports
+          path: /tmp/circstats-ga-ci-1

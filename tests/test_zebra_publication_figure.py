@@ -1,0 +1,555 @@
+"""Hermetic checks for the zebra publication figure generator.
+
+Everything renders on synthetic fits and tiny raster fixtures with
+DejaVu Sans, so no ``unwrap-data`` checkout or licensed fonts are needed.
+The layout test compares the measured layout constants against the
+committed reference PDF, and the restore test verifies that the original
+JPEG streams survive the SVG/PDF round trip.
+"""
+import base64
+import hashlib
+import json
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import numpy as np
+import pandas as pd
+import pytest
+import xarray as xr
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "notebooks"))
+import zebra_publication_figure as figure  # noqa: E402
+import zebra_posthoc as posthog  # noqa: E402
+
+SVG_NS = "http://www.w3.org/2000/svg"
+TRACKS = [f"observation088-{i}" for i in range(4)]
+FACTORS = {name: ("chain", "draw", "Track__factor_dim")
+           for name in ("1|Track", "PostStimulus|Track",
+                        "kappa_1|Track", "kappa_PostStimulus|Track")}
+
+
+def make_idata(seed=2718, n_chains=2, n_draws=24):
+    rng = np.random.default_rng(seed)
+    post = {name: xr.DataArray(rng.normal(0.0, 0.2, (n_chains, n_draws)),
+                               dims=("chain", "draw"))
+            for name in ("Intercept", "PostStimulus",
+                         "kappa_Intercept", "kappa_PostStimulus")}
+    for name, dims in FACTORS.items():
+        post[name] = xr.DataArray(
+            rng.normal(0.0, 0.2, (n_chains, n_draws, len(TRACKS))),
+            dims=dims,
+            coords={"Track__factor_dim": TRACKS})
+    ds = xr.Dataset(post)
+    # the statistics path only reads ``idata.posterior``; a plain
+    # namespace keeps the fixture off arviz's constructor surface, which
+    # shifted between 0.x and 1.x
+    import types
+    return types.SimpleNamespace(posterior=ds)
+
+
+def make_df_blocks(seed=71, heading_offset=None):
+    rng = np.random.default_rng(seed)
+    rows = []
+    for t in TRACKS:
+        for cond in (0, 1):
+            base = 1.0 + cond * 2.2
+            for _ in range(4):
+                rows.append({"Track": t, "Observation": "observation088",
+                             "Condition": "pre-approach" if cond == 0
+                             else "post-approach",
+                             "HeadingRadians": (rng.normal(base, 0.25)
+                                                + np.pi) % (2 * np.pi) - np.pi,
+                             "PostStimulus": cond})
+    df = pd.DataFrame(rows)
+    if heading_offset is not None:
+        df["HeadingRadians"] = df["HeadingRadians"] + heading_offset
+    return df
+
+
+@pytest.fixture
+def idata():
+    return make_idata()
+
+
+@pytest.fixture
+def df_blocks():
+    return make_df_blocks()
+
+
+def small_jpeg(path, w=60, h=40, seed=3):
+    from PIL import Image
+    rng = np.random.default_rng(seed)
+    a = rng.integers(0, 255, (h, w, 3), dtype="uint8")
+    Image.fromarray(a).save(path)
+    return Path(path)
+
+
+def make_context(tmp_path, idata, df_blocks):
+    """A synthetic drawing context with the same shape as build_context's.
+
+    Tiny mosaic stand-in, a wandering focal track plus two others, and one
+    JPEG per raster slot, so draw_figure exercises every panel without
+    unwrap-data.
+    """
+    rng = np.random.default_rng(11)
+    img = rng.integers(0, 255, (400, 160, 4), dtype="uint8")
+    extent = (267525.0, 267680.0, 37300.0, 37770.0)
+
+    frames = np.arange(0, 901, 2)
+    rows = []
+    for k, (name, fx, fy) in enumerate([
+            (figure.FOCAL_TRACK,
+             lambda f: 267580 + 40 * np.sin(f / 40.0),
+             lambda f: 37535 + 120 * np.cos(f / 60.0)),
+            (f"{figure.OBS}-1",
+             lambda f: 267600 + 25 * np.cos(f / 55.0),
+             lambda f: 37510 + 90 * np.sin(f / 70.0)),
+            (f"{figure.OBS}-2",
+             lambda f: 267620 + 30 * np.sin(f / 51.0 + 1.0),
+             lambda f: 37550 - 80 * np.cos(f / 80.0))]):
+        for f in frames:
+            rows.append({"frame": int(f), "track_number": name,
+                         "kp0_x": float(fx(f)), "kp0_y": float(fy(f))})
+    df_pos = pd.DataFrame(rows)
+
+    bear_rows = []
+    for f in frames:
+        bear_rows.append({"observation": figure.OBS,
+                          "track_number": figure.FOCAL_TRACK,
+                          "frame": int(f),
+                          "compass_bearing": float((90.0 + 20 * np.sin(f / 40.0)) % 360.0),
+                          "pre_scare": bool(f < 400),
+                          "row_index": int(f)})
+    df_bearings = pd.DataFrame(bear_rows)
+
+    photo = small_jpeg(tmp_path / "photo.jpg", 120, 80, seed=4)
+    insets = {key: small_jpeg(tmp_path / f"inset_{key}.jpg", 60, 60,
+                              seed=5 + i)
+              for i, key in enumerate(("pre", "post"))}
+    anchors = {
+        "pre": {"frame": 100, "pos": [267580.0, 37585.0],
+                "arrow_bearing_deg": 93.2, "n_window": 30},
+        "post": {"frame": 800, "pos": [267610.0, 37480.0],
+                 "arrow_bearing_deg": 214.1, "n_window": 30},
+    }
+    numbers = figure.summary_numbers(idata, df_blocks)
+    return {"img": img, "extent": extent, "df_pos": df_pos,
+            "df_bearings": df_bearings, "numbers": numbers,
+            "anchors": anchors, "photo": photo, "inset_assets": insets,
+            "fit_meta": {}, "divergences": 0}
+
+
+# ---------------------------------------------------------------------------
+# Statistics path (summary_numbers on the saved-fit structure, synthetic)
+# ---------------------------------------------------------------------------
+def test_summary_statistics_shapes(idata, df_blocks):
+    stats = figure.summary_numbers(idata, df_blocks)
+    prep = stats["stats"]
+    assert stats["nT"] == len(TRACKS)
+    assert stats["tracks"] == list(TRACKS)
+    assert prep["theta"].shape == (200,)
+    assert prep["r_group_pre"].shape == (200,)
+    assert prep["r_group_post"].shape == (200,)
+    assert prep["r_ind_pre"].shape == (len(TRACKS), 200)
+    assert prep["r_ind_post"].shape == (len(TRACKS), 200)
+    # unit-scaled KDE radii: 1 at zero density, up to 2 at the max
+    for key in ("r_group_pre", "r_group_post"):
+        assert prep[key].min() >= 1.0 - 1e-12
+        assert prep[key].max() <= 2.0 + 1e-12
+    # the radial scale is shared across all group and individual KDEs
+    maxima = [prep[key].max() for key in ("r_group_pre", "r_group_post",
+                                          "r_ind_pre", "r_ind_post")]
+    assert max(maxima) == pytest.approx(2.0, abs=1e-6)
+    for cond in ("pre", "post"):
+        lo = stats["group_alignment"][f"R_group_{cond}_lo"]
+        hi = stats["group_alignment"][f"R_group_{cond}_hi"]
+        mean = stats["group_alignment"][f"R_group_{cond}_mean"]
+        assert 0.0 <= lo <= hi <= 1.0
+        assert 0.0 <= mean <= 1.0
+    assert len(stats["individual_concentration"]["R_hdi_post"]) == len(TRACKS)
+    for hdi in (stats["individual_concentration"]["R_hdi_pre"],
+                stats["individual_concentration"]["R_hdi_post"]):
+        assert all(lo <= hi for lo, hi in hdi)
+    for values in (stats["empirical_mean_direction_deg"]["pre"],
+                   stats["empirical_mean_direction_deg"]["post"]):
+        assert len(values) == len(TRACKS)
+
+
+def _assert_direction_lists_equal(a, b):
+    assert len(a) == len(b)
+    for v_a, v_b in zip(a, b):
+        if v_a is None or v_b is None:
+            assert v_a is None and v_b is None
+        else:
+            assert v_a == pytest.approx(v_b, abs=1e-9)
+
+
+def test_summary_statistics_cross_check(idata, df_blocks):
+    """Group alignment and mean direction agree with direct computation."""
+    stats = figure.summary_numbers(idata, df_blocks)
+    directions = posthog.posterior_directions(idata, df_blocks)
+    mu, idx = directions["mu"], directions["idx_pre"]
+    n_samples = idata.posterior.sizes["chain"] * idata.posterior.sizes["draw"]
+    assert mu.shape == (n_samples, 2 * len(TRACKS))
+    assert float(np.nanmax(np.abs(mu))) <= np.pi + 1e-12
+    r_pre = np.abs(np.exp(1j * mu[:, idx]).mean(axis=1))
+    assert stats["stats"]["R_group_pre_mean"] == pytest.approx(
+        float(r_pre.mean()), abs=1e-12)
+    from scipy.stats import circmean
+    pre_draw = circmean(mu[:, idx], high=np.pi, low=-np.pi, axis=1)
+    group_mean = circmean(pre_draw, high=np.pi, low=-np.pi)
+    expected_axis = float(np.rad2deg(group_mean) % 360.0)
+    assert stats["group_mean_direction_deg"]["pre"] == pytest.approx(
+        expected_axis, abs=1e-9)
+
+
+def test_summary_statistics_wrap_invariance(df_blocks):
+    """Adding 2*pi to every heading leaves the empirical summary unchanged."""
+    base = make_idata()
+    a = figure.summary_numbers(base, df_blocks)
+    b = figure.summary_numbers(base, make_df_blocks(heading_offset=2 * np.pi))
+    for cond in ("pre", "post"):
+        _assert_direction_lists_equal(
+            a["empirical_mean_direction_deg"][cond],
+            b["empirical_mean_direction_deg"][cond])
+    assert a["paired_permanent_turn_deg"] == pytest.approx(
+        b["paired_permanent_turn_deg"], abs=1e-9)
+    assert a["group_alignment"] == pytest.approx(b["group_alignment"])
+
+
+def test_paired_turn_is_circular(idata, df_blocks):
+    """The paired turn is the circular mean of the per-track turns."""
+    stats = figure.summary_numbers(idata, df_blocks)
+    turns = []
+    for m_pre, m_post in zip(stats["stats"]["emp_mu_pre"],
+                             stats["stats"]["emp_mu_post"]):
+        if not (np.isnan(m_pre) or np.isnan(m_post)):
+            turns.append(np.angle(np.exp(1j * (m_post - m_pre))))
+    from unwrap.circular import circ_mean
+    expected = float(np.rad2deg(circ_mean(np.asarray(turns))) % 360.0)
+    assert stats["paired_permanent_turn_deg"] == pytest.approx(expected,
+                                                               abs=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# Vector export (synthetic context, DejaVu Sans)
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("style", ["published", "companion"])
+def test_vector_export_deterministic_and_text_free(tmp_path, idata,
+                                                   df_blocks, style):
+    ctx = make_context(tmp_path, idata, df_blocks)
+    svg = figure.draw_figure(ctx, family="DejaVu Sans", style=style)
+    assert svg == figure.draw_figure(ctx, family="DejaVu Sans", style=style)
+    root = ET.fromstring(svg)
+    # mosaic, photo and the two inset crops: four raster embeds, all text
+    # outlined to paths
+    assert len(root.findall(f".//{{{SVG_NS}}}image")) == 4
+    assert not root.findall(f".//{{{SVG_NS}}}text")
+    desc = root.find(f"{{{SVG_NS}}}desc")
+    caption = figure.COMPANION_CAPTION if style == "companion" else figure.CAPTION
+    assert desc is not None and desc.text == caption
+    title = root.find(f"{{{SVG_NS}}}title")
+    assert title is not None and title.text == "Zebra escape response"
+    assert root.get("role") == "img"
+
+
+def test_companion_polar_axes_use_geographic_bearings():
+    fig, ax = figure.plt.subplots(subplot_kw={"projection": "polar"})
+    try:
+        figure._style_polar(ax, grid_color="0.81", grid_lw=0.85, compass=True)
+        # Model headings in radians corresponding to north, east, south, west.
+        angles = [np.pi / 2, 0.0, -np.pi / 2, np.pi]
+        positions = ax.transData.transform([(angle, 1.0) for angle in angles])
+        xy = positions - ax.transData.transform((0.0, 0.0))
+        signs = np.sign(np.round(xy, decimals=9))
+        np.testing.assert_array_equal(signs, [[0, 1], [1, 0], [0, -1], [-1, 0]])
+        assert len(ax.get_xticks()) == 4
+    finally:
+        figure.plt.close(fig)
+
+
+def test_write_outputs_round_trip(tmp_path, idata, df_blocks):
+    pytest.importorskip("cairosvg")
+    pytest.importorskip("pymupdf")
+    from PIL import Image
+    ctx = make_context(tmp_path, idata, df_blocks)
+    svg = figure.draw_figure(ctx, family="DejaVu Sans")
+    stem = figure.write_outputs(tmp_path / "out", ctx, svg,
+                                {"figure": "test"}, family="DejaVu Sans")
+    assert stem.with_suffix(".pdf").read_bytes().startswith(b"%PDF-")
+    assert stem.with_suffix(".png").read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    svg_text = stem.with_suffix(".svg").read_text()
+    assert "<svg " in svg_text and svg_text.rstrip().endswith("</svg>")
+    assert '<title id="figure-title">Zebra escape response</title>' in svg_text
+    assert stem.with_suffix(".html").read_text().startswith("<!doctype html>")
+    meta = json.loads(stem.with_suffix(".json").read_text())
+    for suffix in (".svg", ".pdf", ".png", ".html"):
+        assert meta["outputs_sha256"][suffix] == figure.sha256(
+            stem.with_suffix(suffix))
+    with Image.open(stem.with_suffix(".png")) as img:
+        assert img.size == (1800, 2160)
+
+
+def test_exported_photos_match_reference(tmp_path, idata, df_blocks):
+    """Compare the actual four exports with the author artwork in page space."""
+    pytest.importorskip("cairosvg")
+    fitz = pytest.importorskip("pymupdf")
+    from PIL import Image
+
+    ctx = make_context(tmp_path, idata, df_blocks)
+    ctx["photo"] = figure.ASSETS / "zebra_photo.jpg"
+    ctx["inset_assets"] = {k: figure.ASSETS / f"drone_inset_{k}.jpg"
+                           for k in ("pre", "post")}
+    svg = figure.draw_figure(ctx, family="DejaVu Sans")
+    stem = figure.write_outputs(tmp_path, ctx, svg, {}, family="DejaVu Sans")
+    assert svg in stem.with_suffix(".html").read_text()
+
+    with fitz.open(figure.ASSETS / "reference.pdf") as ref, \
+            fitz.open(stem.with_suffix(".pdf")) as out:
+        def placements(doc):
+            return {doc.extract_image(i["xref"])["image"]: i["transform"]
+                    for i in doc[0].get_image_info(xrefs=True)}
+
+        expected, actual = placements(ref), placements(out)
+        for path in (ctx["photo"], *ctx["inset_assets"].values()):
+            jpeg = path.read_bytes()
+            # Signed affine coefficients distinguish a mirror or rotation
+            # even when the bounding rectangle is unchanged.
+            assert actual[jpeg] == pytest.approx(expected[jpeg], abs=0.1)
+
+        # These patches are inside the circular masks clear of the vector
+        # arrows and labels. A reversed image, wrong zoom or wrong crop
+        # changes the rendered pixels even if the PDF inventory looks right.
+        preview = np.asarray(Image.open(stem.with_suffix(".png")).convert("RGB"))
+        for rect in [(475, 50, 770, 280), (84, 285, 143, 309),
+                     (80, 754, 137, 776)]:
+            clip = fitz.Rect(rect)
+            matrix = fitz.Matrix(2, 2)
+            pix = ref[0].get_pixmap(matrix=matrix, clip=clip)
+            target = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width, 3)
+            x0, y0, x1, y1 = (v * 2 for v in rect)
+            crop = preview[y0:y1, x0:x1].astype(float)
+            assert np.abs(crop - target).mean() < 3
+
+
+def test_exported_map_arrow_sizes_match_reference(tmp_path, idata, df_blocks):
+    cairosvg = pytest.importorskip("cairosvg")
+    fitz = pytest.importorskip("pymupdf")
+    ctx = make_context(tmp_path, idata, df_blocks)
+    svg = figure.draw_figure(ctx, family="DejaVu Sans")
+    pdf = cairosvg.svg2pdf(bytestring=svg.encode())
+
+    def map_arrows(page):
+        heading, legend, north = [], [], []
+        for path in page.get_drawings():
+            box = path["rect"]
+            if path["type"] != "fs" or box.x1 > figure.MAP_RECT[2]:
+                continue
+            items = path["items"]
+            if len(items) == 7 and path["color"] == (0, 0, 0):
+                if path["fill"] == (0, 0, 0):
+                    if 920 < box.y0 < 940 and 980 < box.y1 < 1000:
+                        north.append((*box, path["width"]))
+                else:
+                    head_a, tip, head_b = items[2][1], items[2][-1], items[3][-1]
+                    tail_a, tail_b = items[0][1], items[5][-1]
+                    heading.append((abs(tip - (tail_a + tail_b) / 2),
+                                    abs(tip - (head_a + head_b) / 2),
+                                    abs(head_a - head_b), abs(tail_a - tail_b),
+                                    path["width"]))
+            elif len(items) == 3 and 535 < box.y0 < 580 and box.x1 < 85:
+                legend.append((box.width, box.height, path["width"]))
+        return heading, legend, north
+
+    with fitz.open(figure.ASSETS / "reference.pdf") as ref, \
+            fitz.open(stream=pdf, filetype="pdf") as out:
+        expected_heading, expected_legend, expected_north = map_arrows(ref[0])
+        heading, legend, north = map_arrows(out[0])
+
+    assert heading and expected_heading
+    for dimensions in heading:
+        assert dimensions == pytest.approx(expected_heading[0], abs=0.03)
+    assert len(legend) == len(expected_legend) == 2
+    for actual, expected in zip(legend, expected_legend):
+        assert actual == pytest.approx(expected, abs=0.03)
+    assert len(north) == len(expected_north) == 1
+    assert north[0] == pytest.approx(expected_north[0], abs=0.03)
+
+
+def test_restore_pdf_refuses_mismatched_pixels(tmp_path):
+    cairosvg = pytest.importorskip("cairosvg")
+    pytest.importorskip("pymupdf")
+
+    def svg_with(jpeg):
+        data = base64.b64encode(jpeg.read_bytes()).decode("ascii")
+        return (f'<svg xmlns="{SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink" '
+                f'width="72" height="48"><image width="72" height="48" '
+                f'xlink:href="data:image/jpeg;base64,{data}"/></svg>')
+
+    pdf = tmp_path / "input.pdf"
+    svg = svg_with(small_jpeg(tmp_path / "a.jpg", 72, 48, seed=1))
+    cairosvg.svg2pdf(bytestring=svg.encode(), write_to=str(pdf))
+    wrong = svg_with(small_jpeg(tmp_path / "b.jpg", 72, 48, seed=2))
+    with pytest.raises(ValueError, match="matches the decoded SVG JPEG"):
+        figure.restore_pdf_source_images(pdf, wrong)
+
+
+def test_stabilize_pdf_id_pins_the_trailer_id():
+    trailer = (b"/ID[<0123456789ABCDEF0123456789ABCDEF>"
+               b"<FEDCBA9876543210FEDCBA9876543210>]>>")
+    data = (b"%PDF-1.7\ntrailer\n<</Size 2/Root 1 0 R" + trailer
+            + b"\nstartxref\n0\n%%EOF")
+    out = figure._stabilize_pdf_id(data)
+    assert len(out) == len(data)
+    # the result does not depend on the ID MuPDF happened to stamp
+    other = data.replace(b"FEDCBA9876543210FEDCBA9876543210",
+                         b"00112233445566778899001122334455")
+    assert figure._stabilize_pdf_id(other) == out
+    # both slots carry the SHA-256 of the document with the ID zeroed,
+    # truncated to the 16-byte slot width
+    m = figure._PDF_ID_RE.search(out)
+    digest = out[m.start(1):m.end(1)]
+    base = (out[:m.start(1)]
+            + b"0" * (m.end(2) - m.start(1))
+            + out[m.end(2):])
+    assert digest == (hashlib.sha256(base).hexdigest()[:32]
+                      .upper().encode("ascii"))
+    assert m.group(1) == m.group(2)
+    for bad in (b"%PDF-1.7\nno trailer here",
+                data + b"trailer/ID[<ABCDEF0123456789ABCDEF0123456789>"
+                      b"<ABCDEF0123456789ABCDEF0123456789>]>"):
+        with pytest.raises(ValueError, match="one trailer /ID"):
+            figure._stabilize_pdf_id(bad)
+
+
+# ---------------------------------------------------------------------------
+# Pinned inputs and committed assets
+# ---------------------------------------------------------------------------
+def test_input_pins_cover_the_documented_inputs():
+    assert figure.DATA_REVISION == "86c41b5f43eb61191405b9bc85baf730a492a06f"
+    expected = (
+        ["fit_cache/zebra_escape_fit.nc",
+         "fit_cache/zebra_escape_fit.meta.json",
+         "zebra_bearings/zebra_bearings_blocks.parquet",
+         "zebra_bearings/mosaic/manifest.json"]
+        + [f"zebra_bearings/mosaic/tile_{i:03d}.png" for i in range(8)]
+        + [f"zebra_bearings/postures/observation088-{i}.parquet"
+           for i in range(18)]
+        + [f"zebra_bearings/raw/observation088-{i}.parquet"
+           for i in range(18)])
+    assert set(figure.INPUT_HASHES) == set(expected)
+    assert all(len(h) == 64 for h in figure.INPUT_HASHES.values())
+
+
+def test_prepare_inputs_verifies_and_tamper_proofs(tmp_path, monkeypatch):
+    payload = b"pinned zebra input\n"
+    monkeypatch.setattr(
+        figure, "INPUT_HASHES",
+        {"zebra_bearings/x.dat": hashlib.sha256(payload).hexdigest()})
+    root = tmp_path / "data"
+    (root / "zebra_bearings").mkdir(parents=True)
+    (root / "zebra_bearings" / "x.dat").write_bytes(payload)
+    assert figure.prepare_inputs(root) == root
+
+    # existing files are verified, never overwritten
+    (root / "zebra_bearings" / "x.dat").write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="Checksum mismatch"):
+        figure.prepare_inputs(root)
+
+    # missing files require an explicit download
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(FileNotFoundError):
+        figure.prepare_inputs(empty, download=False)
+
+
+def test_build_context_reads_only_pinned_tracks(tmp_path, monkeypatch):
+    from unwrap import datasets
+
+    frames = np.r_[np.arange(5, 16), np.arange(25, 36)]
+    pos = pd.DataFrame({"track_number": figure.FOCAL_TRACK, "frame": frames,
+                        "kp0_x": 1.0, "kp0_y": 2.0})
+    bearings = pd.DataFrame({"track_number": figure.FOCAL_TRACK,
+                             "observation": figure.OBS, "frame": frames,
+                             "compass_bearing": 90.0,
+                             "row_index": np.arange(frames.size)})
+    pins = {}
+    for name, table in (("postures", pos), ("raw", bearings)):
+        directory = tmp_path / "zebra_bearings" / name
+        directory.mkdir(parents=True)
+        path = directory / f"{figure.FOCAL_TRACK}.parquet"
+        table.to_parquet(path)
+        pins[path.relative_to(tmp_path).as_posix()] = figure.sha256(path)
+        # Any attempt to read an unpinned track will fail on this file.
+        (directory / f"{figure.OBS}-99.parquet").write_bytes(b"unpinned")
+
+    monkeypatch.setattr(figure, "INPUT_HASHES", pins)
+    monkeypatch.setitem(figure.INSET_PRE, "anchor_frame", 10)
+    monkeypatch.setitem(figure.INSET_POST, "anchor_frame", 30)
+    monkeypatch.setattr(figure, "ANCHOR_WINDOW_FRAMES", 5)
+    monkeypatch.setattr(figure, "load_fit", lambda root: (None, {}, 0))
+    monkeypatch.setattr(figure, "summary_numbers", lambda idata, blocks: {})
+    monkeypatch.setattr(datasets, "load_zebra_bearings",
+                        lambda data_root: pd.DataFrame())
+    monkeypatch.setattr(datasets, "load_zebra_mosaic",
+                        lambda **kwargs: (np.zeros((2, 2, 4)), (0, 1, 0, 1)))
+
+    ctx = figure.build_context(figure.prepare_inputs(tmp_path))
+    pd.testing.assert_frame_equal(ctx["df_pos"], pos)
+    pd.testing.assert_frame_equal(ctx["df_bearings"], bearings)
+
+
+def test_committed_assets_match_manifest():
+    manifest = figure.check_assets()
+    for name in ("drone_inset_pre.jpg", "drone_inset_post.jpg",
+                 "zebra_photo.jpg"):
+        assert name in manifest["images"]
+    assert figure.sha256(figure.ASSETS / "reference.pdf") == \
+        manifest["source_sha256"]
+
+
+# ---------------------------------------------------------------------------
+# Layout constants vs the committed reference PDF
+# ---------------------------------------------------------------------------
+def test_reference_layout_matches_constants():
+    fitz = pytest.importorskip("pymupdf")
+
+    with fitz.open(figure.ASSETS / "reference.pdf") as doc:
+        page = doc[0]
+        assert page.rect == fitz.Rect(0, 0, figure.PAGE_W, figure.PAGE_H)
+        rects = [r for row in page.get_images(full=True)
+                 for r in page.get_image_rects(row[0])]
+        # the mosaic fills panel a
+        assert any(abs(r.x0 - figure.MAP_RECT[0]) < 1 and
+                   abs(r.y0 - figure.MAP_RECT[1]) < 1 and
+                   abs(r.x1 - figure.MAP_RECT[2]) < 1 and
+                   abs(r.y1 - figure.MAP_RECT[3]) < 1
+                   for r in rects)
+        # the photo fills panel b
+        assert any(abs(r.x0 - figure.PHOTO_RECT[0]) < 1 and
+                   abs(r.y0 - figure.PHOTO_RECT[1]) < 1 and
+                   abs(r.x1 - figure.PHOTO_RECT[2]) < 1 and
+                   abs(r.y1 - figure.PHOTO_RECT[3]) < 1
+                   for r in rects)
+        # panel letters: 32 pt, at the measured positions
+        spans = [s for b in page.get_text("dict")["blocks"]
+                 if b.get("type") == 0
+                 for l in b["lines"] for s in l["spans"]]
+        letters = {s["text"].strip():
+                   (s["bbox"], s["size"]) for s in spans
+                   if s["text"].strip() in ("a.", "b.", "c.", "d.",
+                                            "e.", "f.")}
+        assert set(letters) == {"a.", "b.", "c.", "d.", "e.", "f."}
+        for name, (bbox, size) in letters.items():
+            letter = name.rstrip(".")
+            character, x, y, _ = next((l for l in figure.LETTERS
+                                       if l[0] == letter))
+            assert character == letter
+            assert size == pytest.approx(figure.FS["letter"], abs=0.3)
+            assert abs(bbox[0] - x) < 1.5
+            assert abs((bbox[1] + bbox[3]) / 2 - y) < 3.0

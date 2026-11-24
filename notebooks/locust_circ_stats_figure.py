@@ -95,7 +95,7 @@ REPO = HERE.parent
 sys.path.insert(0, str(HERE))
 
 import unwrap  # noqa: E402
-from unwrap.datasets import load_directional  # noqa: E402
+from unwrap.datasets import ensure_clone, load_directional  # noqa: E402
 from unwrap.link.pymc import circular_modulo  # noqa: E402
 from unwrap.preprocess import rediscretize_directional  # noqa: E402
 
@@ -117,9 +117,11 @@ REF_PAGE_H = 600.0
 SNAPSHOT_DIR = REPO / "assets" / "locust-circ-stats"
 STEM = "locust_circ_stats_figure"
 CAPTION = (
-    "Locust circular statistics. (a) Virtual-swarm schematic of the free-flight "
-    "arena. (b) Leave-one-out cross-validated predictive density of the bimodal "
-    "and unimodal course models (+/- one standard error). (c) Predictive check, "
+    "Locust circular statistics. (a) Lateral virtual swarms presented to a marching "
+    "locust. (b) Leave-one-out expected log predictive density of the bimodal "
+    "and unimodal course models (+/- one standard error). Influential steps in "
+    "the unimodal fit (48 with Pareto k above 0.7) limit the precision of this "
+    "comparison. (c) Predictive check, "
     "one polar plot per model: each model's replicated posterior-predictive "
     "direction density (von Mises KDE, median and 2.5/97.5 band) against the "
     "observed bootstrap KDE (solid line). (d) The hypothesis test on the "
@@ -354,7 +356,8 @@ UNIFORM_DASH = (7.74302, 3.3483332)
 # data + cached fits
 # ---------------------------------------------------------------------------
 def load_data():
-    raw = load_directional()
+    checkout = ensure_clone(data_root=os.environ.get("UNWRAP_DATA_ROOT")).root
+    raw = load_directional(data_root=checkout)
     df = rediscretize_directional(raw)
     df["animal_id"] = pd.factorize(df["animal_id"], sort=True)[0]
     return df
