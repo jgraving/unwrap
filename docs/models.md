@@ -5,6 +5,8 @@ It could change the animal's preferred heading, make its headings more
 consistent, or do both. A circular regression models the observed headings
 directly and estimates these responses separately, with uncertainty.
 
+The [visual regression guide](regression-basics.md) shows the effects of a cue
+and how an animal’s estimate changes when it shares information with other animals.
 For the equations, follow the mathematical guide in increasing complexity:
 [von Mises distribution](math/von-mises.md), [GLMs](math/glms.md),
 [GLMMs](math/glmms.md), and [mixture extensions](math/mixtures.md).
@@ -131,6 +133,6 @@ Bayesian fitting combines priors with the observed angles to estimate a
 posterior distribution. Check sampling diagnostics, summarize angles on the
 circle, and compare simulated headings from the fitted model with the data
 using **posterior predictive checks**. The
-[circular regression tutorial](notebooks/circular_regression.ipynb)
+[circular regression tutorial](../notebooks/circular_regression.ipynb)
 demonstrates fitting and checking a GLM; the [biological examples](examples.md)
 explore repeated observations and richer directional patterns.

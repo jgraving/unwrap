@@ -11,6 +11,15 @@ title: unwrap
 conditions. Do animals turn toward a cue? Do their headings become more
 consistent? Do individuals respond differently?
 
+[Choose a circular model and worked example](choose-a-model.md), or follow the visual lessons in order.
+
+1. [Read a heading on a circle](angle-basics.md) and connect its mean vector to [von Mises concentration](math/von-mises.md).
+2. [Update a prior with four beetle headings](bayes-basics.md) and explore [how the paper chooses priors](priors.md).
+3. [See what GLMs and GLMMs estimate](regression-basics.md), then [watch four MCMC chains fit circular models](mcmc.md).
+
+For an agent-assisted analysis, start with the
+[coding-agent prompt](coding-agents.md#copyable-prompt).
+
 These questions can be addressed with **Bayesian generalized linear models
 (GLMs)**, which relate an outcome such as heading to predictors such as
 treatment or neighbor density. The circular GLMs here use a von Mises
@@ -30,6 +39,9 @@ inference, and **Bambi** for a high-level formula interface to GLMs and GLMMs.
 
 ## Start with a biological question
 
+[Use the model map](choose-a-model.md) to match your questions to a model and
+find an example in Python or R.
+
 | Your question | What the model describes |
 | --- | --- |
 | Does a treatment change where animals point? | A change in mean direction |
@@ -41,8 +53,8 @@ inference, and **Bambi** for a high-level formula interface to GLMs and GLMMs.
 
 Install the Python side (the [Python setup page](getting-started.md)) or
 take the [R setup](getting-started-r.md), then do the circular
-regression tutorial in [Python](notebooks/circular_regression.ipynb) or
-[R](notebooks_r/circular_regression.ipynb). It generates its own
+regression tutorial in [Python](../notebooks/circular_regression.ipynb) or
+[R](../notebooks_r/circular_regression.ipynb). It generates its own
 observations and shows how to fit a model, interpret its predictions, and
 check how well it describes the data.
 The [model guide](models.md) explains how these questions become GLM and GLMM
@@ -51,10 +63,14 @@ formulas, with biological interpretations alongside the statistical terms.
 Every analysis on this site - the tutorial and all the
 [biological examples](examples.md) - runs in both **Python** (PyMC and
 Bambi) and **R** (brms on CmdStan); the notebooks are Python/R pairs that
-use the same observations, formulas, and prior scales. The
+analyze the same biological observations. The simulated regression tutorials
+draw independent samples from the same design. The
 [R setup page](getting-started-r.md) covers the one-time R environment.
 
 ## Read a fitted model
+
+See [Bayesian basics](bayes-basics.md) for a visual walkthrough from prior
+expectations through observed headings to a posterior.
 
 **Mean direction** tells you where observations tend to cluster. **Concentration**
 tells you how tightly they cluster: near zero, directions are nearly uniform;
@@ -83,9 +99,8 @@ can each hold a steady heading while pointing in different directions.
 - [Python API guide](api.md): components for Bambi and PyMC models.
 - [R and MATLAB](languages.md): the R versions of the tutorial and every study, the standalone R scripts, and the MATLAB examples.
 
-The introductory tutorial is executed automatically in CI, and every
-notebook is rerun end to end before a change that touches it is merged.
-The example guide describes each analysis and its inputs.
+The [development guide](development.md#notebook-execution-local-only) describes
+how to run and check the notebooks locally. The docs build displays their saved outputs.
 
 ## Citation
 

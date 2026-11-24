@@ -21,9 +21,9 @@ direction is intended; individual angular offsets use the same construction.
 "Uninformed" is therefore never a flat uniform over an interval - it is a
 von Mises prior with a near-zero concentration.
 
-[`notebooks_r/circular_regression.ipynb`](notebooks_r/circular_regression.ipynb)
+[`notebooks_r/circular_regression.ipynb`](../notebooks_r/circular_regression.ipynb)
 is the R version of the
-[Python tutorial](notebooks/circular_regression.ipynb), and the remaining
+[Python tutorial](../notebooks/circular_regression.ipynb), and the remaining
 notebooks mirror the
 [biological examples](examples.md) and the method examples one for one.
 

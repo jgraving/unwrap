@@ -4,11 +4,10 @@ Shared materials for the bat homing figure pipeline:
 `goldshtein_bats_figure_core.py` (pinned inputs, artwork loading, font
 resolution) and `goldshtein_bats_layout_review.py` (the publication
 composite renderer, written up in
-[`assets/goldshtein-bats-layout-review/README.md`](../../assets/goldshtein-bats-layout-review/README.md)).
+[`assets/goldshtein-bats-layout-review/README.md`](../../../assets/goldshtein-bats-layout-review/README.md)).
 
-The composite draws everything it shows — including the eight flight maps,
-which sit on live CartoDB "Positron" tiles — from code and pinned data.
-What lives here is only what has no code counterpart:
+The composite draws all eight flight maps from tracking data and a pinned
+OpenStreetMap extract. The supporting materials are:
 
 * `artwork.json` — verbatim vector extraction of the authored original
   (schema 1: 459 vector drawings, 8 image objects with 12 placements,
@@ -16,9 +15,8 @@ What lives here is only what has no code counterpart:
   grid (the 69 drawings whose bounding-box centre sits in the icon-grid
   band, checked on load) from it; all other reference content is
   superseded by code-drawn panels.
-* `image_279.jpeg` — the tagged-bat photograph panel b sits on (page
-  alpha 0.4684, a uniform mask the renderer synthesises; the "1.4cm"
-  ruler is baked into the JPEG).
+* `image_279.jpeg` — the tagged-bat photograph in panel a. The 1.4 cm
+  scale is part of the original image.
 * `basemap_osm.geojson.gz` — the pinned vector basemap: water, roads and
   buildings clipped to the map extents from the Geofabrik
   israel-and-palestine free-shp extract (retrieved 2026-11-22), written

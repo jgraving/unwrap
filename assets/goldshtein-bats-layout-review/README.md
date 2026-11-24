@@ -16,7 +16,8 @@ magnetic manipulation (n = 15), or in combination with both magnetic
 manipulation and anosmia (n = 9). The cyan polygon is the lake (Agamon), one of
 the two homing destinations; the star marks the roost (the other destination),
 crosses mark release sites, and dashed segments indicate tracking gaps.
-Tagged-bat photograph by [Photographer]. © [Year] [Copyright holder].
+The tagged-bat photograph is reproduced from the original manuscript figure
+with permission. Basemap © OpenStreetMap contributors (ODbL).
 
 **(b)** The von Mises–uniform mixture (vMU) represents headings as a mixture
 of a directed von Mises component and an undirected uniform component.

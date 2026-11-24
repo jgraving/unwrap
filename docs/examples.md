@@ -5,8 +5,8 @@ live under `notebooks/`, built on **PyMC** (with **Bambi** for the formula
 interface), and the site's "Open in Colab" button launches them in the
 cloud; the R notebooks live under `notebooks_r/` next to their Python
 counterparts, fitted with [brms](https://paulbuerkner.com/brms/) on
-CmdStan. The two sides of each pair use the same observations, formulas,
-and prior scales. The [Python setup page](getting-started.md) covers the
+CmdStan. The biological studies use the same observations across languages. The
+simulated regression tutorials draw independent samples from the same model. The [Python setup page](getting-started.md) covers the
 Python environment and the [R setup page](getting-started-r.md) the R one;
 [R and MATLAB](languages.md) covers the standalone R scripts and the MATLAB
 examples.
@@ -17,16 +17,16 @@ lists all examples, their inputs, and what each validated run covers.
 ## The tutorial
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/circular_regression/">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/circular_regression/">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/circular_regression.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/circular_regression.ipynb">R</a>
 </p>
 
-The circular regression tutorial
-using simulated observations: a math example on toy data, not a
-biological study, and the cheapest way to see the whole workflow. It
-fits a circular generalized linear model (GLM) with a formula for both
-the mean direction and the concentration. The tutorial creates its own
-data, so no download is needed.
+At nine cue levels, generate repeated headings whose preferred direction turns
+across the ±180° boundary and whose concentration increases. Fit a single
+von Mises regression with `y ~ x` and `kappa ~ x`. Compare each fitted curve
+and its uncertainty with the known simulation, then check whether replicate
+headings reproduce the observed pattern at each cue level. Both tutorials
+generate their own data.
 
 ## Biological examples
 
@@ -39,8 +39,8 @@ terms to biological questions and model formulas.
 ### Grevy's zebra body orientation during an escape response
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/zebra_escape/">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/zebra_escape/">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/zebra_escape.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/zebra_escape.ipynb">R</a>
 </p>
 
 A focal group of Grevy's zebra (*Equus grevyi*) was recorded with an overhead
@@ -52,7 +52,7 @@ using drones and computer vision," *Journal of Animal Ecology* **92**(6),
 1415-1433 (2023); [doi:10.1111/1365-2656.13904](https://doi.org/10.1111/1365-2656.13904).
 The first flights capture baseline (grazing) body orientation, and the final
 flight contains a disturbance event in which a human observer approaches the
-group. The zebra analysis
+group. The zebra analysis compares
 body orientation in the **pre-stimulus baseline period** (pre-approach) with
 the **post-stimulus period** (post-approach), using circularly averaged
 orientation over 10 s windows. The hierarchical model separates three
@@ -69,11 +69,11 @@ before the approach, purple after) placed every 5 m of travel or every
 ### Decomposing goal-directedness and directional precision in sensory-deprived echolocating bats during homing
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/goldshtein_bats/">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/goldshtein_bats/">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/goldshtein_bats.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/goldshtein_bats.ipynb">R</a>
 </p>
 
-The homing bat analysis
+The homing bat analysis examines
 kilometer-scale homing flights of echolocating bats from the experiments of
 A. Goldshtein et al., "Acoustic cognitive map-based navigation in
 echolocating bats," *Science* **386**(6721), 561-567 (2024);
@@ -96,11 +96,11 @@ compared with a unimodal von Mises baseline.
 ### Order and density shape locust directional alignment in virtual reality
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/locust_density_order/">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/locust_density_order/">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/locust_density_order.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/locust_density_order.ipynb">R</a>
 </p>
 
-The order and density analysis
+The order and density analysis uses data from
 a virtual-reality experiment from S. Sayin et al., "The behavioral
 mechanisms governing collective motion in swarming locusts," *Science*
 **387**(6737), 995-1000 (2025);
@@ -110,7 +110,7 @@ panoramic projection of moving virtual conspecifics, parameterized by *order*
 (how aligned the virtual locusts' motion is, 0 to 1) and *density* (virtual
 locusts per m$^2$, 1–64). The question is whether the focal locust's directional alignment is
 driven primarily by the directional structure of the neighbor motion (order)
-or by the number of neighbors (density); a PSIS-LOO model-selection sweep
+or by their spatial density; a PSIS-LOO model-selection sweep
 over the order and density specifications supports an order-dominant
 interpretation - order captures the bulk of the improvement in out-of-sample
 performance, and adding density provides at most a secondary gain.
@@ -118,11 +118,11 @@ performance, and adding density provides at most a secondary gain.
 ### Testing optic-flow vs. vectorial encoding in marching locusts
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/locust_direction_mixture_model/">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/locust_direction_mixture_model/">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/locust_direction_mixture_model.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/locust_direction_mixture_model.ipynb">R</a>
 </p>
 
-The mixture analysis
+The mixture analysis examines
 a second paradigm from the same experiments, in which moving virtual
 conspecifics are placed symmetrically at a lateral distance of 8 or 50 cm. A hierarchical
 bimodal von Mises mixture fitted to the full distribution of headings
@@ -135,11 +135,11 @@ turns).
 ### Artificial light reorients nocturnal dung beetles
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/beetles/">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/beetles/">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/beetles.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/beetles.ipynb">R</a>
 </p>
 
-The beetle analysis a two-condition
+The beetle analysis uses a two-condition
 arena experiment in the nocturnal ball-rolling dung beetle *Escarabaeus
 satyrus* from the experiments of J. J. Foster et al., "Light pollution
 forces a change in dung beetle orientation behavior," *Current Biology*
@@ -165,12 +165,11 @@ backwards from likelihood to behavior.
 ### Periodic but not circular: a 24-hour activity rhythm
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/periodic_not_circular/">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/periodic_not_circular/">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/periodic_not_circular.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/periodic_not_circular.ipynb">R</a>
 </p>
 
-The periodicity example
-*periodic* and *circular*: time of day repeats every 24 hours, but the
+The periodicity example separates a periodic predictor from a circular outcome: time of day repeats every 24 hours, but the
 quantity of interest - activity - is a level bounded in (0, 1), not an angle.
 The periodicity belongs to the *predictor*, so the model is a Beta GLM whose
 mean (logit-linked) and precision (softplus-linked) each vary sinusoidally
@@ -183,12 +182,11 @@ posterior-predictive uncertainty bands.
 ### Von Mises navigation policy
 
 <p class="unwrap-lang-row">
-  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/von_mises_policy/">Python</a>
-  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/von_mises_policy/">R</a>
+  <a class="unwrap-lang unwrap-lang-py" href="../notebooks/von_mises_policy.ipynb">Python</a>
+  <a class="unwrap-lang unwrap-lang-r" href="../notebooks_r/von_mises_policy.ipynb">R</a>
 </p>
 
-The policy example
-the opposite direction - as a *navigation policy* rather than a likelihood.
+The policy example uses von Mises headings to define a *navigation policy*.
 With utility defined as the negated distance to a goal, the heading
 distribution that maximizes utility in constant-length steps is exactly a von
 Mises distribution centered on the goal direction, with the concentration
@@ -197,14 +195,14 @@ the policy density at each concentration and samples trajectories under it:
 at zero concentration the policy is uniform and the walk is a
 constant-step random walk with no net progress, while rising concentration
 progressively aligns the trajectories with the goal. It is the visual
-companion to the likelihood use in the [beetle](notebooks/beetles.ipynb) and
-[zebra](notebooks/zebra_escape.ipynb) analyses, where fitted mean direction
+companion to the likelihood use in the [beetle](../notebooks/beetles.ipynb) and
+[zebra](../notebooks/zebra_escape.ipynb) analyses, where fitted mean direction
 and concentration describe observed directional control.
 
 ## Before running one of these notebooks
 
-Each notebook on this page was rerun end to end from this checkout on the
-current stack, and the outputs shown come from that validated run. The
+The docs display the outputs saved in each notebook. Run it locally to
+reproduce the figures with the current source. The
 [Python setup guide](getting-started.md) covers the environment; the R
 notebooks follow the [R setup guide](getting-started-r.md) and load the same
 published data through a Git-managed local checkout. The

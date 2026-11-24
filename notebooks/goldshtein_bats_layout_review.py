@@ -548,10 +548,6 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     with Image.open(photo_path or source.ASSET_DIR / "image_279.jpeg") as image:
         photo.imshow(image.convert("RGB"))
     photo.axis("off")
-    if photo_path is None:
-        photo.text(.5, .075, "Photo placeholder", transform=photo.transAxes,
-                   ha="center", va="center", color="white", fontsize=8,
-                   bbox={"facecolor": "#272727", "edgecolor": "none", "alpha": .58, "pad": 2.3})
     letter(18, route_top - 9, "a")
     page_text(39, route_top - 9, "Homing experiment", weight="bold", fontsize=11)
     page_text(139, photo_top + 4, "Treatment groups", fontsize=10.7)

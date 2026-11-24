@@ -21,8 +21,9 @@ inference, and **Bambi**, a high-level, formula-based interface built on PyMC
 for GLMs and GLMMs. `unwrap` supplies circular links and prior helpers for these existing
 APIs. The repository also includes examples in **R** and **MATLAB**.
 
-**Start here:** [Read the guide](https://jgraving.github.io/unwrap/) ·
+[Choose a model](docs/choose-a-model.md) ·
 [Try a worked example](notebooks/circular_regression.ipynb) ·
+[Use a coding agent](docs/coding-agents.md#copyable-prompt) ·
 [Explore the biological analyses](notebooks/README.md)
 
 ## What can you learn from a circular model?
@@ -64,7 +65,7 @@ python -m pip install --upgrade pip
 python -m pip install git+https://github.com/jgraving/unwrap.git
 ```
 
-Python 3.10 or newer is required. Install using the GitHub URL shown above.
+Python 3.12 or newer is required. Install using the GitHub URL shown above.
 See the [setup guide](docs/getting-started.md) to run a notebook in this environment.
 
 ### Install with uv
@@ -102,19 +103,20 @@ the two relationships; `unwrap` supplies their links and a circular prior.
 ```python
 import numpy as np
 import bambi as bmb
-import arviz as az
+
+from unwrap.circular import circular_summary
 
 from unwrap.data import generate_circular_regression_data
 from unwrap.link.bambi import LINKS
 from unwrap.prior import CircularUniformPrior
 
 data = generate_circular_regression_data(
-    num_samples=200,
+    num_samples=720,
     x_range=(-1, 1),
-    mean_intercept=0,
-    mean_slope=1,
+    mean_intercept=1.5,
+    mean_slope=2,
     conc_intercept=2,
-    conc_slope=0.5,
+    conc_slope=2,
     mean_link="circular_modulo",
     conc_link="softplus",
     seed=42,
@@ -139,10 +141,11 @@ model = bmb.Model(
 idata = model.fit(draws=1000, tune=1000, chains=4, random_seed=42)
 
 print(
-    az.summary(
+    circular_summary(
         idata,
         var_names=["Intercept", "x", "kappa_Intercept", "kappa_x"],
         circ_var_names=["Intercept"],
+        circ_diag="circular",
     )
 )
 ```
@@ -163,8 +166,10 @@ sampling diagnostics and use posterior predictive checks, comparing observations
 simulated from the fitted model with your data, before interpreting results.
 Use circular summaries for angular parameters, as shown for the intercept.
 
-See [the circular regression notebook](notebooks/circular_regression.ipynb)
-for a longer example with plots.
+In this simulation the preferred heading crosses the ±180° seam and concentration
+rises from 0.69 to 4.02 across the predictor range. The [circular regression
+notebook](notebooks/circular_regression.ipynb) repeats trials at nine cue levels
+and plots fitted curves and predictive checks against that known pattern.
 
 ## Examples and documentation
 
@@ -183,8 +188,9 @@ to the [link conventions](docs/links.md) and
 
 The R and MATLAB implementations have separate one-time setup requirements;
 installing the Python package does not install the R or MATLAB dependencies.
-The R study notebooks reproduce their Python counterparts with the same data,
-formulas, and prior scales (see the [examples](docs/examples.md)).
+The R study notebooks analyze the same biological datasets as their Python
+counterparts. The two simulated regression tutorials draw independent samples
+from the same model (see the [examples](docs/examples.md)).
 
 ### R
 
@@ -201,7 +207,7 @@ for brms — the same machinery the R notebooks build on. It loads `brms` and
 `circular` and uses [`R/vonmises_data.csv`](R/vonmises_data.csv). Its relative
 paths assume that the working directory is `R/`. Additional functions and
 analysis are in [`R/unwrap_functions.R`](R/unwrap_functions.R) and
-[the R Markdown analysis](R/Circular%20Dataset%20Structures.Rmd).
+[the R Markdown analysis](docs/Circular%20Dataset%20Structures.Rmd).
 
 ### MATLAB
 

@@ -29,7 +29,7 @@ $$
 | --- | --- |
 | $y$ | An observed angle in radians |
 | $\mu$ | Mean direction, around which observations cluster |
-| $\kappa$ | Concentration: larger values give tighter clustering |
+| $\kappa$ | Concentration (larger values give tighter clustering) |
 | $I_0(\kappa)$ | The modified Bessel function of the first kind, order zero |
 | $2\pi I_0(\kappa)$ | The normalising factor, also written $Z(\kappa)$; it makes the density integrate to one |
 
@@ -39,15 +39,25 @@ how strongly observations cluster around that mean. At $\kappa=0$, the density
 is uniform, $1/(2\pi)$, and no mean direction is preferred. Positive values
 describe progressively stronger directional consistency.
 
+![Three density curves show a broad peak at 0°, a tighter peak at 0°, and the same tight peak shifted to 90°.](../assets/von-mises-density.svg)
+
+Read the teal curves first. Increasing $\kappa$ from 1 to 4 keeps $\mu=0^\circ$
+and moves probability toward the light. Compare the narrow teal curve with
+the rust curve. Shifting $\mu$ by a quarter turn moves the peak to 90° and
+preserves its shape. Each curve joins smoothly at the two ends of the
+horizontal axis.
+
 This is a **probability density** over angles. A probability for an angular
 range is found by integrating the density over that range; the height at an
 exact direction is not a probability.
 
 ## Angular conventions
 
+See [Angle basics](../angle-basics.md) for visual examples of wraparound,
+mean direction, and concentration.
+
 All model equations use radians. The circular-modulo link represents
-angles in $[-\pi,\pi)$. The alternative $(-\pi,\pi]$ convention is equivalent:
-the endpoints describe the same direction. Keep the angular origin
+angles in $[-\pi,\pi)$. The alternative $(-\pi,\pi]$ convention uses the same circle, since the endpoints describe the same direction. Keep the angular origin
 and clockwise or anticlockwise convention consistent across observations and
 predictions.
 
@@ -60,11 +70,37 @@ R(\kappa)=\frac{I_1(\kappa)}{I_0(\kappa)},
 \qquad V=1-R(\kappa).
 $$
 
-$I_1$ is the corresponding Bessel function of order one. $R$ describes
-directional agreement on a scale from zero toward one; $V$ is circular
-variance. These describe variation in the distribution of observations,
-rather than uncertainty about an estimated mean. The
-[Bessel helpers](../api.md#concentration-conversion-unwrapbessel) convert
-between von Mises concentration and mean resultant length.
+$I_1$ is the modified Bessel function of order one. $R(\kappa)$ gives the
+length of the *population* mean vector, and $V$ is the circular variance.
+You can read the relationship in either direction. At $\kappa=2$ the
+population MRL is about 0.70. A population MRL of 0.86 corresponds to a
+$\kappa$ close to 4. Doubling $\kappa$ from 4 to 8 increases the MRL only
+from 0.86 to 0.94, as the curve approaches its upper limit of one.
 
-**Next:** [Relate mean direction and concentration to predictors with a GLM](glms.md).
+![The population MRL increases along a flattening curve from zero toward one. Concentrations of 1, 2, 4 and 8 correspond to MRLs of 0.45, 0.70, 0.86 and 0.94.](../assets/von-mises-mrl.svg)
+
+The [sample MRL](../angle-basics.md#where-do-the-headings-point-and-how-tightly-do-they-cluster)
+varies from sample to sample. For independent observations from a single
+von Mises distribution, a sample with $0<\bar R<1$ has a maximum-likelihood
+concentration estimate given by $R(\hat\kappa)=\bar R$. Exact cancellation gives $\hat\kappa=0$. If all headings
+coincide, $\bar R=1$ and the estimate tends to infinity. This conversion
+assumes one common mean and concentration. Pooling across conditions that point in different directions
+can shorten the sample mean vector, even when each condition has tightly
+clustered observations.
+
+The [Bessel helpers](../api.md#concentration-conversion-unwrapbessel) work
+on the population relationship in either direction.
+
+```python
+from unwrap.bessel import bessel_ratio, inverse_bessel_ratio
+
+print(round(bessel_ratio(2), 3))             # 0.698
+print(round(inverse_bessel_ratio(0.86), 2))  # 3.91
+```
+
+Higher $\kappa$ means individual headings are more consistent. Precision
+in an *estimated mean direction* also depends on how many independent
+observations you collect. The [Bayesian basics guide](../bayes-basics.md)
+illustrates both sources of uncertainty.
+
+Continue to [circular GLMs](glms.md) to relate mean direction and concentration to predictors.
