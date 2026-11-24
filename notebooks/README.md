@@ -25,6 +25,14 @@ without running the notebook or sampling again. See the
 [reproduction instructions](BEETLE_FIGURE.md) and the
 [rendered preview](../assets/beetles-publication/beetles_publication.png).
 
+The Goldshtein bat publication composite can be regenerated as PDF, PNG
+and a provenance JSON from the notebook's own code path, the pinned data
+and the pinned model fits (`python notebooks/goldshtein_bats_layout_review.py
+--data-root …`); the flight maps use the bundled vector basemap from OpenStreetMap.
+See the [render instructions and caption](../assets/goldshtein-bats-layout-review/README.md)
+and the
+[rendered preview](../assets/goldshtein-bats-layout-review/bat_composite.png).
+
 ## Locust composite figure
 
 `locust_circ_stats_figure.py` rebuilds the locust circular-statistics composite

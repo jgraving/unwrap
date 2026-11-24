@@ -147,6 +147,15 @@ def format_treatment_nicely(name: str) -> str:
     return ", ".join(parts)
 
 
+def _title_first_alpha(name: str) -> str:
+    """Upper-case the first letter of a treatment name, leaving a leading
+    marker (the "+ " of the composite's "+ Magnet" / "+ Anosmia") alone."""
+    for i, ch in enumerate(name):
+        if ch.isalpha():
+            return name[:i] + ch.upper() + name[i + 1:]
+    return name
+
+
 def _format_treatment_name(name: str) -> str:
     if name is None or (isinstance(name, float) and np.isnan(name)):
         return "Unknown"
@@ -157,7 +166,7 @@ def _format_treatment_name(name: str) -> str:
     if not parts:
         parts = ["control"]
     parts = sorted(parts)
-    parts = [p[:1].upper() + p[1:] for p in parts]
+    parts = [_title_first_alpha(p) for p in parts]
     return ", ".join(parts)
 
 
@@ -1066,7 +1075,7 @@ def build_res_treat_from_vonmises_idata(
         if not parts:
             parts = ["control"]
         parts = sorted(parts)
-        parts = [p[:1].upper() + p[1:] for p in parts]
+        parts = [_title_first_alpha(p) for p in parts]
         return ", ".join(parts)
 
     def _cat_dim(varname: str):

@@ -59,6 +59,7 @@ from goldshtein_bats_posthoc import (
     hdi_1d,
     hdi_along_samples,
     _format_treatment_name,
+    _title_first_alpha,
     log_i0_stable,
     log_vonmises_pdf,
     build_res_treat_from_vonmises_idata,
@@ -155,6 +156,11 @@ EVIDENCE_LABEL = "Posterior directedness"
 # ------------------------------------------------------------------ anchors
 #: map anchors and the Web Mercator EPSG for every basemap figure
 LAKE_GEOJSON = bats_lake_outline_path()
+#: the lake is the homing destination, so it reads as water against the
+#: pale basemap: cyan fill with a deeper shore line, shared by the map
+#: cells and the composite's flight maps (and its legend key)
+LAKE_FILL, LAKE_EDGE = "#7fd3e0", "#3f97a5"
+LAKE_LEGEND_LABEL = "Lake"
 WEBMERC_EPSG = 3857
 ROOST_LAT, ROOST_LON = 33.112373, 35.584135
 TRANS_POINTS = [(33.135136, 35.592712), (33.081932, 35.604462)]
@@ -646,8 +652,8 @@ def plot_destination_panels(
     treat_name_col="treatmentName",
 
     # colorblind-ish cyan replacement for tab:cyan
-    lake_facecolor="#56B4E9",
-    lake_alpha=0.35,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     # style knobs
     res_lw: float = 1.6,
     res_alpha: float = 0.95,
@@ -773,14 +779,14 @@ def plot_destination_panels(
                 lake_gdf_3857.plot(
                     ax=ax,
                     facecolor=lake_facecolor,
-                    edgecolor=lake_facecolor,
+                    edgecolor=LAKE_EDGE,
                     alpha=lake_alpha,
                     linewidth=1.2,
                     zorder=12
                 )
                 lake_gdf_3857.boundary.plot(
                     ax=ax,
-                    color=lake_facecolor,
+                    color=LAKE_EDGE,
                     linewidth=1.4,
                     alpha=1.0,
                     zorder=13
@@ -862,6 +868,25 @@ def plot_destination_panels(
         _save(fig, save, save_path)
         return fig
 
+
+def _compact_destination_legend(*, show_dropout, gap_linestyle="--", gap_color="black"):
+    """Return the notebook's map key for the lake, roost, releases, and gaps."""
+    handles = [
+        Patch(facecolor=LAKE_FILL, edgecolor=LAKE_EDGE, linewidth=.7,
+              label=LAKE_LEGEND_LABEL),
+        Line2D([0], [0], marker="*", color="none",
+               markerfacecolor="white", markeredgecolor="black",
+               markeredgewidth=0.8, markersize=7.2, label="Roost"),
+        Line2D([0], [0], marker="X", color="none",
+               markerfacecolor="white", markeredgecolor="black",
+               markeredgewidth=0.8, markersize=6.2, label="Translocation"),
+    ]
+    if show_dropout:
+        handles.append(Line2D([0, 1], [0, 0], color=gap_color, lw=1.0,
+                              linestyle=gap_linestyle, alpha=0.95, label="Signal dropout"))
+    return handles
+
+
 def plot_destination_panels_compact(
     resampled_df,
     meta_df,
@@ -871,12 +896,17 @@ def plot_destination_panels_compact(
     lon_col="lon",
     treat_col="treatment",
     treat_name_col="treatmentName",
-    lake_facecolor="tab:cyan",
-    lake_alpha=0.35,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     # line style
     res_lw=1.35,
     res_alpha=0.95,
     basemap_alpha=1.0,
+    # offline basemap: an RGB raster (e.g. the published figure's own
+    # CartoDB tile raster) drawn over the unified data extent in place of
+    # a contextily fetch; the notebook default (None) keeps the network
+    # basemap
+    basemap_img=None,
     # gap style
     gap_lw=None,
     gap_alpha=0.85,
@@ -958,25 +988,29 @@ def plot_destination_panels_compact(
         ax.set_ylim(*ylim)
 
         # basemap (already raster by nature)
-        try:
-            with _cartodb_quiet():
-                cx.add_basemap(ax, source=_carto_auth(cx.providers.CartoDB.PositronNoLabels), attribution=False, alpha=basemap_alpha)
-        except Exception as e:
-            print("Basemap failed (continuing without tiles):", e)
+        if basemap_img is not None:
+            ax.imshow(basemap_img, extent=(*xlim, *ylim), aspect="auto",
+                      alpha=basemap_alpha, zorder=0)
+        else:
+            try:
+                with _cartodb_quiet():
+                    cx.add_basemap(ax, source=_carto_auth(cx.providers.CartoDB.PositronNoLabels), attribution=False, alpha=basemap_alpha)
+            except Exception as e:
+                print("Basemap failed (continuing without tiles):", e)
 
         # lake ONLY on Agamon panel (keep vector)
         if dest == "Agamon" and len(lake_gdf_3857):
             lake_gdf_3857.plot(
                 ax=ax,
                 facecolor=lake_facecolor,
-                edgecolor=lake_facecolor,
+                edgecolor=LAKE_EDGE,
                 alpha=lake_alpha,
                 linewidth=1.0,
                 zorder=12,
             )
             lake_gdf_3857.boundary.plot(
                 ax=ax,
-                color=lake_facecolor,
+                color=LAKE_EDGE,
                 linewidth=1.1,
                 alpha=1.0,
                 zorder=13,
@@ -1049,22 +1083,9 @@ def plot_destination_panels_compact(
         ax.add_patch(rect)
 
     # --- Legend: top-right INSIDE right plot, compact and properly fitting ---
-    other_handles = [
-        Line2D([0], [0], marker="*", color="none",
-               markerfacecolor="white", markeredgecolor="black",
-               markeredgewidth=0.8, markersize=7.2, label="Roost"),
-        Line2D([0], [0], marker="X", color="none",
-               markerfacecolor="white", markeredgecolor="black",
-               markeredgewidth=0.8, markersize=6.2, label="Translocation"),
-    ]
-    if len(res_gaps_gdf):
-        other_handles.append(
-            Line2D([0, 1], [0, 0], color="black", lw=1.0,
-                   linestyle=gap_linestyle, alpha=0.95, label="Signal dropout")
-        )
-
     axes[1].legend(
-        handles=other_handles,
+        handles=_compact_destination_legend(show_dropout=not res_gaps_gdf.empty,
+                                            gap_linestyle=gap_linestyle),
         loc="upper right",
         bbox_to_anchor=(0.985, 0.985),
         borderaxespad=0.2,
@@ -1266,8 +1287,8 @@ def plot_destination_flow_fields(
     lat_col="lat",
     lon_col="lon",
     figsize=(8, 9),                     # EXACT match to your trajectory panels
-    lake_facecolor="tab:cyan",
-    lake_alpha=0.35,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     lake_edge_lw=1.4,
     basemap_alpha: float = 1.0,
     basemap_source=cx.providers.CartoDB.DarkMatter,
@@ -1398,14 +1419,14 @@ def plot_destination_flow_fields(
             lake_gdf_3857.plot(
                 ax=ax,
                 facecolor=lake_facecolor,
-                edgecolor=lake_facecolor,
+                edgecolor=LAKE_EDGE,
                 alpha=lake_alpha,
                 linewidth=1.2,
                 zorder=12,
             )
             lake_gdf_3857.boundary.plot(
                 ax=ax,
-                color=lake_facecolor,
+                color=LAKE_EDGE,
                 linewidth=lake_edge_lw,
                 alpha=1.0,
                 zorder=13,
@@ -1632,8 +1653,12 @@ def plot_per_tag_polar_kde(
     _save(fig, save, save_path)
     return fig
 
-def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True, save_path=None):
-    """Population mu/kappa coefficients of the Bambi von Mises model (intercept + treatment effects) with circular/linear mean + 95% HDI."""
+def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, ax=None,
+                                         save=True, save_path=None):
+    """Population mu/kappa coefficients of the Bambi von Mises model (intercept + treatment effects) with circular/linear mean + 95% HDI.
+
+    ``ax``: draw into an existing axes (for multi-panel figures) instead of
+    creating its own figure; ``save`` is then the caller's business."""
     post = idata_treatment.posterior
 
     def _has(varname: str) -> bool:
@@ -1692,7 +1717,7 @@ def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True
         if not parts:
             parts = ["control"]
         parts = sorted(parts)
-        parts = [p[:1].upper() + p[1:] for p in parts]
+        parts = [_title_first_alpha(p) for p in parts]
         return ", ".join(parts)
 
     # ---- treatment levels in fit order (for consistent colors/labels) ----
@@ -1810,8 +1835,12 @@ def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True
         y_k  = y_base
 
     # ---- plot ----
-    fig = plt.figure(figsize=(1.8, 0.40 * len(terms_order)), dpi=_plots.DEFAULT_DISPLAY_DPI)
-    ax = plt.gca()
+    own_fig = ax is None
+    if own_fig:
+        fig = plt.figure(figsize=(1.8, 0.40 * len(terms_order)), dpi=_plots.DEFAULT_DISPLAY_DPI)
+        ax = plt.gca()
+    else:
+        fig = ax.figure
 
     for i in range(n):
         c = treat_to_color[row_treatment[i]]
@@ -1852,11 +1881,16 @@ def plot_treatment_coefficients_mu_kappa(idata_treatment, df_track, *, save=True
     if handles:
         ax.legend(handles=handles, loc="lower right", frameon=True)
 
-    _save(fig, save, save_path)
+    if own_fig:
+        _save(fig, save, save_path)
     return fig
 
-def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=True, save_path=None):
-    """Predictive density at 0 deg of the Bambi von Mises model for the population intercept and each treatment shift (mean + 95% HDI, uniform reference line)."""
+def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, ax=None,
+                                             save=True, save_path=None):
+    """Predictive density at 0 deg of the Bambi von Mises model for the population intercept and each treatment shift (mean + 95% HDI, uniform reference line).
+
+    ``ax``: draw into an existing axes (for multi-panel figures) instead of
+    creating its own figure; ``save`` is then the caller's business."""
     post = idata_treatment.posterior
 
     # ----------------------
@@ -1903,7 +1937,7 @@ def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=
         if not parts:
             parts = ["control"]
         parts = sorted(parts)
-        parts = [p[:1].upper() + p[1:] for p in parts]
+        parts = [_title_first_alpha(p) for p in parts]
         return ", ".join(parts)
 
     def _cat_dim(varname: str):
@@ -2026,8 +2060,12 @@ def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=
     # ----------------------
     y = np.arange(len(labels), dtype=float)
 
-    fig = plt.figure(figsize=(fig_width, fig_height), dpi=DPI)
-    ax = plt.gca()
+    own_fig = ax is None
+    if own_fig:
+        fig = plt.figure(figsize=(fig_width, fig_height), dpi=DPI)
+        ax = plt.gca()
+    else:
+        fig = ax.figure
 
     for i in range(len(labels)):
         c = colors[i]
@@ -2069,8 +2107,9 @@ def plot_treatment_pred_density_at0_mu_kappa(idata_treatment, df_track, *, save=
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    plt.tight_layout()
-    _save(fig, save, save_path)
+    if own_fig:
+        plt.tight_layout()
+        _save(fig, save, save_path)
     return fig
 
 def plot_total_elpd(
@@ -2151,7 +2190,10 @@ def plot_delta_total_and_by_treatment(
     vline_at_zero=True,
     y_step=1.35,
     y_margins=0.10,
+    ax=None,
+    treatment_colors=None,
 ):
+    """Plot paired ELPD differences on a new or supplied axis."""
     import numpy as np
     import pandas as pd
     import matplotlib.pyplot as plt
@@ -2175,14 +2217,18 @@ def plot_delta_total_and_by_treatment(
 
     out = pd.concat([total_row, treat_rows], ignore_index=True)
 
-    cmap = mpl.colormaps.get_cmap("tab10")
-    treat_to_color = {t: cmap(i % 10) for i, t in enumerate(treatment_order)}
+    if treatment_colors is None:
+        cmap = mpl.colormaps.get_cmap("tab10")
+        treatment_colors = {t: cmap(i % 10) for i, t in enumerate(treatment_order)}
 
     y = np.arange(len(out), dtype=float) * float(y_step)
 
-    fig_h = max(1.35, (0.20 * y_step) * len(out) + 0.20)
-    fig = plt.figure(figsize=(3.0, fig_h), dpi=dpi)
-    ax = plt.gca()
+    standalone = ax is None
+    if standalone:
+        fig_h = max(1.35, (0.20 * y_step) * len(out) + 0.20)
+        fig, ax = plt.subplots(figsize=(3.0, fig_h), dpi=dpi)
+    else:
+        fig = ax.figure
 
     if vline_at_zero:
         ax.axvline(0.0, linestyle="--", linewidth=1.0, color="k", zorder=0)
@@ -2196,7 +2242,7 @@ def plot_delta_total_and_by_treatment(
             ecolor = "black"
         else:
             t = r["treatment"]
-            color = treat_to_color.get(t, "black")
+            color = treatment_colors.get(t, "black")
             ecolor = color
 
         if np.isfinite(se):
@@ -2233,7 +2279,8 @@ def plot_delta_total_and_by_treatment(
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    plt.tight_layout()
+    if standalone:
+        fig.tight_layout()
     _save(fig, save, save_path)
     return fig, ax
 
@@ -4088,8 +4135,8 @@ def plot_tracks_pgoal_viridis(
     # style
     basemap_source=cx.providers.CartoDB.Positron,
     basemap_alpha=1.0,
-    lake_facecolor="tab:cyan",
-    lake_alpha=0.25,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     lake_edge_lw=1.0,
     seg_lw=0.9,
     seg_alpha=0.92,
@@ -4230,9 +4277,9 @@ def plot_tracks_pgoal_viridis(
 
         # lake
         if len(lake_gdf):
-            lake_gdf.plot(ax=ax, facecolor=lake_facecolor, edgecolor=lake_facecolor,
+            lake_gdf.plot(ax=ax, facecolor=lake_facecolor, edgecolor=LAKE_EDGE,
                           alpha=lake_alpha, linewidth=lake_edge_lw, zorder=12)
-            lake_gdf.boundary.plot(ax=ax, color=lake_facecolor, linewidth=lake_edge_lw + 0.2,
+            lake_gdf.boundary.plot(ax=ax, color=LAKE_EDGE, linewidth=lake_edge_lw + 0.2,
                                    alpha=1.0, zorder=13)
 
         # roost + trans points
@@ -4368,7 +4415,8 @@ def plot_tracks_pgoal_viridis(
 
     # legend (+ optional gap entry)
     legend_handles = [
-        Patch(facecolor=lake_facecolor, edgecolor=lake_facecolor, alpha=lake_alpha, label="Lake"),
+        Patch(facecolor=lake_facecolor, edgecolor=LAKE_EDGE, alpha=lake_alpha,
+              label=LAKE_LEGEND_LABEL),
         Line2D([0], [0], marker="*", color="none", markerfacecolor="white",
                markeredgecolor="black", markersize=11, label="Roost"),
         Line2D([0], [0], marker="X", color="none", markerfacecolor="white",
@@ -4500,8 +4548,13 @@ def plot_tracks_pgoal_small_bigfont(
     # style
     basemap_source=cx.providers.CartoDB.Positron,
     basemap_alpha=1.0,
-    lake_facecolor="tab:cyan",
-    lake_alpha=0.25,
+    # offline basemap: an RGB raster (e.g. the published figure's own
+    # CartoDB tile raster) drawn over each panel's data extent in place of
+    # a contextily fetch; the notebook default (None) keeps the network
+    # basemap
+    basemap_img=None,
+    lake_facecolor=LAKE_FILL,
+    lake_alpha=0.6,
     lake_edge_lw=0.8,
     seg_lw=0.8,
     seg_alpha=0.90,
@@ -4523,6 +4576,11 @@ def plot_tracks_pgoal_small_bigfont(
     cbar_width=0.60,
     cbar_ticksize=8,      # BIGGER
     cbar_labelsize=9,     # BIGGER
+    # explicit figure-fraction box for the colorbar axis; when given it
+    # overrides the four cbar_* fraction knobs above (the publication
+    # figure generator passes it so the gradient bar lands on the
+    # published composite's measured colorbar)
+    cbar_box=None,
     # colorbar name of the encoded per-step score (default keeps the
     # original directed-component probability figure unchanged)
     cbar_label="Directed-component probability",
@@ -4631,25 +4689,29 @@ def plot_tracks_pgoal_small_bigfont(
         ax.set_ylim(*ylim)
 
         # basemap (already raster by nature)
-        try:
-            with _cartodb_quiet():
-                cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
-        except Exception as e:
-            print("Basemap failed (continuing without tiles):", e)
+        if basemap_img is not None:
+            ax.imshow(basemap_img, extent=(*xlim, *ylim), aspect="auto",
+                      alpha=basemap_alpha, zorder=0)
+        else:
+            try:
+                with _cartodb_quiet():
+                    cx.add_basemap(ax, source=_carto_auth(basemap_source), attribution=False, alpha=basemap_alpha)
+            except Exception as e:
+                print("Basemap failed (continuing without tiles):", e)
 
         # lake (keep vector)
         if len(lake_gdf):
             lake_gdf.plot(
                 ax=ax,
                 facecolor=lake_facecolor,
-                edgecolor=lake_facecolor,
+                edgecolor=LAKE_EDGE,
                 alpha=lake_alpha,
                 linewidth=lake_edge_lw,
                 zorder=12
             )
             lake_gdf.boundary.plot(
                 ax=ax,
-                color=lake_facecolor,
+                color=LAKE_EDGE,
                 linewidth=lake_edge_lw + 0.15,
                 alpha=1.0,
                 zorder=13
@@ -4782,7 +4844,9 @@ def plot_tracks_pgoal_small_bigfont(
         hspace=hspace
     )
 
-    cax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
+    cax = fig.add_axes(
+        cbar_box if cbar_box is not None
+        else [cbar_left, cbar_bottom, cbar_width, cbar_height])
 
     sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
@@ -4813,6 +4877,8 @@ def plot_population_curve_smooth(
     invert_x=False,
     xlim=None,
     x_tick_abs=False,
+    ax=None,
+    legend=True,
     save=True,
     save_path=None,
     palette_name="colorblind",
@@ -4821,8 +4887,12 @@ def plot_population_curve_smooth(
     colors = sns.color_palette(palette_name, n_colors=len(treat_levels))
     treat_to_color = {t: colors[i] for i, t in enumerate(treat_levels)}
 
-    fig = plt.figure(figsize=(fig_w, fig_h), dpi=DPI)
-    ax = plt.gca()
+    own_fig = ax is None
+    if own_fig:
+        fig = plt.figure(figsize=(fig_w, fig_h), dpi=DPI)
+        ax = plt.gca()
+    else:
+        fig = ax.figure
     ax.axhline(0.5, color="0.90", lw=0.9, ls="--", zorder=0)
 
     for t in treat_levels:
@@ -4864,18 +4934,21 @@ def plot_population_curve_smooth(
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    ax.legend(
-        frameon=True,
-        fontsize=legend_fontsize,
-        ncol=1,
-        handlelength=1.4,
-        loc="center left",
-        bbox_to_anchor=(1.02, 0.5),
-        borderaxespad=0.0,
-    )
-    fig.subplots_adjust(right=0.78)
+    if legend:
+        ax.legend(
+            frameon=True,
+            fontsize=legend_fontsize,
+            ncol=1,
+            handlelength=1.4,
+            loc="center left",
+            bbox_to_anchor=(1.02, 0.5),
+            borderaxespad=0.0,
+        )
+        if own_fig:
+            fig.subplots_adjust(right=0.78)
 
-    _save(fig, save, save_path)
+    if own_fig:
+        _save(fig, save, save_path)
     return fig
 
 def plot_population_curve_smooth_compact(
@@ -4900,11 +4973,18 @@ def plot_population_curve_smooth_compact(
     tick_label_fs=6,
     y_labelpad=1,
     x_labelpad=1,
+    ax=None,
+    treatment_colors=None,
 ):
-    colors = sns.color_palette(palette_name, n_colors=len(treat_levels))
-    treat_to_color = {t: colors[i] for i, t in enumerate(treat_levels)}
+    if treatment_colors is None:
+        colors = sns.color_palette(palette_name, n_colors=len(treat_levels))
+        treatment_colors = dict(zip(treat_levels, colors))
 
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=DPI)
+    standalone = ax is None
+    if standalone:
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=DPI)
+    else:
+        fig = ax.figure
 
     ax.axhline(0.5, color="0.88", lw=0.8, ls="--", zorder=0)
 
@@ -4920,9 +5000,9 @@ def plot_population_curve_smooth_compact(
         order = np.argsort(x)
         x, m, lo, hi = x[order], m[order], lo[order], hi[order]
 
-        c = treat_to_color[t]
+        c = treatment_colors[t]
         ax.fill_between(x, lo, hi, color=c, alpha=band_alpha, linewidth=0)
-        ax.plot(x, m, color=c, lw=line_lw)
+        ax.plot(x, m, color=c, lw=line_lw, label=s.get("label", str(t)))
 
     ax.set_ylim(0, 1)
     ax.set_xlabel(xlabel, fontsize=axis_label_fs, labelpad=x_labelpad)
@@ -4950,8 +5030,8 @@ def plot_population_curve_smooth_compact(
     ax.spines["right"].set_visible(False)
     ax.grid(False)
 
-    # No legend; use manual margins because tight_layout can struggle at tiny height
-    fig.subplots_adjust(left=0.13, right=0.995, bottom=0.30, top=0.98)
+    if standalone:
+        fig.subplots_adjust(left=0.13, right=0.995, bottom=0.30, top=0.98)
 
     _save(fig, save, save_path)
     return fig
