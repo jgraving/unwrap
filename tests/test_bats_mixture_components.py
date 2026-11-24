@@ -1,4 +1,4 @@
-"""Regression tests for population density profiles and individual goal-window probabilities."""
+"""Regression tests for population and individual full-mixture heading densities."""
 import sys
 from pathlib import Path
 
@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-from scipy.integrate import quad, trapezoid
+from scipy.integrate import trapezoid
 from scipy.stats import vonmises
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "notebooks"))
@@ -32,19 +32,25 @@ def test_draw_weighted_component_densities_and_intervals(predictions):
     data, mu, kappa, omega = predictions
     angle = data["density_bearings"]
     uniform = 1 / (2 * np.pi)
+    goal_draws = []
     for i, level in enumerate([1, 2, 3, 4]):
         directed = vonmises.pdf(angle, kappa[:, i, None], loc=mu[:, i, None])
         weight = omega[:, i, None]
         mixture = weight * directed + (1 - weight) * uniform
-        np.testing.assert_allclose(data["directed_density_profiles"][level]["mean"],
-                                   directed.mean(axis=0))
         curve = data["density_profiles"][level]
         np.testing.assert_allclose(curve["mean"], mixture.mean(axis=0))
         np.testing.assert_allclose(curve["lo"], mixture.min(axis=0))
         np.testing.assert_allclose(curve["hi"], mixture.max(axis=0))
 
         assert trapezoid(curve["mean"], angle) == pytest.approx(1)
-        assert trapezoid(data["directed_density_profiles"][level]["mean"], angle) == pytest.approx(1)
+        goal = mixture[:, angle == 0].ravel()
+        goal_draws.append(goal)
+        np.testing.assert_allclose(data["density_at_zero_by_treatment"][level],
+                                   [goal.mean(), goal.min(), goal.max()])
+    for level, draws in enumerate(goal_draws[1:], start=2):
+        difference = draws - goal_draws[0]
+        np.testing.assert_allclose(data["full_contrasts"][level],
+                                   [difference.mean(), difference.min(), difference.max()], atol=1e-14)
 
 
 def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
@@ -65,17 +71,17 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
         "p_goal": (("chain", "draw", "p_goal_dim_0", "p_goal_dim_1"),
                    np.stack([directed_share, 1 - directed_share], axis=-1)[None]),
     })
-    rows = layout._goal_window_by_bat(posterior, observed, posthoc)
+    rows = layout._density_at_zero_by_bat(posterior, observed, posthoc)
     assert [row["tag"] for row in rows] == list(tags)
     assert [row["treatment"] for row in rows] == groups
     for i, row in enumerate(rows):
-        draws = []
-        for m, k, w in zip(mu[:, i], kappa[:, i], weight[:, i], strict=True):
-            probability, _ = quad(lambda x: w * vonmises.pdf(x, k, loc=m) + (1 - w) / (2 * np.pi),
-                                  -np.pi / 4, np.pi / 4)
-            draws.append(probability)
-        assert row["probability"] == pytest.approx(np.mean(draws), abs=1e-12)
-    assert rows[2]["probability"] == pytest.approx(0.25)
+        uniform = 1 / (2 * np.pi)
+        draws = weight[:, i] * vonmises.pdf(0, kappa[:, i], loc=mu[:, i]) + (1 - weight[:, i]) * uniform
+        np.testing.assert_allclose([row["mean"], row["lo"], row["hi"]],
+                                   [draws.mean(), draws.min(), draws.max()])
+        assert row["prob_above_uniform"] == np.mean(draws > uniform)
+    assert rows[0]["hi"] > 1  # density per radian can exceed 1
+    assert rows[2]["mean"] == pytest.approx(1 / (2 * np.pi))
     observed.loc[7, "treatment"] = 4
     with pytest.raises(ValueError, match="more than one treatment"):
-        layout._goal_window_by_bat(posterior, observed, posthoc)
+        layout._density_at_zero_by_bat(posterior, observed, posthoc)

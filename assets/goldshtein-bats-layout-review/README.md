@@ -25,13 +25,13 @@ Predictive performance is compared with a single von Mises model (vM) using
 stepwise PSIS–LOO expected log predictive density. Points show vMU minus vM
 overall and within each treatment. Whiskers show one standard error.
 
-**(c)** Polar curves show posterior mean heading densities by treatment for the
-full mixture (solid) and the directed component alone (dashed), with the goal
-at 0°. The shaded sector spans ±45° around the goal. Each bat’s point gives
-the posterior mean probability of a heading in this sector under the full
-mixture, including that bat’s individual offsets. Population estimates set
-the offsets to zero and show posterior means and 95% highest-density
-intervals.
+**(c)** Polar curves show the posterior mean heading density under the full
+mixture for each treatment, with pointwise 95% highest-density intervals.
+At the goal (0°), population contrasts subtract the control density within
+each posterior draw, setting individual offsets to zero. Each bat’s density
+at the goal is estimated under its observed treatment and compared with the
+uniform density, 1/(2π). Points and bars show posterior means and 95%
+highest-density intervals.
 
 **(d)** Directedness compares the directed and undirected heading likelihoods
 under equal prior odds, with 0.5 indicating equal evidence. Step scores were
