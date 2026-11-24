@@ -34,7 +34,7 @@ This is the starting R example, with all angles in **radians** and no external d
 
 ## Setup
 
-Set up the R side once: the [R setup](../getting-started-r.md) page
+Set up the R side once: the [R setup](https://jakegraving.com/unwrap/getting-started-r/) page
 installs the CRAN packages, CmdStan, and the Jupyter R kernel against
 the pinned `renv.lock` versions. The first code cell below re-checks
 the environment and stops with a pointer to the setup page if the
@@ -55,7 +55,7 @@ missing <- required[!vapply(required, requireNamespace, logical(1),
 if (length(missing))
   stop("Missing R package(s): ", paste(missing, collapse = ", "),
        " - run the one-time setup on the R setup page first:",
-       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
+       "\n  https://jakegraving.com/unwrap/getting-started-r/")
 
 cmdstan_ok <- tryCatch(
   dir.exists(as.character(cmdstanr::cmdstan_path())),
@@ -63,7 +63,7 @@ cmdstan_ok <- tryCatch(
 if (!cmdstan_ok)
   stop("cmdstanr/CmdStan is not available - run the one-time setup on the",
        " R setup page first:",
-       "\n  https://jgraving.github.io/unwrap/getting-started-r/")
+       "\n  https://jakegraving.com/unwrap/getting-started-r/")
 ```
 
 ```{r}
@@ -93,8 +93,7 @@ dir.create(FIG_DIR, recursive = TRUE, showWarnings = FALSE)
 theme_set(theme_minimal(base_size = 12))
 
 SEED <- 42
-# CI runs with shortened sampling (the committed outputs use the full
-# budget); local runs always use the full budget.
+# Set UNWRAP_R_QUICK=1 for a shorter local smoke run.
 quick_run <- Sys.getenv("UNWRAP_R_QUICK") == "1"
 CHAINS <- 4L
 ITER <- if (quick_run) 750L else 1000L
@@ -114,43 +113,39 @@ c(R = as.character(getRversion()),
 The figures follow the analysis from parameter estimation to predicted directions and replicated data. They appear inline and are also saved as vector PDF files under `figures/circular_regression/`.
 
 
-## 1. Generate synthetic angular data
+## 1. Simulate a turn and a change in precision
 
-We draw 200 independent angles with predictor values between $-1$ and $1$. The generating mean direction is $\mu(x)=x$, wrapped onto the circle. Over this predictor range the mean moves from $-1$ to $1$ radians and does not cross $\pm\pi$. Concentration is
+Imagine a cue presented at nine equally spaced strengths from $x=-1$ to $x=1$. At each strength, 80 independent animals each contribute one heading. The preferred bearing rotates from $-29^\circ$ through $180^\circ$ to $201^\circ$ (the same bearing as $-159^\circ$). Responses also tighten around that moving bearing. The two generating curves are
 
 $$
-\kappa(x)=\log\bigl(1+\exp(2+0.5x)\bigr).
+\mu(x)=\operatorname{wrap}(1.5+2x), \qquad
+\kappa(x)=\log(1+\exp(2+2x)).
 $$
 
-As $x$ increases, the preferred direction moves and concentration rises from about 1.70 to 2.58. We can ask separately how well a finite sample reveals directional change and increasing tightness around that direction. The R and Python tutorials use separate samples from the same generating relationships, so their observations and fitted estimates differ.
-
+At the weakest cue, $\kappa\approx0.69$ and headings can be far from their preferred bearing. At the strongest cue, $\kappa\approx4.02$. Repeating each cue level lets us check the spread of new headings at that strength. Python and R draw independent samples from this same experiment.
 
 ```{r}
 #| cell-id: "c06"
 set.seed(SEED)
-n_samples <- 200
-x <- runif(n_samples, min = -1, max = 1)
+levels_x <- seq(-1, 1, length.out = 9)
+n_per_level <- 80L
+x <- rep(levels_x, each = n_per_level)
+beta0 <- 1.5
+beta1 <- 2
+alpha0 <- 2
+alpha1 <- 2
 
-# Generating model (known ground truth): mu = 0 + 1 * x wrapped, and
-# kappa = softplus(2 + 0.5 * x) - the concentration on the natural
-# scale; the model below recovers the pre-softplus values (2 and 0.5).
-mu_true <- mod_circular(x)
-kappa_true <- softplus(2 + 0.5 * x)
-# circular 0.5.x samplers take scalar mu and kappa plus a control list;
-# draw on the default [0, 2*pi) domain and wrap back to the model's
-# (-pi, pi] convention. (These helpers are reused in the PPC cell below.)
-vm_ctrl <- list(units = "radians", template = "none", modulo = "2pi")
-y <- vapply(
-    seq_len(n_samples),
-    function(i) as.numeric(circular::rvonmises(1,
-        mu = vmu(mu_true[i]),
-        kappa = kappa_true[i],
-        control.circular = vm_ctrl)),
-    numeric(1))
-y <- mod_circular(y)
-
+generating_mu <- function(x) mod_circular(beta0 + beta1 * x)
+generating_kappa <- function(x) softplus(alpha0 + alpha1 * x)
+# circular::rvonmises accepts a scalar location and concentration.
+# Draw each group's headings together, then wrap to the signed angle scale.
+sample_headings <- function(mu, kappa) {
+    mod_circular(as.numeric(circular::rvonmises(n_per_level, vmu(mu), kappa)))
+}
+y <- unlist(lapply(levels_x, function(z)
+    sample_headings(generating_mu(z), generating_kappa(z))))
 data <- data.frame(x = x, y = y)
-stopifnot(all(data$y <= pi & data$y >= -pi))
+stopifnot(all(abs(y) <= pi))
 head(data)
 ```
 
@@ -197,14 +192,11 @@ prior_vonmises
 
 ## 3. Fit and inspect sampling
 
-Stan's No-U-Turn Sampler (NUTS) approximates the posterior using four chains, each with 500 warmup iterations and 500 retained draws in the saved run. Comparing chains helps assess whether reported uncertainty represents the posterior adequately. For the circular intercept, $\hat R$ is calculated after unwrapping draws so that equivalent directions are compared together.
-
-Values of $\hat R$ near one indicate agreement among chains. The saved summary reports $\hat R$ values of 1.0001–1.0048 and bulk effective sample sizes of about 2,072–2,333. Effective sample size accounts for dependence between successive draws; the trace figure shows progression within each chain. These results are encouraging, but the fit object does not retain the divergence flags used by this diagnostic cell. Its printed message means that the divergence count is unavailable, leaving that part of the sampling assessment unresolved.
-
+Four Stan NUTS chains each retain 500 draws after 500 warmup iterations in a full run. Check for divergences, agreement across chains ($\hat R$ near one), adequate effective sample sizes and traces that mix. The table pairs each estimate with the generating coefficient. The concentration coefficients are on the pre-softplus scale.
 
 ```{r}
 #| cell-id: "c10"
-fit <- unwrap_load_fit_cache("circular_regression_fit_v2", SEED, ITER, WARMUP)
+fit <- unwrap_load_fit_cache("circular_regression_balanced_fit", SEED, ITER, WARMUP)
 if (is.null(fit)) {
   fit <- brm(
       form_vonmises, data = data,
@@ -213,55 +205,27 @@ if (is.null(fit)) {
       chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CHAINS,
       seed = SEED, control = list(adapt_delta = 0.9),
       backend = "cmdstanr")
-  unwrap_save_fit_cache("circular_regression_fit_v2", fit, SEED, ITER, WARMUP)
+  unwrap_save_fit_cache("circular_regression_balanced_fit", fit, SEED, ITER, WARMUP)
 }
-# NUTS divergences. Not every brms/cmdstanr combination keeps the
-# per-iteration divergence flag in the fit object, so probe for it and
-# report what the fit object actually carries (the R-hat and ESS values
-# below are the primary convergence checks either way).
-divergences <- tryCatch({
-  div_flags <- lapply(fit$fit@sim$samples, function(ch) ch[["divergent"]])
-  if (any(vapply(div_flags, is.null, logical(1)))) NA_real_
-  else sum(unlist(div_flags))
-}, error = function(e) NA_real_)
-if (is.na(divergences)) {
-    cat("Divergences: not retained in this fit object (see R-hat/ESS below).\n")
-} else {
-    cat("Divergences:", divergences, "\n")
-}
+nuts <- brms::nuts_params(fit)
+divergent <- nuts$Value[nuts$Parameter == "divergent__"]
+stopifnot(length(divergent) > 0)
+cat("Divergences:", sum(divergent), "\n")
 
 parameters <- c("b_Intercept", "b_x", "b_kappa_Intercept", "b_kappa_x")
 draws <- posterior::as_draws_df(fit, variables = parameters)
-stopifnot(all(vapply(draws, function(v) all(is.finite(v)), logical(1))))
-
-# Convergence: R-hat (unwrapped for the circular intercept) and ESS,
-# computed across the chains on the [iteration x chain] draws.
-n_chains <- max(draws[[".chain"]])
-draw_split <- lapply(parameters, function(p) {
-    o <- order(draws[[".chain"]], draws[[".iteration"]])
-    matrix(as.numeric(draws[[p]][o]), ncol = n_chains)
-})
-names(draw_split) <- parameters
-rhat_values <- c(b_Intercept = unname(Rhat_unwrap(draw_split[[1]], method = "mean")),
-                 unname(vapply(draw_split[2:4], posterior::rhat, numeric(1))))
-names(rhat_values) <- parameters
-ess_values <- vapply(parameters, function(p) posterior::ess_bulk(draw_split[[p]]), numeric(1))
-
-# Posterior summary. The intercept is circular, so its location is the
-# circular mean and its spread the circular standard deviation - the
-# R analogue of the Python tutorial's circular_summary().
-m_int <- circ_mean(draws$b_Intercept)
-summary_frame <- data.frame(
-    parameter = parameters,
-    mean = c(m_int, mean(draws$b_x), mean(draws$b_kappa_Intercept),
-             mean(draws$b_kappa_x)),
-    sd = c(circ_sd(draws$b_Intercept, m_int), sd(draws$b_x),
-           sd(draws$b_kappa_Intercept), sd(draws$b_kappa_x)),
-    rhat = round(rhat_values, 4),
-    ess = round(ess_values, 1),
-    # generating values (kappa on the pre-softplus scale)
-    truth = c(0, 1, 2, 0.5),
-    row.names = NULL, check.names = FALSE)
+chain_draws <- posterior::as_draws_array(draws)
+summary_frame <- do.call(rbind, lapply(parameters, function(name) {
+    a <- as.matrix(chain_draws[, , name])
+    angular <- name == "b_Intercept"
+    center <- if (angular) circ_mean(a) else mean(a)
+    centered <- if (angular) mod_circular(a - center) else a
+    data.frame(parameter = name, mean = center,
+        sd = if (angular) circ_sd(a) else sd(a),
+        rhat = if (angular) Rhat_unwrap(a, method = "sine") else posterior::rhat(a),
+        ess_bulk = posterior::ess_bulk(centered), ess_tail = posterior::ess_tail(centered))
+}))
+summary_frame$truth <- c(beta0, beta1, alpha0, alpha1)
 summary_frame
 ```
 
@@ -276,75 +240,56 @@ ggsave(file.path(FIG_DIR, "trace.pdf"), p_trace, width = 7, height = 3.5)
 show_figure(p_trace, "trace", 7, 3.5)
 ```
 
-## 4. Interpret predictions on the circle
+## 4. Recover the two generating curves
 
-Each posterior draw defines a direction and concentration at every value of $x$. Directions are averaged as unit vectors, preserving proximity across the wrap boundary. Concentration is transformed through softplus for each draw before averaging. Solid curves are posterior averages; dashed curves are generating relationships. Neither panel displays uncertainty bands.
+The fit sees only $x$ and the observed heading. Compare each fitted curve (solid) and its pointwise 90% credible band with the known generating curve (dashed). For direction, we average the posterior unit vectors, then take quantiles of angular deviations about that mean. For concentration, we apply softplus to **each draw** before computing the median and interval.
 
-The mean-direction panel closely follows the generating trend: the slope averages 1.055 with posterior standard deviation 0.089, compared with a generating slope of 1. In the concentration panel, the fitted average lies above the generating curve. The concentration intercept before softplus averages 2.278 rather than the generating value of 2, and its slope averages 0.598 with standard deviation 0.370. This broad slope distribution shows that the sample gives a less precise account of how concentration changes. The panels answer different questions, even though both arise from the same angular observations.
-
+The bearing axis spans one turn, from $-90^\circ$ to $270^\circ$, so you can follow a continuous turn through $180^\circ$. The grey points are individual headings. Their spread can be much wider than the band for the mean bearing. The second panel estimates $\kappa$ from those same observations. The printed probabilities quantify the evidence for increasing rotation on the unwrapped predictor and increasing concentration across the cue range.
 
 ```{r}
 #| cell-id: "c13"
-grid_x <- seq(-1, 1, length.out = 100)
+grid_x <- seq(-1, 1, length.out = 101)
 
-# Posterior draws of the linear predictors: [grid x draws] matrices -
-# row j / column d holds the draw-d linear predictor at grid point j.
-lin_mu <- matrix(rep(draws$b_Intercept, each = length(grid_x)),
-                 nrow = length(grid_x)) + outer(grid_x, draws$b_x)
-lin_kappa <- matrix(rep(draws$b_kappa_Intercept, each = length(grid_x)),
-                    nrow = length(grid_x)) + outer(grid_x, draws$b_kappa_x)
+# Rows are joint posterior draws, columns are predictor values.
+predict_parameters <- function(x) {
+    list(mu = mod_circular(draws$b_Intercept + outer(draws$b_x, x)),
+         kappa = softplus(draws$b_kappa_Intercept + outer(draws$b_kappa_x, x)))
+}
+pred <- predict_parameters(grid_x)
+cat("P(positive direction slope) =", mean(draws$b_x > 0), "\n")
+cat("P(kappa at +1 > kappa at -1) =",
+    mean(pred$kappa[, length(grid_x)] > pred$kappa[, 1]), "\n")
 
-# Average the predicted directions as unit vectors (angles near +/-pi
-# are neighbours), and average the concentration draws for the right-
-# hand panel.
-mean_direction <- atan2(apply(sin(lin_mu), 1, mean),
-                        apply(cos(lin_mu), 1, mean))
-concentration <- apply(softplus(lin_kappa), 1, mean)
-
-p_pred <- predictions_plot(data, grid_x, mean_direction, concentration)
-ggsave(file.path(FIG_DIR, "predictions.pdf"), p_pred, width = 8, height = 3)
-show_figure(p_pred, "predictions", 8, 3)
+p_pred <- predictions_plot(data, grid_x, pred, generating_mu(grid_x),
+                           generating_kappa(grid_x))
+ggsave(file.path(FIG_DIR, "predictions.pdf"), p_pred, width = 9, height = 4)
+show_figure(p_pred, "predictions", 9, 4)
 ```
 
-## 5. Check posterior predictive behavior
+## 5. Would new animals behave like these?
 
-We generate new angles at the observed predictor values, drawing coefficients from the posterior and outcomes from their von Mises distributions. For each replicated dataset we calculate
+At each cue strength, draw 80 **new headings** for each of 400 posterior draws. Summarize each replicated group by its circular mean and its mean resultant length, $\bar R=|\sum_j e^{iy_j}/80|$. The bars enclose the middle 90% of these predictions for group summaries. Compare the observed group (diamond) with the predictive center (dot, circular mean for bearing and median for resultant length) and interval at the same cue.
 
-$$
-R=\left|\frac{1}{N}\sum_{n=1}^N e^{iy_n}\right|,
-$$
-
-the mean resultant length. This average-unit-vector length approaches one when directions align and becomes small when they cancel. The saved density plot places the observed value, about 0.63, near the center of the replicated distribution. The observed overall alignment is typical of the replicated datasets, even though the concentration relationship remains uncertain.
-
-Pooling across $x$ makes this a summary of both changing mean direction and dispersion around that direction. Rotating every angle together leaves it unchanged. Agreement on $R$ answers this aggregate question; checking distributions at particular predictor values would examine other features of the relationship.
-
+A mismatch in bearing suggests that the fitted turn misses the preferred direction. A mismatch in $\bar R$ suggests that the model misses the group's spread. Pooling across cue strengths would mix the turn itself with scatter around each preferred direction. These predictive intervals include new-animal variability as well as uncertainty about the coefficients.
 
 ```{r}
 #| cell-id: "c15"
-obs_x <- data$x
-n_draws <- nrow(draws)
+pred <- predict_parameters(levels_x)
+set.seed(SEED + 1)
+selected <- sample.int(nrow(draws), size = 400, replace = FALSE)
+# Keep each draw's direction and concentration together across all cue levels.
+predicted_vectors <- sapply(seq_along(levels_x), function(j) {
+    vapply(selected, function(d) {
+        y_new <- sample_headings(pred$mu[d, j], pred$kappa[d, j])
+        mean(exp(1i * y_new))
+    }, complex(1))
+})
+observed_vectors <- vapply(levels_x, function(z)
+    mean(exp(1i * data$y[data$x == z])), complex(1))
 
-# The 0.5.x sampler draws one observation at a time (scalar mu/kappa),
-# so replicate in a draw-by-observation nested loop (~2-4 min for the
-# full posterior here).
-replicated <- matrix(0, nrow = n_draws, ncol = length(obs_x))
-for (d in seq_len(n_draws))
-  for (i in seq_len(length(obs_x)))
-    replicated[d, i] <- as.numeric(circular::rvonmises(1,
-        mu = vmu(draws$b_Intercept[d] + draws$b_x[d] * obs_x[i]),
-        kappa = softplus(draws$b_kappa_Intercept[d] +
-                         draws$b_kappa_x[d] * obs_x[i]),
-        control.circular = vm_ctrl))
-replicated <- mod_circular(replicated)
-# Replicate the data at the observed x values; the figure below compares
-# the observed mean resultant length against the replicated one.
-replicated_R <- apply(exp(1i * replicated), 1, function(z) Mod(mean(z)))
-observed_R <- Mod(mean(exp(1i * data$y)))
-stopifnot(all(is.finite(replicated_R)))
-
-p_ppc <- ppc_plot(replicated_R, observed_R)
-ggsave(file.path(FIG_DIR, "ppc.pdf"), p_ppc, width = 5, height = 3)
-show_figure(p_ppc, "ppc", 5, 3)
+p_ppc <- ppc_plot(levels_x, observed_vectors, predicted_vectors)
+ggsave(file.path(FIG_DIR, "ppc.pdf"), p_ppc, width = 9, height = 4)
+show_figure(p_ppc, "ppc", 9, 4)
 ```
 
 ## Next steps
@@ -353,4 +298,4 @@ This example uses one generative model to learn where angles point and how consi
 
 The beetle, zebra, and locust notebooks extend the approach to biological questions, repeated observations, treatments, and mixtures. For your study, define the directional reference, the independent observational unit, and the predictor effects that answer the question. These choices guide extensions beyond this independent-observation example.
 
-The standalone R scripts (`R/brms_example.R`, `R/unwrap_functions.R`) that this notebook builds on are documented on the [R and MATLAB](../languages.md) page.
+The standalone R scripts (`R/brms_example.R`, `R/unwrap_functions.R`) that this notebook builds on are documented on the [R and MATLAB](https://jakegraving.com/unwrap/languages/) page.

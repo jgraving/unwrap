@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Circular MCMC explorer | unwrap</title>
+  <link rel="stylesheet" href="explorer.css">
+  <script defer src="frame.js"></script>
+  <script defer src="core.js"></script>
+  <script defer src="regression.js"></script>
+  <script defer src="explorer.js"></script>
+</head>
+<body>
+<main>
+<section class="circ-experiment" aria-labelledby="circ-title">
+  <div class="circ-surface">
+    <h1 id="circ-title">Circular MCMC explorer</h1>
+    <div class="circ-examples">
+      <label for="circ-example">Example</label>
+      <select id="circ-example">
+        <option value="single">Single distribution</option>
+        <option value="mixture">Bimodal mixture</option>
+        <option value="uniform">von Mises–uniform</option>
+        <option value="treatments">Two treatments</option>
+        <option value="regression">Continuous predictor</option>
+        <option value="hierarchical">Treatments and individuals</option>
+      </select>
+      <p id="circ-example-note">Infer a mean direction and concentration.</p>
+    </div>
+    <div class="circ-playback" aria-label="Sampler controls">
+      <button type="button" class="circ-primary circ-icon-button" data-action="run" disabled aria-label="Play sampling" title="Play sampling" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path d="M9 5.5 19 12 9 18.5Z" fill="currentColor"></path>
+        </svg>
+      </button>
+      <button type="button" class="circ-icon-button" data-action="restart" aria-label="Restart chains" title="Restart chains">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" aria-hidden="true">
+          <path d="M5 5v5h5M5.5 9A7.5 7.5 0 1 1 5 15"></path>
+        </svg>
+      </button>
+      <label class="circ-speed">Speed<select id="circ-speed">
+          <option value="1">1×</option>
+          <option value="4" selected>4×</option>
+          <option value="12">12×</option>
+        </select>
+      </label>
+      <p class="circ-progress" id="circ-status" role="status" aria-live="polite">Ready</p>
+    </div>
+    <div class="circ-component-legend" data-mixture hidden aria-label="Mixture density curves">
+      <span>
+        <i class="circ-component-first"></i>
+        <span id="circ-component-1-key">w × component 1</span>
+      </span>
+      <span>
+        <i class="circ-component-second"></i>
+        <span id="circ-component-2-key">(1 − w) × component 2</span>
+      </span>
+      <span>
+        <i class="circ-component-total"></i>Full mixture</span>
+    </div>
+    <div class="circ-data-row">
+      <figure class="circ-panel">
+        <figcaption class="circ-polar-caption">
+          <h2 id="circ-data-heading">Observed directions</h2>
+          <span id="circ-data-condition" class="circ-polar-condition" hidden></span>
+        </figcaption>
+        <canvas id="circ-data" role="img" aria-label="Generated angular observations around a circle, with their generating von Mises density."></canvas>
+      </figure>
+      <figure class="circ-panel">
+        <figcaption class="circ-polar-caption">
+          <h2 id="circ-predictive-heading">Posterior on the circle</h2>
+          <span id="circ-predictive-condition" class="circ-polar-condition" hidden></span>
+        </figcaption>
+        <canvas id="circ-predictive" role="img" aria-label="Von Mises densities from posterior parameter draws, their mean and a pointwise 90 percent credible band."></canvas>
+      </figure>
+      <section class="circ-data-controls" aria-labelledby="circ-data-title">
+        <h2 id="circ-data-title">Data</h2>
+        <div class="circ-control-group">
+          <div class="circ-control">
+            <label for="circ-n">Observations <output id="circ-n-value">50</output>
+            </label>
+            <input id="circ-n" type="range" min="8" max="120" step="1" value="50">
+          </div>
+          <div class="circ-control" data-mixture hidden>
+            <label for="circ-weight">
+              <span id="circ-weight-label">Mixing weight</span>
+              <output id="circ-weight-value">50%</output>
+            </label>
+            <input id="circ-weight" type="range" min="0.1" max="0.9" step="0.05" value="0.5">
+          </div>
+        </div>
+        <div class="circ-control-group">
+          <div class="circ-control">
+            <label for="circ-mu">
+              <span id="circ-mu-label">Mean angle</span>
+              <output id="circ-mu-value">155°</output>
+            </label>
+            <input id="circ-mu" type="range" min="-180" max="180" step="1" value="155">
+          </div>
+          <div class="circ-control" data-multi hidden>
+            <label for="circ-mu2">
+              <span id="circ-mu2-label">Mean 2</span>
+              <output id="circ-mu2-value">60°</output>
+            </label>
+            <input id="circ-mu2" type="range" min="-180" max="180" step="1" value="60">
+          </div>
+        </div>
+        <div class="circ-control-group">
+          <div class="circ-control">
+            <label for="circ-kappa">
+              <span id="circ-kappa-label">Concentration</span>
+              <output id="circ-kappa-value">1.0</output>
+            </label>
+            <input id="circ-kappa" type="range" min="0.1" max="12" step="0.1" value="1">
+          </div>
+          <div class="circ-control" data-multi hidden>
+            <label for="circ-kappa2">
+              <span id="circ-kappa2-label">Concentration 2</span>
+              <output id="circ-kappa2-value">6.0</output>
+            </label>
+            <input id="circ-kappa2" type="range" min="0.1" max="12" step="0.1" value="6">
+          </div>
+        </div>
+        <div class="circ-control circ-vary" data-regression hidden>
+          <label for="circ-vary-concentration">
+            <input id="circ-vary-concentration" type="checkbox">Concentration varies with x</label>
+        </div>
+        <div class="circ-control" id="circ-concentration-slope-control" hidden>
+          <label for="circ-concentration-slope">Concentration predictor slope <output id="circ-concentration-slope-value">2.0</output>
+          </label>
+          <input id="circ-concentration-slope" type="range" min="-5" max="5" step="0.1" value="2">
+        </div>
+        <div class="circ-control" data-hierarchical hidden>
+          <label for="circ-individual-sd">Individual mean-direction spread <output id="circ-individual-sd-value">20°</output>
+          </label>
+          <input id="circ-individual-sd" type="range" min="5" max="50" step="1" value="20">
+        </div>
+        <div class="circ-control" data-hierarchical hidden>
+          <label for="circ-individual-k-sd">Individual concentration spread <output id="circ-individual-k-sd-value">0.8</output>
+          </label>
+          <input id="circ-individual-k-sd" type="range" min="0" max="2" step="0.1" value="0.8">
+        </div>
+        <div class="circ-generate">
+          <button type="button" data-action="generate">New data</button>
+          <span class="circ-sr-only" id="circ-seed">Dataset 42</span>
+        </div>
+      </section>
+    </div>
+    <section class="circ-effects" data-conditional hidden aria-labelledby="circ-effects-title">
+      <div class="circ-effects-heading">
+        <h2 id="circ-effects-title">Mean direction across the predictor</h2>
+        <div data-regression hidden>
+          <label for="circ-predictor">Predictor x <output id="circ-predictor-value">0.00</output>
+          </label>
+          <input id="circ-predictor" type="range" min="-1" max="1" step="0.05" value="0">
+        </div>
+        <label data-hierarchical hidden for="circ-individual">Individual<select id="circ-individual">
+            <option value="0">Individual 1</option>
+            <option value="1">Individual 2</option>
+            <option value="2">Individual 3</option>
+            <option value="3">Individual 4</option>
+          </select>
+        </label>
+      </div>
+      <p id="circ-conditional-selection"></p>
+      <canvas id="circ-effects" role="img" aria-label="Observations and posterior mean directions across predictor values or treatments and individuals."></canvas>
+      <div data-conditional hidden>
+        <h3 id="circ-concentration-effects-title">Concentration across the predictor</h3>
+        <canvas id="circ-concentration-effects" role="img" aria-label="Generating concentration and posterior concentration with a pointwise 90 percent credible band across the predictor."></canvas>
+        <p id="circ-concentration-note" data-hierarchical hidden></p>
+        <p id="circ-concentration-summary" data-hierarchical hidden></p>
+      </div>
+      <p id="circ-effects-note"></p>
+      <p id="circ-effect-summary" aria-live="off"></p>
+    </section>
+    <div class="circ-group-key" id="circ-group-key" hidden>
+      <span>Treatment A</span>
+      <span>Treatment B</span>
+    </div>
+    <div class="circ-section-heading">
+      <div>
+        <h2>Posterior geometry</h2>
+      </div>
+      <label id="circ-component-control" hidden>
+        <span id="circ-component-label">Component</span>
+        <select id="circ-component">
+          <option value="0">Component 1</option>
+          <option value="1">Component 2</option>
+        </select>
+      </label>
+    </div>
+    <div class="circ-joint-grid">
+      <figure class="circ-panel">
+        <figcaption>
+          <h3>Unconstrained space</h3>
+          <span>η<sub>μ</sub> ∈ ℝ  ·  η<sub>κ</sub> ∈ ℝ</span>
+        </figcaption>
+        <canvas id="circ-raw" role="img" aria-label="Joint posterior in unconstrained mean and concentration predictors, showing exact posterior contours, sampled density and MCMC paths."></canvas>
+      </figure>
+      <figure class="circ-panel">
+        <figcaption>
+          <h3>Constrained space</h3>
+          <span>μ ∈ [−180°, 180°)  ·  κ &gt; 0</span>
+        </figcaption>
+        <canvas id="circ-linked" role="img" aria-label="The same posterior samples mapped into valid circular angles and positive concentrations."></canvas>
+      </figure>
+    </div>
+    <div class="circ-joint-legend">
+      <span>
+        <i class="circ-density-key"></i>Sample density</span>
+      <span>
+        <i class="circ-contour-key"></i>
+        <span id="circ-contour-label">Posterior contours</span>
+      </span>
+      <span>
+        <i class="circ-path-key"></i>MCMC path</span>
+    </div>
+    <div class="circ-section-heading">
+      <div>
+        <h2>Chains</h2>
+      </div>
+      <label>Trace coordinates<select id="circ-traces">
+          <option value="raw">Unconstrained</option>
+          <option value="linked">Constrained</option>
+        </select>
+      </label>
+    </div>
+    <div class="circ-chains" aria-label="Chain colors">
+      <span style="--chain:var(--circ-blue)">Chain 1</span>
+      <span style="--chain:var(--circ-teal)">Chain 2</span>
+      <span style="--chain:var(--circ-orange)">Chain 3</span>
+      <span style="--chain:var(--circ-mauve)">Chain 4</span>
+      <span class="circ-warmup-key">Warmup shaded</span>
+    </div>
+    <div class="circ-trace-grid">
+      <figure class="circ-panel">
+        <figcaption>
+          <h3 id="circ-mean-trace-title">Mean predictor η<sub>μ</sub>
+          </h3>
+        </figcaption>
+        <canvas id="circ-trace-mu" role="img" aria-label="Mean angle traces for four chains; warmup is shaded."></canvas>
+      </figure>
+      <figure class="circ-panel">
+        <figcaption>
+          <h3 id="circ-k-trace-title">Concentration predictor η<sub>κ</sub>
+          </h3>
+        </figcaption>
+        <canvas id="circ-trace-k" role="img" aria-label="Concentration traces for four chains; warmup is shaded."></canvas>
+      </figure>
+    </div>
+    <figure class="circ-panel circ-weight-trace" data-mixture hidden>
+      <figcaption>
+        <h3 id="circ-weight-trace-title">Weight predictor η<sub>w</sub>
+        </h3>
+      </figcaption>
+      <canvas id="circ-trace-weight" role="img" aria-label="Mixing weight traces for all four chains; bimodal component weights follow the sorted means."></canvas>
+    </figure>
+    <details class="circ-method">
+      <summary>Model details</summary>
+      <div>
+        <p id="circ-model-note"></p>
+        <p id="circ-prior-note">Bayesian inference updates prior expectations with the evidence in the observations. The posterior describes plausible parameter values and the uncertainty that remains.</p>
+        <p>Link functions connect unconstrained values to valid model parameters. They keep directions within a complete circle, concentrations positive and mixture weights between zero and one. The paired posterior panels show how these constraints change the geometry of the same sampled uncertainty.</p>
+        <p>Markov chain Monte Carlo (MCMC) explores the posterior through a sequence of parameter values. Four chains start separately. An initial warmup period adapts the sampler and is excluded from the density estimates and uncertainty summaries. Restart replays the same data and deterministic chains. New data generates another set of observations.</p>
+        <div class="circ-diagnostics" aria-label="Sampler diagnostics">
+          <p>
+            <span>Retained draws</span>
+            <strong id="circ-draws">0</strong>
+          </p>
+          <p>
+            <span>Acceptance</span>
+            <strong id="circ-acceptance">—</strong>
+          </p>
+          <p>
+            <span>Divergent proposals</span>
+            <strong id="circ-divergences">0</strong>
+          </p>
+          <p>
+            <span>Phase</span>
+            <strong id="circ-phase">Ready</strong>
+          </p>
+        </div>
+        <p>Dots show observations, and dashed curves show the distribution used to generate them. Both circles plot radius as 1 + density, so density zero begins on the unit circle. They share the same fixed radial limit during sampling. For mixtures, the colored component curves include their mixing weights and add to the full density. At each angle the posterior band shows the central 90% of sampled density values. The band measures uncertainty about the density height.</p>
+        <p>Posterior contours mark regions containing 50%, 80% and 95% of the displayed density. The single-distribution and two-treatment panels evaluate contours numerically. The mixture, regression and hierarchical panels estimate contours from retained samples. The trace-coordinate selector lets you compare unconstrained sampling values with valid model parameters.</p>
+        <p class="circ-caution" id="circ-mixing">Compare the chains to assess whether they explore the same posterior. Acceptance and divergence counts provide useful checks, but acceptance alone does not establish convergence.</p>
+        <p>Repeated parameter values after a rejected proposal remain part of the posterior sample. Thin proposal paths show the sampler’s movement and are distinct from retained draws.</p>
+      </div>
+    </details>
+    <noscript>
+      <p>Enable JavaScript to simulate headings and run the four chains.</p>
+    </noscript>
+  </div>
+</section>
+</main>
+</body>
+</html>

@@ -91,8 +91,7 @@ in the same environment:
 python -m pip install seaborn pyarrow
 ```
 
-The introductory notebook is executed automatically in CI. Before a change
-is merged, each research notebook it touches is rerun end to end, and the
-outputs stored in the repository come from that run. To make your own
+The docs build displays saved notebook outputs. The [development guide](development.md#notebook-execution-local-only)
+gives the command for a local end-to-end run. To make your own
 analysis reproducible, record the repository commit and installed package
 versions with your results.

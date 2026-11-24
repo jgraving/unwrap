@@ -41,7 +41,8 @@ can share the same radial scale.
 
 Try changing the strength of the prior. In this particular example the
 update has a simple calculation. Represent each heading by an arrow of
-length 2 and the prior by one arrow pointing at 0°. The sum points in the
+length 2 and the prior by an arrow of length 2 pointing at 0°. Try prior
+arrows of length 0 or 8 in the exercise below. The sum points in the
 posterior mean direction.
 
 ```python
@@ -90,5 +91,6 @@ The [circular regression tutorial](examples.md#the-tutorial) fits a model
 in Python or R, lets the predictors affect mean direction and
 concentration, and uses simulated headings to check the fit. For an
 interactive view of how directional observations and posterior
-uncertainty relate, see
-[From angles to inference](https://jakegraving.com/circular-statistics/).
+uncertainty relate, [run the MCMC explorer](mcmc.md). It lets you compare four
+chains and inspect the headings a fitted model predicts. The [prior guide](priors.md)
+shows what prior choices imply about turns and directional consistency.

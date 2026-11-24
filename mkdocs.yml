@@ -13,6 +13,7 @@ plugins:
       ignore_h1_titles: true
 hooks:
   - docs_hooks/notebook_css.py
+  - docs_hooks/notebook_links.py
   - docs_hooks/notebook_titles.py
 edit_uri: blob/main/docs/
 theme:
@@ -54,6 +55,9 @@ nav:
   - Foundations:
       - Angle basics: angle-basics.md
       - Bayesian basics: bayes-basics.md
+      - Visual guide to circular regression: regression-basics.md
+      - Choosing priors: priors.md
+      - MCMC explorer: mcmc.md
   - Python setup: getting-started.md
   - R setup: getting-started-r.md
   - Circular GLMs and GLMMs: models.md

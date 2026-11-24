@@ -163,8 +163,8 @@ shorter draw budget when `UNWRAP_R_QUICK=1` is set; unset, they run
 the full budgets. Review R-hat, bulk ESS, the divergence report, and
 the predictive checks before interpreting results.
 
-Every notebook's stored outputs come from an end-to-end run of that
-notebook (see the [development](development.md) page).
+The docs display saved outputs. The [development guide](development.md#notebook-execution-local-only)
+gives the commands to rerun a notebook locally.
 
 ## Skip the refit with the saved fits
 

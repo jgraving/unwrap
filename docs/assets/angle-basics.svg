@@ -1,42 +1,207 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 221" width="720" height="221"
-     role="img" aria-labelledby="title description">
-  <title id="title">The circular boundary and directional concentration</title>
-  <desc id="description">Headings of 350 and 10 degrees are 20 degrees apart and have a circular
-    mean of zero. Two other sets of five headings have the same mean at zero, with lower and higher
-    concentration. Dots show observations and arrows show circular means.</desc>
-  <rect width="720" height="221" fill="white"/>
-  <path d="M 280 20 V 202" fill="none" stroke="#c6d5d3"/>
-  <g font-family="Arial, sans-serif" fill="#193131" text-anchor="middle">
-    <text x="146" y="26" font-size="16" font-weight="bold">Across the circular boundary</text>
-    <text x="505" y="26" font-size="16" font-weight="bold">Same center, different concentration</text>
-    <circle cx="146" cy="126" r="60" fill="none" stroke="#c6d5d3"/>
-  <path d="M 146 126 V 78 m -4 5 l 4 -5 4 5" stroke="#a54b2d" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <circle cx="135.58" cy="66.91" r="4" fill="#08726d"/>
-<circle cx="156.42" cy="66.91" r="4" fill="#08726d"/>
-    <path d="M 134.19 59.03 A 68 68 0 0 1 157.81 59.03" fill="none"
-          stroke="#08726d" stroke-width="2"/>
-    <text x="117" y="59" font-size="14">350°</text>
-    <text x="176" y="59" font-size="14">10°</text>
-    <text x="146" y="111" fill="#a54b2d" font-size="14" text-anchor="start" dx="7">0°</text>
-    <text x="146" y="210" font-size="14">20° apart</text>
-    <circle cx="400" cy="126" r="60" fill="none" stroke="#c6d5d3"/>
-  <path d="M 400 126 V 78 m -4 5 l 4 -5 4 5" stroke="#a54b2d" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <circle cx="352.72" cy="89.06" r="4" fill="#08726d"/>
-<circle cx="374.64" cy="71.62" r="4" fill="#08726d"/>
-<circle cx="400.00" cy="66.00" r="4" fill="#08726d"/>
-<circle cx="425.36" cy="71.62" r="4" fill="#08726d"/>
-<circle cx="447.28" cy="89.06" r="4" fill="#08726d"/>
-    <circle cx="609" cy="126" r="60" fill="none" stroke="#c6d5d3"/>
-  <path d="M 609 126 V 78 m -4 5 l 4 -5 4 5" stroke="#a54b2d" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <circle cx="588.48" cy="69.62" r="4" fill="#08726d"/>
-<circle cx="598.58" cy="66.91" r="4" fill="#08726d"/>
-<circle cx="609.00" cy="66.00" r="4" fill="#08726d"/>
-<circle cx="619.42" cy="66.91" r="4" fill="#08726d"/>
-<circle cx="629.52" cy="69.62" r="4" fill="#08726d"/>
-    <text x="400" y="210" font-size="14">Lower concentration</text>
-    <text x="609" y="210" font-size="14">Higher concentration</text>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg role="img" aria-labelledby="title desc" xmlns:xlink="http://www.w3.org/1999/xlink" width="403.2pt" height="183.6pt" viewBox="0 0 403.2 183.6" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <desc id="desc">The same 350° and 10° points appear near opposite ends of a line cut at zero, together near the middle of a line cut at minus 180°, and 20° apart on a circle.</desc>
+ <title id="title">Two headings on a number line and on the circle</title>
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title>Two headings on a number line and on the circle</dc:title>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.8, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 183.6
+L 403.2 183.6
+L 403.2 0
+L 0 0
+z
+" style="fill: #ffffff"/>
   </g>
+  <g id="axes_1">
+   <g id="line2d_1">
+    <path d="M 23.592118 44.243166
+L 226.288343 44.243166
+" clip-path="url(#p6891e30456)" style="fill: none; stroke: #adc3c0; stroke-width: 1.5; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_2">
+    <path d="M 23.592118 48.788386
+L 23.592118 39.697947
+" clip-path="url(#p6891e30456)" style="fill: none; stroke: #193131; stroke-width: 1.2; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_3">
+    <path d="M 124.94023 48.788386
+L 124.94023 39.697947
+" clip-path="url(#p6891e30456)" style="fill: none; stroke: #193131; stroke-width: 1.2; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_4">
+    <path d="M 226.288343 48.788386
+L 226.288343 39.697947
+" clip-path="url(#p6891e30456)" style="fill: none; stroke: #193131; stroke-width: 1.2; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_5">
+    <path d="M 23.592118 145.248051
+L 226.288343 145.248051
+" clip-path="url(#p6891e30456)" style="fill: none; stroke: #adc3c0; stroke-width: 1.5; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_6">
+    <path d="M 23.592118 149.79327
+L 23.592118 140.702831
+" clip-path="url(#p6891e30456)" style="fill: none; stroke: #193131; stroke-width: 1.2; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_7">
+    <path d="M 124.94023 149.79327
+L 124.94023 140.702831
+" clip-path="url(#p6891e30456)" style="fill: none; stroke: #193131; stroke-width: 1.2; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_8">
+    <path d="M 226.288343 149.79327
+L 226.288343 140.702831
+" clip-path="url(#p6891e30456)" style="fill: none; stroke: #193131; stroke-width: 1.2; stroke-linecap: square"/>
+   </g>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 13px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #193131" x="23.592118" y="17.981897" transform="rotate(-0 23.592118 17.981897)">Cut at 0°</text>
+   </g>
+   <g id="text_2">
+    <text style="font-size: 12.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #193131" x="23.592118" y="66.871848" transform="rotate(-0 23.592118 66.871848)">0°</text>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 12.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #193131" x="124.94023" y="66.871848" transform="rotate(-0 124.94023 66.871848)">180°</text>
+   </g>
+   <g id="text_4">
+    <text style="font-size: 12.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #193131" x="226.288343" y="66.871848" transform="rotate(-0 226.288343 66.871848)">360°</text>
+   </g>
+   <g id="PathCollection_1">
+    <defs>
+     <path id="mc713bea5fe" d="M 0 3.24037
+C 0.859356 3.24037 1.683631 2.898944 2.291288 2.291288
+C 2.898944 1.683631 3.24037 0.859356 3.24037 0
+C 3.24037 -0.859356 2.898944 -1.683631 2.291288 -2.291288
+C 1.683631 -2.898944 0.859356 -3.24037 0 -3.24037
+C -0.859356 -3.24037 -1.683631 -2.898944 -2.291288 -2.291288
+C -2.898944 -1.683631 -3.24037 -0.859356 -3.24037 0
+C -3.24037 0.859356 -2.898944 1.683631 -2.291288 2.291288
+C -1.683631 2.898944 -0.859356 3.24037 0 3.24037
+z
+" style="stroke: #08726d"/>
+    </defs>
+    <g clip-path="url(#p6891e30456)">
+     <use xlink:href="#mc713bea5fe" x="29.222568" y="44.243166" style="fill: #08726d; stroke: #08726d"/>
+     <use xlink:href="#mc713bea5fe" x="220.657892" y="44.243166" style="fill: #08726d; stroke: #08726d"/>
+    </g>
+   </g>
+   <g id="text_5">
+    <text style="font-weight: 700; font-size: 13px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #193131" x="23.592118" y="118.986781" transform="rotate(-0 23.592118 118.986781)">Cut at −180°</text>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 12.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #193131" x="23.592118" y="167.876732" transform="rotate(-0 23.592118 167.876732)">−180°</text>
+   </g>
+   <g id="text_7">
+    <text style="font-size: 12.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #193131" x="124.94023" y="167.876732" transform="rotate(-0 124.94023 167.876732)">0°</text>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 12.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #193131" x="226.288343" y="167.876732" transform="rotate(-0 226.288343 167.876732)">180°</text>
+   </g>
+   <g id="PathCollection_2">
+    <g clip-path="url(#p6891e30456)">
+     <use xlink:href="#mc713bea5fe" x="119.309779" y="145.248051" style="fill: #08726d; stroke: #08726d"/>
+     <use xlink:href="#mc713bea5fe" x="130.570681" y="145.248051" style="fill: #08726d; stroke: #08726d"/>
+    </g>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="patch_2">
+    <path d="M 324.35214 152.898582
+C 340.444159 152.898582 355.879257 146.505155 367.258033 135.126379
+C 378.636809 123.747604 385.030236 108.312505 385.030236 92.220486
+C 385.030236 76.128467 378.636809 60.693369 367.258033 49.314593
+C 355.879257 37.935818 340.444159 31.542391 324.35214 31.542391
+C 308.260121 31.542391 292.825023 37.935818 281.446247 49.314593
+C 270.067472 60.693369 263.674045 76.128467 263.674045 92.220486
+C 263.674045 108.312505 270.067472 123.747604 281.446247 135.126379
+C 292.825023 146.505155 308.260121 152.898582 324.35214 152.898582
+L 324.35214 152.898582
+z
+" clip-path="url(#p9e7d8b751b)" style="fill: none; stroke: #adc3c0; stroke-width: 1.3; stroke-linejoin: miter"/>
+   </g>
+   <g id="PathCollection_3">
+    <defs>
+     <path id="m2abe7490d5" d="M 0 2.95804
+C 0.784481 2.95804 1.536938 2.646362 2.09165 2.09165
+C 2.646362 1.536938 2.95804 0.784481 2.95804 0
+C 2.95804 -0.784481 2.646362 -1.536938 2.09165 -2.09165
+C 1.536938 -2.646362 0.784481 -2.95804 0 -2.95804
+C -0.784481 -2.95804 -1.536938 -2.646362 -2.09165 -2.09165
+C -2.646362 -1.536938 -2.95804 -0.784481 -2.95804 0
+C -2.95804 0.784481 -2.646362 1.536938 -2.09165 2.09165
+C -1.536938 2.646362 -0.784481 2.95804 0 2.95804
+z
+" style="stroke: #08726d"/>
+    </defs>
+    <g clip-path="url(#p9e7d8b751b)">
+     <use xlink:href="#m2abe7490d5" x="384.108399" y="81.683846" style="fill: #08726d; stroke: #08726d"/>
+    </g>
+   </g>
+   <g id="PathCollection_4">
+    <g clip-path="url(#p9e7d8b751b)">
+     <use xlink:href="#m2abe7490d5" x="384.108399" y="102.757127" style="fill: #08726d; stroke: #08726d"/>
+    </g>
+   </g>
+   <g id="line2d_9">
+    <path d="M 248.504521 92.220486
+L 400.19976 92.220486
+" clip-path="url(#p9e7d8b751b)" style="fill: none; stroke: #adc3c0; stroke-width: 0.8; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_10">
+    <path d="M 324.35214 165.034201
+L 324.35214 19.406772
+" clip-path="url(#p9e7d8b751b)" style="fill: none; stroke: #adc3c0; stroke-width: 0.8; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_11">
+    <path d="M 324.35214 92.220486
+L 384.108399 81.683846
+" clip-path="url(#p9e7d8b751b)" style="fill: none; stroke: #08726d; stroke-width: 1.6; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_12">
+    <path d="M 324.35214 92.220486
+L 384.108399 102.757127
+" clip-path="url(#p9e7d8b751b)" style="fill: none; stroke: #08726d; stroke-width: 1.6; stroke-linecap: square"/>
+   </g>
+   <g id="text_9">
+    <text style="font-weight: 700; font-size: 13px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #08726d" x="378.04059" y="68.941446" transform="rotate(-0 378.04059 68.941446)">10°</text>
+   </g>
+   <g id="text_10">
+    <text style="font-weight: 700; font-size: 13px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #08726d" x="378.04059" y="119.140213" transform="rotate(-0 378.04059 119.140213)">350°</text>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: end; fill: #193131" x="320.711455" y="49.76223" transform="rotate(-0 320.711455 49.76223)">90°</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 12px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #193131" x="262.460483" y="104.356106" transform="rotate(-0 262.460483 104.356106)">180°</text>
+   </g>
+   <g id="text_13">
+    <text style="font-weight: 700; font-size: 15.6px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #193131" x="324.35214" y="13.406772" transform="rotate(-0 324.35214 13.406772)">One circle</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p6891e30456">
+   <rect x="7.37642" y="3.841213" width="235.127621" height="176.758547"/>
+  </clipPath>
+  <clipPath id="p9e7d8b751b">
+   <rect x="248.504521" y="19.406772" width="151.695239" height="145.62743"/>
+  </clipPath>
+ </defs>
 </svg>

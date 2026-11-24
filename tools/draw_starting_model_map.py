@@ -4,7 +4,8 @@ from math import cos, exp, factorial, pi, radians, sin
 from pathlib import Path
 
 
-DOCS = "https://jakegraving.com/unwrap/"
+# The published SVG lives one directory below the documentation root.
+DOCS = "../"
 INK, MUTED, LINK = "#1f2827", "#455655", "#13665e"
 RULE, RUST = "#c6d3d0", "#9e6646"
 EDGE = "#738782"
@@ -19,7 +20,7 @@ def text(x, y, label, *, size=13, color=INK, bold=False, anchor="start"):
 
 def link(key, x, y, label, path, *, size=12.5, anchor="start"):
     url = escape(DOCS + path, quote=True)
-    return (f'<a id="{key}" href="{url}" xlink:href="{url}">'
+    return (f'<a id="{key}" href="{url}" xlink:href="{url}" target="_top">'
             f'{text(x, y, label, size=size, color=LINK, bold=True, anchor=anchor)}</a>')
 
 
@@ -173,7 +174,7 @@ def render():
         link("entry-biology", 130, 81, "Biological questions", "#start-with-a-biological-question", size=11.65, anchor="middle"),
         link("entry-angles", 41, 96, "Angles", "angle-basics/", size=11.65),
         text(85, 96, "·", size=11.65, color=MUTED),
-        link("entry-glms", 95, 96, "GLMs", "models/#from-a-biological-question-to-a-glm", size=11.65),
+        link("entry-glms", 95, 96, "GLMs", "regression-basics/", size=11.65),
         text(131, 96, "·", size=11.65, color=MUTED),
         link("entry-bayes", 141, 96, "Bayesian basics", "bayes-basics/", size=11.65),
         text(363, 65, "Set up to run a notebook", size=12.5, bold=True, anchor="middle"),
