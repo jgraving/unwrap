@@ -34,6 +34,9 @@ Treatment-minus-control contrasts pair draws with individual offsets set to zero
 Each bat’s probability includes its own offsets under its observed treatment. Curves and points show posterior means.
 Bands and bars show 90% highest-density intervals, pointwise for the curves.
 Uniform headings have goalward probability 0.5 (dashed line in the individual panel).
+Individual intervals lay entirely above 0.5 for 29/29 controls,
+14/14 bats with eye cover, 15/15 with the added magnet,
+and 9/9 with added anosmia.
 
 **(d)** Directedness compares the directed and undirected heading likelihoods
 under equal prior odds, with 0.5 indicating equal evidence. Step scores were
