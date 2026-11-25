@@ -33,7 +33,8 @@ from scipy.special import expit
 from shapely.geometry.polygon import orient
 
 from goldshtein_bats_layout_data import (
-    PANEL_C_HDI_PROB, _population_parameters, _read_context, assemble_layout_data,
+    PANEL_C_CLOSE_HALF_WIDTH_DEG, PANEL_C_HDI_PROB, _population_parameters, _read_context,
+    assemble_layout_data,
 )
 
 
@@ -219,21 +220,26 @@ def _draw_treatment_icons(ax, drawings, row_ys, colors, *, active_alpha=.54):
 
 
 def draw_polar_density(ax, bearings, profile, color, radius_max, half_width_deg, *,
-                       zero_radius=1.0, line_scale=1.0):
+                       close_half_width_deg=None, zero_radius=1.0, line_scale=1.0):
     """Draw the full mixture around a common zero-density reference ring."""
     ax.set_theta_zero_location('N')
     ax.set_theta_direction(-1)
     ax.set(ylim=(0, radius_max), xticks=[], yticks=[])
     ax.spines['polar'].set_visible(False)
-    sector = np.abs(bearings) <= np.deg2rad(half_width_deg)
-    ax.fill_between(bearings, 0, zero_radius + profile['mean'], where=sector,
+    absolute_bearings = np.abs(bearings)
+    mean_radius = zero_radius + profile['mean']
+    ax.fill_between(bearings, 0, mean_radius, where=absolute_bearings <= np.deg2rad(half_width_deg),
                     color=color, alpha=.12, linewidth=0)
+    if close_half_width_deg is not None:
+        ax.fill_between(bearings, 0, mean_radius,
+                        where=absolute_bearings <= np.deg2rad(close_half_width_deg),
+                        color=color, alpha=.19, linewidth=0)
     ax.plot(bearings, np.full_like(bearings, zero_radius), color='#aaaaaa', lw=.55 * line_scale)
     upper_at_goal = profile['hi'][np.argmin(np.abs(bearings))]
     ax.plot([0, 0], [zero_radius, zero_radius + 1.08 * upper_at_goal], color='#9a9a9a', lw=.6 * line_scale)
     ax.fill_between(bearings, zero_radius + profile['lo'], zero_radius + profile['hi'],
                     color=color, alpha=.26, linewidth=0)
-    ax.plot(bearings, zero_radius + profile['mean'], color=color, lw=1.05 * line_scale)
+    ax.plot(bearings, mean_radius, color=color, lw=1.05 * line_scale)
 
 
 def draw_predictive_panel(data, colors, axes_at, page_text):
@@ -252,20 +258,34 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
         page_text(center, 273, label, ha="center", color=colors[level], fontsize=8.5, weight="bold")
         polar = axes_at(center - size / 2, 281, size, size, projection="polar", facecolor="none")
         draw_polar_density(polar, bearings, profiles[level], colors[level], population_radius,
-                           half_width, line_scale=.76)
+                           half_width, close_half_width_deg=PANEL_C_CLOSE_HALF_WIDTH_DEG, line_scale=.76)
 
     page_text(18, 302, "Population heading density", fontsize=8.8, weight="bold")
-    page_text(18, 338, "Treatment contrast", fontsize=8.8, weight="bold")
-    page_text(18, 350, "Δ goalward probability", fontsize=8.2)
+    page_text(18, 337, "Treatment − control", fontsize=8.8, weight="bold")
+    page_text(18, 349, "Goalward probability difference", fontsize=7.7)
     contrast = axes_at(left, 324, width, 43)
     contrast.axhline(0, color="#777777", lw=.40, ls=(0, (3, 2)), zorder=0)
-    contrast.plot(0, 0, "o", color=colors[levels[0]], ms=2.9)
-    contrasts = [data["goal_window_contrasts"][level] for level in levels[1:]]
-    for i, (level, (mean, lo, hi)) in enumerate(zip(levels[1:], contrasts, strict=True), start=1):
-        contrast.errorbar(i, mean, yerr=[[mean - lo], [hi - mean]], fmt="o", color=colors[level],
-                          ms=3.1, elinewidth=.78, capsize=1.8, capthick=.48)
-    lo = min(-.2, *(interval[1] for interval in contrasts))
-    hi = max(0, *(interval[2] for interval in contrasts))
+    windows = data["goal_window_summaries_by_half_width_degrees"]
+    contrast_intervals = []
+    markers = []
+    for cutoff, offset, filled in ((PANEL_C_CLOSE_HALF_WIDTH_DEG, -.09, False), (half_width, .09, True)):
+        estimates = windows[cutoff]["goal_window_contrasts"]
+        contrast_intervals.extend(estimates.values())
+        for i, level in enumerate(levels):
+            color = colors[level]
+            mean, lower, upper = estimates.get(level, (0, 0, 0))
+            errors = [[mean - lower], [upper - mean]] if i else None
+            contrast.errorbar(i + offset, mean, yerr=errors, fmt="o", color=color,
+                              markerfacecolor=color if filled else "white", markeredgewidth=.75,
+                              ms=3.8, elinewidth=.78, capsize=1.8, capthick=.70)
+        markers.append(Line2D([], [], linestyle="none", marker="o", ms=3.8, markeredgecolor=INK,
+                              markerfacecolor=INK if filled else "white", markeredgewidth=.75,
+                              label=f"±{cutoff:g}°"))
+    contrast.figure.legend(handles=markers, frameon=False, ncols=2, loc="center left",
+                           bbox_to_anchor=(18 / PAGE_W, 1 - 362 / PAGE_H), fontsize=8.2,
+                           handlelength=.8, handletextpad=.4, columnspacing=1.1, borderaxespad=0)
+    lo = min(-.2, *(interval[1] for interval in contrast_intervals))
+    hi = max(0, *(interval[2] for interval in contrast_intervals))
     contrast.set(xlim=(-.5, len(levels) - .5), ylim=(lo - .006, hi + .008), xticks=[])
     contrast.spines[["top", "right", "bottom"]].set_visible(False)
     contrast.yaxis.set_major_locator(MultipleLocator(.1))
@@ -282,8 +302,10 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     individual.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     individual.tick_params(axis="y", labelsize=7.8, length=2.1, pad=2.6)
     individual.axhline(uniform, color="#494949", lw=.65, ls=(0, (3, 2)), zorder=1)
+    individual.annotate("Chance", (1, uniform), xycoords=individual.get_yaxis_transform(),
+                        xytext=(5, 0), textcoords="offset points", va="center", fontsize=7.1, color="#595959")
     page_text(18, 391, "Individual bats", fontsize=8.8, weight="bold")
-    page_text(18, 403, "Goalward probability", fontsize=8.2)
+    page_text(18, 403, f"Goalward probability (±{half_width:g}°)", fontsize=8.2)
     for i, level in enumerate(levels):
         bats = sorted((r for r in rows if r["treatment"] == level), key=lambda r: (r["mean"], r["tag"]))
         count = len(bats)
@@ -811,6 +833,7 @@ def main(argv=None):
         "goal_window_rates": data["goal_window_groups"],
         "goal_window_treatment_contrasts": data["goal_window_contrasts"],
         "goal_window_pooled_contrast": data["pooled_goal_window_contrast"],
+        "goal_window_summaries_by_half_width_degrees": data["goal_window_summaries_by_half_width_degrees"],
     }
     (args.output_dir / "bat_layout_review.json").write_text(json.dumps(summary, indent=2) + "\n")
 

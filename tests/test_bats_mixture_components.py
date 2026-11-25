@@ -59,25 +59,31 @@ def test_draw_weighted_component_densities_and_intervals(predictions):
         np.testing.assert_allclose(data["full_contrasts"][level], expected_summary(difference), atol=1e-14)
 
 
-def sector_integral(mu, kappa, weight):
-    """Independent quadrature of both components over the goalward hemisphere."""
+def sector_integral(mu, kappa, weight, half_width=90):
+    """Independent quadrature of both components over a goal sector."""
+    bound = half_width * np.pi / 180
     return quad(lambda x: weight * vonmises.pdf(x, kappa, loc=mu) + (1 - weight) / (2 * np.pi),
-                -np.pi / 2, np.pi / 2)[0]
+                -bound, bound)[0]
 
 
-def test_population_sector_contrasts_are_paired_in_each_draw(predictions):
+@pytest.mark.parametrize("half_width", [45, 90])
+def test_population_sector_contrasts_are_paired_in_each_draw(predictions, half_width):
     data, mu, kappa, omega = predictions
     assert layout.PANEL_C_HDI_PROB == 0.90
     assert data["goal_window_half_width_degrees"] == 90
+    windows = data["goal_window_summaries_by_half_width_degrees"]
+    assert data["goal_window_groups"] == windows[90]["goal_window_groups"]
+    assert data["goal_window_contrasts"] == windows[90]["goal_window_contrasts"]
+    sector = windows[half_width]
     group_draws = []
     for i, level in enumerate([1, 2, 3, 4]):
-        draws = np.array([sector_integral(m, k, w)
+        draws = np.array([sector_integral(m, k, w, half_width)
                           for m, k, w in zip(mu[:, i], kappa[:, i], omega[:, i], strict=True)])
         group_draws.append(draws)
-        np.testing.assert_allclose(data["goal_window_groups"][level], expected_summary(draws), atol=1e-14)
+        np.testing.assert_allclose(sector["goal_window_groups"][level], expected_summary(draws), atol=1e-14)
     for level, draws in enumerate(group_draws[1:], start=2):
         delta = draws - group_draws[0]
-        np.testing.assert_allclose(data["goal_window_contrasts"][level], expected_summary(delta), atol=1e-14)
+        np.testing.assert_allclose(sector["goal_window_contrasts"][level], expected_summary(delta), atol=1e-14)
 
 
 def individual_posterior(tag_index, mu, kappa, weight):

@@ -12,7 +12,8 @@ from unwrap.link.numpy import circular_modulo, softplus
 
 
 PANEL_C_HDI_PROB = 0.90
-PANEL_C_GOAL_HALF_WIDTH_DEG = 90.0
+PANEL_C_CLOSE_HALF_WIDTH_DEG = 45
+PANEL_C_GOAL_HALF_WIDTH_DEG = 90
 
 
 def _read_context(data_root):
@@ -119,13 +120,21 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
         density_at_goal[:, i] = density[:, goal_index]
         density_profiles[level] = _density_profile(density, posthoc)
 
-    half_width = PANEL_C_GOAL_HALF_WIDTH_DEG
-    mass = _goal_window_probability(mu, kappa, weight, half_width)
-    by_treatment = mass - mass[:, :1]
-    pooled = np.average(by_treatment[:, 1:], axis=1,
-                        weights=[counts[level] for level in levels[1:]])
-    goal_window_groups = {level: summary(draws) for level, draws in zip(levels, mass.T, strict=True)}
-    goal_window_contrasts = {level: summary(by_treatment[:, i]) for i, level in enumerate(levels[1:], 1)}
+    window_summaries = {}
+    treatment_counts = [counts[level] for level in levels[1:]]
+    for half_width in (PANEL_C_CLOSE_HALF_WIDTH_DEG, PANEL_C_GOAL_HALF_WIDTH_DEG):
+        mass = _goal_window_probability(mu, kappa, weight, half_width)
+        by_treatment = mass - mass[:, :1]
+        pooled = np.average(by_treatment[:, 1:], axis=1, weights=treatment_counts)
+        window_summaries[half_width] = {
+            "goal_window_groups": {
+                level: summary(draws) for level, draws in zip(levels, mass.T, strict=True)
+            },
+            "goal_window_contrasts": {
+                level: summary(draws) for level, draws in zip(levels[1:], by_treatment[:, 1:].T, strict=True)
+            },
+            "pooled_goal_window_contrast": summary(pooled),
+        }
     return {
         "density_bearings": bearings,
         "density_profiles": density_profiles,
@@ -136,10 +145,9 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
             level: summary(density_at_goal[:, i] - density_at_goal[:, 0])
             for i, level in enumerate(levels[1:], 1)
         },
-        "goal_window_half_width_degrees": half_width,
-        "goal_window_groups": goal_window_groups,
-        "goal_window_contrasts": goal_window_contrasts,
-        "pooled_goal_window_contrast": summary(pooled),
+        "goal_window_half_width_degrees": PANEL_C_GOAL_HALF_WIDTH_DEG,
+        **window_summaries[PANEL_C_GOAL_HALF_WIDTH_DEG],
+        "goal_window_summaries_by_half_width_degrees": window_summaries,
     }
 
 
