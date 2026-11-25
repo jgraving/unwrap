@@ -1151,7 +1151,7 @@ def distance_to_polygon_along_direction(
 def add_dist_and_angle_to_destination(
     rediscretized_ll_w_meta_df: pd.DataFrame,
     *,
-    LAKE_GEOJSON = bats_lake_outline_path(),
+    LAKE_GEOJSON = None,
     METRIC_EPSG: int = 32636,
     ROOST_LAT: float = 33.112373,
     ROOST_LON: float = 35.584135,
@@ -1189,7 +1189,9 @@ def add_dist_and_angle_to_destination(
     df["flyAgamon"] = pd.to_numeric(df["flyAgamon"], errors="coerce").fillna(0).astype(int)
     df["dest"] = make_dest_label(df["flyHome"], df["flyAgamon"])
 
-    # load lake polygon
+    # Resolve the default only when loading the polygon, not in worker imports.
+    if LAKE_GEOJSON is None:
+        LAKE_GEOJSON = bats_lake_outline_path()
     lake_4326 = gpd.read_file(LAKE_GEOJSON).to_crs(4326)
     lake_poly_4326 = lake_4326.unary_union
     lake_poly_m = gpd.GeoSeries([lake_poly_4326], crs=4326).to_crs(METRIC_EPSG).iloc[0]
