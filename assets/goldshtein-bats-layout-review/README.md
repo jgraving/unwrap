@@ -25,18 +25,15 @@ Predictive performance is compared with a single von Mises model (vM) using
 stepwise PSIS–LOO expected log predictive density. Points show vMU minus vM
 overall and within each treatment. Whiskers show one standard error.
 
-**(c)** Probability mass is the integral of the full-mixture heading density
-within ±45° of the goal (shaded, 0° up). Small polar curves show each group’s
-lowest, middle, and highest bats by posterior mean mass (7th of 14 for eye cover).
-At similar probabilities, the lowest-ranked control peaks off goal and
-the lowest-ranked eye-covered bat has a broad peak near the goal.
+**(c)** A heading is scored as goalward when its bearing error is less than 90°
+in absolute value (shaded, 0° up), equivalent to a positive projection onto the
+goal direction. Goalward probability integrates the full-mixture heading density
+over this hemisphere. Small polar curves show each group’s lowest, middle,
+and highest bats by posterior mean goalward probability (7th of 14 for eye cover).
 Treatment-minus-control contrasts pair draws with individual offsets set to zero.
 Each bat’s probability includes its own offsets under its observed treatment. Curves and points show posterior means.
 Bands and bars show 90% highest-density intervals, pointwise for the curves.
-For uniform headings, the density is 1/(2π) per radian, so the π/2-radian
-sector has probability (π/2)/(2π) = 0.25 (dashed line in the individual panel).
-Individual intervals lay entirely above this value for 28/29 controls, 14/14 bats with eye cover,
-14/15 with the added magnet, and 9/9 with added anosmia.
+Uniform headings have goalward probability 0.5 (dashed line in the individual panel).
 
 **(d)** Directedness compares the directed and undirected heading likelihoods
 under equal prior odds, with 0.5 indicating equal evidence. Step scores were

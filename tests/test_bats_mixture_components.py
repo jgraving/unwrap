@@ -60,15 +60,15 @@ def test_draw_weighted_component_densities_and_intervals(predictions):
 
 
 def sector_integral(mu, kappa, weight):
-    """Independent quadrature of both components over the specified ±45° sector."""
+    """Independent quadrature of both components over the goalward hemisphere."""
     return quad(lambda x: weight * vonmises.pdf(x, kappa, loc=mu) + (1 - weight) / (2 * np.pi),
-                -np.pi / 4, np.pi / 4)[0]
+                -np.pi / 2, np.pi / 2)[0]
 
 
 def test_population_sector_contrasts_are_paired_in_each_draw(predictions):
     data, mu, kappa, omega = predictions
     assert layout.PANEL_C_HDI_PROB == 0.90
-    assert data["goal_window_half_width_degrees"] == 45
+    assert data["goal_window_half_width_degrees"] == 90
     group_draws = []
     for i, level in enumerate([1, 2, 3, 4]):
         draws = np.array([sector_integral(m, k, w)
@@ -116,7 +116,7 @@ def test_each_fitted_bat_is_counted_once_in_its_observed_treatment():
         draws = np.array([sector_integral(m, k, w)
                           for m, k, w in zip(mu[:, i], kappa[:, i], weight[:, i], strict=True)])
         np.testing.assert_allclose([row["mean"], row["lo"], row["hi"]], expected_summary(draws))
-    assert rows[2]["mean"] == pytest.approx(0.25)
+    assert rows[2]["mean"] == pytest.approx(0.5)
     observed.loc[7, "treatment"] = 4
     with pytest.raises(ValueError, match="more than one treatment"):
         layout._individual_predictions(posterior, observed, posthoc, bearings)

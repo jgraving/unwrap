@@ -12,6 +12,7 @@ from unwrap.link.numpy import circular_modulo, softplus
 
 
 PANEL_C_HDI_PROB = 0.90
+PANEL_C_GOAL_HALF_WIDTH_DEG = 90.0
 
 
 def _read_context(data_root):
@@ -81,7 +82,7 @@ def _individual_predictions(posterior, observed, posthoc, bearings):
     mu = posthoc._stack_samples_first(posterior["mu"].isel(mu_dim_0=first))
     kappa = posthoc._stack_samples_first(posterior["kappa"].isel(kappa_dim_0=first))
     weight = posthoc._stack_samples_first(posterior["p_goal"].isel(p_goal_dim_0=first, p_goal_dim_1=0))
-    probabilities = _goal_window_probability(mu, kappa, weight, posthoc.MASS_HALF_WIDTH_DEG)
+    probabilities = _goal_window_probability(mu, kappa, weight, PANEL_C_GOAL_HALF_WIDTH_DEG)
     if not np.isfinite(probabilities).all():
         raise ValueError("Non-finite posterior goal-sector probability for a fitted bat")
     rows = []
@@ -118,7 +119,7 @@ def _mixture_predictions(posterior, levels, counts, posthoc):
         density_at_goal[:, i] = density[:, goal_index]
         density_profiles[level] = _density_profile(density, posthoc)
 
-    half_width = posthoc.MASS_HALF_WIDTH_DEG
+    half_width = PANEL_C_GOAL_HALF_WIDTH_DEG
     mass = _goal_window_probability(mu, kappa, weight, half_width)
     by_treatment = mass - mass[:, :1]
     pooled = np.average(by_treatment[:, 1:], axis=1,

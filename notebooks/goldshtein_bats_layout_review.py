@@ -43,6 +43,7 @@ HEATMAP_NORM = mpl.colors.TwoSlopeNorm(vmin=0, vcenter=.5, vmax=1)
 PALETTE = ("#0072B2", "#BC7300", "#008664", "#C95118")
 LABELS = ("Control", "Eye cover", "+ Magnet", "+ Anosmia")
 PAGE_W, PAGE_H = 532, 850
+POPULATION_POLAR_SIZE = 45
 #: Tile zoom for the live CartoDB raster fallback (used only when the
 #: vector extract below is absent): pinned rather than left to
 #: contextily's auto-zoom, which matches screen-pixel sizes and on a
@@ -244,26 +245,30 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     half_width = data["goal_window_half_width_degrees"]
     left, width = 148, 344
     column_width = width / len(levels)
+    size = POPULATION_POLAR_SIZE
     population_radius = 1 + 1.08 * max(p["hi"].max() for p in profiles.values())
     for i, (level, label) in enumerate(zip(levels, LABELS, strict=True)):
         center = left + (i + .5) * column_width
         page_text(center, 273, label, ha="center", color=colors[level], fontsize=8.5, weight="bold")
-        polar = axes_at(center - 22.5, 281, 45, 45, projection="polar", facecolor="none")
+        polar = axes_at(center - size / 2, 281, size, size, projection="polar", facecolor="none")
         draw_polar_density(polar, bearings, profiles[level], colors[level], population_radius,
                            half_width, line_scale=.76)
 
     page_text(18, 302, "Population heading density", fontsize=8.8, weight="bold")
     page_text(18, 338, "Treatment contrast", fontsize=8.8, weight="bold")
-    page_text(18, 350, "Probability mass difference", fontsize=8.2)
+    page_text(18, 350, "Δ goalward probability", fontsize=8.2)
     contrast = axes_at(left, 324, width, 43)
     contrast.axhline(0, color="#777777", lw=.40, ls=(0, (3, 2)), zorder=0)
     contrast.plot(0, 0, "o", color=colors[levels[0]], ms=2.9)
-    for i, level in enumerate(levels[1:], start=1):
-        mean, lo, hi = data["goal_window_contrasts"][level]
+    contrasts = [data["goal_window_contrasts"][level] for level in levels[1:]]
+    for i, (level, (mean, lo, hi)) in enumerate(zip(levels[1:], contrasts, strict=True), start=1):
         contrast.errorbar(i, mean, yerr=[[mean - lo], [hi - mean]], fmt="o", color=colors[level],
                           ms=3.1, elinewidth=.78, capsize=1.8, capthick=.48)
-    contrast.set(xlim=(-.5, len(levels) - .5), ylim=(-.206, .008), xticks=[], yticks=(-.2, -.1, 0))
+    lo = min(-.2, *(interval[1] for interval in contrasts))
+    hi = max(0, *(interval[2] for interval in contrasts))
+    contrast.set(xlim=(-.5, len(levels) - .5), ylim=(lo - .006, hi + .008), xticks=[])
     contrast.spines[["top", "right", "bottom"]].set_visible(False)
+    contrast.yaxis.set_major_locator(MultipleLocator(.1))
     contrast.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     contrast.tick_params(axis="y", labelsize=7.8, length=2.1, pad=2.6)
 
@@ -278,7 +283,7 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     individual.tick_params(axis="y", labelsize=7.8, length=2.1, pad=2.6)
     individual.axhline(uniform, color="#494949", lw=.65, ls=(0, (3, 2)), zorder=1)
     page_text(18, 391, "Individual bats", fontsize=8.8, weight="bold")
-    page_text(18, 403, "Probability mass", fontsize=8.2)
+    page_text(18, 403, "Goalward probability", fontsize=8.2)
     for i, level in enumerate(levels):
         bats = sorted((r for r in rows if r["treatment"] == level), key=lambda r: (r["mean"], r["tag"]))
         count = len(bats)
@@ -642,7 +647,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     letter(18, body_top, "b")
     page_text(39, body_top, "Model selection", weight="bold", fontsize=11)
     vm_center, vmu_center = 48, 134
-    model_top, model_size = 197, 35
+    model_top, model_size = 197, POPULATION_POLAR_SIZE
     page_text(vm_center, 190, "von Mises (vM)", fontsize=8.7, ha="center")
     page_text(vmu_center, 190, "vM–Uniform mixture", fontsize=8.7, ha="center")
     draw_likelihood_diagrams(
@@ -651,7 +656,8 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
     )
     fig.legend(handles=[Patch(facecolor=DIRECTED_FILL, label="Directed"),
                         Patch(facecolor=UNDIRECTED_FILL, label="Undirected")],
-               frameon=False, loc="center left", bbox_to_anchor=(177 / PAGE_W, 1 - 214 / PAGE_H),
+               frameon=False, loc="center left",
+               bbox_to_anchor=(177 / PAGE_W, 1 - (model_top + model_size / 2) / PAGE_H),
                fontsize=8.6, handlelength=1.3, handletextpad=.45, borderaxespad=0)
     delta_ax = axes_at(320, 187, 193, 49)
     draw_elpd_difference(plots, delta, delta_ax, colors)
