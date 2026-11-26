@@ -302,7 +302,7 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     individual.yaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
     individual.tick_params(axis="y", labelsize=7.8, length=2.1, pad=2.6)
     individual.axhline(uniform, color="#494949", lw=.65, ls=(0, (3, 2)), zorder=1)
-    individual.annotate("Chance", (1, uniform), xycoords=individual.get_yaxis_transform(),
+    individual.annotate("Uniform", (1, uniform), xycoords=individual.get_yaxis_transform(),
                         xytext=(5, 0), textcoords="offset points", va="center", fontsize=7.1, color="#595959")
     page_text(18, 391, "Individual bats", fontsize=8.8, weight="bold")
     page_text(18, 403, f"Goalward probability (±{half_width:g}°)", fontsize=8.2)
@@ -319,7 +319,8 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     # The thumbnails share a radial scale. A smaller zero-density ring leaves
     # room for the individual lobes at this print size. Their centers fall
     # under the low, middle and high ranks with a gutter between treatments.
-    page_text(18, 443, "Individual heading density", fontsize=8.8, weight="bold")
+    density_center = 437.5
+    page_text(18, density_center - 1.5, "Individual heading density", fontsize=8.8, weight="bold")
     zero_radius = .60
     largest_band = max(p["hi"].max() for group in examples.values() for p in group.values())
     radius_max = zero_radius + 1.08 * largest_band
@@ -329,7 +330,7 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
         offsets = np.linspace(-.30, .30, len(group))
         for offset, profile in zip(offsets, group.values(), strict=True):
             center = left + (i + .5 + offset) * column_width
-            polar = axes_at(center - size / 2, 444.5 - size / 2, size, size,
+            polar = axes_at(center - size / 2, density_center - size / 2, size, size,
                             projection="polar", facecolor="none")
             draw_polar_density(polar, bearings, profile, colors[level], radius_max, half_width,
                                zero_radius=zero_radius, line_scale=.53)
