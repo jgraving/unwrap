@@ -21,7 +21,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
-from matplotlib.patches import Circle, Patch, PathPatch
+from matplotlib.patches import Circle, ConnectionPatch, Patch, PathPatch
 from matplotlib.path import Path as MplPath
 from matplotlib.textpath import TextToPath
 from matplotlib.ticker import MultipleLocator, StrMethodFormatter
@@ -255,7 +255,7 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     population_radius = 1 + 1.08 * max(p["hi"].max() for p in profiles.values())
     for i, (level, label) in enumerate(zip(levels, LABELS, strict=True)):
         center = left + (i + .5) * column_width
-        page_text(center, 273, label, ha="center", color=colors[level], fontsize=8.5, weight="bold")
+        page_text(center, 273, label, ha="center", color=colors[level], fontsize=8.5)
         polar = axes_at(center - size / 2, 281, size, size, projection="polar", facecolor="none")
         draw_polar_density(polar, bearings, profiles[level], colors[level], population_radius,
                            half_width, close_half_width_deg=PANEL_C_CLOSE_HALF_WIDTH_DEG, line_scale=.76)
@@ -306,6 +306,7 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
                         xytext=(5, 0), textcoords="offset points", va="center", fontsize=7.1, color="#595959")
     page_text(18, 391, "Individual bats", fontsize=8.8, weight="bold")
     page_text(18, 403, f"Goalward probability (±{half_width:g}°)", fontsize=8.2)
+    dot_positions = {}
     for i, level in enumerate(levels):
         bats = sorted((r for r in rows if r["treatment"] == level), key=lambda r: (r["mean"], r["tag"]))
         count = len(bats)
@@ -315,6 +316,8 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
                           color=colors[level], alpha=.78, lw=.60, zorder=2)
         individual.scatter(x, [r["mean"] for r in bats], color=colors[level], s=4.8,
                            edgecolors="none", zorder=3)
+        dot_positions.update({r["tag"]: (position, r["mean"])
+                              for r, position in zip(bats, x, strict=True)})
 
     # The thumbnails share a radial scale. A smaller zero-density ring leaves
     # room for the individual lobes at this print size. Their centers fall
@@ -324,16 +327,26 @@ def draw_predictive_panel(data, colors, axes_at, page_text):
     zero_radius = .60
     largest_band = max(p["hi"].max() for group in examples.values() for p in group.values())
     radius_max = zero_radius + 1.08 * largest_band
-    size = 2 * 11 * radius_max  # 11 print points per density unit in every thumbnail
+    points_per_unit = 11
+    size = 2 * points_per_unit * radius_max
+    goal_index = np.argmin(np.abs(bearings))
     for i, level in enumerate(levels):
         group = examples[level]
         offsets = np.linspace(-.30, .30, len(group))
-        for offset, profile in zip(offsets, group.values(), strict=True):
+        for offset, (tag, profile) in zip(offsets, group.items(), strict=True):
             center = left + (i + .5 + offset) * column_width
             polar = axes_at(center - size / 2, density_center - size / 2, size, size,
                             projection="polar", facecolor="none")
             draw_polar_density(polar, bearings, profile, colors[level], radius_max, half_width,
                                zero_radius=zero_radius, line_scale=.53)
+            # End one print point above the thumbnail's goal-bearing guide.
+            guide_tip = zero_radius + 1.08 * profile["hi"][goal_index]
+            individual.add_artist(ConnectionPatch(
+                dot_positions[tag], (0, guide_tip + 1 / points_per_unit),
+                coordsA=individual.transData, coordsB=polar.transData,
+                arrowstyle="-", shrinkA=0, shrinkB=0, color="#d5d5d5", linewidth=.4,
+                capstyle="round", clip_on=False, zorder=.8,
+            ))
 
 
 def draw_likelihood_diagrams(ax_vm, ax_vmu):
@@ -682,7 +695,7 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
                frameon=False, loc="center left",
                bbox_to_anchor=(177 / PAGE_W, 1 - (model_top + model_size / 2) / PAGE_H),
                fontsize=8.6, handlelength=1.3, handletextpad=.45, borderaxespad=0)
-    delta_ax = axes_at(320, 187, 193, 49)
+    delta_ax = axes_at(320, 182, 193, 49)
     draw_elpd_difference(plots, delta, delta_ax, colors)
 
     letter(18, 268, "c")
@@ -722,16 +735,14 @@ def draw_composite(data, delta, flights, plots, *, photo_path=None):
         tile_left = tile_lefts[col]
         color = colors[level]
         n_bats = data["counts"][level]
-        page_text(left + map_w / 2, map_top - 8, label, ha="center", color=color,
-                  fontsize=9.1, weight="bold")
+        page_text(left + map_w / 2, map_top - 8, label, ha="center", color=color, fontsize=9.1)
         map_ax = axes_at(left, map_top, map_w, map_h)
         draw_track_map(map_ax, data, treatments[level], color, xlim, ylim,
                        scores=route_scores, show_scale=level == levels[-1],
                        zoom=TILE_ZOOM)
 
         tile_top = heatmap_tops[row]
-        page_text(tile_left + tile_w / 2, tile_top - 8, label, ha="center", color=color,
-                  fontsize=9.3, weight="bold")
+        page_text(tile_left + tile_w / 2, tile_top - 8, label, ha="center", color=color, fontsize=9.3)
         tile = axes_at(tile_left, tile_top, tile_w, n_bats * row_height)
         draw_flight_heatmap(tile, heatmaps[level])
         draw_onsets(tile, onsets[level])
