@@ -31,8 +31,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 from scipy.stats import norm
-from joblib import Parallel, delayed
-from tqdm.auto import tqdm
 
 from unwrap.link import circular_modulo, softplus
 from unwrap.bessel import log_i0 as _log_i0
@@ -59,6 +57,12 @@ from unwrap.inference import (
 KAPPA_UNIFORM = 1e-6
 #: half-width of the "predictive mass around the destination" statistic, deg.
 MASS_HALF_WIDTH_DEG = 45.0
+
+
+def tqdm(*args, **kwargs):
+    """Load the notebook progress bar on use so the notebook can override it."""
+    from tqdm.auto import tqdm as progress_bar
+    return progress_bar(*args, **kwargs)
 
 
 def sigmoid(x):
@@ -1661,6 +1665,8 @@ def bootstrap_observed(
       obs_boot[treat]["kde"]  shape (B, P)
       obs_boot[treat]["hist"] shape (B, BINS)
     """
+    from joblib import Parallel, delayed
+
     obs_boot: Dict[str, Dict[str, np.ndarray]] = {}
     base_rng = np.random.default_rng(seed)
 
@@ -1825,6 +1831,8 @@ def posterior_predictive_summaries(
       ppc[treat]["hist"] shape (S, BINS)
     where S = n_draws used.
     """
+    from joblib import Parallel, delayed
+
     mu, kappa, p_dir = extract_simulation_arrays(idata, n_draws=n_draws, seed=seed)
     S, N = mu.shape
 
@@ -1918,6 +1926,8 @@ def individual_ppc(idata_mix_full, df_track, *, n_cols=8):
     (density -> polar radius), ``RMAX``, the treatment labels/colors and
     the tag ordering.
     """
+    from joblib import Parallel, delayed
+
     df = df_track.copy()
 
     treat_cat = pd.Categorical(df["treatment"])
